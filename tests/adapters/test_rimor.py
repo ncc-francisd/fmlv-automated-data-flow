@@ -956,3 +956,36 @@ def test_an_ambiguous_factory_bedding_word_defers_to_the_floorplan() -> None:
     # A word that names a shape only a built-in bed has stays usable.
     assert "transverse bed" not in rimor.AMBIGUOUS_BEDDING
     assert "bunk beds" not in rimor.AMBIGUOUS_BEDDING
+
+
+def test_a_source_link_is_anchored_to_the_quoted_line() -> None:
+    """A bare product URL lands at the top of a long page; the sentence is far below.
+
+    The requester, 6 September 2026: *"when you click on the source, it just goes to the
+    top of the page"*. Chrome and Edge honour `#:~:text=`; Firefox ignores it and behaves
+    exactly as before, so there is nothing to lose.
+    """
+    url = rimor.anchored("https://example.test/p/", "Combi C4 heating and hot water system")
+    assert url.startswith("https://example.test/p/#:~:text=")
+    assert "Combi%20C4%20heating" in url
+
+
+def test_an_anchor_uses_only_the_first_quoted_line() -> None:
+    """`bed_types` quotes several lines joined by `/`, which no run of page text matches."""
+    url = rimor.anchored("https://example.test/p/", "Rear double island bed / Electric drop-down bed")
+    assert "Rear%20double%20island%20bed" in url
+    assert "Electric" not in url
+
+
+def test_an_anchor_is_cut_on_a_word_boundary() -> None:
+    long_line = "Kitchen unit equipped with 3 burner hob, sink, and a 141L fridge with freezer compartment"
+    url = rimor.anchored("https://example.test/p/", long_line)
+    fragment = url.split("#:~:text=", 1)[1]
+    from urllib.parse import unquote
+
+    assert not unquote(fragment).endswith(" ")
+    assert long_line.startswith(unquote(fragment))
+
+
+def test_an_empty_snippet_leaves_the_url_alone() -> None:
+    assert rimor.anchored("https://example.test/p/", "") == "https://example.test/p/"

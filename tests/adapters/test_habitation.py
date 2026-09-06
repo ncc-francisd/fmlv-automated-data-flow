@@ -216,7 +216,7 @@ def test_both_beds_are_recorded_when_the_copy_names_both() -> None:
         ("Rear double island bed", BedType.ISLAND),
         ("Rear fixed bunk beds", BedType.FIXED_BUNKS),
         ("Rear Fixed twin single beds", BedType.FIXED_SEPARATE),
-        ("Rear double French bed", BedType.FIXED),
+        ("Rear fixed bed", BedType.FIXED),
         ("XL Front Electric drop-down double bed", BedType.DROP_DOWN),
     ],
 )
@@ -314,3 +314,36 @@ def test_features_from_quotes_the_manufacturers_own_wording() -> None:
 
 def test_features_from_an_empty_page_is_empty() -> None:
     assert habitation.features_from([]) == {}
+
+
+def test_a_shape_word_never_implies_a_fixed_bed() -> None:
+    """"French" and "double" describe a bed's shape and width, not its permanence.
+
+    The requester, 6 September 2026, on Horus 12: *"A double bed is not a fixed bed […]
+    French bed really has to do with the shape of it. It normally is fixed, but actually
+    that's not relevant. It says it folds away."* FMLV has no column for a French bed and
+    only asks built-in versus made up, so a shape word alone answers nothing and the
+    layout falls through to its floorplan.
+    """
+    assert habitation.bed_types_from(["Rear double French bed"]) == ([], [])
+    assert habitation.bed_types_from(["Rear double bed"]) == ([], [])
+
+
+def test_an_explicit_word_still_gives_a_fixed_bed() -> None:
+    beds, _quotes = habitation.bed_types_from(["Rear fixed double bed"])
+    assert beds == [BedType.FIXED]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "The Horus 12 offers a rear double French bed that also lifts to create more storage space",
+        "Rear fold-away double bed",
+        "Rear bed lifts for extra storage",
+    ],
+)
+def test_a_bed_that_lifts_or_folds_is_made_up(line: str) -> None:
+    """Lifting is the same claim as folding: the bed is not standing made up."""
+    beds, _quotes = habitation.bed_types_from([line])
+    assert BedType.MAKE_UP in beds
+    assert BedType.FIXED not in beds

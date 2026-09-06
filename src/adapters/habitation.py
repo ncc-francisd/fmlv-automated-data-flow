@@ -243,15 +243,30 @@ BED_PHRASES: tuple[tuple[str, BedType], ...] = (
     ("twin single bed", BedType.FIXED_SEPARATE),
     ("twin bed", BedType.FIXED_SEPARATE),
     ("single beds", BedType.FIXED_SEPARATE),
-    ("french bed", BedType.FIXED),
+    # `fixed_bed` is asserted **only from an explicit word**, never from a shape or a
+    # size. "French bed" describes a cut corner, "double" describes width, and neither
+    # says the bed is permanently made up — Rimor's Horus 12 has "a rear double French
+    # bed that also lifts to create more storage space", which is not a fixed bed at all.
+    # The requester, 6 September 2026: *"A double bed is not a fixed bed […] French bed
+    # really has to do with the shape of it. It normally is fixed, but actually that's not
+    # relevant. It says it folds away."*
+    #
+    # A shape word with nothing else to go on therefore contributes nothing, and the
+    # layout falls through to its floorplan — which is the honest answer, since FMLV has
+    # no column for "French bed" and the only question it asks is built-in versus made up.
     ("fixed bed", BedType.FIXED),
     ("fixed double", BedType.FIXED),
+    ("permanent bed", BedType.FIXED),
 )
 
 #: A bed made up rather than permanently there.
+#: A bed made up rather than permanently there. `lift` is here alongside the folding
+#: words because it is the same claim in different clothes: Rimor's Horus 12 bed "lifts to
+#: create more storage space for travel", so it is not standing made up.
 _MAKE_UP = re.compile(
     r"\bconvert\w*\b|\bmakes? (?:up )?(?:into )?a?\s*(?:double|single|bed)"
-    r"|\bmake[- ]up bed\b|\bfold[- ]away\b|\bpull[- ]out bed\b",
+    r"|\bmake[- ]up bed\b|\bfold[- ]?(?:s|ing)?[- ]away\b|\bpull[- ]out bed\b"
+    r"|\blifts?\b|\blift[- ]up\b|\bstow\w*\b",
     re.I,
 )
 

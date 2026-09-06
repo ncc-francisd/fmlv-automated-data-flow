@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import html
 import re
+from urllib.parse import quote
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -913,6 +914,41 @@ UNCONFIRMED_FEATURES: dict[str, str] = {
 }
 
 
+#: How much of a quoted line to put in a text-fragment anchor. Long fragments fail to
+#: match when a page wraps or punctuates differently, short ones risk matching the wrong
+#: place; a first clause is usually both distinctive and stable.
+_ANCHOR_CHARS = 60
+
+
+def anchored(url: str, snippet: str) -> str:
+    """`url` with a text-fragment anchor, so the browser jumps to the quoted line.
+
+    A plain product URL lands the reviewer at the top of a long page with the sentence
+    that justified the value somewhere below — the requester, 6 September 2026: *"when you
+    click on the source, it just goes to the top of the page […] I'm not sure if it
+    actually finds the exact location"*. `#:~:text=` scrolls to the text and highlights it.
+
+    Chrome and Edge implement this; Firefox ignores an unknown fragment and lands at the
+    top, which is exactly today's behaviour, so there is nothing to lose by adding it.
+
+    Only the first line of a multi-line snippet is used — `bed_types` quotes several joined
+    by `/`, and no single run of text on the page matches that.
+    """
+    first = snippet.split(" / ")[0].strip()
+    # The snippet is prefixed with "<range> <model> — " for the reviewer; the anchor has
+    # to be the manufacturer's own words, which start after that dash.
+    _, _, quoted = first.rpartition("— ")
+    quoted = (quoted or first).strip()
+    if not quoted:
+        return url
+    if len(quoted) > _ANCHOR_CHARS:
+        # Cut on a word boundary. A fragment ending mid-word still matches, but reads as
+        # a mistake in a URL a person may well look at.
+        head = quoted[:_ANCHOR_CHARS]
+        quoted = head[: head.rfind(" ")] if " " in head else head
+    return f"{url}#:~:text={quote(quoted.strip(' ,;:'), safe='')}"
+
+
 def _feature_value(features: dict[str, habitation.Feature], name: str) -> object | None:
     """One feature's value, or `None` when the sources did not settle it."""
     found = features.get(name)
@@ -1094,7 +1130,10 @@ def _build_extracted_motorhome(
         if name == "bed_types" and feature.snippet.startswith("Bedding solution:"):
             note = "the factory's own bedding solution, the prose naming no beds"
             source = factory_source or mnc_source
-        record(name, f"{note}: {feature.snippet}", url=source)
+        # Anchored to the quoted line, so the link opens at the sentence rather than the
+        # top of a long page. `rear_garage` is skipped: its "snippet" is an opening size,
+        # not a run of text that appears anywhere on the page.
+        record(name, f"{note}: {feature.snippet}", url=anchored(source, feature.snippet))
 
     # Dimensions are recorded here rather than in either branch, because each axis may
     # have come from either site: the factory where it has the layout, MNC where it does
