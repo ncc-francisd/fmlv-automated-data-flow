@@ -17,3 +17,8 @@ wheels/
 
 # Local secrets
 .env
+
+# Office owner-lock files. Word/Excel create these beside an open document and
+# delete them on close, so a tracked one is a permanent phantom change that
+# re-modifies itself whenever the document is opened.
+~$*
