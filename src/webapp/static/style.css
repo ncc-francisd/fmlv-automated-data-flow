@@ -1,0 +1,6 @@
+
+/* The floorplan link in a product header — one drawing serving several layout fields. */
+.product-floorplan {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.95rem;
+}

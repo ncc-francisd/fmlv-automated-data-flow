@@ -8,6 +8,23 @@
         <span class="badge new">new product</span>
       {% endif %}
     </h3>
+    {#
+      The floorplan, lifted out of the rows and put above them. Several fields point at
+      the same drawing — sleeping area, kitchen, lounge, sometimes the washroom — and a
+      reviewer opens it once, before working down the product. Requested 6 September 2026.
+    #}
+    {% set ns = namespace(floorplan=None) %}
+    {% for entry in entries %}
+      {% if ns.floorplan is none and entry.change.reviewer_reference and entry.change.source_url %}
+        {% set ns.floorplan = entry.change.source_url %}
+      {% endif %}
+    {% endfor %}
+    {% if ns.floorplan %}
+      <p class="product-floorplan">
+        <a href="{{ ns.floorplan }}" target="_blank" rel="noopener">Floorplan</a>
+        <span class="muted">— for the layout fields no wording settles</span>
+      </p>
+    {% endif %}
     {% set pending_entries = entries | selectattr('decision', 'none') | list %}
     {% if pending_entries %}
       <form

@@ -138,6 +138,9 @@ class ProposedChange:
     source_snippet: str | None
     confidence: float | None
     created_at: str
+    #: True when this row exists to hand the reviewer a source — the floorplan for a
+    #: field no wording settles — rather than to propose a value.
+    reviewer_reference: bool = False
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> ProposedChange:
@@ -152,6 +155,7 @@ class ProposedChange:
             source_snippet=row["source_snippet"],
             confidence=row["confidence"],
             created_at=row["created_at"],
+            reviewer_reference=bool(row["reviewer_reference"]),
         )
 
 
@@ -275,16 +279,17 @@ def record_proposed_change(
     source_url: str | None = None,
     source_snippet: str | None = None,
     confidence: float | None = None,
+    reviewer_reference: bool = False,
 ) -> ProposedChange:
     cursor = connection.execute(
         """
         INSERT INTO proposed_change
             (run_id, product_id, field, old_value, new_value, source_url, source_snippet,
-             confidence, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             confidence, created_at, reviewer_reference)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (run_id, product_id, field, old_value, new_value, source_url, source_snippet,
-         confidence, _now()),
+         confidence, _now(), int(reviewer_reference)),
     )
     connection.commit()
     assert cursor.lastrowid is not None
@@ -465,6 +470,7 @@ def persist_diff(
                     new_value=_serialize(value),
                     source_url=provenance.source_url,
                     source_snippet=provenance.snippet,
+                    reviewer_reference=provenance.reviewer_reference,
                 )
                 proposed += 1
             continue
@@ -485,6 +491,9 @@ def persist_diff(
                 new_value=new_value,
                 source_url=change.provenance.source_url if change.provenance else None,
                 source_snippet=change.provenance.snippet if change.provenance else None,
+                reviewer_reference=(
+                    change.provenance.reviewer_reference if change.provenance else False
+                ),
                 confidence=diff.match_score,
             )
             proposed += 1
@@ -534,6 +543,9 @@ def persist_diff(
                 old_value=old_serialized,
                 new_value=old_serialized,
                 source_url=missing.provenance.source_url if missing.provenance else None,
+                reviewer_reference=(
+                    missing.provenance.reviewer_reference if missing.provenance else False
+                ),
                 source_snippet=_missing_field_snippet(missing),
             )
             proposed += 1

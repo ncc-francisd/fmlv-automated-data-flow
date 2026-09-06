@@ -30,6 +30,10 @@ _ADDED_COLUMNS = [
     ("run", "range_label", "TEXT"),
     ("run", "vehicle_class", "TEXT NOT NULL DEFAULT 'motorhome'"),
     ("product", "vehicle_class", "TEXT NOT NULL DEFAULT 'motorhome'"),
+    # Marks a row that is a pointer for the reviewer rather than a proposal — the
+    # floorplan handed over for a field only a drawing can answer. The review page
+    # lifts the first one to the product header.
+    ("proposed_change", "reviewer_reference", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

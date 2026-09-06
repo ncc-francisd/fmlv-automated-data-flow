@@ -1200,3 +1200,53 @@ def test_blanking_a_required_column_is_flagged_on_the_button(
     assert "Leave blank" in body
     assert "blank-required-flag" in body
     assert "will report this row as missing it" in body
+
+
+def test_a_floorplan_reference_is_lifted_into_the_product_header(
+    client: TestClient, db_path: Path
+) -> None:
+    """Several fields point at the same drawing, so it belongs above the rows, not in them.
+
+    The requester, 6 September 2026: *"a single floor plan link in the product header
+    above all the rows would be very helpful."*
+    """
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    extracted = make_extracted(rrp_pounds=45000)
+    extracted.provenance["sleeping_area"] = Provenance(
+        source_url="https://example.test/floorplan.jpg",
+        snippet="read which end the beds are at off the floorplan",
+        reviewer_reference=True,
+    )
+    diffs = diff_products([extracted], [])
+    store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
+    store.finish_run(connection, run.id)
+    connection.close()
+
+    response = client.get(f"/runs/{run.id}")
+
+    assert response.status_code == 200
+    assert 'class="product-floorplan"' in response.text
+    assert 'href="https://example.test/floorplan.jpg"' in response.text
+    assert ">Floorplan</a>" in response.text
+
+
+def test_a_product_with_no_floorplan_gets_no_header_link(
+    client: TestClient, db_path: Path
+) -> None:
+    """Rimor's Van 238 and Horus 12 have no factory page, so there is no drawing."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    diffs = diff_products([make_extracted(rrp_pounds=45000)], [])
+    store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
+    store.finish_run(connection, run.id)
+    connection.close()
+
+    response = client.get(f"/runs/{run.id}")
+
+    assert response.status_code == 200
+    assert 'class="product-floorplan"' not in response.text
