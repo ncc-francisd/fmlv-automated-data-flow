@@ -875,7 +875,20 @@ FLOORPLAN_FIELDS: tuple[str, ...] = (
     "kitchen_location",
     "lounge_location",
     "bathroom_layout",
+    "bed_types",
 )
+
+#: Factory `Bedding solution` wordings that name the sleeping *arrangement* without
+#: saying whether the bed is permanently there. `Double bed` is the whole problem: it maps
+#: to `fixed_bed`, which asserts fixedness the word never claimed, and on the Horus vans
+#: the drawing shows a lounge that becomes a bed at night. The requester, 6 September
+#: 2026: *"A double bed is the bedding solution, but it may well be a made up double bed
+#: […] in the day that area is a lounge, and at night it's a bed."*
+#:
+#: So these decline to propose anything and hand over the floorplan instead. The other
+#: wordings — `Transverse bed`, `Bunk beds`, `Central bed` — name a shape that only a
+#: built-in bed has, and stay usable.
+AMBIGUOUS_BEDDING: frozenset[str] = frozenset({"double bed", "two double beds"})
 
 #: What the reviewer is told to do with the floorplan, per field.
 _FLOORPLAN_NOTES: dict[str, str] = {
@@ -883,6 +896,7 @@ _FLOORPLAN_NOTES: dict[str, str] = {
     "kitchen_location": "whether the kitchen is rear, side or corner",
     "lounge_location": "whether the lounge is front, rear or twin",
     "bathroom_layout": "whether the washroom is rear or side",
+    "bed_types": "which beds are built in and which are made up from the seating",
 }
 
 #: Features whose *absence* from the copy is worth reporting rather than passing over.
@@ -962,10 +976,14 @@ def _build_extracted_motorhome(
     # a fixed bed and a made-up one, and MNC is the accurate one.
     features = dict(listing.features)
     if "bed_types" not in features and model is not None and model.bed_types:
-        # Nothing in the prose named a bed, so fall back to the factory's single word.
-        features["bed_types"] = habitation.Feature(
-            model.bed_types, f"Bedding solution: {model.bedding_solution}"
-        )
+        # Nothing in the prose named a bed, so fall back to the factory's single word —
+        # unless that word cannot tell a built-in bed from a made-up one, in which case
+        # nothing is proposed and the floorplan is handed over instead.
+        solution = (model.bedding_solution or "").strip().lower()
+        if solution not in AMBIGUOUS_BEDDING:
+            features["bed_types"] = habitation.Feature(
+                model.bed_types, f"Bedding solution: {model.bedding_solution}"
+            )
     if model is not None and model.rear_garage is not None:
         features["rear_garage"] = habitation.Feature(model.rear_garage, model.garage_opening)
 
@@ -1043,7 +1061,9 @@ def _build_extracted_motorhome(
     if model is not None and model.floorplan_path:
         floorplan = BASE_URL + model.floorplan_path
         for name in FLOORPLAN_FIELDS:
-            if getattr(motorhome, name) is not None:
+            settled = getattr(motorhome, name)
+            # `bed_types` is a list, so its "unset" is empty rather than None.
+            if settled is not None and settled != []:
                 continue  # already settled from the copy — bathroom_layout on 23 of 34
             provenance[name] = Provenance(
                 source_url=floorplan,

@@ -255,12 +255,25 @@ for the fields no wording settles:
 | `kitchen_location` | rear, side or corner |
 | `lounge_location` | front, rear or twin |
 | `bathroom_layout` | rear or side — **only** on the 11 the copy left open |
+| `bed_types` | built in versus made up — only where the copy named no beds |
 
 Each gets a row of its own with the same link, rather than one detached reference, so the
 drawing is beside the field being decided. They carry
 `Provenance(reviewer_reference=True)` and no value, which is what makes them survive onto
 a new product — see the habitation section of `README.md` for why an ordinary empty field
 does not.
+
+**The factory's "Double bed" is not evidence of a fixed bed.** It names the sleeping
+arrangement and says nothing about whether the bed is permanently there — and on the Horus
+vans the drawing shows a lounge that becomes a bed at night, which is a *made-up* bed. So
+`AMBIGUOUS_BEDDING` stops that word proposing anything and hands over the floorplan
+instead. `Transverse bed`, `Bunk beds` and `Central bed` name shapes only a built-in bed
+has, and stay usable.
+
+This is latent rather than live: MNC's prose names the beds on all 34 layouts today, so
+the factory fallback never fires. It was live before 5 September 2026, when bed types came
+from the factory word alone — which is what produced the wrong `fixed_bed` proposals on
+the Horus vans.
 
 The Van 238 and Horus 12 get none, having no factory page and therefore no drawing.
 

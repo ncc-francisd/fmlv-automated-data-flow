@@ -883,14 +883,20 @@ def test_every_positional_field_gets_the_floorplan(
     extracted = rimor._build_extracted_motorhome(listing, model)
 
     links = {
-        name: extracted.provenance[name]
-        for name in rimor.FLOORPLAN_FIELDS
-        if name in extracted.provenance
+        name: entry
+        for name, entry in extracted.provenance.items()
+        if entry.reviewer_reference
     }
-    assert set(links) == set(rimor.FLOORPLAN_FIELDS)
-    assert len({p.source_url for p in links.values()}) == 1
-    assert all(p.reviewer_reference for p in links.values())
-    assert all(getattr(extracted.motorhome, name) is None for name in links)
+    # Kilig 5's copy names a transverse bed, so `bed_types` is settled and gets no
+    # drawing; the four positional fields it cannot answer all do.
+    assert set(links) == {
+        "sleeping_area",
+        "kitchen_location",
+        "lounge_location",
+        "bathroom_layout",
+    }
+    assert len({entry.source_url for entry in links.values()}) == 1
+    assert all(name in rimor.FLOORPLAN_FIELDS for name in links)
 
 
 def test_a_floorplan_pointer_never_overwrites_a_value_the_copy_settled(
@@ -916,7 +922,8 @@ def test_no_factory_page_means_no_floorplan(mnc_van_238: str) -> None:
     """The Van 238 has no model page, so there is no drawing to point at."""
     listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
     extracted = rimor._build_extracted_motorhome(listing, None)
-    assert not any(name in extracted.provenance for name in rimor.FLOORPLAN_FIELDS)
+    # Its beds still come from MNC's copy; it is the *drawing* there is none of.
+    assert not any(entry.reviewer_reference for entry in extracted.provenance.values())
 
 
 def test_a_reviewer_reference_survives_onto_a_new_product(
@@ -934,3 +941,18 @@ def test_a_reviewer_reference_survives_onto_a_new_product(
     assert pointer.reviewer_reference is True
     # An ordinary empty field, for contrast: reported, but not a reviewer reference.
     assert extracted.provenance["microwave"].reviewer_reference is False
+
+
+def test_an_ambiguous_factory_bedding_word_defers_to_the_floorplan() -> None:
+    """"Double bed" names the sleeping arrangement, not whether the bed is built in.
+
+    The requester, 6 September 2026, reading a Horus floorplan: *"A double bed is the
+    bedding solution, but it may well be a made up double bed […] in the day that area is
+    a lounge, and at night it's a bed."* So the factory word is not enough to propose
+    `fixed_bed` from, and the drawing is handed over instead.
+    """
+    assert "double bed" in rimor.AMBIGUOUS_BEDDING
+    assert "two double beds" in rimor.AMBIGUOUS_BEDDING
+    # A word that names a shape only a built-in bed has stays usable.
+    assert "transverse bed" not in rimor.AMBIGUOUS_BEDDING
+    assert "bunk beds" not in rimor.AMBIGUOUS_BEDDING
