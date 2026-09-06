@@ -351,6 +351,71 @@ baseline was **wrong** and the manufacturer right. The rule is not "trust the ba
 it is that a systematic disagreement is a question to answer, and often only the requester
 can answer it.
 
+### Habitation features split into the factual and the subjective
+
+`schema.LAYOUT` holds twenty-odd Yes/No columns describing the inside of the vehicle, and
+until September 2026 **no adapter populated any of them** beyond body type. They are not
+one problem, and the requester drew the line on 6 September 2026:
+
+| | fields | source | who decides |
+|---|---|---|---|
+| **Factual** | refrigeration, heating, microwave, rear garage, separated shower/toilet | stated *in words* in the specification list | the adapter, quoting the line |
+| **Subjective** | lounge location, sleeping area, kitchen location | need the floorplan drawing | a reviewer, given a link to it |
+| **Both** | bed types | named in the copy by some brands, not others | the adapter where the copy names them, else a reviewer |
+
+`adapters/habitation.py` does the factual half. An adapter passes in its specification
+lines and gets back `{field name: Feature}`, where a `Feature` carries the value **and the
+manufacturer's own line verbatim** — which becomes the provenance snippet. That is the
+point of collecting these at all: the requester asked for "a source which takes me to
+precisely that section of text", so a decision that used to mean opening a floorplan
+becomes reading one sentence.
+
+It lives outside any one adapter because the vocabulary is **the industry's, not a
+brand's**. "141L fridge with freezer compartment", "Combi C4 heating", "separate shower
+cubicle and cassette toilet", "electric drop-down double bed" recur across manufacturers,
+so the second adapter to want these should be one call and a loop.
+
+Two rules run through it, both learned on Rimor's 34 products:
+
+* **Only ever assert a feature from positive evidence.** A page that never mentions a
+  microwave is not a page saying there is none. `microwave_from` returns `None`, never
+  `False` — and because these are booleans defaulting to `False`, returning `False` would
+  have proposed an unevidenced negative on every product. Rimor mentions a microwave on
+  none of its 34, so the field is simply left alone.
+* **Never read a paid option as standard.** "Rear Adjustable Bed Option: £1,500" is a bed
+  the buyer may not have, and the price is what gives it away.
+
+Three traps worth knowing before writing the next one:
+
+* **A bare "wet" is not wet central heating.** "Wet room Shower and cassette toilet"
+  appears on seven Rimor products, all of them blown air. Match `wet central`, `Alde`,
+  `radiator` — never `wet`.
+* **An oven is not a microwave.** Rimor lists "Oven" on 24 products. Conflating them
+  invents 24 microwaves.
+* **The summary and the specification disagree, and the specification is right.** Rimor's
+  Sarus 66 Plus summary says "141 L fridge" where its spec list says "141L fridge with
+  freezer compartment". Read *every* line for a freezer, and put the itemised list ahead
+  of the marketing paragraph when choosing which line to quote — `rimor._spec_lines` does
+  that reordering, and it is why the quoted line is a bullet and not a hundred words of
+  prose.
+
+**Do not flip `automated_collection_scope_flag` to `in_scope` to "enable" any of this.**
+The flag does not gate collection — `diff.compare.compare_fields` iterates over the
+fields an adapter recorded **provenance** for, so an adapter can already propose any
+field it can evidence. What `in_scope` adds is an *obligation*: for a field the adapter
+did not touch where FMLV holds a value, the reviewer is asked to confirm or replace it
+rather than letting it pass. Setting it before extraction exists would add a prompt per
+field per product across every manufacturer with nothing behind them. Extract first, then
+flip the flag per field once most adapters cover it.
+
+Know also that **these fields are not empty in FMLV** — they have been filled in by hand.
+Across the 1,590 baseline rows in `data/exports`, `fridge_freezer` is Yes on 89%,
+`blown_air_heating` on 68%, `microwave` on 50%, `rear_garage` on 46%, and the three
+bathroom columns between them on nearly all. So an adapter here is proposing *changes*,
+not filling blanks, and the accuracy bar is correspondingly high — which is the argument
+for adding one manufacturer at a time and reading the result. (`no_heating` is Yes on
+zero rows of 1,590, so that value appears to be unused.)
+
 ### A field is only real if it has provenance
 
 `ExtractedMotorhome` carries the value and the provenance separately, and **the provenance

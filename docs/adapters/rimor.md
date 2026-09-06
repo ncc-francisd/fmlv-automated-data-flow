@@ -191,6 +191,54 @@ does not reintroduce MNC's truncation or its two wrong layouts anywhere the fact
 speak. Where a fallback figure *is* truncated, the run and the provenance snippet say so,
 because that is the one thing a reviewer cannot see from the value itself.
 
+## Habitation features, and where each site wins
+
+Added 6 September 2026 as the pilot for `adapters/habitation.py` — see the habitation
+section of `README.md` for the policy. The split here is the opposite of the numbers, and
+worth stating plainly:
+
+| Field | Source | Why |
+|---|---|---|
+| refrigeration, heating, bathroom, microwave | **MNC** | the factory publishes none of them |
+| bed types | **MNC**, factory as fallback | see below |
+| rear garage | **the factory** | MNC never mentions one |
+
+**MNC's prose beats the factory's single word for bed types.** The factory publishes one
+enum-like `Bedding solution` per layout; MNC writes out what is fitted. Where they differ
+MNC is the accurate one:
+
+| | factory says | MNC says | truth |
+|---|---|---|---|
+| Sarus 66 Plus | `Central bed` → island | "Rear double island bed" + "Electric drop-down double bed" | both |
+| Horus 38 | `Double bed` → fixed | "Rear fold-away double bed" | a made-up bed, not a fixed one |
+| Horus 66 | `Twin beds` → fixed separate | "Rear lounge which converts into single beds" | made up from the lounge |
+
+The Sarus 66 Plus is the case that prompted the whole thing: FMLV holds island +
+drop-down, and the adapter had been proposing island alone. FMLV was right.
+
+**The rear garage comes from an unlabelled Italian icon.** `lc-icons-gavone` — *gavone*
+is the garage or locker in Italian camper terminology — carries the opening size and no
+label, in either language edition. Its presence is the signal: it is on all ten
+coachbuilt layouts checked and on none of the six Horus vans, whose bed sits over the
+back. That pattern is what makes the **negative** safe, and only for a van: a coachbuilt
+with no garage value returns nothing rather than `False`, because that would be a layout
+breaking the pattern and is a reviewer's call.
+
+**Every Rimor is blown air.** All 34 say "Combi C4/C6 heating and hot water system",
+"Truma Combi C6" or "Webasto AirTop" — warm-air heaters with a water tank, not wet
+systems, which the requester confirmed. `wet_central_heating` is never proposed for Rimor.
+Note that seven products say "Wet room" about the *bathroom*; matching a bare "wet" would
+have called all seven wet central heating.
+
+**Microwave is never proposed.** No Rimor page mentions one — 24 list "Oven", which is not
+the same thing. Rather than assert `False` on 34 products from silence, the field is left
+untouched, so whatever FMLV holds survives.
+
+**Bathroom is proposed only when the words settle it.** 23 of 34 say "separate" of the
+shower or toilet. The rest say "Wet room" or "Central washroom", which are combined — but
+`BathroomLayout` then wants *rear* or *side*, and the prose never says which, so those 11
+go to a reviewer with the floorplan.
+
 ## Traps on the factory site
 
 **Seats and berths are distinguishable only by Italian icon classes.** The two widgets

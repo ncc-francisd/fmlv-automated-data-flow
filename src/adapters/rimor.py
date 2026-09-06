@@ -48,12 +48,13 @@ from __future__ import annotations
 import html
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..fetch.http import Fetcher
 from ..product_model.enums import BedType, BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.rimor.it"
@@ -246,6 +247,7 @@ _HEIGHT = _spec_row(r"maximum outside height\s*-?\s*inside height", r"(\d+)\s*-\
 _MTPLM = _spec_row("maximum overall weight", r"(\d+(?:\s*/\s*\d+)*)\s*kg")
 _MRO = _spec_row(r"\bMRO", r"(\d+)\s*kg")
 
+
 _BEDDING = re.compile(r"Bedding solution\s*</span>\s*:\s*<span>\s*([^<]+?)\s*</span>", re.S)
 
 #: Seats and berths are distinguishable **only** by these Italian icon class names. Until
@@ -273,6 +275,15 @@ def _icon_value(icon_class: str) -> re.Pattern[str]:
 
 _SEATS = _icon_value(_SEATS_ICON)
 _BERTHS = _icon_value(_BERTHS_ICON)
+#: The rear garage, published as its opening size and identified only by an Italian icon
+#: class — `gavone` is the garage or storage locker in Italian camper terminology, and the
+#: Italian edition of the page labels it no more than the English one does.
+#:
+#: Its **presence** is the signal. It appears on all ten coachbuilt layouts checked and on
+#: none of the six Horus vans, which is what a van with its bed over the back would
+#: predict — so a value here means a rear garage, and its absence on a van means there is
+#: none. See `rear_garage_from`.
+_GARAGE = _icon_value("lc-icons-gavone")
 
 
 def _leading_int(text: str | None) -> int | None:
@@ -312,6 +323,52 @@ def _plain_text(fragment: str) -> str:
     return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", fragment)).split())
 
 
+#: Block-level tags that end a line. MNC's specification is a `<ul>` of one feature per
+#: `<li>`, and `habitation.features_from` reads it a line at a time — so unlike
+#: `_plain_text`, which collapses the page to one string for the field regexes, this has
+#: to keep those boundaries. Collapsing them would join "Oven" to the fridge line and put
+#: a bed on the same line as a bathroom.
+_LINE_BREAK = re.compile(r"(?is)<br\s*/?>|</(?:p|div|li|tr|h[1-6]|td|th|ul|ol)>")
+
+
+def _spec_lines(html_text: str) -> list[str]:
+    """MNC's specification as one string per bullet, in page order.
+
+    Trimmed to the product's own description — from the "Back to … Listings" link down to
+    the standing disclaimer — so the site navigation, the finance calculator and the
+    footer's opening hours never reach the feature vocabulary.
+    """
+    stripped = re.sub(r"(?is)<(script|style|noscript)\b.*?</\1>", " ", html_text)
+    stripped = re.sub(r"(?is)<!--.*?-->", " ", stripped)
+    text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", _LINE_BREAK.sub("\n", stripped)))
+
+    lines = [" ".join(line.split()) for line in text.split("\n")]
+    lines = [line for line in lines if line]
+    start = next((n for n, line in enumerate(lines) if line.startswith("Back to")), 0)
+    end = next(
+        (
+            n
+            for n, line in enumerate(lines)
+            if "PLEASE CALL AHEAD" in line.upper() or "PLE ASE CALL" in line.upper()
+        ),
+        len(lines),
+    )
+    lines = lines[start:end]
+
+    # The itemised specification comes back **first**, ahead of the marketing paragraph
+    # that precedes it on the page, because the feature readers quote the first line that
+    # matches and the bullets are the precise ones. Horus 38's opening paragraph is the
+    # cautionary case: it runs to a hundred words and mentions a bed in passing, so
+    # reading in page order quoted it in place of the bullet "Rear fold-away double bed".
+    #
+    # The paragraph is kept rather than discarded — it is the only place some pages state
+    # the bathroom arrangement — so this is about precedence, not exclusion.
+    spec = next((n for n, line in enumerate(lines) if line.strip() == "Specifications"), None)
+    if spec is None:
+        return lines
+    return lines[spec:] + lines[:spec]
+
+
 @dataclass(frozen=True)
 class MncListing:
     """One product listing on MNC — a UK availability record, a price and a body type.
@@ -343,6 +400,10 @@ class MncListing:
     dimensions_are_exact: bool = False
     mnc_berths: int | None = None
     mnc_seats: int | None = None
+    #: Habitation features read from the specification prose, keyed by field name.
+    #: MNC is the better source for these than the factory: it writes out what is
+    #: actually in the vehicle, where the factory publishes one enum-like word.
+    features: dict[str, habitation.Feature] = field(default_factory=dict)
 
     @property
     def range_label(self) -> str:
@@ -379,6 +440,8 @@ class RimorModel:
     mro_kilograms: int | None = None
     bedding_solution: str | None = None
     bed_types: list[BedType] | None = None
+    rear_garage: bool | None = None
+    garage_opening: str | None = None
 
     @property
     def mh_payload_kilograms(self) -> int | None:
@@ -487,6 +550,7 @@ def parse_mnc_listing(html_text: str, slug: str, url: str) -> MncListing | None:
     )
 
     text = _plain_text(html_text)
+    features = habitation.features_from(_spec_lines(html_text))
     vehicle = _MNC_VEHICLE.search(text)
     berths = _MNC_BERTHS.search(text)
     length, width, height, exact = mnc_dimensions(text)
@@ -511,6 +575,7 @@ def parse_mnc_listing(html_text: str, slug: str, url: str) -> MncListing | None:
         mnc_width_mm=width,
         mnc_height_mm=height,
         dimensions_are_exact=exact,
+        features=features,
         mnc_berths=int(berths.group(1)) if berths else None,
         mnc_seats=int(berths.group(2)) if berths else None,
     )
@@ -619,6 +684,7 @@ def parse_model_page(html_text: str, url: str) -> RimorModel | None:
     mtplm = _MTPLM.search(overview)
     mro = _MRO.search(overview)
     bedding = _BEDDING.search(overview)
+    garage = rear_garage_from(overview, body_style)
 
     solution = bedding.group(1) if bedding else None
     mtplm_text = " ".join(mtplm.group(1).split()) if mtplm else None
@@ -645,6 +711,8 @@ def parse_model_page(html_text: str, url: str) -> RimorModel | None:
         mro_kilograms=int(mro.group(1)) if mro else None,
         bedding_solution=solution,
         bed_types=bed_types_for(solution),
+        rear_garage=garage[0] if garage else None,
+        garage_opening=garage[1] if garage else None,
     )
 
 
@@ -677,6 +745,28 @@ def body_type_for(body_style: str | None, height_mm: int | None) -> BodyType | N
     if body_style != "vans" or height_mm is None:
         return None
     return BodyType.CAMPERVAN_HIGH_TOP if height_mm > HIGH_TOP_ABOVE_MM else BodyType.CAMPERVAN
+
+
+def rear_garage_from(overview: str, body_style: str | None) -> tuple[bool, str] | None:
+    """`(has a rear garage, the evidence)` from the factory overview, or `None`.
+
+    The garage is published as its opening size under an Italian icon class and never
+    labelled, so presence is the signal. It is on all ten coachbuilt layouts checked and
+    on none of the six vans — a van's bed sits over the back, so there is nowhere for one.
+
+    That pattern is what makes a **negative** safe here, and only for a van: the field is
+    systematically published for the body styles that have a garage, so its absence on a
+    van is the site saying there is none rather than the site being silent. On a coachbuilt
+    with no garage value this returns `None`, because that would be a layout breaking the
+    pattern and is a reviewer's call, not a guess.
+    """
+    match = _GARAGE.search(overview)
+    if match is not None:
+        opening = " ".join(match.group(1).split())
+        return True, opening
+    if body_style == "vans":
+        return False, ""
+    return None
 
 
 def bed_types_for(solution: str | None) -> list[BedType]:
@@ -752,6 +842,24 @@ def _model_name_from_title(listing: MncListing) -> str:
     return name.strip(" ,-") or listing.layout
 
 
+def _feature_value(features: dict[str, habitation.Feature], name: str) -> object | None:
+    """One feature's value, or `None` when the sources did not settle it."""
+    found = features.get(name)
+    return found.value if found is not None else None
+
+
+#: How each habitation field's provenance snippet is introduced, so a reviewer reading
+#: "Refrigeration — a freezer is mentioned: …" can see the reasoning and not just the
+#: quote. The quote itself is always the manufacturer's own wording.
+_FEATURE_NOTES: dict[str, str] = {
+    "refrigeration": "read from the specification",
+    "heating": "read from the specification",
+    "microwave": "stated in the specification",
+    "bathroom_layout": "the copy states the shower and toilet are separated",
+    "bed_types": "the beds the copy names, in the order it names them",
+}
+
+
 def _build_extracted_motorhome(
     listing: MncListing, model: RimorModel | None
 ) -> ExtractedMotorhome:
@@ -790,6 +898,20 @@ def _build_extracted_motorhome(
 
     model_name = model.model if model is not None else _model_name_from_title(listing)
 
+    # Habitation features, from MNC's specification prose. MNC is the better source here
+    # even though the factory wins on every number: the factory publishes one enum-like
+    # word per layout ("Double bed"), where MNC writes out what is actually fitted ("Rear
+    # fold-away double bed"). On the Horus vans that difference is the difference between
+    # a fixed bed and a made-up one, and MNC is the accurate one.
+    features = dict(listing.features)
+    if "bed_types" not in features and model is not None and model.bed_types:
+        # Nothing in the prose named a bed, so fall back to the factory's single word.
+        features["bed_types"] = habitation.Feature(
+            model.bed_types, f"Bedding solution: {model.bedding_solution}"
+        )
+    if model is not None and model.rear_garage is not None:
+        features["rear_garage"] = habitation.Feature(model.rear_garage, model.garage_opening)
+
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -797,7 +919,7 @@ def _build_extracted_motorhome(
         model=model_name,
         base_vehicle_manufacturer=listing.base_vehicle_manufacturer,
         body_type=body_type,
-        bed_types=model.bed_types if model and model.bed_types else [],
+        bed_types=features["bed_types"].value if "bed_types" in features else [],
         mh_passenger_seats_inc_driver=seats,
         berths=berths,
         rrp_pounds=listing.rrp_pounds,
@@ -807,6 +929,11 @@ def _build_extracted_motorhome(
         mh_length_mm=length,
         mh_width_mm=width,
         mh_height_mm=height,
+        bathroom_layout=_feature_value(features, "bathroom_layout"),
+        heating=_feature_value(features, "heating"),
+        refrigeration=_feature_value(features, "refrigeration"),
+        rear_garage=bool(_feature_value(features, "rear_garage")),
+        microwave=bool(_feature_value(features, "microwave")),
     )
 
     mnc_source = listing.url
@@ -847,6 +974,26 @@ def _build_extracted_motorhome(
                 f"the {HIGH_TOP_ABOVE_MM} mm high-top threshold"
             )
         record("body_type", listed_under, url=source)
+
+    # Habitation features. Recorded before the branch below because they come from MNC
+    # and so are available whether or not the layout has a factory page — and each one
+    # quotes the manufacturer's own line, which is the whole point of collecting them:
+    # the reviewer's decision is then reading one sentence, not opening a floorplan.
+    for name, feature in features.items():
+        if name == "rear_garage":
+            where = (
+                f"garage opening {feature.snippet} published on the layout's page"
+                if feature.value
+                else "no garage published, and none of the six Horus vans has one"
+            )
+            record("rear_garage", where, url=factory_source or mnc_source)
+            continue
+        note = _FEATURE_NOTES.get(name, "read from the specification")
+        source = mnc_source
+        if name == "bed_types" and feature.snippet.startswith("Bedding solution:"):
+            note = "the factory's own bedding solution, the prose naming no beds"
+            source = factory_source or mnc_source
+        record(name, f"{note}: {feature.snippet}", url=source)
 
     # Dimensions are recorded here rather than in either branch, because each axis may
     # have come from either site: the factory where it has the layout, MNC where it does
@@ -892,8 +1039,10 @@ def _build_extracted_motorhome(
         # The cell text is kept verbatim: "4 (+1 opt)" says something the integer cannot,
         # namely that the fifth berth needs optional equipment.
         record("berths", f"numero posti letto (berths): {model.berths_text}", url=factory_source)
-    if model.bed_types:
-        record("bed_types", f"Bedding solution: {model.bedding_solution}", url=factory_source)
+    # `bed_types` is deliberately not recorded here. It is one of the habitation features
+    # now, recorded above from whichever source named the beds — MNC's prose where it
+    # names any, the factory's single word only as a fallback. Recording it again here
+    # would overwrite that snippet with the fallback wording even when the prose was used.
     if model.mtplm_kilograms is not None:
         note = f"Maximum overall weight: {model.mtplm_text} kg"
         if model.mtplm_text and "/" in model.mtplm_text:

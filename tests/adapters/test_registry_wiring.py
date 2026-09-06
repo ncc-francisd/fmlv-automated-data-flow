@@ -28,7 +28,10 @@ from src.adapters.base import fmlv_base_vehicle
 from src.vehicle_class import VehicleClass
 
 #: Modules in `src/adapters/` that are infrastructure rather than a manufacturer.
-_NOT_ADAPTERS = {"base"}
+#: `habitation` is the shared feature vocabulary several adapters read their spec prose
+#: with — industry wording, not one brand's, hence its living beside them rather than
+#: inside one of them.
+_NOT_ADAPTERS = {"base", "habitation"}
 
 
 def _adapter_modules() -> list[ModuleType]:
