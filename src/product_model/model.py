@@ -112,8 +112,12 @@ class Motorhome(BaseModel):
     lounge_location: LoungeLocation | None = None
     heating: Heating | None = None
     refrigeration: Refrigeration | None = None
-    rear_garage: bool = False
-    microwave: bool = False
+    #: `None` means the adapter looked and the source did not say — which the review
+    #: surfaces as confirm-or-replace rather than proposing an unevidenced `No`. A
+    #: baseline read from an FMLV export is never `None`: that column always holds
+    #: Yes or No, so only a *scraped* product can be undecided here.
+    rear_garage: bool | None = None
+    microwave: bool | None = None
 
     automatic: AutomaticVariant | None = None
 

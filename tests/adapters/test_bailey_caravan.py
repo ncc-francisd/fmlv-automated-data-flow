@@ -295,7 +295,10 @@ def test_no_layout_flag_is_guessed_from_the_marketing_copy() -> None:
     assert caravan.lounge_location is None
     assert caravan.heating is None
     assert caravan.refrigeration is None
-    assert caravan.microwave is False
+    # `None`, not `False`: the copy not mentioning a microwave is not the copy saying
+    # there is none. `False` here would have proposed an unevidenced No over whatever
+    # FMLV holds; `None` sends it to the reviewer as confirm-or-replace instead.
+    assert caravan.microwave is None
 
 
 def test_no_caravan_carries_an_optional_equipment_payload() -> None:

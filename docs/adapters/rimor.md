@@ -230,14 +230,45 @@ systems, which the requester confirmed. `wet_central_heating` is never proposed 
 Note that seven products say "Wet room" about the *bathroom*; matching a bare "wet" would
 have called all seven wet central heating.
 
-**Microwave is never proposed.** No Rimor page mentions one — 24 list "Oven", which is not
-the same thing. Rather than assert `False` on 34 products from silence, the field is left
-untouched, so whatever FMLV holds survives.
+**Microwave is never proposed, but its absence is reported.** No Rimor page mentions one
+— 24 list "Oven", which is not the same thing. The value stays `None` and provenance is
+recorded anyway, so a reviewer gets a confirm-or-replace saying the specification does not
+mention a microwave, rather than a proposed `No` quietly deleting a fact nobody disproved.
+See `UNCONFIRMED_FEATURES`.
 
 **Bathroom is proposed only when the words settle it.** 23 of 34 say "separate" of the
 shower or toilet. The rest say "Wet room" or "Central washroom", which are combined — but
 `BathroomLayout` then wants *rear* or *side*, and the prose never says which, so those 11
 go to a reviewer with the floorplan.
+
+### The floorplan is the source for everything positional
+
+Every one of the 16 model pages checked publishes a floorplan drawing —
+`…/immagine_piantina/full/Kilig-9.jpg`, *piantina* being Italian for a floorplan — and
+some are UK-specific editions (`Horus-40-UK.jpg`). It is the only thing on either site
+that says **where in the vehicle** something sits, so it is what the reviewer is handed
+for the fields no wording settles:
+
+| Field | What to read off it |
+|---|---|
+| `sleeping_area` | which end the beds are at |
+| `kitchen_location` | rear, side or corner |
+| `lounge_location` | front, rear or twin |
+| `bathroom_layout` | rear or side — **only** on the 11 the copy left open |
+
+Each gets a row of its own with the same link, rather than one detached reference, so the
+drawing is beside the field being decided. They carry
+`Provenance(reviewer_reference=True)` and no value, which is what makes them survive onto
+a new product — see the habitation section of `README.md` for why an ordinary empty field
+does not.
+
+The Van 238 and Horus 12 get none, having no factory page and therefore no drawing.
+
+**Marking these fields `in_scope` would have been the wrong way to do it**, even though
+that is the other route to showing an empty field on a new product. FMLV holds
+`sleeping_area`, `kitchen_location` and `lounge_location` on 99% of its 1,590 baseline
+rows and no adapter sets any of them, so the flag would raise a confirm-or-replace on
+roughly 4,700 rows across the twenty adapters that cannot answer them.
 
 ## Traps on the factory site
 

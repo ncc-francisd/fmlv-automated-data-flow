@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from src.adapters import rimor
-from src.product_model.enums import BedType, BodyType
+from src.product_model.enums import BathroomLayout, BedType, BodyType
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -787,3 +787,150 @@ def test_bed_types_for_leaves_an_unknown_solution_empty() -> None:
     """An unmapped phrase is a new layout style to notice, not one to guess at."""
     assert rimor.bed_types_for("Hammock") == []
     assert rimor.bed_types_for(None) == []
+
+
+# --------------------------------------------------------------------------- #
+# A feature that could not be confirmed
+# --------------------------------------------------------------------------- #
+
+
+def test_an_unconfirmed_microwave_is_reported_not_denied(
+    mnc_kilig_66: str, factory_kilig_66_plus: str
+) -> None:
+    """No Rimor page mentions a microwave, and 24 list an oven, which is not the same.
+
+    The requester, 6 September 2026: *"you couldn't find or validate the microwave value,
+    so you can either keep what we've got, or change it"*. So the value stays `None` and
+    provenance is recorded anyway — which is what `diff.compare` turns into a
+    confirm-or-replace instead of an unevidenced `No`.
+    """
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = rimor.parse_model_page(
+        factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+    )
+    extracted = rimor._build_extracted_motorhome(listing, model)
+
+    assert extracted.motorhome.microwave is None
+    assert "no microwave stated" in extracted.provenance["microwave"].snippet
+
+
+def test_an_unconfirmed_feature_becomes_confirm_or_replace(
+    mnc_kilig_66: str, factory_kilig_66_plus: str
+) -> None:
+    """The end-to-end shape: FMLV holds a microwave, the adapter cannot check it.
+
+    It must reach the reviewer as a missing field carrying the reason — never as a
+    proposed change to No, which would quietly delete a fact nobody disproved.
+    """
+    from src.diff.compare import compare_fields
+    from src.product_model.model import Motorhome
+
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = rimor.parse_model_page(
+        factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+    )
+    extracted = rimor._build_extracted_motorhome(listing, model)
+    baseline = Motorhome(manufacturer="Rimor", model="66 Plus", product_id=1, microwave=True)
+
+    changes, _confirmed, missing = compare_fields(baseline, extracted)
+
+    assert "microwave" not in {change.field for change in changes}
+    unconfirmed = next(m for m in missing if m.field == "microwave")
+    assert unconfirmed.old_value is True
+    assert unconfirmed.provenance is not None
+
+
+def test_rear_garage_is_answered_rather_than_left_unconfirmed(
+    mnc_kilig_66: str, factory_kilig_66_plus: str
+) -> None:
+    """Unlike the microwave, the factory publishes the garage for every style that has one.
+
+    So its presence is a Yes and its absence on a van is a No — an answer, not a silence.
+    """
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = rimor.parse_model_page(
+        factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+    )
+    product = rimor._build_extracted_motorhome(listing, model).motorhome
+    assert product.rear_garage is True
+
+
+# --------------------------------------------------------------------------- #
+# The floorplan, for the positional fields
+# --------------------------------------------------------------------------- #
+
+
+def test_the_floorplan_is_read_from_the_model_page(factory_kilig_66_plus: str) -> None:
+    """`piantina` is Italian for a floorplan, and all 16 model pages checked have one."""
+    model = rimor.parse_model_page(
+        factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+    )
+    assert model.floorplan_path is not None
+    assert "piantina" in model.floorplan_path
+
+
+def test_every_positional_field_gets_the_floorplan(
+    mnc_kilig_5: str, factory_kilig_5: str
+) -> None:
+    """One row per field, all pointing at the same drawing.
+
+    The requester, 6 September 2026: *"the link will be to the same place because that's
+    where a human can interpret the diagram"*. Kilig 5's copy settles none of the four,
+    so all four are handed over.
+    """
+    listing = rimor.parse_mnc_listing(mnc_kilig_5, "rimor-kilig-5-2026", "u")
+    model = rimor.parse_model_page(factory_kilig_5, "/int/en/gamma/kilig/modello/5")
+    extracted = rimor._build_extracted_motorhome(listing, model)
+
+    links = {
+        name: extracted.provenance[name]
+        for name in rimor.FLOORPLAN_FIELDS
+        if name in extracted.provenance
+    }
+    assert set(links) == set(rimor.FLOORPLAN_FIELDS)
+    assert len({p.source_url for p in links.values()}) == 1
+    assert all(p.reviewer_reference for p in links.values())
+    assert all(getattr(extracted.motorhome, name) is None for name in links)
+
+
+def test_a_floorplan_pointer_never_overwrites_a_value_the_copy_settled(
+    mnc_kilig_66: str, factory_kilig_66_plus: str
+) -> None:
+    """Kilig 66 Plus says "separate", so its bathroom is decided and needs no drawing.
+
+    The other three positional fields still get one — a pointer is recorded per field the
+    copy left open, not per product.
+    """
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = rimor.parse_model_page(
+        factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+    )
+    extracted = rimor._build_extracted_motorhome(listing, model)
+
+    assert extracted.motorhome.bathroom_layout is BathroomLayout.SEPARATE_SHOWER_TOILET
+    assert extracted.provenance["bathroom_layout"].reviewer_reference is False
+    assert extracted.provenance["sleeping_area"].reviewer_reference is True
+
+
+def test_no_factory_page_means_no_floorplan(mnc_van_238: str) -> None:
+    """The Van 238 has no model page, so there is no drawing to point at."""
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    extracted = rimor._build_extracted_motorhome(listing, None)
+    assert not any(name in extracted.provenance for name in rimor.FLOORPLAN_FIELDS)
+
+
+def test_a_reviewer_reference_survives_onto_a_new_product(
+    mnc_kilig_5: str, factory_kilig_5: str
+) -> None:
+    """The point of the flag. A new product has no baseline, so an ordinary empty field is
+    dropped as a `None -> None` row nobody needs — but a floorplan pointer must survive,
+    or a new product's positional fields have nothing to click.
+    """
+    listing = rimor.parse_mnc_listing(mnc_kilig_5, "rimor-kilig-5-2026", "u")
+    model = rimor.parse_model_page(factory_kilig_5, "/int/en/gamma/kilig/modello/5")
+    extracted = rimor._build_extracted_motorhome(listing, model)
+
+    pointer = extracted.provenance["sleeping_area"]
+    assert pointer.reviewer_reference is True
+    # An ordinary empty field, for contrast: reported, but not a reviewer reference.
+    assert extracted.provenance["microwave"].reviewer_reference is False

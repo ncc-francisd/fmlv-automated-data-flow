@@ -360,7 +360,7 @@ one problem, and the requester drew the line on 6 September 2026:
 | | fields | source | who decides |
 |---|---|---|---|
 | **Factual** | refrigeration, heating, microwave, rear garage, separated shower/toilet | stated *in words* in the specification list | the adapter, quoting the line |
-| **Subjective** | lounge location, sleeping area, kitchen location | need the floorplan drawing | a reviewer, given a link to it |
+| **Subjective** | lounge location, sleeping area, kitchen location, bathroom rear-vs-side | need the floorplan drawing | a reviewer, given a link to it |
 | **Both** | bed types | named in the copy by some brands, not others | the adapter where the copy names them, else a reviewer |
 
 `adapters/habitation.py` does the factual half. An adapter passes in its specification
@@ -379,9 +379,20 @@ Two rules run through it, both learned on Rimor's 34 products:
 
 * **Only ever assert a feature from positive evidence.** A page that never mentions a
   microwave is not a page saying there is none. `microwave_from` returns `None`, never
-  `False` — and because these are booleans defaulting to `False`, returning `False` would
-  have proposed an unevidenced negative on every product. Rimor mentions a microwave on
-  none of its 34, so the field is simply left alone.
+  `False`. `rear_garage` and `microwave` are `bool | None` on both products for exactly
+  this reason — they were plain booleans defaulting to `False` until 6 September 2026,
+  which meant every adapter silently wrote "No" for a microwave it had never looked for.
+
+  An adapter that checked and found nothing should **record provenance with no value**.
+  `diff.compare` renders that as confirm-or-replace: the reviewer is shown what FMLV
+  holds, told why the adapter could not check it, and keeps or changes it. The requester,
+  6 September 2026: *"you couldn't find or validate the microwave value, so you can either
+  keep what we've got, or change it"*. `rimor.UNCONFIRMED_FEATURES` is the worked example.
+  Saying nothing at all is worse — the reviewer then cannot tell "checked, and the
+  manufacturer is silent" from "never looked".
+
+  On a **new** product there is no baseline to keep, so `None` still writes `No` — FMLV's
+  column has no third state. That is a first upload a reviewer reads in full anyway.
 * **Never read a paid option as standard.** "Rear Adjustable Bed Option: £1,500" is a bed
   the buyer may not have, and the price is what gives it away.
 
@@ -399,6 +410,26 @@ Three traps worth knowing before writing the next one:
   that reordering, and it is why the quoted line is a bullet and not a hundred words of
   prose.
 
+**Hand the reviewer the floorplan for the subjective half.** An adapter that cannot know
+a positional field can still say *where to look*, and should: record provenance whose
+`source_url` is the floorplan and whose value is empty, with
+`Provenance(reviewer_reference=True)`. One row per field, all pointing at the same
+drawing, so the link sits beside the field being decided — the requester, 6 September
+2026: *"the link will be to the same place because that's where a human can interpret the
+diagram"*. `rimor.FLOORPLAN_FIELDS` is the worked example.
+
+`reviewer_reference` exists because an empty field is otherwise ambiguous.
+`swift_caravan` records one to ask for a stale figure to be *cleared*, which is rightly
+dropped on a product that never had one; a floorplan pointer must survive onto a new
+product, or its positional fields have nothing to click. `store.changes` is where the two
+part company.
+
+Record a pointer **per field the copy left open**, not per product. Rimor's
+`bathroom_layout` is settled by the words on 23 of its 34 layouts ("separate shower
+cubicle and cassette toilet"); those keep their extracted value and get no drawing. The
+other 11 say "Wet room" or "Central washroom" — combined, but rear-versus-side is still
+open, and `BathroomLayout` demands one of the two.
+
 **Do not flip `automated_collection_scope_flag` to `in_scope` to "enable" any of this.**
 The flag does not gate collection — `diff.compare.compare_fields` iterates over the
 fields an adapter recorded **provenance** for, so an adapter can already propose any
@@ -407,6 +438,13 @@ did not touch where FMLV holds a value, the reviewer is asked to confirm or repl
 rather than letting it pass. Setting it before extraction exists would add a prompt per
 field per product across every manufacturer with nothing behind them. Extract first, then
 flip the flag per field once most adapters cover it.
+
+That is not theoretical for the subjective fields. FMLV holds `sleeping_area` on 1,585 of
+its 1,590 baseline rows, `kitchen_location` on 1,588, `lounge_location` on 1,581 and
+`bed_types` on 1,589 — 99% each — and no adapter sets any of them. Marking those three
+in-scope today would raise a confirm-or-replace on roughly 4,700 rows across the twenty
+adapters that cannot answer them. Use a `reviewer_reference` instead: it reaches the
+reviewer on new and matched products alike, and costs the other brands nothing.
 
 Know also that **these fields are not empty in FMLV** — they have been filled in by hand.
 Across the 1,590 baseline rows in `data/exports`, `fridge_freezer` is Yes on 89%,

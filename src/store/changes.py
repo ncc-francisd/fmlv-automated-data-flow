@@ -432,7 +432,11 @@ def persist_diff(
             profile = profile_for(diff.extracted.product)
             for field_name, provenance in diff.extracted.provenance.items():
                 value = field_value(diff.extracted.product, field_name)
-                if value is None and field_name not in profile.in_scope:
+                if (
+                    value is None
+                    and field_name not in profile.in_scope
+                    and not provenance.reviewer_reference
+                ):
                     # Nothing to say. A *new* product has no stored figure to confirm or
                     # clear, and an out-of-scope field carries no obligation to fill one,
                     # so this would be a `None -> None` row a reviewer has to decide for
@@ -446,6 +450,11 @@ def persist_diff(
                     # family but not the subtype records provenance with no value so the
                     # reviewer is offered the choice, rather than the field going blank
                     # forever on a product with no baseline to preserve.
+                    #
+                    # So is a `reviewer_reference`, for the same reason from the other
+                    # direction: the adapter cannot know the value and is not pretending
+                    # to, but it can say *where to look*. Dropping those would leave a new
+                    # product's floorplan-only fields with nothing to click.
                     continue
                 record_proposed_change(
                     connection,

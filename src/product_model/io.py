@@ -202,7 +202,11 @@ def motorhome_to_row(motorhome: Motorhome) -> dict[str, str]:
     def set_str(column: str, value: str | None) -> None:
         row[column] = value or ""
 
-    def set_yes_no(column: str, value: bool) -> None:  # noqa: FBT001
+    def set_yes_no(column: str, value: bool | None) -> None:  # noqa: FBT001
+        # `None` writes No. FMLV's column is Yes/No with no third state, and an
+        # undecided field only reaches here on a brand-new product — an existing one
+        # keeps its baseline value, because the upload applies accepted changes onto
+        # the baseline and an unconfirmed field is simply not among them.
         row[column] = schema.YES if value else schema.NO
 
     set_int("product_id", motorhome.product_id)

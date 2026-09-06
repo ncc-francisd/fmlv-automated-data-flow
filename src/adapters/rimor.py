@@ -285,6 +285,13 @@ _BERTHS = _icon_value(_BERTHS_ICON)
 #: none. See `rear_garage_from`.
 _GARAGE = _icon_value("lc-icons-gavone")
 
+#: The layout's floorplan drawing. `piantina` is Italian for a floorplan, and every one of
+#: the 16 model pages checked publishes one — sometimes a UK-specific edition
+#: (`Horus-40-UK.jpg`). It is the only thing on either site that answers where in the
+#: vehicle something sits, which is why it is the link handed to the reviewer for the
+#: fields no wording settles. See `FLOORPLAN_FIELDS`.
+_FLOORPLAN = re.compile(r'src="(/public/[^"]*piantina[^"]*\.(?:jpg|jpeg|png|webp))"', re.I)
+
 
 def _leading_int(text: str | None) -> int | None:
     if not text:
@@ -442,6 +449,9 @@ class RimorModel:
     bed_types: list[BedType] | None = None
     rear_garage: bool | None = None
     garage_opening: str | None = None
+    #: Path to the layout's floorplan drawing, for the reviewer to read the
+    #: positional fields off — see `FLOORPLAN_FIELDS`.
+    floorplan_path: str | None = None
 
     @property
     def mh_payload_kilograms(self) -> int | None:
@@ -685,6 +695,9 @@ def parse_model_page(html_text: str, url: str) -> RimorModel | None:
     mro = _MRO.search(overview)
     bedding = _BEDDING.search(overview)
     garage = rear_garage_from(overview, body_style)
+    # Searched over the whole page rather than the overview block: the drawing sits
+    # in its own column next to the spec table, outside the block's markers.
+    floorplan = _FLOORPLAN.search(html_text)
 
     solution = bedding.group(1) if bedding else None
     mtplm_text = " ".join(mtplm.group(1).split()) if mtplm else None
@@ -713,6 +726,7 @@ def parse_model_page(html_text: str, url: str) -> RimorModel | None:
         bed_types=bed_types_for(solution),
         rear_garage=garage[0] if garage else None,
         garage_opening=garage[1] if garage else None,
+        floorplan_path=floorplan.group(1) if floorplan else None,
     )
 
 
@@ -842,6 +856,49 @@ def _model_name_from_title(listing: MncListing) -> str:
     return name.strip(" ,-") or listing.layout
 
 
+#: The fields no wording on either site settles, because they are all about **where in
+#: the vehicle** something sits. Each gets a row of its own pointing at the same
+#: floorplan, so the link is beside the field being decided rather than detached from it —
+#: the requester, 6 September 2026: *"the link will be to the same place because that's
+#: where a human can interpret the diagram"*.
+#:
+#: `bathroom_layout` is here even though the copy often *does* settle it: 23 of the 34
+#: layouts say "separate", and those keep their extracted value. The other 11 say "Wet
+#: room" or "Central washroom", which is combined but leaves rear-versus-side open — and
+#: `BathroomLayout` demands one of the two. A pointer is only recorded for a field the
+#: copy left undecided.
+#:
+#: `bed_types` is deliberately absent: the copy names the beds on all 34, so there is
+#: nothing left to read off a drawing.
+FLOORPLAN_FIELDS: tuple[str, ...] = (
+    "sleeping_area",
+    "kitchen_location",
+    "lounge_location",
+    "bathroom_layout",
+)
+
+#: What the reviewer is told to do with the floorplan, per field.
+_FLOORPLAN_NOTES: dict[str, str] = {
+    "sleeping_area": "which end the beds are at",
+    "kitchen_location": "whether the kitchen is rear, side or corner",
+    "lounge_location": "whether the lounge is front, rear or twin",
+    "bathroom_layout": "whether the washroom is rear or side",
+}
+
+#: Features whose *absence* from the copy is worth reporting rather than passing over.
+#: Both are plain Yes/No columns FMLV already holds a value for, so saying nothing would
+#: leave a reviewer unable to tell "the adapter checked and the manufacturer is silent"
+#: from "the adapter never looked". Recorded with no value, which `diff.compare` renders
+#: as confirm-or-replace.
+#:
+#: `rear_garage` is not here: Rimor publishes it for every body style that has one, so its
+#: absence on a van is an answer rather than a silence — see `rear_garage_from`.
+UNCONFIRMED_FEATURES: dict[str, str] = {
+    "microwave": "no microwave stated in the specification; 24 layouts list an oven, "
+    "which is not the same thing",
+}
+
+
 def _feature_value(features: dict[str, habitation.Feature], name: str) -> object | None:
     """One feature's value, or `None` when the sources did not settle it."""
     found = features.get(name)
@@ -932,8 +989,10 @@ def _build_extracted_motorhome(
         bathroom_layout=_feature_value(features, "bathroom_layout"),
         heating=_feature_value(features, "heating"),
         refrigeration=_feature_value(features, "refrigeration"),
-        rear_garage=bool(_feature_value(features, "rear_garage")),
-        microwave=bool(_feature_value(features, "microwave")),
+        # Left as None where the sources did not say, rather than coerced to False —
+        # see `UNCONFIRMED_FEATURES` for how that reaches the reviewer.
+        rear_garage=_feature_value(features, "rear_garage"),
+        microwave=_feature_value(features, "microwave"),
     )
 
     mnc_source = listing.url
@@ -979,6 +1038,28 @@ def _build_extracted_motorhome(
     # and so are available whether or not the layout has a factory page — and each one
     # quotes the manufacturer's own line, which is the whole point of collecting them:
     # the reviewer's decision is then reading one sentence, not opening a floorplan.
+    # The floorplan, for every positional field the wording cannot settle. One row each,
+    # all pointing at the same drawing, so the link sits beside the field being decided.
+    if model is not None and model.floorplan_path:
+        floorplan = BASE_URL + model.floorplan_path
+        for name in FLOORPLAN_FIELDS:
+            if getattr(motorhome, name) is not None:
+                continue  # already settled from the copy — bathroom_layout on 23 of 34
+            provenance[name] = Provenance(
+                source_url=floorplan,
+                snippet=f"{label} — read {_FLOORPLAN_NOTES[name]} off the floorplan",
+                reviewer_reference=True,
+            )
+
+    for name in UNCONFIRMED_FEATURES:
+        if name in features:
+            continue
+        # The adapter looked and the copy did not say. Recording provenance with no value
+        # is what turns this into a "confirm or replace" for the reviewer rather than
+        # silence — the requester, 6 September 2026: "you couldn't find or validate the
+        # microwave value, so you can either keep what we've got, or change it".
+        record(name, UNCONFIRMED_FEATURES[name], url=mnc_source)
+
     for name, feature in features.items():
         if name == "rear_garage":
             where = (

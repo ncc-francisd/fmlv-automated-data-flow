@@ -95,7 +95,11 @@ class Caravan(BaseModel):
     heating: Heating | None = None
     refrigeration: Refrigeration | None = None
     twin_axle: bool = False
-    microwave: bool = False
+    #: `None` means the adapter looked and the source did not say — which the review
+    #: surfaces as confirm-or-replace rather than proposing an unevidenced `No`. A
+    #: baseline read from an FMLV export is never `None`: that column always holds
+    #: Yes or No, so only a *scraped* product can be undecided here.
+    microwave: bool | None = None
 
     #: Whether a door or a firm partition divides the toilet from the shower.
     #:

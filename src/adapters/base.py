@@ -142,6 +142,17 @@ class Provenance:
 
     source_url: str
     snippet: str
+    #: True when this is a **pointer for the reviewer rather than a claim about a value**
+    #: — "here is the floorplan, you decide whether the washroom is rear or side". Such
+    #: an entry always carries an empty value, and unlike an ordinary empty one it
+    #: survives onto a brand-new product, where there is no baseline to confirm but the
+    #: decision still has to be made. `store.changes` is where that distinction is
+    #: applied; `rimor.FLOORPLAN_FIELDS` is the worked example.
+    #:
+    #: Without this flag the two cases are indistinguishable: `swift_caravan` records an
+    #: empty field to ask for a stale figure to be *cleared*, which is rightly dropped on
+    #: a product that never had one.
+    reviewer_reference: bool = False
 
 
 @dataclass
