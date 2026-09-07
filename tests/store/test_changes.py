@@ -642,3 +642,124 @@ def test_an_existing_product_is_not_asked_about_columns_it_already_holds(
 
     fields = [e.change.field for e in store.list_change_queue(connection, run_id)]
     assert fields == ["rrp_pounds"]
+
+
+def test_a_payload_that_disagrees_with_the_two_masses_is_corrected(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """Horus 38: FMLV holds 2624 MRO, 3500 MTPLM and 676 payload, which is 200kg out.
+
+    The requester, 7 September 2026: *"that figure for the payload should be 876 […] even
+    though you have no source to prove what the actual MRO and MTPLM are, you've simply
+    carried it over from FMLV."* Payload is arithmetic, so a disagreement is checkable
+    whether or not the site published anything.
+    """
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=676
+    )
+    scraped = make_extracted(rrp_pounds=93950)  # nothing about the masses this run
+    store.persist_diff(
+        connection, run_id=run_id, manufacturer_id=3, diffs=diff_products([scraped], [baseline])
+    )
+
+    payload_rows = [
+        e.change
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.field == "mh_payload_kilograms"
+    ]
+    # Exactly one row, not a correction sitting beneath a "confirm the existing figure".
+    assert len(payload_rows) == 1
+    assert payload_rows[0].old_value == "676"
+    assert payload_rows[0].new_value == "876"
+    assert "3500kg MTPLM - 2624kg MRO = 876kg" in payload_rows[0].source_snippet
+    # Nothing was read, so nothing is cited as a source.
+    assert payload_rows[0].source_url is None
+
+
+def test_a_payload_that_already_agrees_is_left_alone(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=876
+    )
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93950)], [baseline]),
+    )
+
+    # A confirm-or-replace row is still right — the site published nothing, and payload
+    # is in scope — but nothing is *corrected*, because the arithmetic already agrees.
+    payload_rows = [
+        e.change
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.field == "mh_payload_kilograms"
+    ]
+    assert [r.new_value for r in payload_rows] == ["876"]
+    assert all(r.old_value == r.new_value for r in payload_rows)
+
+
+def test_the_adapters_own_payload_wins_over_the_derived_one(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """When the site publishes both masses the adapter does this arithmetic itself."""
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=676
+    )
+    scraped = make_extracted(
+        rrp_pounds=93950,
+        mro_kilograms=2770,
+        mtplm_kilograms=3500,
+        mh_payload_kilograms=730,
+    )
+    scraped.provenance["mro_kilograms"] = Provenance("https://x.test", "MRO: 2770 kg")
+    scraped.provenance["mh_payload_kilograms"] = Provenance("https://x.test", "3500 - 2770")
+    store.persist_diff(
+        connection, run_id=run_id, manufacturer_id=3, diffs=diff_products([scraped], [baseline])
+    )
+
+    payload_rows = [
+        e.change
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.field == "mh_payload_kilograms"
+    ]
+    assert len(payload_rows) == 1
+    assert payload_rows[0].new_value == "730"
+    assert payload_rows[0].source_url == "https://x.test"
+
+
+def test_a_rejected_derived_payload_is_not_offered_again(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """A reviewer who has judged the arithmetic wrong is not asked every run."""
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=676
+    )
+    diffs = diff_products([make_extracted(rrp_pounds=93950)], [baseline])
+    store.persist_diff(connection, run_id=run_id, manufacturer_id=3, diffs=diffs)
+    entry = next(
+        e
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.field == "mh_payload_kilograms"
+    )
+    store.record_decision(
+        connection, proposed_change_id=entry.change.id, action="reject", decided_by="ben"
+    )
+
+    later = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    result = store.persist_diff(
+        connection, run_id=later.id, manufacturer_id=3, diffs=diffs
+    )
+
+    # The confirm-or-replace row survives by design — a missing in-scope field keeps
+    # being asked about — but the rejected 876 is not proposed again.
+    proposed = [
+        e.change.new_value
+        for e in store.list_change_queue(connection, later.id)
+        if e.change.field == "mh_payload_kilograms"
+    ]
+    assert "876" not in proposed
+    assert result.suppressed_rejections >= 1

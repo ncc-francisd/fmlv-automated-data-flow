@@ -173,6 +173,34 @@ publishes no price anywhere in the world, and its products still carry one, beca
 exclusive UK importer prices every layout it sells. See [Rimor](rimor.md), which reads the
 importer for the price and the range and the factory for the specifications.
 
+### Payload is arithmetic, so it is checkable even when nothing was published
+
+`mh_payload_kilograms` is MTPLM minus MRO. That means a payload can be checked against
+the other two whether or not the manufacturer published anything this run — and where it
+disagrees, the pipeline proposes the derived figure rather than only warning about it.
+
+Rimor's Horus 38 is the case that prompted it: FMLV holds MRO 2624, MTPLM 3500 and
+payload 676, which is 200kg out, and Rimor withdrew MRO from its site the day after
+publishing it. So nothing was read, both masses were carried over from FMLV, and the
+mismatch had been reaching the issues file as a `payload_mismatch` warning *after* the
+upload was generated. The requester, 7 September 2026: *"even though you have no source to
+prove what the actual MRO and MTPLM are, you've simply carried it over from FMLV"* — the
+figures are still the figures, and the arithmetic still holds.
+
+`store.changes._derived_payload_proposal` takes each mass from the site where the adapter
+found one and from FMLV where it did not, which is what the upload row will actually hold,
+and says which in the snippet. It stands down in three cases:
+
+* **the adapter already proposed a payload** — it does the same arithmetic itself, so its
+  figure, with its real source, wins;
+* **the arithmetic already agrees** — nothing to say;
+* **caravans** — `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the
+  personal-effects half of a split, and one published figure may be the total. Deriving it would be wrong.
+
+It is gated by `was_previously_rejected` like any other proposal, and it suppresses the
+confirm-or-replace row for the same field, so a reviewer never sees "the existing figure
+is wrong" directly above "confirm the existing figure".
+
 ### A figure that could not be found must be visible, and must never be inherited
 
 Where a manufacturer normally publishes a spec and it is **absent for a particular model**,

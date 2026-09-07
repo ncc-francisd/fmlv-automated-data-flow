@@ -152,6 +152,77 @@ _IDENTITY_FIELDS: frozenset[str] = frozenset(
 LIST_SEPARATOR = ", "
 
 
+#: `source_snippet` for a payload the pipeline derived rather than read. Says where the
+#: two masses came from, because "no source found this run" and "here is a corrected
+#: payload" look contradictory side by side unless the arithmetic is spelled out.
+PAYLOAD_ARITHMETIC_SNIPPET = (
+    "Derived, not read from the site: {mtplm}kg MTPLM - {mro}kg MRO = {derived}kg, "
+    "against the {held}kg on record. {basis}. Accepting this makes the three figures "
+    "agree; rejecting it leaves FMLV as it is."
+)
+
+
+def _derived_payload_proposal(
+    diff: ProductDiff,
+) -> tuple[int, int, int, int, str] | None:
+    """`(derived, held, mtplm, mro, basis)` where a matched motorhome's payload disagrees.
+
+    Payload is arithmetic — MTPLM minus MRO — so whenever both masses are known the
+    payload is checkable whether or not the site published anything this run. Until now a
+    disagreement only surfaced as a `payload_mismatch` warning in the issues file, after
+    the upload had been generated.
+
+    The requester, 7 September 2026, on Horus 38: *"that figure for the payload should be
+    876. So should be presenting a correction to the payload figure of 676, because if the
+    MRO and MTPLM are correct, the figure should be 876. Even though you have no source to
+    prove what the actual MRO and MTPLM are, you've simply carried it over from FMLV."*
+
+    Each mass is taken from the site where the adapter found one and from FMLV where it
+    did not, which is what the upload row will hold. Skipped when the adapter is already
+    proposing a payload of its own — it computes the same arithmetic — and skipped for
+    caravans, whose `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the
+    personal-effects half of a split.
+    """
+    baseline, extracted = diff.baseline, diff.extracted
+    if baseline is None or extracted is None:
+        return None
+    if isinstance(baseline, Caravan) or isinstance(extracted.product, Caravan):
+        return None
+    if any(change.field == "mh_payload_kilograms" for change in diff.changes):
+        return None
+
+    def effective(field_name: str) -> tuple[int | None, bool]:
+        scraped = field_value(extracted.product, field_name)
+        if scraped is not None:
+            return scraped, True
+        return field_value(baseline, field_name), False
+
+    mtplm, mtplm_scraped = effective("mtplm_kilograms")
+    mro, mro_scraped = effective("mro_kilograms")
+    held = field_value(baseline, "mh_payload_kilograms")
+    if mtplm is None or mro is None or held is None:
+        return None
+
+    derived = mtplm - mro
+    if derived == held:
+        return None
+
+    basis = {
+        (True, True): "Both masses come from the manufacturer's site this run",
+        (False, False): (
+            "Neither mass was published this run, so both are FMLV's own figures "
+            "carried over"
+        ),
+        (True, False): (
+            "The MTPLM comes from the site this run; the MRO is FMLV's own, carried over"
+        ),
+        (False, True): (
+            "The MRO comes from the site this run; the MTPLM is FMLV's own, carried over"
+        ),
+    }[(mtplm_scraped, mro_scraped)]
+    return derived, held, mtplm, mro, basis
+
+
 def _missing_field_snippet(missing: MissingField) -> str:
     """The confirm-or-replace offer, plus whatever evidence the adapter recorded.
 
@@ -597,11 +668,45 @@ def persist_diff(
                 proposed += 1
                 year_rollover_proposed += 1
 
+        # Payload is arithmetic, so a disagreement is checkable even when nothing was
+        # read this run — see `_derived_payload_proposal`.
+        derived_payload_offered = False
+        if (found := _derived_payload_proposal(diff)) is not None:
+            derived, held, mtplm, mro, basis = found
+            new_value = _serialize(derived)
+            if was_previously_rejected(
+                connection,
+                product_id=product.id,
+                field="mh_payload_kilograms",
+                new_value=new_value,
+            ):
+                suppressed += 1
+            else:
+                record_proposed_change(
+                    connection,
+                    run_id=run_id,
+                    product_id=product.id,
+                    field="mh_payload_kilograms",
+                    old_value=_serialize(held),
+                    new_value=new_value,
+                    source_url=None,
+                    source_snippet=PAYLOAD_ARITHMETIC_SNIPPET.format(
+                        mtplm=mtplm, mro=mro, derived=derived, held=held, basis=basis
+                    ),
+                )
+                proposed += 1
+                derived_payload_offered = True
+
         for field_name in diff.confirmed_fields:
             record_verification(connection, run_id=run_id, product_id=product.id, field=field_name)
             verified += 1
 
         for missing in diff.missing_fields:
+            if derived_payload_offered and missing.field == "mh_payload_kilograms":
+                # The derived proposal above already offers this field, with the
+                # arithmetic behind it. A second row saying "confirm the existing figure"
+                # would sit right beneath one saying the existing figure is wrong.
+                continue
             # No `was_previously_rejected` gate here, unlike an ordinary proposal:
             # "reject" isn't a coherent action for a field that's simply missing —
             # the review UI only offers "keep existing" (accept) or "replace"
