@@ -1,6 +1,9 @@
 {% set missing = is_missing_field(entry.change) %}
 {# `run` is in scope from run_detail.html; both areas name their layout fields the same things while meaning different enums, so the area has to be passed. #}
 {% set choices = field_choices(entry.change.field, run.vehicle_class) %}
+{# `bed_types` takes several values at once, so it gets tick boxes rather than a single-choice select. #}
+{% set multi = is_multi_select(entry.change.field) %}
+{% set already = (entry.change.new_value or entry.change.old_value or '').split(', ') %}
 <div id="change-{{ entry.change.id }}" class="change-row{% if missing %} missing-field-row{% endif %}">
   <div class="field-name">
     {{ entry.change.field }}
@@ -80,7 +83,15 @@
         <button type="submit" name="action" value="blank" class="btn btn-blank"
                 title="{% if required %}Clear this field in FMLV. It is a required column, so the generated CSV will report this row as missing it — deliberate, but check that is what you want.{% else %}Clear this field in FMLV — for a spec the manufacturer no longer publishes.{% endif %}">Leave blank{% if required %} <span class="blank-required-flag" aria-hidden="true">!</span>{% endif %}</button>
         {% endif %}
-        {% if choices %}<select name="corrected_value" class="choice-select">
+        {% if multi %}<fieldset class="choice-checks">
+          <legend class="muted">tick every type that applies</legend>
+          {% for group, options in choices %}
+            {% for value, label in options %}
+              <label><input type="checkbox" name="corrected_values" value="{{ value }}"{% if value in already %} checked{% endif %}> {{ label }}</label>
+            {% endfor %}
+          {% endfor %}
+        </fieldset>
+        {% elif choices %}<select name="corrected_value" class="choice-select">
           <option value="">choose a value…</option>
           {% for group, options in choices %}
             {% if group %}<optgroup label="{{ group }}">{% endif %}
@@ -106,7 +117,15 @@
       >
         <button type="submit" name="action" value="accept" class="btn btn-accept">Accept</button>
         <button type="submit" name="action" value="reject" class="btn btn-reject">Reject</button>
-        {% if choices %}<select name="corrected_value" class="choice-select">
+        {% if multi %}<fieldset class="choice-checks">
+          <legend class="muted">tick every type that applies</legend>
+          {% for group, options in choices %}
+            {% for value, label in options %}
+              <label><input type="checkbox" name="corrected_values" value="{{ value }}"{% if value in already %} checked{% endif %}> {{ label }}</label>
+            {% endfor %}
+          {% endfor %}
+        </fieldset>
+        {% elif choices %}<select name="corrected_value" class="choice-select">
           <option value="">choose a value…</option>
           {% for group, options in choices %}
             {% if group %}<optgroup label="{{ group }}">{% endif %}

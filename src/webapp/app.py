@@ -67,6 +67,7 @@ from ..diff.compare import LAYOUT_FIELDS
 from ..output import generate_upload
 from ..registry import loader
 from ..store.decisions import Action
+from ..store.changes import LIST_SEPARATOR
 from ..vehicle_class import DEFAULT as DEFAULT_VEHICLE_CLASS
 from ..vehicle_class import VehicleClass
 from . import choices
@@ -83,6 +84,7 @@ _templates.env.globals["is_layout_field"] = lambda field: field in LAYOUT_FIELDS
 _templates.env.globals["is_year_field"] = lambda field: field == "year"
 _templates.env.globals["field_choices"] = choices.field_choices
 _templates.env.globals["choice_label"] = choices.label_for
+_templates.env.globals["is_multi_select"] = choices.is_multi_select
 # A `MissingField` proposal (store.changes.persist_diff) always has `old_value ==
 # new_value` and this exact snippet — same "match on the snippet text" trick as the
 # archive/year-rollover proposals above, since there's no DB column for "why".
@@ -683,6 +685,10 @@ def create_app(
         connection: ConnectionDep,
         action: Action = Form(...),
         corrected_value: str = Form(""),
+        # A multi-select submits one of these per ticked box. Kept as its own field name
+        # rather than making `corrected_value` a list, so the single-select and free-text
+        # paths are untouched.
+        corrected_values: list[str] = Form([]),  # noqa: B006 — FastAPI reads the default
         reviewer_name: str = Form(""),
     ) -> HTMLResponse:
         run = _run_or_404(connection, run_id)
@@ -697,6 +703,10 @@ def create_app(
         reviewer_name = reviewer_name.strip()
         error = None
         run = store.get_run(connection, change.run_id)
+        if choices.is_multi_select(change.field):
+            # Joined the way `output.build.apply_field` splits it again.
+            ticked = [value.strip() for value in corrected_values if value.strip()]
+            corrected_value = LIST_SEPARATOR.join(ticked)
         selectable = choices.field_choices(change.field, run.vehicle_class)
         known_reviewers: set[str] = app.state.reviewer_names_lower
         if known_reviewers and reviewer_name.lower() not in known_reviewers:

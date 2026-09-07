@@ -19,6 +19,7 @@ from src import paths, store
 from src.adapters.base import ExtractedMotorhome, Provenance
 from src.diff.classify import diff_products
 from src.product_model import io
+from src.product_model.enums import BedType
 from src.product_model.model import Motorhome
 from src.vehicle_class import VehicleClass
 from src.webapp import create_app
@@ -1250,3 +1251,120 @@ def test_a_product_with_no_floorplan_gets_no_header_link(
 
     assert response.status_code == 200
     assert 'class="product-floorplan"' not in response.text
+
+
+def _run_with_a_bed_types_change(db_path: Path) -> tuple[int, int]:
+    """A pending `bed_types` proposal on a matched product, for the multi-select tests."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    baseline = Motorhome(
+        manufacturer="Adria Mobil",
+        manufacturer_range="Matrix",
+        model="Supreme 670 DC",
+        product_id=1,
+        bed_types=[BedType.ISLAND],
+    )
+    extracted = make_extracted(rrp_pounds=45000, bed_types=[BedType.DROP_DOWN])
+    extracted.provenance["bed_types"] = Provenance(
+        source_url="https://example.test/p", snippet="Front electric drop-down double bed"
+    )
+    diffs = diff_products([extracted], [baseline])
+    store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
+    store.finish_run(connection, run.id)
+    change = next(
+        entry.change
+        for entry in store.list_change_queue(connection, run_id=run.id)
+        if entry.change.field == "bed_types"
+    )
+    connection.close()
+    return run.id, change.id
+
+
+def test_bed_types_is_offered_as_tick_boxes_not_one_choice(
+    client: TestClient, db_path: Path
+) -> None:
+    """The requester, 7 September 2026: *"we need the option to be able to select all the
+    types that apply rather than correct the value with one other value."*
+    """
+    run_id, _change_id = _run_with_a_bed_types_change(db_path)
+
+    response = client.get(f"/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert 'class="choice-checks"' in response.text
+    assert 'name="corrected_values"' in response.text
+    assert 'value="island_bed"' in response.text
+    assert 'value="drop_down_bed"' in response.text
+    # And the labels, not the column names, since a reviewer reads these.
+    assert "Drop-down bed" in response.text
+
+
+def test_correcting_bed_types_records_every_type_ticked(
+    client: TestClient, db_path: Path
+) -> None:
+    """A four-berth coachbuilt has a fixed bed at the back and a drop-down over the cab."""
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "correct",
+            "reviewer_name": "ben",
+            "corrected_values": ["island_bed", "drop_down_bed"],
+        },
+    )
+
+    assert response.status_code == 200
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision is not None
+    assert decision.action == "correct"
+    assert decision.corrected_value == "island_bed, drop_down_bed"
+
+
+def test_a_corrected_bed_type_list_survives_into_the_upload(
+    client: TestClient, db_path: Path
+) -> None:
+    """The whole point: `apply_field` has always split this, so the list has to reach it."""
+    from src.output.build import apply_field
+
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+    client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "correct",
+            "reviewer_name": "ben",
+            "corrected_values": ["fixed_bed", "drop_down_bed"],
+        },
+    )
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+
+    product = apply_field(Motorhome(manufacturer="Adria Mobil"), "bed_types", decision.corrected_value)
+    assert product.bed_types == [BedType.FIXED, BedType.DROP_DOWN]
+
+
+def test_an_unrecognised_bed_type_is_refused_at_review_not_at_upload(
+    client: TestClient, db_path: Path
+) -> None:
+    """One bad part would make `apply_field` raise for the whole row, hours later."""
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "correct",
+            "reviewer_name": "ben",
+            "corrected_values": ["island_bed", "hammock"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert "not one of the values" in response.text
+    connection = store.connect(db_path)
+    assert store.latest_decision(connection, change_id) is None
+    connection.close()
