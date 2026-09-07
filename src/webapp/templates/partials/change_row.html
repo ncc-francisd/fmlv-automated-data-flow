@@ -5,6 +5,8 @@
 {% set multi = is_multi_select(entry.change.field) %}
 {# Nothing to accept on either side, so a reviewer has to choose. See `choices.needs_selection`. #}
 {% set unset = needs_selection(entry.change) %}
+{# A new product's empty column: no existing value, so the answers are set one or leave it blank. #}
+{% set unset_new = is_unset_field(entry.change) %}
 {% set already = (entry.change.new_value or entry.change.old_value or '').split(', ') %}
 <div id="change-{{ entry.change.id }}" class="change-row{% if missing %} missing-field-row{% endif %}{% if unset and not entry.decision %} selection-needed-row{% endif %}">
   <div class="field-name">
@@ -20,7 +22,11 @@
     {% endif %}
   </div>
   <div>
-    {% if missing %}
+    {% if unset_new %}
+      <div class="value-diff">
+        <span class="muted">no value from the site, and none on record</span>
+      </div>
+    {% elif missing %}
       <div class="value-diff">
         <span class="muted">current value:</span>
         <span class="old">{{ entry.change.old_value if entry.change.old_value is not none else "—" }}</span>
@@ -69,6 +75,44 @@
           <button type="submit" name="action" value="undo" class="btn btn-undo">Undo</button>
         </form>
       </div>
+    {% elif unset_new %}
+      <form
+        class="decision-form"
+        hx-post="/runs/{{ run.id }}/changes/{{ entry.change.id }}/decide"
+        hx-target="#change-{{ entry.change.id }}"
+        hx-swap="outerHTML"
+        hx-include="#reviewer-name"
+      >
+        {% if can_be_blanked(entry.change.field, run.vehicle_class) %}
+        {% set required = is_required_field(entry.change.field, run.vehicle_class) %}
+        <button type="submit" name="action" value="blank" class="btn btn-blank"
+                title="{% if required %}Leave this column empty. It is a required field, so the generated CSV will report the row as missing it — deliberate, but check that is what you want.{% else %}Leave this column empty in FMLV.{% endif %}">Leave blank{% if required %} <span class="blank-required-flag" aria-hidden="true">!</span>{% endif %}</button>
+        {% else %}
+        <button type="submit" name="action" value="accept" class="btn btn-accept" title="Nothing to apply, so this leaves the column as it is">Leave as is</button>
+        {% endif %}
+        {% if multi %}<fieldset class="choice-checks">
+          <legend class="muted">tick every type that applies</legend>
+          {% for group, options in choices %}
+            {% for value, label in options %}
+              <label><input type="checkbox" name="corrected_values" value="{{ value }}"> {{ label }}</label>
+            {% endfor %}
+          {% endfor %}
+        </fieldset>
+        {% elif choices %}<select name="corrected_value" class="choice-select">
+          <option value="">choose a value…</option>
+          {% for group, options in choices %}
+            {% if group %}<optgroup label="{{ group }}">{% endif %}
+            {% for value, label in options %}
+              <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+            {% if group %}</optgroup>{% endif %}
+          {% endfor %}
+        </select>
+        {% else %}
+        <input type="text" name="corrected_value" placeholder="value">
+        {% endif %}
+        <button type="submit" name="action" value="correct" class="btn btn-correct">Set</button>
+      </form>
     {% elif missing %}
       <form
         class="decision-form"

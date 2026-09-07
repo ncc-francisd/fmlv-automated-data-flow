@@ -94,6 +94,14 @@ _templates.env.globals["needs_selection"] = lambda change: choices.needs_selecti
 _templates.env.globals["is_missing_field"] = lambda change: (change.source_snippet or "").startswith(
     (store.MISSING_FIELD_SNIPPET, store.UNDETERMINED_FIELD_SNIPPET)
 )
+#: A row for a column a **new** product has nothing for, from
+#: `store.changes.NEEDS_A_CHOICE_SNIPPET`. Rendered differently again from a missing
+#: field: there is no existing value, so "keep it" is not one of the answers. The two
+#: answers are "set one" and "leave it blank", and the reviewer has to pick.
+_templates.env.globals["is_unset_field"] = lambda change: (
+    change.source_snippet or ""
+).startswith(store.NEEDS_A_CHOICE_SNIPPET)
+
 #: Whether the "Leave blank" button is offered for a field — see `choices.can_be_blanked`.
 #: A guard, not a preference: blanking a boolean writes `No` and blanking an identity
 #: string orphans the product's FMLV id, so neither is offered.

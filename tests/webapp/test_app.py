@@ -1533,3 +1533,75 @@ def test_accept_all_does_accept_a_new_products_weights(
     # value for at all. Nothing with a real figure is.
     assert "sleeping_area" in pending
     assert not {"mro_kilograms", "mtplm_kilograms", "mh_payload_kilograms"} & set(pending)
+
+
+def _run_with_a_new_products_missing_weight(db_path: Path) -> tuple[int, int, int]:
+    """A new product with no MRO from anywhere: `(run, product, mro change)`."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    extracted = make_extracted(
+        rrp_pounds=69995, manufacturer_range="Super Brig", model="Suite"
+    )
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [])
+    )
+    store.finish_run(connection, run.id)
+    queue = store.list_change_queue(connection, run_id=run.id)
+    mro = next(e for e in queue if e.change.field == "mro_kilograms")
+    connection.close()
+    return run.id, mro.product.id, mro.change.id
+
+
+def test_a_new_products_missing_weight_offers_blank_or_a_value(
+    client: TestClient, db_path: Path
+) -> None:
+    """There is no existing figure, so "keep it" is not one of the answers."""
+    run_id, _product_id, _change_id = _run_with_a_new_products_missing_weight(db_path)
+
+    response = client.get(f"/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert "no value from the site, and none on record" in response.text
+    assert 'value="blank"' in response.text
+    assert "Leave blank" in response.text
+    # Not offered: there is nothing on record to keep.
+    assert "Keep existing value" not in response.text
+
+
+def test_a_new_products_weight_can_be_left_blank(
+    client: TestClient, db_path: Path
+) -> None:
+    """Francis, 7 September 2026: *"I can choose to leave it blank, I assume."*"""
+    run_id, _product_id, change_id = _run_with_a_new_products_missing_weight(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={"action": "blank", "reviewer_name": "ben"},
+    )
+
+    assert response.status_code == 200
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision is not None
+    assert decision.action == "blank"
+
+
+def test_a_new_products_weight_can_be_typed_in_instead(
+    client: TestClient, db_path: Path
+) -> None:
+    run_id, _product_id, change_id = _run_with_a_new_products_missing_weight(db_path)
+
+    client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={"action": "correct", "corrected_value": "3005", "reviewer_name": "ben"},
+    )
+
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision is not None
+    assert decision.action == "correct"
+    assert decision.corrected_value == "3005"
