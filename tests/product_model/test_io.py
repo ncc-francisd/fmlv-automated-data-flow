@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from src.product_model import io, schema, validation
+from src.product_model.model import Motorhome
 
 ADRIA_EXPORT = (
     Path(__file__).parents[2]
@@ -131,3 +132,28 @@ def test_write_csv_preserves_column_order(adria_result: io.ReadResult, tmp_path:
 
     header = out_path.read_text(encoding="utf-8").splitlines()[0].split(",")
     assert header == list(schema.COLUMNS)
+
+
+def test_the_leading_dash_rows_end_the_same_way_as_every_other_row(tmp_path: Path) -> None:
+    """The upload's whole purpose is to be parsed by the FMLV site, so it cannot be mixed.
+
+    The two `-` rows FMLV wants above the header were written with `handle.write("-\n")`
+    while the csv writer ended every other row `\r\n`, leaving the first two lines LF and
+    the rest CRLF. Run 86's export was the first anyone tried to open.
+    """
+    path = tmp_path / "upload.csv"
+    io.write_csv([Motorhome(manufacturer="Rimor", model="66 Plus")], path, leading_blank_rows=2)
+
+    raw = path.read_bytes()
+    assert raw.startswith(b"-\r\n-\r\n")
+    assert raw.count(b"\n") == raw.count(b"\r\n"), "no bare LF anywhere in an upload CSV"
+
+
+def test_a_plain_csv_still_has_no_dash_rows(tmp_path: Path) -> None:
+    """`leading_blank_rows` defaults to 0, so round-tripping and tests are unaffected."""
+    path = tmp_path / "plain.csv"
+    io.write_csv([Motorhome(manufacturer="Rimor", model="66 Plus")], path)
+
+    raw = path.read_bytes()
+    assert not raw.startswith(b"-")
+    assert raw.count(b"\n") == raw.count(b"\r\n")

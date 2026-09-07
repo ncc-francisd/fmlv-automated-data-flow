@@ -257,7 +257,9 @@ def write_csv(
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=caravan_schema.COLUMNS)
         for _ in range(leading_blank_rows):
-            handle.write("-\n")
+            # Through the csv writer, so these rows end CRLF like the rest — see
+            # `io.write_csv`, which had the same mixed-line-endings bug.
+            writer.writer.writerow(["-"])
         writer.writeheader()
         for caravan in caravans:
             writer.writerow(caravan_to_row(caravan))

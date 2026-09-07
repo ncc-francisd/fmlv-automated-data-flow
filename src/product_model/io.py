@@ -356,7 +356,11 @@ def write_csv(
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=schema.COLUMNS)
         for _ in range(leading_blank_rows):
-            handle.write("-\n")
+            # Written through the csv writer rather than `handle.write`, so these rows end
+            # CRLF like every other row. Writing them with a bare "\n" left the upload with
+            # mixed line endings — the first two lines LF, the rest CRLF — in a file whose
+            # whole purpose is to be parsed by the FMLV upload site.
+            writer.writer.writerow(["-"])
         writer.writeheader()
         for motorhome in motorhomes:
             writer.writerow(motorhome_to_row(motorhome))
