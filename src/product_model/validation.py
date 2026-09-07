@@ -21,7 +21,12 @@ Severity = Literal["error", "warning"]
 #: Single-select layout groups worth flagging when unset on an existing product.
 #: Refrigeration is deliberately excluded — the guide phrases it as "at most one"
 #: (fridge/fridge_freezer/neither), not "select one", so an unset value is valid.
-_LAYOUT_GROUP_FIELDS: tuple[str, ...] = (
+#:
+#: Public because `store.changes.persist_diff` reads it too: a **new** product with one of
+#: these unset now gets a row in the review, rather than only a warning hours later at
+#: upload. The Rimor Van 238 shipped with four of them blank because the adapter has no
+#: floorplan for it and so recorded nothing at all — leaving the reviewer no row to see.
+LAYOUT_GROUP_FIELDS: tuple[str, ...] = (
     "body_type",
     "sleeping_area",
     "kitchen_location",
@@ -76,7 +81,7 @@ def validate(motorhome: Motorhome) -> list[Issue]:
     issues.extend(_validate_length(motorhome, key))
     issues.extend(_validate_automatic(motorhome, key))
 
-    for field_name in _LAYOUT_GROUP_FIELDS:
+    for field_name in LAYOUT_GROUP_FIELDS:
         if getattr(motorhome, field_name) is None:
             issues.append(
                 Issue(
@@ -223,7 +228,7 @@ def format_issues(issues: Iterable[Issue]) -> str:
 #: Single-select layout groups worth flagging when unset on an existing caravan.
 #: Refrigeration is excluded for the same reason as on the motorhome side — the guide
 #: phrases it as "at most one", so unset is valid.
-_CARAVAN_LAYOUT_GROUP_FIELDS: tuple[str, ...] = (
+CARAVAN_LAYOUT_GROUP_FIELDS: tuple[str, ...] = (
     "body_type",
     "sleeping_area",
     "kitchen_location",
@@ -259,7 +264,7 @@ def validate_caravan(caravan: Caravan) -> list[Issue]:
     issues.extend(_validate_caravan_payload(caravan, key))
     issues.extend(_validate_caravan_lengths(caravan, key))
 
-    for field_name in _CARAVAN_LAYOUT_GROUP_FIELDS:
+    for field_name in CARAVAN_LAYOUT_GROUP_FIELDS:
         if getattr(caravan, field_name) is None:
             issues.append(
                 Issue(

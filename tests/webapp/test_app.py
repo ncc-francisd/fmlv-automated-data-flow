@@ -1430,8 +1430,11 @@ def test_accept_all_leaves_a_field_that_needs_a_choice_pending(
         if entry.decision is None
     ]
     connection.close()
-    # The pointer is still pending; everything else was accepted.
-    assert [entry.change.field for entry in pending] == ["sleeping_area"]
+    # The pointer is still pending, along with every other column this new product has
+    # nothing for — see `store.changes.fields_needing_a_choice`. Everything with a real
+    # value was accepted.
+    assert "sleeping_area" in [entry.change.field for entry in pending]
+    assert "rrp_pounds" not in [entry.change.field for entry in pending]
 
 
 def test_accept_all_still_accepts_everything_when_nothing_needs_a_choice(
@@ -1465,3 +1468,68 @@ def test_needs_selection_only_fires_when_both_sides_are_empty() -> None:
     assert choices.needs_selection("", "  ") is True
     assert choices.needs_selection("side_shower_toilet", None) is False
     assert choices.needs_selection(None, "island_bed") is False
+
+
+def test_accept_all_does_accept_a_new_products_weights(
+    client: TestClient, db_path: Path
+) -> None:
+    """Regression guard for run 87: MRO and payload must not be caught by the new skip.
+
+    The `needs_selection` guard only skips rows with nothing on either side. A new
+    product's MRO is a real proposed value, so Accept all has to take it — otherwise the
+    upload reports `required field 'mro_kilograms' is missing`.
+    """
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    extracted = make_extracted(
+        rrp_pounds=61995,
+        manufacturer_range="Kilig",
+        model="55 Plus",
+        mro_kilograms=3051,
+        mtplm_kilograms=3500,
+        mh_payload_kilograms=449,
+    )
+    for name, snippet in (
+        ("mro_kilograms", "MRO: 3051 kg"),
+        ("mtplm_kilograms", "Maximum overall weight: 3500"),
+        ("mh_payload_kilograms", "3500 kg MTPLM - 3051 kg MRO"),
+    ):
+        extracted.provenance[name] = Provenance("https://www.rimor.it/x", snippet)
+    extracted.provenance["sleeping_area"] = Provenance(
+        "https://www.rimor.it/plan.jpg", "read it off the floorplan", reviewer_reference=True
+    )
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [])
+    )
+    store.finish_run(connection, run.id)
+    product_id = next(
+        e.product.id for e in store.list_change_queue(connection, run_id=run.id)
+    )
+    connection.close()
+
+    client.post(
+        f"/runs/{run.id}/products/{product_id}/accept-all", data={"reviewer_name": "ben"}
+    )
+
+    connection = store.connect(db_path)
+    decided = {
+        e.change.field: e.decision.action
+        for e in store.list_change_queue(connection, run_id=run.id)
+        if e.decision is not None
+    }
+    pending = [
+        e.change.field
+        for e in store.list_change_queue(connection, run_id=run.id)
+        if e.decision is None
+    ]
+    connection.close()
+
+    assert decided.get("mro_kilograms") == "accept"
+    assert decided.get("mh_payload_kilograms") == "accept"
+    assert decided.get("mtplm_kilograms") == "accept"
+    # Held back: the floorplan pointer, and the other columns this new product has no
+    # value for at all. Nothing with a real figure is.
+    assert "sleeping_area" in pending
+    assert not {"mro_kilograms", "mtplm_kilograms", "mh_payload_kilograms"} & set(pending)

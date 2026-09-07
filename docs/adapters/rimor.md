@@ -405,6 +405,39 @@ Horus 54 is the useful case for the other direction: its MNC page gives exact
 millimetres, so the check runs at **zero tolerance**, and the two sites agree on all three
 axes exactly.
 
+## Rimor withdrew MRO on 7 September 2026
+
+One day after it appeared. The overview block now reads:
+
+```
+outside length 7338 mm
+outside width - inside width 2340 - 2200 mm
+maximum outside height inside height 2845 - 2060 mm
+maximum overall weight 3500 / 3550 / 4100 kg
+4  4  1150x850
+Bedding solution : Transverse bed
+```
+
+Both `MRO` and `available mass for optional equipment installation` are gone, as are the
+footnote markers. So **`mro_kilograms` and `mh_payload_kilograms` are unavailable again**,
+and the payload arithmetic with them. Everything else still parses — dimensions, the
+homologated seat count, berths, MTPLM, the bedding solution and the garage were all
+checked against the live pages the same day.
+
+Nothing in the adapter changed for this and nothing needed to: the run reports the field
+as unfound, a matched product keeps whatever FMLV holds, and the figure is not silently
+inherited into anything that would look collected. That is
+`docs/adapters/README.md`'s rule on a withdrawn spec working as intended.
+
+**It leaves a real gap on new products**, though, and this is where it hurts: a layout
+FMLV has never held has no MRO from anywhere, so its upload row carries none and
+`validation` reports `required field 'mro_kilograms' is missing`. That is honest but it
+used to surface only in the issues file, after the upload was generated — which is why
+`store.changes.fields_needing_a_choice` now puts a row in the review for it instead.
+
+Worth re-checking whether MRO comes back, since it lasted a day: if it does,
+`_MRO` still matches the markup it had.
+
 ## What is unverified
 
 * **`ncc_supplier_name`** is `Rimor`, inherited from the seed list and **not confirmed**

@@ -135,11 +135,28 @@ def test_new_product_persists_every_extracted_field_with_no_old_value(
         connection, run_id=run_id, manufacturer_id=3, diffs=diffs
     )
 
-    assert result.proposed == 1
+    # The extracted field, plus one row per single-select layout group the product has no
+    # value for — a new product needs a choice from each, and without a row the reviewer
+    # never sees it. See `LAYOUT_GROUP_UNSET_SNIPPET`.
+    unset_count = sum(
+        1
+        for f in store.changes.fields_needing_a_choice(extracted.product)
+        if f not in extracted.provenance
+        and getattr(extracted.product, f, None) is None
+    )
+    assert result.proposed == 1 + unset_count
     queue = store.list_change_queue(connection, run_id)
-    assert queue[0].change.old_value is None
-    assert queue[0].change.new_value == "45000"
-    assert queue[0].product.fmlv_product_id is None
+    rrp = next(e for e in queue if e.change.field == "rrp_pounds")
+    assert rrp.change.old_value is None
+    assert rrp.change.new_value == "45000"
+    assert rrp.product.fmlv_product_id is None
+
+    unset = {e.change.field for e in queue if e.change.reviewer_reference}
+    assert "mro_kilograms" in unset
+    assert "sleeping_area" in unset
+    assert all(
+        e.change.new_value is None for e in queue if e.change.reviewer_reference
+    )
 
 
 def test_disappeared_product_gets_a_disappearance_notice_not_a_proposed_change(
@@ -557,7 +574,71 @@ def test_a_new_product_is_still_asked_about_an_empty_in_scope_field(
         connection, run_id=run.id, manufacturer_id=26, diffs=diff_products([scraped], [])
     )
 
-    [entry] = store.list_change_queue(connection, run.id)
+    queue = store.list_change_queue(connection, run.id)
+    entry = next(e for e in queue if e.change.field == "body_type")
 
-    assert entry.change.field == "body_type"
     assert entry.change.new_value is None
+    # The adapter's own row, carrying the evidence it did find — not one of the
+    # "nothing here at all" rows a new product also gets for its blank columns.
+    assert entry.change.source_snippet is not None
+    assert "subtype unstated" in entry.change.source_snippet
+
+
+def test_a_new_product_is_asked_about_every_column_it_has_nothing_for(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """The Rimor Van 238, which shipped blank in run 87 with no row to warn anyone.
+
+    It has no factory page, so the adapter found no weights and nothing positional — not
+    even a floorplan to point at. Before this the only sign was `required field
+    'mro_kilograms' is missing` in the issues file, after the upload was generated.
+    """
+    scraped = ExtractedMotorhome(
+        motorhome=Motorhome(
+            manufacturer="Rimor",
+            manufacturer_range="Horus",
+            model="Van 238",
+            rrp_pounds=56995,
+            mh_length_mm=5980,
+        ),
+        provenance={
+            "rrp_pounds": Provenance(source_url="https://mnc.test/x", snippet="£56,995"),
+            "mh_length_mm": Provenance(source_url="https://mnc.test/x", snippet="Length: 5.98m"),
+        },
+    )
+    store.persist_diff(
+        connection, run_id=run_id, manufacturer_id=75, diffs=diff_products([scraped], [])
+    )
+
+    rows = {e.change.field: e.change for e in store.list_change_queue(connection, run_id)}
+
+    # The weights it could not find, each needing a figure typed in.
+    for field_name in ("mro_kilograms", "mtplm_kilograms", "mh_payload_kilograms"):
+        assert field_name in rows, field_name
+        assert rows[field_name].new_value is None
+        assert rows[field_name].reviewer_reference is True
+
+    # And the positional groups, which no wording could ever settle.
+    for field_name in ("sleeping_area", "kitchen_location", "lounge_location"):
+        assert field_name in rows, field_name
+        assert rows[field_name].new_value is None
+
+    # What it did find is a normal proposal, not one of these.
+    assert rows["rrp_pounds"].new_value == "56995"
+    assert rows["rrp_pounds"].reviewer_reference is False
+    # And nothing is invented for a column it already has.
+    assert rows["mh_length_mm"].new_value == "5980"
+
+
+def test_an_existing_product_is_not_asked_about_columns_it_already_holds(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """Only new products get these rows: a matched one has a baseline value to keep."""
+    baseline = make_baseline()
+    scraped = make_extracted(rrp_pounds=93920)
+    store.persist_diff(
+        connection, run_id=run_id, manufacturer_id=3, diffs=diff_products([scraped], [baseline])
+    )
+
+    fields = [e.change.field for e in store.list_change_queue(connection, run_id)]
+    assert fields == ["rrp_pounds"]

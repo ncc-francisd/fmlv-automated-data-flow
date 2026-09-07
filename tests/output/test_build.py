@@ -196,7 +196,11 @@ def test_new_product_is_built_from_scratch_using_manufacturer_and_product_identi
     diffs = diff_products([extracted], [])
     store.persist_diff(connection, run_id=run_id, manufacturer_id=3, diffs=diffs)
 
-    [entry] = store.list_change_queue(connection, run_id)
+    # A new product also gets a row per column it has nothing for; only the one carrying
+    # a real value is accepted here. See `store.changes.fields_needing_a_choice`.
+    entry = next(
+        e for e in store.list_change_queue(connection, run_id) if e.change.field == "rrp_pounds"
+    )
     store.record_decision(
         connection, proposed_change_id=entry.change.id, action="accept", decided_by="ben"
     )

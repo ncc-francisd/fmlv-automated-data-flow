@@ -49,6 +49,12 @@ from typing import Any
 from ..diff.classify import ChangeKind, ProductDiff
 from ..diff.compare import MissingField, field_value, profile_for
 from ..diff.year_rollover import bump_year, can_bump_year
+from ..product_model import caravan_schema, schema
+from ..product_model.caravan import Caravan
+from ..product_model.validation import (
+    CARAVAN_LAYOUT_GROUP_FIELDS,
+    LAYOUT_GROUP_FIELDS,
+)
 from ..vehicle_class import DEFAULT as DEFAULT_VEHICLE_CLASS
 from ..vehicle_class import VehicleClass
 from . import products as products_store
@@ -94,6 +100,51 @@ UNDETERMINED_FIELD_SNIPPET = (
     "field from the manufacturer's site. Confirm the existing value is still correct, "
     "or choose a replacement."
 )
+
+#: `source_snippet` for a field a new product would otherwise reach FMLV blank on.
+#: Nothing was read off the site — the adapter could not determine it and there is no
+#: baseline to keep — so the reviewer has to choose, and `choices.needs_selection` marks
+#: the row accordingly.
+NEEDS_A_CHOICE_SNIPPET = (
+    "Nothing was found for this field and there is no existing value to keep, so it "
+    "needs one. Left unset, FMLV receives the product with this column blank."
+)
+
+
+def fields_needing_a_choice(product: Product) -> tuple[str, ...]:
+    """Fields a **new** product must not reach FMLV blank, in the order to show them.
+
+    Two kinds, and both were shipping blank without the reviewer ever seeing a row:
+
+    * **Required columns** the adapter could not fill. `Kilig 55 Plus` went out with no
+      MRO, MTPLM or payload, and the only sign was `required field 'mro_kilograms' is
+      missing` in the issues file after the upload was generated.
+    * **Single-select layout groups.** The `Rimor Van 238` has no factory page at all, so
+      the adapter recorded nothing for sleeping area, kitchen, lounge or washroom — not
+      even a floorplan to point at — and there was no row to flag.
+
+    The identity strings are excluded: `manufacturer`, `model` and their kin are always
+    set on a product that exists at all, and a reviewer cannot usefully be asked to
+    choose one.
+    """
+    layout = (
+        CARAVAN_LAYOUT_GROUP_FIELDS
+        if isinstance(product, Caravan)
+        else LAYOUT_GROUP_FIELDS
+    )
+    required = caravan_schema.REQUIRED if isinstance(product, Caravan) else schema.REQUIRED
+    return (
+        *(f for f in sorted(required) if f not in _IDENTITY_FIELDS),
+        *layout,
+    )
+
+
+#: Never asked about: a product with no manufacturer or model does not exist, and these
+#: are what `diff.matching` keys on.
+_IDENTITY_FIELDS: frozenset[str] = frozenset(
+    {"manufacturer", "manufacturer_display_name", "manufacturer_range", "model"}
+)
+
 
 #: How `_serialize` joins a multi-valued field (e.g. `bed_types`) into one TEXT column.
 #: `output.build.apply_field` is `_serialize`'s inverse and splits on this same
@@ -471,6 +522,28 @@ def persist_diff(
                     source_url=provenance.source_url,
                     source_snippet=provenance.snippet,
                     reviewer_reference=provenance.reviewer_reference,
+                )
+                proposed += 1
+
+            # Anything a new product would otherwise reach FMLV blank on gets a row,
+            # whether the adapter mentioned it or not — see `fields_needing_a_choice`.
+            # Without this the only sign was a line in the issues file, after the upload
+            # had been generated.
+            for field_name in fields_needing_a_choice(diff.extracted.product):
+                if field_name in diff.extracted.provenance:
+                    continue
+                if field_value(diff.extracted.product, field_name) is not None:
+                    continue
+                record_proposed_change(
+                    connection,
+                    run_id=run_id,
+                    product_id=product.id,
+                    field=field_name,
+                    old_value=None,
+                    new_value=None,
+                    source_url=None,
+                    source_snippet=NEEDS_A_CHOICE_SNIPPET,
+                    reviewer_reference=True,
                 )
                 proposed += 1
             continue
