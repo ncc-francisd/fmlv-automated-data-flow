@@ -202,10 +202,29 @@ this figure as exactly the optional-equipment half of that sum:
 > ensure that the minimum payload, i.e. the legally required free mass for baggage and
 > retrofitted accessories, is actually available."*
 
-So the reading is `optional_equipment_payload_kilograms` = the published figure and
-`personal_effects_payload_kilograms` = the remainder. That is a **different** answer from the
-one Bailey, Adria and Swift needed, where the manufacturer published a single figure and it
-was taken as the personal-effects total, so it should be confirmed before it is emitted.
+The tempting reading is therefore `optional_equipment_payload_kilograms` = the published
+figure and `personal_effects_payload_kilograms` = the remainder, which is what this survey
+first proposed. **That is wrong, and three things say so:**
+
+- **FMLV's own field guide.** `personal_effects_payload_kilograms` is marked `REQUIRED FIELD`
+  and `in_scope`; `optional_equipment_payload_kilograms` is marked
+  `NOT REQUIRED - rarely published` and carries no scope flag at all.
+- **The base-vehicle rule.** [`README.md`](README.md) records the vehicle *as standard*, and a
+  standard Touring 310 has no factory options fitted, so its usable payload is the whole
+  180 kg. Eriba's 92 kg is a **ceiling on what may be ordered**, not weight that is present —
+  and the motorhome half of that file names this exact label as "a cap on factory-fitted
+  extras … NOT payload".
+- **Bailey and Swift both put the whole figure in the personal-effects column**, and
+  `optional_equipment_payload_kilograms` is blank across all 92 caravans FMLV held when those
+  two were built.
+
+So: **`personal_effects_payload_kilograms` = `MTPLM − MRO`**, the same arithmetic and wording
+`swift_caravan.py` uses, with Eriba's published allowance quoted in the provenance as the
+cross-check that it leaves a legal minimum payload. The optional column gets **provenance
+with no value**, which `diff.compare` turns into a confirm-or-clear row.
+
+**That clearing matters more here than it did for Swift**, because FMLV has Eriba's data in
+the wrong column on **all 18** — see [the baseline](#what-the-fmlv-baseline-holds).
 
 There is a third, weaker redundancy: `Unladen weight, approx. kg` sits exactly 41 kg below
 the MRO on every Touring layout and exactly 61 kg below it on every Feeling and Novaline —
@@ -214,14 +233,31 @@ of water against the others' 2 × 11 kg and 45 l. It is a real check but a range
 one, and the band above is cleaner. FMLV's `mro_kilograms` takes **Mass in running order**,
 not this figure.
 
-## Roof type is not uniform, and twelve of eighteen lift — but all eighteen are rigid
+## Roof type and body type <a id="roof-type-and-body-type-open"></a>
 
-**Settled by the requester, 7 September 2026: `type_rigid` on all eighteen.** The reasoning
-is now a cross-manufacturer rule in [`README.md`](README.md#body-type-is-nearly-always-type_rigid)
-— a lifting roof does not make a caravan `type_pop_up`, because an Eriba is a hard-sided
-rigid caravan with a lifting panel while `type_pop_up` reads to a UK audience as a folding
-camper. The roof still belongs in the `body_type` provenance snippet, quoting the row below,
-so a reviewer can see why the obvious alternative was refused.
+**Open, and it must be settled before the adapter emits a body type.** The requester's first
+answer, 7 September 2026, was `type_rigid` on all eighteen — given before the FMLV export had
+been fetched, because the supplier name was not yet known. The export contradicts it:
+
+> **FMLV holds `type_pop_up` = Yes on 15 of the 21 current Eriba caravans** — all twelve
+> Touring layouts and all three Feeling — and `type_rigid` on the six Novaline. Not one
+> current row is `type_folding` or `type_micro`.
+
+That maps **exactly** onto the `Roof type` row below: the 15 are the ones reading `Pop-up
+roof` or `Sleeping roof`, the 6 are the ones reading `Fix roof`. So FMLV's existing answer is
+that **any raisable roof is a pop-up**, applied consistently across two model years and by
+whoever entered the data. It is also the reading Eriba's own wording invites.
+
+Emitting `type_rigid` would therefore propose a change on 15 products at once, which is the
+shape [`README.md`](README.md) says to treat as a question about the parse rather than as 15
+stale records. Nothing here suggests the baseline is wrong: it is internally consistent, it
+agrees with the manufacturer's own vocabulary, and it predates this survey.
+
+The argument for `type_rigid` remains a real one — an Eriba is a hard-sided caravan with a
+lifting panel, and a UK buyer filtering for "pop up" may well be looking for a folding
+camper. But it is an argument for changing FMLV's convention across an existing 15 products,
+not for reading the source differently, and that is a bigger decision than an adapter should
+make on its own. **Put back to the requester with the export in hand.**
 
 Every layout carries a `Roof type` row, and it does not follow the range:
 
@@ -361,39 +397,158 @@ and there are only three PDFs on the site.
 
 Expect **18 products** and compare every run against that number.
 
+## What the FMLV baseline holds <a id="what-the-fmlv-baseline-holds"></a>
+
+Fetched 7 September 2026 once the requester confirmed `ncc_supplier_name` as **`Eriba`** —
+the same string as `fmlv_manufacturer`, so the Weinsberg worry about a Hymer parent-company
+name came to nothing.
+
+**54 rows in the touring-caravan export, of which 21 are the current model year and
+unarchived.** The other 33 are 2022 and 2025 rows that `cli._is_current_model_year` drops, so
+the baseline the diff sees is 21 — count against that, not against 54, per the Elddis lesson
+in [`README.md`](README.md).
+
+**The identity strings need no changing at all**, which is rare here:
+`manufacturer` = `Eriba`, `manufacturer_range` = `Touring` / `Feeling` / `Novaline`, and
+`model` = the bare number (`310`, stored numeric). **All 18 price-list layouts match a
+baseline row exactly**, so nothing is near the fuzzy-matching threshold and no rename is
+being proposed. That also means the matcher's usual hazards do not arise.
+
+### What the first run should propose
+
+| Field | Unchanged | Changed | Was blank |
+|---|---|---|---|
+| `berths` | **18** | 0 | 0 |
+| `shipping_length_mm` | **18** | 0 | 0 |
+| `internal_length_mm` | **18** | 0 | 0 |
+| `headroom_mm` | **18** | 0 | 0 |
+| `exterior_body_length_mm` | 17 | 1 | 0 |
+| `overall_width_mm` | 17 | 1 | 0 |
+| `height_mm` | 17 | 1 | 0 |
+| `rrp_pounds` | 0 | **18** | 0 |
+| `mtplm_kilograms` | 0 | **18** | 0 |
+| `mro_kilograms` | 0 | **18** | 0 |
+| `awning_length_mm` | 0 | 0 | **18** |
+
+That table is the best evidence in this survey that the parse is right, and it is worth
+reading as a shape rather than as numbers. **Every dimension is unchanged and every price and
+mass has moved** — which is exactly what a model-year rollover on carried-over shells looks
+like. The 2027 range reuses the 2026 bodies and re-rates the weights. If the columnar split
+were misaligned, the dimensions would not have landed on 18 of 18 four times over.
+
+**`berths` at 18 of 18 independently confirms the lower-figure rule.** FMLV holds `2` where
+Eriba prints `2 - 4` and `3` where it prints `3 - 5`, so the general rule and the customer's
+own data agree without being made to.
+
+**`awning_length_mm` is blank on all 18** and the price list publishes it, so this fills 18
+genuine gaps rather than changing anything.
+
+### Three figures in FMLV appear to be wrong, not merely old
+
+The three single-product changes are almost certainly corrections rather than model-year
+movement, because every *other* dimension on those same vehicles is unchanged:
+
+- **Touring 620, `exterior_body_length_mm` 5060 → 5230.** The stored figure is **impossible**:
+  its `internal_length_mm` is 5110, so the caravan's inside is longer than its body. 5230 is
+  what the price list says and what its 630 and 642 siblings already hold.
+- **Touring 620, `overall_width_mm` 2000 → 2190.** 2000 mm is the narrow Touring body; the
+  620 shares the 2190 mm shell with the 630 and 642, which FMLV holds correctly.
+- **Touring 310, `height_mm` 2770 → 2270.** Every other Touring is 2270 and the price list
+  says 227 cm for all nine. This reads as a transposed digit.
+
+Note the 620 carries two of the three, which is a hint they were entered together.
+
+### The payload columns are populated the wrong way round
+
+**On all 18, `personal_effects_payload_kilograms` is blank and
+`optional_equipment_payload_kilograms` holds exactly the baseline's own `MTPLM − MRO`.**
+
+That is the inverse of what [the field guide](#the-self-check-a-printed-tolerance-band-and-a-payload-decomposition)
+asks for — the required, in-scope column is empty and the derived payload sits in the column
+marked "rarely published". Bailey's and Swift's caravans are the other way round.
+
+So the adapter's first run will ask a reviewer to clear all 18 optional figures while filling
+18 required ones. That is a lot of rows for one field, and it is the right outcome rather than
+a bug: leaving the old figure in place beside a new personal-effects total would make each row
+claim roughly twice the capacity the caravan has.
+
+Watch for one coincidence that makes the wrong reading look corroborated: on Feeling 425,
+Novaline 442 and Novaline 515 the baseline's stored figure happens to **equal** Eriba's 2027
+optional-equipment allowance (46, 20 and 92). Three of eighteen, and it is arithmetic
+coincidence — the 2026 masses differed — but it is exactly the kind of agreement that would
+talk someone into the split reading.
+
+### Two oddities worth knowing
+
+- **Four rows in the Eriba export are filed under `manufacturer` = `HYMER`** — product IDs
+  3445–3448, range `60th Edition`, models 310, 430, 530 and 542. They are Eriba Touring
+  anniversary caravans sitting under the parent brand's name. All four are 2022, so they fall
+  outside the current-model-year baseline and this run will neither touch nor report them —
+  but a baseline filtered on `manufacturer == "Eriba"` would silently exclude them if they
+  were ever current, and they are the reason `HYMER` exists separately at ID 86 in
+  `resources/manufacturers-full-list.csv`.
+- **The motorhome-and-campervan export is not empty**: two rows, `ERIBA CAR` 600 and 602, at
+  2026. Out of scope per the requester, and they confirm the campervan would be a second
+  module rather than anything this adapter should touch.
+
+### Three Touring layouts have gone
+
+`Touring 320`, `Touring 550` and `Touring 560` are in the baseline at 2026 and **absent from
+the 2027 price list**. Nothing new appears alongside them, so this is not a rename being
+misread — the standard check from [`README.md`](README.md) is to look for claimed-new products
+that match the disappeared ones, and here there are none at all. The 2027 range is genuinely
+three Touring layouts shorter, and the price list's own contents page lists the nine that
+remain.
+
+So the expected first run is **18 collected, 18 matched, 0 new, 3 disappeared.**
+
 ## What is still unverified
 
-- **`ncc_supplier_name` is not known, so the FMLV baseline export has not been fetched.**
-  This is the one genuinely blocking gap. It means the question
-  [`README.md`](README.md) says to answer before choosing identity strings — *what does FMLV
-  already call these vehicles?* — is unanswered. `manufacturer_range` and `model` are
-  presumably `Touring` + `310`, but the export decides that, not this document, and Weinsberg
-  is the warning: it is filed under `fmlv_manufacturer` `Knaus Tabbert AG` with display name
-  `Weinsberg`, so a Hymer parent-company string is entirely possible here.
-  `fmlv_manufacturer` is drafted as `Eriba` from `resources/manufacturers-full-list.csv` ID
-  196 and **must be checked against the export before an adapter is registered.**
-- **Whether any of these products is already in FMLV**, and so whether the first run proposes
-  eighteen new products or matches an existing set. Also blocked on the export.
-- **The optional-equipment payload reading**, per
-  [the self-check](#the-self-check-a-printed-tolerance-band-and-a-payload-decomposition).
-  Put to the requester on 7 September 2026 with a recommendation and not contradicted, so it
-  is being taken as agreed rather than as confirmed: emit the published figure as
-  `optional_equipment_payload_kilograms` and the remainder as
-  `personal_effects_payload_kilograms`. Worth re-confirming when the first run's numbers are
-  in front of a reviewer, since it is the one field here that departs from what Bailey,
-  Adria and Swift needed.
-
-Settled since the checkpoint, and recorded above rather than here: `body_type` is
-`type_rigid` on all eighteen, and `exterior_body_length_mm` is in scope.
+- **`body_type` on 15 of 18**, per [above](#roof-type-and-body-type-open). The one genuinely
+  blocking item now: FMLV says `type_pop_up`, the requester's first answer was `type_rigid`,
+  and the export was not available when that answer was given.
 - **The positional habitation fields** — `sleeping_area`, `kitchen_location`,
-  `lounge_location`, `bathroom_layout`. The price list names bed dimensions but not
-  positions, and the floorplan drawings are images on the range pages, so these need
-  `reviewer_reference` pointers. Note the Touring range page has no floorplans at all, so
-  there is no per-layout drawing to point a reviewer at for nine of the eighteen — the
-  configurator may be the only place, and it needs JavaScript.
+  `lounge_location`, `bathroom_layout`. The price list gives bed *dimensions* but no
+  positions, so these need `reviewer_reference` pointers at a drawing, and **only nine of the
+  eighteen have one** — see [floorplans](#floorplans-nine-of-eighteen) below.
+- **Whether the three departing Touring layouts should be archived** rather than left as
+  live 2026 rows once the 2027 range is uploaded. That is an FMLV-side action, not an
+  adapter one.
 - **When the 2028 price list lands.** This one is valid from 1 July 2026 and the model year
   rolls over July to early September, so per [`README.md`](README.md) re-check at the end of
   September.
+
+Settled and recorded above rather than here: the identity strings and the roster (from the
+export), `exterior_body_length_mm` in scope, and the payload columns.
+
+## Floorplans: nine of eighteen <a id="floorplans-nine-of-eighteen"></a>
+
+The Feeling and Novaline slides carry a per-layout drawing as an SVG on a strictly
+predictable path:
+
+```
+https://www.eriba.com/hymer/produktbilder/2020_01/produktbilder/
+  eriba_caravans-campervans/lofi-grundrisse_caravans-hochkant/eriba_<range>_<model>_hoch.svg
+```
+
+All nine resolve — `eriba_feeling_425_hoch.svg` is 9.6 KB of `image/svg+xml`. Read the URL
+out of the slide rather than building it, per the standing preference, but the pattern is
+worth recording because it is what made the next paragraph checkable.
+
+**There is no Touring drawing anywhere reachable.** All nine predicted URLs
+(`eriba_touring_310_hoch.svg` and its siblings) return a genuine **404** — verified against
+two controls, a known-good `feeling_425` returning 200 and a known-bad `touring_999`
+returning the same 404 as the rest. Nor does any Touring asset matching `grundriss`,
+`floorplan` or `layout` appear in the HTML of the UK Touring page, the international English
+one, the caravans index, the model overview, or the price list's link set. The site publishes
+plenty of Touring *photography* under `/eriba/produktbilder/2024/`, and no layout drawings.
+
+So for the nine Touring layouts the best available pointer is the configurator index,
+`/gb/en/configurator/touring`, which needs JavaScript and offers no per-layout deep link —
+the Touring page carries no `selectedModelId` to build one from. That is a pointer to a
+range, not to a layout, and it is weak enough that a `reviewer_reference` citing it may be
+worse than none: it sends a reviewer somewhere they still have to search. Left for the
+requester to weigh.
 
 ## What this adds to the general pattern
 

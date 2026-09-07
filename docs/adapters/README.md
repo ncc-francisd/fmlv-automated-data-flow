@@ -1208,29 +1208,15 @@ a very small car. Weight alone would have mislabelled thirteen products across B
 Adria; Bailey's Discovery D4-2 is 995kg and FMLV holds it as rigid, as is Swift's 1043kg
 Basecamp. Folding and pop-up exist in the schema but no surveyed brand builds one yet.
 
-**And a lifting roof does not make a caravan `type_pop_up`.** Rule from the NCC side,
-7 September 2026, on Eriba — the first brand to raise it, and the answer is that twelve of
-its eighteen layouts stay `type_rigid`.
-
-Eriba's own spec table publishes a `Roof type` row reading **`Pop-up roof`** on six Touring
-layouts and `Sleeping roof` on six more, against `Fix roof` on the six Novaline. So this is
-not a case of inferring a body type from a photograph: the manufacturer names the thing, in
-its own words, in the same table the weights come from. It is still not the FMLV value,
-because the two vocabularies do not mean the same thing. An Eriba is a **hard-sided rigid
-caravan with a lifting roof panel**; `type_pop_up` reads to a UK audience as a folding
-camper — a Pennine or Conway — which is a different kind of vehicle, and that is what
-someone filtering FMLV for it is looking for.
-
-Two things generalise from it:
-
-- **The manufacturer's own naming is decisive for `type_micro` and not for the others.**
-  That asymmetry is deliberate: the micro rule spells out "the manufacturer calls it one",
-  so a brand's vocabulary is *part* of the test there. Nothing says that for the rest of the
-  enum, and a roof row is a description of a roof rather than a claim about the body.
-- **Say where the roof went instead.** It is a real feature of the vehicle and the reason
-  half of Eriba's range exists, so it belongs in the `body_type` provenance snippet, quoting
-  the row. The value is `type_rigid`; the evidence for it says why the obvious alternative
-  was refused.
-
-`type_folding` and `type_pop_up` therefore still have no product behind them, and the bar
-for using either is a caravan whose **walls** fold or rise, not its roof.
+> **`type_pop_up` does have products behind it, and a lifting roof is why — open on Eriba,
+> 7 September 2026.** FMLV holds **`type_pop_up` = Yes on 15 of Eriba's 21 current caravans**
+> — every Touring and every Feeling — and `type_rigid` on the six Novaline. That maps exactly
+> onto the `Roof type` row in Eriba's own spec table, which reads `Pop-up roof` or
+> `Sleeping roof` on those 15 and `Fix roof` on the 6, so FMLV is treating **any raisable
+> roof** as a pop-up.
+>
+> This contradicts the sentence above and needs settling before Eriba's adapter emits a body
+> type, because getting it wrong proposes a change on 15 products at once. It is exactly the
+> "systematic disagreement is a question, not a parse error" case below. See
+> [`eriba.md`](eriba.md#roof-type-and-body-type-open) — do not generalise from either answer
+> until it is resolved.
