@@ -1158,6 +1158,14 @@ and the requester reads that as an industry trend rather than one brand's omissi
 (3 September 2026). Do not add it back for a manufacturer that happens to publish it
 without asking first — whatever FMLV already holds is left untouched.
 
+> **Asked for the first time on Eriba, 7 September 2026, and the answer was yes.** So the
+> rule is a requirement to *ask*, not a prohibition — and the question is cheap enough to be
+> worth asking whenever a brand publishes the figure distinctly. Eriba does: `Body length
+> (exterior) (cm)` sits in the same table as the shipping length and the interior length,
+> under three separate labels, so there is no risk of the confusion the scope rule protects
+> against. Note this does **not** re-open it for a brand that publishes one ambiguous
+> "length" — ask again, per case.
+
 **The payload check is `mtplm - mro == published_payload`, and `published_payload` is not
 always one column.** There are two — `personal_effects_payload_kilograms` and
 `optional_equipment_payload_kilograms` — and they must *sum* to `mtplm - mro`. On Bailey's
@@ -1199,3 +1207,30 @@ manufacturer's own naming **and** MTPLM of 1250kg or lower — a micro should be
 a very small car. Weight alone would have mislabelled thirteen products across Bailey and
 Adria; Bailey's Discovery D4-2 is 995kg and FMLV holds it as rigid, as is Swift's 1043kg
 Basecamp. Folding and pop-up exist in the schema but no surveyed brand builds one yet.
+
+**And a lifting roof does not make a caravan `type_pop_up`.** Rule from the NCC side,
+7 September 2026, on Eriba — the first brand to raise it, and the answer is that twelve of
+its eighteen layouts stay `type_rigid`.
+
+Eriba's own spec table publishes a `Roof type` row reading **`Pop-up roof`** on six Touring
+layouts and `Sleeping roof` on six more, against `Fix roof` on the six Novaline. So this is
+not a case of inferring a body type from a photograph: the manufacturer names the thing, in
+its own words, in the same table the weights come from. It is still not the FMLV value,
+because the two vocabularies do not mean the same thing. An Eriba is a **hard-sided rigid
+caravan with a lifting roof panel**; `type_pop_up` reads to a UK audience as a folding
+camper — a Pennine or Conway — which is a different kind of vehicle, and that is what
+someone filtering FMLV for it is looking for.
+
+Two things generalise from it:
+
+- **The manufacturer's own naming is decisive for `type_micro` and not for the others.**
+  That asymmetry is deliberate: the micro rule spells out "the manufacturer calls it one",
+  so a brand's vocabulary is *part* of the test there. Nothing says that for the rest of the
+  enum, and a roof row is a description of a roof rather than a claim about the body.
+- **Say where the roof went instead.** It is a real feature of the vehicle and the reason
+  half of Eriba's range exists, so it belongs in the `body_type` provenance snippet, quoting
+  the row. The value is `type_rigid`; the evidence for it says why the obvious alternative
+  was refused.
+
+`type_folding` and `type_pop_up` therefore still have no product behind them, and the bar
+for using either is a caravan whose **walls** fold or rise, not its roof.

@@ -158,9 +158,11 @@ Two notes. Everything is in **centimetres**, so every figure is ×10 — and `In
 (cm)` and `Maximum nose weight (kg)` have no FMLV column, so they are read only as
 context. And `exterior_body_length_mm` is **out of automated scope** per
 [`README.md`](README.md), on the grounds that Bailey do not publish it and the requester
-reads that as an industry trend. **Eriba does publish it.** That file is explicit that it
-must not be added back for a brand that happens to publish it without asking first, so it
-sits here recorded and uncollected pending that question.
+reads that as an industry trend. **Eriba does publish it**, and that file requires the
+question to be asked rather than assumed either way — so it was asked, and the requester
+approved collecting it on 7 September 2026. It is in scope for this adapter, because the
+figure sits under its own label beside the other two lengths and so carries none of the
+ambiguity the scope rule guards against.
 
 ## The self-check: a printed tolerance band, and a payload decomposition
 
@@ -212,9 +214,14 @@ of water against the others' 2 × 11 kg and 45 l. It is a real check but a range
 one, and the band above is cleaner. FMLV's `mro_kilograms` takes **Mass in running order**,
 not this figure.
 
-## The open question: roof type is not uniform, and twelve of eighteen lift
+## Roof type is not uniform, and twelve of eighteen lift — but all eighteen are rigid
 
-**This needs the requester, and it is the reason stage 2 has not started.**
+**Settled by the requester, 7 September 2026: `type_rigid` on all eighteen.** The reasoning
+is now a cross-manufacturer rule in [`README.md`](README.md#body-type-is-nearly-always-type_rigid)
+— a lifting roof does not make a caravan `type_pop_up`, because an Eriba is a hard-sided
+rigid caravan with a lifting panel while `type_pop_up` reads to a UK audience as a folding
+camper. The roof still belongs in the `body_type` provenance snippet, quoting the row below,
+so a reviewer can see why the obvious alternative was refused.
 
 Every layout carries a `Roof type` row, and it does not follow the range:
 
@@ -230,9 +237,8 @@ the three big Tourings put a bed in it, which is what `Sleeping roof` means and 
 also carry a `Bed dimension: Sleeping roof, L x W (cm)` row of `193 x 150`.
 
 `CaravanBodyType` offers `type_rigid`, `type_folding`, `type_pop_up` and `type_micro`, and
-[`README.md`](README.md) records that **no surveyed brand has used `type_pop_up` yet**. Eriba
-is the first plausible candidate, so this is a precedent rather than a lookup, and the
-arguments run both ways:
+Eriba was the first brand with a plausible claim on `type_pop_up`. The arguments as they were
+put, since the losing one is the more intuitive of the two and will come round again:
 
 - **For `type_pop_up`:** the manufacturer's own spec row says `Pop-up roof`, in its own
   words, on six of them. The Touring range page sells "Pop-top roof" and "Low height (226
@@ -244,8 +250,8 @@ arguments run both ways:
   reader filtering FMLV for `type_pop_up` is probably looking for those. FMLV's own field
   guide may well intend the term that way.
 
-The evidence cannot settle it — it is a question about what FMLV's column means, which only
-the NCC side knows. Recorded here rather than guessed.
+The evidence could not settle it — it was a question about what FMLV's column means, which
+only the NCC side knew, and the second argument won.
 
 **Related, and this one the evidence does settle: none of them is a `type_micro`.** Five
 layouts are at or under the 1250 kg threshold — Touring 310 at 1000, Touring 420 and 430 at
@@ -368,11 +374,17 @@ Expect **18 products** and compare every run against that number.
   196 and **must be checked against the export before an adapter is registered.**
 - **Whether any of these products is already in FMLV**, and so whether the first run proposes
   eighteen new products or matches an existing set. Also blocked on the export.
-- **`body_type` on twelve of eighteen**, per [above](#the-open-question-roof-type-is-not-uniform-and-twelve-of-eighteen-lift).
-- **Whether `exterior_body_length_mm` should be collected**, given Eriba publishes it and the
-  standing rule is that it is out of scope.
-- **Whether the optional-equipment payload reading is right**, per
+- **The optional-equipment payload reading**, per
   [the self-check](#the-self-check-a-printed-tolerance-band-and-a-payload-decomposition).
+  Put to the requester on 7 September 2026 with a recommendation and not contradicted, so it
+  is being taken as agreed rather than as confirmed: emit the published figure as
+  `optional_equipment_payload_kilograms` and the remainder as
+  `personal_effects_payload_kilograms`. Worth re-confirming when the first run's numbers are
+  in front of a reviewer, since it is the one field here that departs from what Bailey,
+  Adria and Swift needed.
+
+Settled since the checkpoint, and recorded above rather than here: `body_type` is
+`type_rigid` on all eighteen, and `exterior_body_length_mm` is in scope.
 - **The positional habitation fields** — `sleeping_area`, `kitchen_location`,
   `lounge_location`, `bathroom_layout`. The price list names bed dimensions but not
   positions, and the floorplan drawings are images on the range pages, so these need
