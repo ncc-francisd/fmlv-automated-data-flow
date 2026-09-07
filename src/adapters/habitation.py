@@ -46,10 +46,16 @@ class Feature:
     `snippet` is what a reviewer reads next to the proposal, so it is the manufacturer's
     own wording verbatim rather than a paraphrase — the requester asked for "a source
     which takes me to precisely that section of text".
+
+    `note` is how that quote is introduced when the reasoning is not simply "it says so":
+    an adapter's own wording is used when it is `None`. `refrigeration` needs it because
+    a fridge freezer is now recorded from a line that says only "fridge", and a reviewer
+    who cannot see why would read that as a mistake.
     """
 
     value: Any
     snippet: str
+    note: str | None = None
 
 #: A spec line describing a priced extra rather than standard equipment. The price is the
 #: giveaway — Rimor's "Rear Adjustable Bed Option: £1,500" and "Alloy wheel option:
@@ -89,21 +95,63 @@ def _first_match(lines: Iterable[str], pattern: re.Pattern[str]) -> str | None:
 #: compartment". Reading the summary alone would silently downgrade it.
 _FREEZER = re.compile(r"\bfreezer\b|\bfreezer compartment\b|\bfridge[-/ ]freezer\b", re.I)
 
+#: A page saying there is **no** freezer. This is now the only thing that makes a plain
+#: `fridge`, so it has to catch the ways a spec denies one — "no freezer", "without a
+#: freezer compartment", "freezer not fitted" — while never matching the far commoner
+#: line that states one. It is tested before `_FREEZER` because "fridge without freezer
+#: compartment" contains both.
+#:
+#: The denial has to sit in **one clause**, which is why the gaps exclude a comma as well
+#: as a full stop: "141L fridge with freezer compartment, oven not fitted" and "no oven,
+#: 141 L freezer" both put a negative within a few words of a freezer that is really
+#: there, and matching either would flip a fridge freezer to a fridge on a page that
+#: states one outright.
+_NO_FREEZER = re.compile(
+    r"\bno\b[^.,]{0,25}\bfreezer\b|\bwithout\b[^.,]{0,25}\bfreezer\b"
+    r"|\bfreezer\b[^.,]{0,25}\bnot\b[^.,]{0,15}\b(?:included|fitted|available|supplied)\b",
+    re.I,
+)
+
 #: Any refrigeration at all. `refrigerator column` is Rimor's phrasing for a tall fridge.
 _FRIDGE = re.compile(r"\bfridge\b|\brefrigerator\b|\brefrigeration\b", re.I)
 
 
-def refrigeration_from(lines: Iterable[str]) -> tuple[Refrigeration, str] | None:
-    """`(Refrigeration, the line that said so)`, or `None` if no fridge is mentioned.
+def refrigeration_from(lines: Iterable[str]) -> Feature | None:
+    """The refrigeration a page evidences, or `None` if no fridge is mentioned at all.
 
-    A freezer anywhere on the page wins, since a page that mentions one both has one and
-    has a fridge to put it in.
+    Three cases, in the order they are tested:
+
+    * **A freezer is denied** — a plain `fridge`. Explicit, and rare.
+    * **A freezer is stated** anywhere on the page — a `fridge_freezer`. Any line will
+      do, since a page mentioning a freezer both has one and has a fridge to put it in.
+    * **A fridge, with the freezer neither stated nor denied** — also a `fridge_freezer`.
+
+    That third case reverses the earlier reading, on the requester's ruling of 7
+    September 2026: *"eighty to ninety percent of fridges supplied to caravan and motor
+    home providers actually come with a freezer compartment […] unless it says it doesn't
+    have a freezer compartment, we should be basically saying it has a fridge freezer
+    even if the specification just says it has a ninety litre or a hundred and forty
+    litre fridge, because the freezer compartment often goes unsaid."* The trade fits
+    Dometic units, which almost all have one. FMLV's own hand-filled baseline agrees:
+    `fridge_freezer` is Yes on 89% of the 1,590 rows in `data/exports`, so proposing
+    `fridge` from a silent spec was contradicting the reviewers most of the time.
+
+    This is the one feature here asserted from something other than the words on the
+    page, so it carries a `note` saying so rather than letting a reviewer discover a
+    "141 L fridge" quote under a fridge-freezer proposal and read it as a bug.
     """
     usable = usable_lines(lines)
+    if denied := _first_match(usable, _NO_FREEZER):
+        return Feature(Refrigeration.FRIDGE, denied, "the specification rules out a freezer")
     if freezer_line := _first_match(usable, _FREEZER):
-        return Refrigeration.FRIDGE_FREEZER, freezer_line
+        return Feature(Refrigeration.FRIDGE_FREEZER, freezer_line, "a freezer is mentioned")
     if fridge_line := _first_match(usable, _FRIDGE):
-        return Refrigeration.FRIDGE, fridge_line
+        return Feature(
+            Refrigeration.FRIDGE_FREEZER,
+            fridge_line,
+            "a fridge, with a freezer neither stated nor ruled out — nearly all of these "
+            "have a freezer compartment, so a fridge freezer",
+        )
     return None
 
 
@@ -341,8 +389,8 @@ def features_from(lines: Iterable[str]) -> dict[str, Feature]:
     usable = usable_lines(lines)
     features: dict[str, Feature] = {}
 
-    if found := refrigeration_from(usable):
-        features["refrigeration"] = Feature(found[0], found[1])
+    if refrigeration := refrigeration_from(usable):
+        features["refrigeration"] = refrigeration
     if found := heating_from(usable):
         features["heating"] = Feature(found[0], found[1])
     if found := microwave_from(usable):

@@ -23,8 +23,9 @@ def test_a_freezer_compartment_makes_it_a_fridge_freezer() -> None:
         ["Kitchen unit equipped with 3 burner hob, sink, and a 141L fridge with freezer compartment"]
     )
     assert found is not None
-    assert found[0] is Refrigeration.FRIDGE_FREEZER
-    assert "freezer compartment" in found[1]
+    assert found.value is Refrigeration.FRIDGE_FREEZER
+    assert "freezer compartment" in found.snippet
+    assert found.note == "a freezer is mentioned"
 
 
 def test_a_freezer_anywhere_on_the_page_wins() -> None:
@@ -41,27 +42,72 @@ def test_a_freezer_anywhere_on_the_page_wins() -> None:
         ]
     )
     assert found is not None
-    assert found[0] is Refrigeration.FRIDGE_FREEZER
+    assert found.value is Refrigeration.FRIDGE_FREEZER
+    # The line that actually names the freezer is the one quoted, not the abbreviated one.
+    assert "freezer compartment" in found.snippet
 
 
-def test_a_plain_fridge_stays_a_fridge() -> None:
+def test_an_unstated_freezer_is_still_a_fridge_freezer() -> None:
+    """The requester's ruling, 7 September 2026: the freezer compartment goes unsaid.
+
+    Eighty to ninety percent of fridges fitted to UK caravans and motorhomes have one,
+    and FMLV's own baseline says Yes on 89% of rows, so a spec that mentions only a
+    fridge is not evidence against a freezer.
+    """
     found = habitation.refrigeration_from(
         ["Kitchen unit equipped with 2 burner hob, sink, and a 90 L compressor fridge"]
     )
     assert found is not None
-    assert found[0] is Refrigeration.FRIDGE
+    assert found.value is Refrigeration.FRIDGE_FREEZER
+    # The reviewer has to be able to see why, since the quote says only "fridge".
+    assert found.note is not None
+    assert "neither stated nor ruled out" in found.note
 
 
-def test_a_refrigerator_column_is_a_fridge() -> None:
+def test_a_refrigerator_column_is_refrigeration_too() -> None:
     """Rimor's wording for a tall fridge, which never says "fridge"."""
     found = habitation.refrigeration_from(
         ["141 L refrigerator column, which can be opened from both sides"]
     )
     assert found is not None
-    assert found[0] is Refrigeration.FRIDGE
+    assert found.value is Refrigeration.FRIDGE_FREEZER
+
+
+def test_a_denied_freezer_is_the_one_thing_that_makes_a_plain_fridge() -> None:
+    for line in (
+        "Kitchen with a 90 L fridge, no freezer compartment",
+        "Kitchen with a 90 L fridge without a freezer",
+        "84 L fridge (freezer compartment not fitted)",
+    ):
+        found = habitation.refrigeration_from([line])
+        assert found is not None, line
+        assert found.value is Refrigeration.FRIDGE, line
+        assert found.note == "the specification rules out a freezer"
+
+
+def test_a_negative_about_something_else_does_not_deny_the_freezer() -> None:
+    """The denial has to be about the freezer, and in the same clause.
+
+    Both of these state a freezer outright and deny something else a few words away.
+    Reading the negative as the freezer's would downgrade a page that could not be
+    clearer.
+    """
+    for line in (
+        "Kitchen unit with a 141L fridge with freezer compartment, oven not fitted",
+        "Kitchen unit with no oven, and a 141 L freezer compartment",
+    ):
+        found = habitation.refrigeration_from([line])
+        assert found is not None, line
+        assert found.value is Refrigeration.FRIDGE_FREEZER, line
 
 
 def test_no_refrigeration_mentioned_is_not_a_guess() -> None:
+    """The fridge-freezer default needs a fridge to start from.
+
+    A page that never mentions refrigeration says nothing, and still proposes nothing —
+    the assumption is about what a stated fridge includes, not about what every vehicle
+    has.
+    """
     assert habitation.refrigeration_from(["Cab air conditioning", "Oven"]) is None
 
 

@@ -958,6 +958,10 @@ def _feature_value(features: dict[str, habitation.Feature], name: str) -> object
 #: How each habitation field's provenance snippet is introduced, so a reviewer reading
 #: "Refrigeration — a freezer is mentioned: …" can see the reasoning and not just the
 #: quote. The quote itself is always the manufacturer's own wording.
+#:
+#: A `Feature` that carries its own `note` uses that instead: `refrigeration` reads a
+#: fridge freezer from a line that may say only "fridge", and has to explain which of
+#: the three cases it took.
 _FEATURE_NOTES: dict[str, str] = {
     "refrigeration": "read from the specification",
     "heating": "read from the specification",
@@ -1125,7 +1129,7 @@ def _build_extracted_motorhome(
             )
             record("rear_garage", where, url=factory_source or mnc_source)
             continue
-        note = _FEATURE_NOTES.get(name, "read from the specification")
+        note = feature.note or _FEATURE_NOTES.get(name, "read from the specification")
         source = mnc_source
         if name == "bed_types" and feature.snippet.startswith("Bedding solution:"):
             note = "the factory's own bedding solution, the prose naming no beds"

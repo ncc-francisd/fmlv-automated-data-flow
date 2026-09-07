@@ -351,6 +351,37 @@ baseline was **wrong** and the manufacturer right. The rule is not "trust the ba
 it is that a systematic disagreement is a question to answer, and often only the requester
 can answer it.
 
+### A fridge is a fridge freezer unless the freezer is ruled out
+
+FMLV has two refrigeration columns and the guide says not to put Yes in both. Where a
+specification names a freezer, that settles it. Where it names only a fridge — "90 L
+compressor fridge", "141 L refrigerator column" — record **`fridge_freezer` anyway.**
+
+The requester's ruling, 7 September 2026: *"eighty to ninety percent of fridges supplied
+to caravan and motor home providers actually come with a freezer compartment […] unless
+it says it doesn't have a freezer compartment, we should be basically saying it has a
+fridge freezer even if the specification just says it has a ninety litre or a hundred and
+forty litre fridge, because the freezer compartment often goes unsaid."* The trade fits
+Dometic units, nearly all of which have one. FMLV's hand-filled baseline agrees:
+`fridge_freezer` is Yes on 89% of its 1,590 rows, so reading a silent spec as a plain
+fridge was contradicting the reviewers most of the time — it produced a downgrade
+proposal on every Rimor van, the Horus 12 among them, which is what surfaced this.
+
+A plain `fridge` is therefore proposed only where the page **denies** the freezer — "no
+freezer compartment", "without a freezer", "freezer not fitted". `habitation._NO_FREEZER`
+is that test, and it runs *before* the freezer test because "fridge without freezer
+compartment" matches both.
+
+This is the one habitation feature asserted from something other than the words on the
+page, so it is not allowed to be silent about that: the `Feature` carries a `note` saying
+which of the three cases applied, and the reviewer reads "a fridge, with a freezer neither
+stated nor ruled out …" above the manufacturer's own quote rather than finding a
+fridge-freezer proposal under a line that says "fridge" and reading it as a bug.
+
+Positive evidence is still required to propose anything at all. A page that never mentions
+refrigeration still proposes nothing: the assumption is about what a stated fridge
+includes, not about what every vehicle has.
+
 ### Habitation features split into the factual and the subjective
 
 `schema.LAYOUT` holds twenty-odd Yes/No columns describing the inside of the vehicle, and
@@ -408,7 +439,9 @@ Three traps worth knowing before writing the next one:
   freezer compartment". Read *every* line for a freezer, and put the itemised list ahead
   of the marketing paragraph when choosing which line to quote — `rimor._spec_lines` does
   that reordering, and it is why the quoted line is a bullet and not a hundred words of
-  prose.
+  prose. The stakes on the freezer itself are lower now that an unstated one is assumed
+  either way, but the precedence still decides *which line the reviewer is shown*, and it
+  still governs every other feature.
 
 **Hand the reviewer the floorplan for the subjective half.** An adapter that cannot know
 a positional field can still say *where to look*, and should: record provenance whose
