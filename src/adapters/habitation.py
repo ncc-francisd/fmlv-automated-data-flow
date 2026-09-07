@@ -256,19 +256,29 @@ _WET_ROOM = re.compile(r"\bwet[- ]room\b|\bshower over (?:the )?toilet\b", re.I)
 _EXTERNAL_SHOWER = re.compile(r"\bexternal\b[^.]{0,30}\bshower\b|\boutdoor shower\b", re.I)
 
 
-def bathroom_from(lines: Iterable[str]) -> tuple[BathroomLayout, str] | None:
-    """`(BathroomLayout, the line that said so)`, or `None` when the copy cannot settle it.
+def shower_toilet_separated_from(lines: Iterable[str]) -> Feature | None:
+    """Whether a partition divides the shower from the toilet, or `None` if unsaid.
 
-    Only the **separated** case is decided here, because it is the only one the words
-    determine. A combined washroom still needs a location — `BathroomLayout` offers
-    `rear_shower_toilet` and `side_shower_toilet`, and nothing in the prose says which —
-    so a wet room returns `None` and goes to the reviewer with the floorplan.
+    This is a **separate fact from where the washroom is**, and not one of
+    `BathroomLayout`'s values. The requester, 7 September 2026, on a Kilig 66 Plus
+    proposed as `separate_shower_toilet` over a held `side_shower_toilet`: *"those are not
+    mutually exclusive. The location is mutually exclusive. But if the type or the
+    construction or layout of the shower and toilet is that it is separate, those are two
+    values."* FMLV holds both together on 84 of its 1,590 motorhome rows.
+
+    So the words answer this, and the floorplan answers the location — `bathroom_layout`
+    is never proposed from prose. Reading "separate shower cubicle and cassette toilet" as
+    a *location* was the bug: it overwrote a side washroom with a construction detail and
+    lost the location a reviewer had set by hand.
+
+    A wet room is the explicit negative — one space, shower over the toilet — so it
+    returns `False` rather than nothing.
     """
     usable = [line for line in usable_lines(lines) if not _EXTERNAL_SHOWER.search(line)]
-    if _first_match(usable, _WET_ROOM):
-        return None
+    if wet := _first_match(usable, _WET_ROOM):
+        return Feature(value=False, snippet=wet, note="one wet space, undivided")
     if line := _first_match(usable, _SEPARATE_BATHROOM):
-        return BathroomLayout.SEPARATE_SHOWER_TOILET, line
+        return Feature(value=True, snippet=line, note="the copy says they are separated")
     return None
 
 
@@ -395,8 +405,10 @@ def features_from(lines: Iterable[str]) -> dict[str, Feature]:
         features["heating"] = Feature(found[0], found[1])
     if found := microwave_from(usable):
         features["microwave"] = Feature(found[0], found[1])
-    if found := bathroom_from(usable):
-        features["bathroom_layout"] = Feature(found[0], found[1])
+    # Deliberately **not** `bathroom_layout`: that column holds the washroom's location,
+    # which only a drawing can give. See `shower_toilet_separated_from`.
+    if found := shower_toilet_separated_from(usable):
+        features["shower_toilet_separated"] = found
 
     bed_types, quotes = bed_types_from(usable)
     if bed_types:

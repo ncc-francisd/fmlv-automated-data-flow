@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from src.adapters import habitation
-from src.product_model.enums import BathroomLayout, BedType, Heating, Refrigeration
+from src.product_model.enums import BedType, Heating, Refrigeration
 
 # --------------------------------------------------------------------------- #
 # Refrigeration
@@ -212,29 +212,56 @@ def test_no_microwave_mentioned_never_asserts_there_is_none() -> None:
         "The new layout consists of a Shower cubicle and separate cassette toilet with a washbasin",
     ],
 )
-def test_separated_shower_and_toilet_is_read_from_the_words(line: str) -> None:
-    found = habitation.bathroom_from([line])
+def test_a_separated_shower_and_toilet_is_read_from_the_words(line: str) -> None:
+    """The construction, which the copy does state — not the location, which it never does."""
+    found = habitation.shower_toilet_separated_from([line])
     assert found is not None
-    assert found[0] is BathroomLayout.SEPARATE_SHOWER_TOILET
+    assert found.value is True
 
 
-def test_a_wet_room_is_left_to_the_reviewer() -> None:
-    """Combined, but `BathroomLayout` then wants rear or side and the prose cannot say."""
-    assert habitation.bathroom_from(["Wet room Shower and cassette toilet with washbasin"]) is None
+def test_a_wet_room_is_an_explicit_negative() -> None:
+    """One space with the shower over the toilet: not unknown, actually undivided."""
+    found = habitation.shower_toilet_separated_from(
+        ["Wet room Shower and cassette toilet with washbasin"]
+    )
+    assert found is not None
+    assert found.value is False
 
 
-def test_a_combined_washroom_is_left_to_the_reviewer() -> None:
+def test_a_combined_washroom_says_nothing_either_way() -> None:
+    """"Central washroom equipped with shower cubicle, washbasin and toilet" — one room,
+    but it does not say whether anything divides the two, so nothing is asserted."""
     assert (
-        habitation.bathroom_from(
+        habitation.shower_toilet_separated_from(
             ["Central washroom equipped with shower cubicle, washbasin, and a cassette toilet"]
         )
         is None
     )
 
 
+def test_the_location_is_never_read_from_prose() -> None:
+    """`bathroom_layout` holds rear-versus-side, and no wording gives it.
+
+    The requester, 7 September 2026: *"those are not mutually exclusive. The location is
+    mutually exclusive. But if the type or the construction or layout of the shower and
+    toilet is that it is separate, those are two values."* Proposing the separated value
+    as a *location* overwrote a side washroom FMLV already held.
+    """
+    features = habitation.features_from(
+        ["The new layout consists of a separate shower cubicle and cassette toilet"]
+    )
+    assert features["shower_toilet_separated"].value is True
+    assert "bathroom_layout" not in features
+
+
 def test_an_external_shower_says_nothing_about_the_bathroom() -> None:
     """Four Rimor products offer one, and it is not the vehicle's washroom."""
-    assert habitation.bathroom_from(["External water supply with shower as standard"]) is None
+    assert (
+        habitation.shower_toilet_separated_from(
+            ["External water supply with shower as standard"]
+        )
+        is None
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -347,7 +374,7 @@ def test_features_from_returns_only_what_the_copy_settles() -> None:
     )
     assert features["heating"].value is Heating.BLOWN_AIR
     assert features["refrigeration"].value is Refrigeration.FRIDGE_FREEZER
-    assert features["bathroom_layout"].value is BathroomLayout.SEPARATE_SHOWER_TOILET
+    assert features["shower_toilet_separated"].value is True
     assert features["bed_types"].value == [BedType.ISLAND, BedType.DROP_DOWN]
     # No microwave on the page, so no key at all — not a False.
     assert "microwave" not in features

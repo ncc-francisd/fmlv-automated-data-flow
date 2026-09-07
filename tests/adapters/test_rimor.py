@@ -899,13 +899,15 @@ def test_every_positional_field_gets_the_floorplan(
     assert all(name in rimor.FLOORPLAN_FIELDS for name in links)
 
 
-def test_a_floorplan_pointer_never_overwrites_a_value_the_copy_settled(
+def test_the_copy_settles_the_construction_and_the_drawing_the_location(
     mnc_kilig_66: str, factory_kilig_66_plus: str
 ) -> None:
-    """Kilig 66 Plus says "separate", so its bathroom is decided and needs no drawing.
+    """Kilig 66 Plus, the case that prompted the split.
 
-    The other three positional fields still get one — a pointer is recorded per field the
-    copy left open, not per product.
+    Its copy says "separate shower cubicle and cassette toilet", which is the
+    construction. FMLV holds `side_shower_toilet`, which is the location. Both are true,
+    so the adapter proposes the construction and hands the drawing over for the location
+    rather than overwriting one with the other.
     """
     listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
     model = rimor.parse_model_page(
@@ -913,9 +915,11 @@ def test_a_floorplan_pointer_never_overwrites_a_value_the_copy_settled(
     )
     extracted = rimor._build_extracted_motorhome(listing, model)
 
-    assert extracted.motorhome.bathroom_layout is BathroomLayout.SEPARATE_SHOWER_TOILET
-    assert extracted.provenance["bathroom_layout"].reviewer_reference is False
-    assert extracted.provenance["sleeping_area"].reviewer_reference is True
+    assert extracted.motorhome.shower_toilet_separated is True
+    assert extracted.provenance["shower_toilet_separated"].reviewer_reference is False
+    # The location is never proposed, only pointed at.
+    assert extracted.motorhome.bathroom_layout is None
+    assert extracted.provenance["bathroom_layout"].reviewer_reference is True
 
 
 def test_no_factory_page_means_no_floorplan(mnc_van_238: str) -> None:

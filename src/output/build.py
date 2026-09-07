@@ -93,7 +93,9 @@ _STR_FIELDS: frozenset[str] = frozenset(
 #: not here — it's a carry-through field no proposal ever touches; a `DISAPPEARED`
 #: product gets a `disappearance_notice` (`store/changes.py`) instead, not a proposed
 #: CSV change.
-_BOOL_FIELDS: frozenset[str] = frozenset({"rear_garage", "microwave"})
+_BOOL_FIELDS: frozenset[str] = frozenset(
+    {"rear_garage", "microwave", "shower_toilet_separated"}
+)
 
 #: Single-select layout groups (DESIGN.md §4.3), field name -> enum class.
 _ENUM_FIELDS: dict[str, type[ColumnEnum]] = {
@@ -144,7 +146,9 @@ _CARAVAN_STR_FIELDS: frozenset[str] = frozenset(
     {"manufacturer", "manufacturer_display_name", "manufacturer_range", "model"}
 )
 
-_CARAVAN_BOOL_FIELDS: frozenset[str] = frozenset({"twin_axle", "microwave"})
+_CARAVAN_BOOL_FIELDS: frozenset[str] = frozenset(
+    {"twin_axle", "microwave", "shower_toilet_separated"}
+)
 
 _CARAVAN_ENUM_FIELDS: dict[str, type[ColumnEnum]] = {
     "body_type": CaravanBodyType,

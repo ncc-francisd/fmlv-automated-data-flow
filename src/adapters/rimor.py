@@ -863,14 +863,14 @@ def _model_name_from_title(listing: MncListing) -> str:
 #: the requester, 6 September 2026: *"the link will be to the same place because that's
 #: where a human can interpret the diagram"*.
 #:
-#: `bathroom_layout` is here even though the copy often *does* settle it: 23 of the 34
-#: layouts say "separate", and those keep their extracted value. The other 11 say "Wet
-#: room" or "Central washroom", which is combined but leaves rear-versus-side open — and
-#: `BathroomLayout` demands one of the two. A pointer is only recorded for a field the
-#: copy left undecided.
+#: `bathroom_layout` is here for **every** product, not just some. It holds the washroom's
+#: *location*, which no wording gives — the construction (whether a partition divides the
+#: shower from the toilet) is a separate column and a separate fact, read from the copy
+#: into `shower_toilet_separated`. Conflating the two was the bug: a Kilig 66 Plus that
+#: FMLV held as `side_shower_toilet` was being proposed as `separate_shower_toilet`,
+#: overwriting the location with a construction detail.
 #:
-#: `bed_types` is deliberately absent: the copy names the beds on all 34, so there is
-#: nothing left to read off a drawing.
+#: `bed_types` is here too, taking a drawing whenever the copy names no beds.
 FLOORPLAN_FIELDS: tuple[str, ...] = (
     "sleeping_area",
     "kitchen_location",
@@ -966,7 +966,7 @@ _FEATURE_NOTES: dict[str, str] = {
     "refrigeration": "read from the specification",
     "heating": "read from the specification",
     "microwave": "stated in the specification",
-    "bathroom_layout": "the copy states the shower and toilet are separated",
+    "shower_toilet_separated": "whether a partition divides the shower from the toilet",
     "bed_types": "the beds the copy names, in the order it names them",
 }
 
@@ -1045,6 +1045,7 @@ def _build_extracted_motorhome(
         mh_width_mm=width,
         mh_height_mm=height,
         bathroom_layout=_feature_value(features, "bathroom_layout"),
+        shower_toilet_separated=_feature_value(features, "shower_toilet_separated"),
         heating=_feature_value(features, "heating"),
         refrigeration=_feature_value(features, "refrigeration"),
         # Left as None where the sources did not say, rather than coerced to False —
@@ -1104,7 +1105,7 @@ def _build_extracted_motorhome(
             settled = getattr(motorhome, name)
             # `bed_types` is a list, so its "unset" is empty rather than None.
             if settled is not None and settled != []:
-                continue  # already settled from the copy — bathroom_layout on 23 of 34
+                continue  # already settled from the copy — bed_types on all 34
             provenance[name] = Provenance(
                 source_url=floorplan,
                 snippet=f"{label} — read {_FLOORPLAN_NOTES[name]} off the floorplan",

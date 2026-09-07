@@ -236,10 +236,15 @@ recorded anyway, so a reviewer gets a confirm-or-replace saying the specificatio
 mention a microwave, rather than a proposed `No` quietly deleting a fact nobody disproved.
 See `UNCONFIRMED_FEATURES`.
 
-**Bathroom is proposed only when the words settle it.** 23 of 34 say "separate" of the
-shower or toilet. The rest say "Wet room" or "Central washroom", which are combined — but
-`BathroomLayout` then wants *rear* or *side*, and the prose never says which, so those 11
-go to a reviewer with the floorplan.
+**The washroom is two fields, and the copy settles only one of them.** 23 of 34 say
+"separate" of the shower or toilet and 7 say "Wet room", so `shower_toilet_separated` is
+proposed True or False on 30 of them from the words. The *location* — `bathroom_layout`'s
+rear or side — is never read from prose and always goes to the floorplan.
+
+Getting that wrong was a real regression: Kilig 66 Plus was proposed as
+`separate_shower_toilet` over a `side_shower_toilet` FMLV already held, which overwrote
+the location with a construction detail. Both are true at once, and FMLV holds both on 84
+of its rows. See the habitation section of `README.md`.
 
 ### The floorplan is the source for everything positional
 

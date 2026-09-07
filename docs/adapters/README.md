@@ -443,6 +443,31 @@ Three traps worth knowing before writing the next one:
   either way, but the precedence still decides *which line the reviewer is shown*, and it
   still governs every other feature.
 
+**A washroom's location and its construction are two facts, not one choice.**
+`BathroomLayout` looks like a single-select group of seven, and the field guide says
+"select one", but two of its members answer different questions: `rear_shower_toilet` and
+`side_shower_toilet` say *where*, while `separate_shower_toilet` says *whether a partition
+divides the shower from the toilet*. A washroom can be both, and FMLV's own data is: **84
+of the 1,590 motorhome rows** in `data/exports` carry a location and the separated flag
+together — Sunlight's T69L is `side_shower_toilet` and separate at once.
+
+So both products carry `shower_toilet_separated: bool | None` beside `bathroom_layout`,
+read from the export's `separate_shower_toilet` column as its own fact and written back on
+its own terms. The requester settled it for caravans on 3 September 2026 and for
+motorhomes on 7 September, after a Kilig 66 Plus was proposed as `separate_shower_toilet`
+over a held `side_shower_toilet`: *"those are not mutually exclusive. The location is
+mutually exclusive. But if the type or the construction or layout of the shower and toilet
+is that it is separate, those are two values."*
+
+For an adapter that means: **read the construction from the copy, and never the location.**
+`habitation.shower_toilet_separated_from` does the first; the location goes to the
+floorplan with everything else positional. Proposing the separated value as a *location*
+is the bug to avoid — it overwrites a side washroom with a construction detail and loses
+what a reviewer set by hand.
+
+This is the second time a "select one" group has turned out not to be exclusive, so treat
+the guide's wording as advice to the typist and query the export before believing it.
+
 **Hand the reviewer the floorplan for the subjective half.** An adapter that cannot know
 a positional field can still say *where to look*, and should: record provenance whose
 `source_url` is the floorplan and whose value is empty, with

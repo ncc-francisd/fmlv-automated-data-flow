@@ -179,6 +179,9 @@ def row_to_motorhome(row: dict[str, Any]) -> tuple[Motorhome, list[Issue]]:
         mh_width_mm=_to_int(row.get("mh_width_mm")),
         mh_height_mm=_to_int(row.get("mh_height_mm")),
         bed_types=bed_types,
+        # Read alongside `bathroom_layout`, not instead of it: the two answer
+        # different questions, and 84 export rows set both.
+        shower_toilet_separated=_is_yes(row.get("separate_shower_toilet")),
         rear_garage=_is_yes(row.get("rear_garage")),
         microwave=_is_yes(row.get("microwave")),
         automatic=automatic,
@@ -247,6 +250,12 @@ def motorhome_to_row(motorhome: Motorhome) -> dict[str, str]:
     set_int("mh_length_mm", motorhome.mh_length_mm)
     set_int("mh_width_mm", motorhome.mh_width_mm)
     set_int("mh_height_mm", motorhome.mh_height_mm)
+
+    # After the single-select loop, which will have written this column off unless
+    # `bathroom_layout` happened to be the separate value. Separation is its own
+    # fact, so a side washroom that divides keeps both flags.
+    if motorhome.shower_toilet_separated:
+        row["separate_shower_toilet"] = schema.YES
 
     set_yes_no("rear_garage", motorhome.rear_garage)
     set_yes_no("microwave", motorhome.microwave)
