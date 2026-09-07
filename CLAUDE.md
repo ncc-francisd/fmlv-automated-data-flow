@@ -70,6 +70,17 @@ Before pushing:
 - If there is a merge conflict, explain it clearly before resolving it.
 - Do not force-push unless explicitly instructed to do so.
 
+This machine has no `gh` CLI, so use plain `git`. Pull requests are not part of the
+workflow; work goes to `master`.
+
+Write commit messages in the imperative, describing the behaviour that changed in the
+project's own terms ("Stop reading a bed's shape as proof it is fixed"), not the files
+that were touched.
+
+When a piece of work is finished and verified — the tests pass, or the adapter has been
+run against the real source — commit and push it without asking first. Only pause for
+the actions listed under Safety.
+
 ## Team working style
 
 This repository is worked on by multiple team members, often using Claude Code.
@@ -86,6 +97,43 @@ Before making significant changes:
 - prefer the smallest safe change that achieves the requested outcome
 
 When a user corrects Claude's approach, treat that correction as potentially useful shared guidance and consider whether CLAUDE.md should be updated.
+
+### Asking the user
+
+Do not put judgement calls to the user as batteries of `AskUserQuestion` options,
+including at a skill's checkpoint. Survey the evidence, then set out the decision and a
+recommendation in prose and act on it — they can redirect if the recommendation is
+wrong. If you need a fact only they hold, ask for it in prose.
+
+### Where the domain rules live
+
+The data rules that hold for every manufacturer — which of two published figures to
+record, how to classify a body type, what counts as a travel seat — live in
+`docs/adapters/README.md`. Read that file before writing or changing an adapter, and put
+any new cross-manufacturer rule there rather than in one brand's notes or in this file.
+Do not re-decide a settled rule per manufacturer, and do not re-derive one from the FMLV
+baseline export: the baseline still contains the errors those rules exist to correct.
+
+Check the exported data before trusting prose about it. The FMLV field guide is written
+for the person typing a row in, so wording such as "select one" is advice to them rather
+than a constraint the data obeys — query the export to find out how a group of columns is
+actually used.
+
+### Reporting what a run found
+
+Sanity-check pipeline output before presenting it. An implausible number of new products
+almost always means a manufacturer has renamed something, so check the claimed-new
+products against the ones that disappeared before reporting them as new.
+
+## Environment and the review loop
+
+Development happens on a Windows laptop without local administrator rights — IT
+intercepts UAC elevation — so prefer routes that do not need elevation, and do not
+propose steps that require it.
+
+Reviewers see this work on the deployed VM, which has its own run store and its own copy
+of the code. A local fix is not visible to them until it is deployed, so say that when
+handing work over rather than implying the change is already live.
 
 ## Safety
 
