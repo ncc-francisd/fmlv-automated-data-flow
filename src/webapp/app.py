@@ -85,6 +85,9 @@ _templates.env.globals["is_year_field"] = lambda field: field == "year"
 _templates.env.globals["field_choices"] = choices.field_choices
 _templates.env.globals["choice_label"] = choices.label_for
 _templates.env.globals["is_multi_select"] = choices.is_multi_select
+_templates.env.globals["needs_selection"] = lambda change: choices.needs_selection(
+    change.old_value, change.new_value
+)
 # A `MissingField` proposal (store.changes.persist_diff) always has `old_value ==
 # new_value` and this exact snippet — same "match on the snippet text" trick as the
 # archive/year-rollover proposals above, since there's no DB column for "why".
@@ -793,12 +796,28 @@ def create_app(
         if known_reviewers and reviewer_name.lower() not in known_reviewers:
             error = "Select your name from the reviewer list before deciding."
         else:
+            # Rows with nothing to accept are left pending deliberately: accepting one
+            # would mark a field reviewed and leave it blank, which is how run 86 went
+            # out with its layout columns unset. See `choices.needs_selection`.
+            skipped = [
+                entry
+                for entry in target_entries
+                if choices.needs_selection(entry.change.old_value, entry.change.new_value)
+            ]
             for entry in target_entries:
+                if entry in skipped:
+                    continue
                 store.record_decision(
                     connection,
                     proposed_change_id=entry.change.id,
                     action="accept",
                     decided_by=reviewer_name or None,
+                )
+            if skipped:
+                fields = ", ".join(sorted(entry.change.field for entry in skipped))
+                error = (
+                    f"Accepted the rest. {len(skipped)} field(s) still need a choice "
+                    f"because there is nothing to accept: {fields}."
                 )
 
         # The whole product's group, not just the entries just decided — so a second

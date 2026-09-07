@@ -3,11 +3,15 @@
 {% set choices = field_choices(entry.change.field, run.vehicle_class) %}
 {# `bed_types` takes several values at once, so it gets tick boxes rather than a single-choice select. #}
 {% set multi = is_multi_select(entry.change.field) %}
+{# Nothing to accept on either side, so a reviewer has to choose. See `choices.needs_selection`. #}
+{% set unset = needs_selection(entry.change) %}
 {% set already = (entry.change.new_value or entry.change.old_value or '').split(', ') %}
-<div id="change-{{ entry.change.id }}" class="change-row{% if missing %} missing-field-row{% endif %}">
+<div id="change-{{ entry.change.id }}" class="change-row{% if missing %} missing-field-row{% endif %}{% if unset and not entry.decision %} selection-needed-row{% endif %}">
   <div class="field-name">
     {{ entry.change.field }}
-    {% if missing %}
+    {% if unset and not entry.decision %}
+      <span class="badge selection-needed" title="Neither the manufacturer's site nor FMLV has a value, so accepting would leave this blank — choose one">selection needed</span>
+    {% elif missing %}
       <span class="badge missing-field" title="Marked in-scope for automated collection, but not found on the manufacturer's site this run">not found this run</span>
     {% elif is_layout_field(entry.change.field) %}
       <span class="badge high-suspicion" title="Layout changes are rare on an existing product">unusual</span>

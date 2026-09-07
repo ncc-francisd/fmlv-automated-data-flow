@@ -1368,3 +1368,100 @@ def test_an_unrecognised_bed_type_is_refused_at_review_not_at_upload(
     connection = store.connect(db_path)
     assert store.latest_decision(connection, change_id) is None
     connection.close()
+
+
+def _run_with_an_unset_field(db_path: Path) -> tuple[int, int]:
+    """A new product carrying a floorplan pointer: no value either side, so no answer yet."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    extracted = make_extracted(rrp_pounds=45000)
+    extracted.provenance["sleeping_area"] = Provenance(
+        source_url="https://example.test/floorplan.jpg",
+        snippet="read which end the beds are at off the floorplan",
+        reviewer_reference=True,
+    )
+    diffs = diff_products([extracted], [])
+    store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
+    store.finish_run(connection, run.id)
+    product_id = next(
+        entry.product.id
+        for entry in store.list_change_queue(connection, run_id=run.id)
+        if entry.change.field == "sleeping_area"
+    )
+    connection.close()
+    return run.id, product_id
+
+
+def test_a_field_with_nothing_to_accept_is_flagged_in_red(
+    client: TestClient, db_path: Path
+) -> None:
+    """The requester, 7 September 2026: *"we need a flag saying selection needed in red"*."""
+    run_id, _product_id = _run_with_an_unset_field(db_path)
+
+    response = client.get(f"/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert "selection needed" in response.text
+    assert "selection-needed-row" in response.text
+
+
+def test_accept_all_leaves_a_field_that_needs_a_choice_pending(
+    client: TestClient, db_path: Path
+) -> None:
+    """Accepting it would mark the field reviewed and leave it blank — how run 86 shipped
+    with its layout columns unset. So it stays pending and the reviewer is told."""
+    run_id, product_id = _run_with_an_unset_field(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/products/{product_id}/accept-all",
+        data={"reviewer_name": "ben"},
+    )
+
+    assert response.status_code == 200
+    assert "still need a choice" in response.text
+    assert "sleeping_area" in response.text
+
+    connection = store.connect(db_path)
+    pending = [
+        entry
+        for entry in store.list_change_queue(connection, run_id=run_id)
+        if entry.decision is None
+    ]
+    connection.close()
+    # The pointer is still pending; everything else was accepted.
+    assert [entry.change.field for entry in pending] == ["sleeping_area"]
+
+
+def test_accept_all_still_accepts_everything_when_nothing_needs_a_choice(
+    client: TestClient, db_path: Path, run_with_one_change: tuple[int, int]
+) -> None:
+    """The ordinary case has to be untouched."""
+    run_id, change_id = run_with_one_change
+    connection = store.connect(db_path)
+    product_id = next(
+        entry.product.id for entry in store.list_change_queue(connection, run_id=run_id)
+    )
+    connection.close()
+
+    response = client.post(
+        f"/runs/{run_id}/products/{product_id}/accept-all",
+        data={"reviewer_name": "ben"},
+    )
+
+    assert response.status_code == 200
+    assert "still need a choice" not in response.text
+    connection = store.connect(db_path)
+    assert store.latest_decision(connection, change_id) is not None
+    connection.close()
+
+
+def test_needs_selection_only_fires_when_both_sides_are_empty() -> None:
+    """On a matched product, accepting is a real answer: keep what FMLV holds."""
+    from src.webapp import choices
+
+    assert choices.needs_selection(None, None) is True
+    assert choices.needs_selection("", "  ") is True
+    assert choices.needs_selection("side_shower_toilet", None) is False
+    assert choices.needs_selection(None, "island_bed") is False

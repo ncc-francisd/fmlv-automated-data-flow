@@ -227,3 +227,20 @@ def can_be_blanked(field: str, vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLA
         or field in profile.enum_fields
         or field in profile.automatic_fields
     )
+
+
+def needs_selection(old_value: str | None, new_value: str | None) -> bool:
+    """Whether a row has nothing to accept, so a reviewer must actually choose something.
+
+    Both sides empty means the adapter could not determine the field *and* FMLV holds
+    nothing to fall back on — a new product's floorplan-only fields are exactly this. The
+    requester, 7 September 2026, after an upload went out with layout columns unset:
+    *"we need a flag saying selection needed in red so that we don't... even though you
+    accept all, if there are inputs required, it stops you doing that or it flags it
+    red."*
+
+    "Accept" on such a row is not a decision, it is a way of losing one: it marks the
+    field reviewed and leaves it blank. On a *matched* product accepting is a real answer
+    — keep what FMLV holds — so those are not flagged.
+    """
+    return not (old_value or "").strip() and not (new_value or "").strip()

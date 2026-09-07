@@ -26,6 +26,10 @@
       </p>
     {% endif %}
     {% set pending_entries = entries | selectattr('decision', 'none') | list %}
+    {% set ns2 = namespace(unset=0) %}
+    {% for entry in pending_entries %}
+      {% if needs_selection(entry.change) %}{% set ns2.unset = ns2.unset + 1 %}{% endif %}
+    {% endfor %}
     {% if pending_entries %}
       <form
         class="accept-all-form"
@@ -34,7 +38,7 @@
         hx-swap="outerHTML"
         hx-include="#reviewer-name"
       >
-        <button type="submit" class="btn btn-accept">Accept all</button>
+        <button type="submit" class="btn btn-accept">Accept all{% if ns2.unset %} but {{ ns2.unset }}{% endif %}</button>
       </form>
     {% endif %}
   </div>
