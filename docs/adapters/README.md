@@ -187,7 +187,12 @@ upload was generated. The requester, 7 September 2026: *"even though you have no
 prove what the actual MRO and MTPLM are, you've simply carried it over from FMLV"* — the
 figures are still the figures, and the arithmetic still holds.
 
-`store.changes._derived_payload_proposal` takes each mass from the site where the adapter
+This covers the **automatic variant too**, on the same reasoning: it has no MTPLM of its
+own — the same chassis with a different gearbox — so `automatic.payload_kilograms`
+derives from the one `mtplm_kilograms` and its own MRO. Horus 38 and 40, Kilig 77 Plus,
+Sailer 69 and Sarus 66 Plus were all out there as well.
+
+`store.changes._derived_payload_proposals` takes each mass from the site where the adapter
 found one and from FMLV where it did not, which is what the upload row will actually hold,
 and says which in the snippet. It stands down in three cases:
 
@@ -197,8 +202,8 @@ and says which in the snippet. It stands down in three cases:
 * **caravans** — `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the
   personal-effects half of a split, and one published figure may be the total. Deriving it would be wrong.
 
-It is gated by `was_previously_rejected` like any other proposal, and it suppresses the
-confirm-or-replace row for the same field, so a reviewer never sees "the existing figure
+Each is gated by `was_previously_rejected` like any other proposal, and suppresses the
+confirm-or-replace row for its own field, so a reviewer never sees "the existing figure
 is wrong" directly above "confirm the existing figure".
 
 ### A figure that could not be found must be visible, and must never be inherited

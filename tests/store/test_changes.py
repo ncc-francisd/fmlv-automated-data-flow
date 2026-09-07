@@ -11,7 +11,7 @@ import pytest
 from src import store
 from src.adapters.base import ExtractedMotorhome, Provenance
 from src.diff.classify import diff_products
-from src.product_model.model import Motorhome
+from src.product_model.model import AutomaticVariant, Motorhome
 
 
 @pytest.fixture
@@ -763,3 +763,91 @@ def test_a_rejected_derived_payload_is_not_offered_again(
     ]
     assert "876" not in proposed
     assert result.suppressed_rejections >= 1
+
+
+def test_the_automatic_payload_is_derived_too(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """Horus 38's automatic figures are 200kg out in exactly the same way.
+
+    The variant has no MTPLM of its own — same chassis, different gearbox — so it derives
+    from the one `mtplm_kilograms`, which is what `validation._validate_automatic` checks.
+    """
+    baseline = make_baseline(
+        mro_kilograms=2624,
+        mtplm_kilograms=3500,
+        mh_payload_kilograms=676,
+        automatic=AutomaticVariant(
+            mro_kilograms=2639,
+            payload_kilograms=661,
+            rrp_pounds=60995,
+            price_min_range_pounds=60995,
+        ),
+    )
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93950)], [baseline]),
+    )
+
+    rows = {
+        e.change.field: e.change for e in store.list_change_queue(connection, run_id)
+    }
+    assert rows["mh_payload_kilograms"].new_value == "876"
+    assert rows["automatic.payload_kilograms"].new_value == "861"
+    assert "3500kg MTPLM - 2639kg MRO = 861kg" in (
+        rows["automatic.payload_kilograms"].source_snippet
+    )
+    # The wording distinguishes the two, so a reviewer reading both knows which is which.
+    assert "Derived automatic payload" in rows["automatic.payload_kilograms"].source_snippet
+    assert "Derived payload" in rows["mh_payload_kilograms"].source_snippet
+
+
+def test_a_product_with_no_automatic_variant_gets_no_automatic_proposal(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """Most products have no automatic figures at all, and none are invented."""
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=676
+    )
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93950)], [baseline]),
+    )
+
+    fields = [e.change.field for e in store.list_change_queue(connection, run_id)]
+    assert "mh_payload_kilograms" in fields
+    assert "automatic.payload_kilograms" not in fields
+
+
+def test_an_automatic_payload_that_already_agrees_is_left_alone(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    baseline = make_baseline(
+        mro_kilograms=2624,
+        mtplm_kilograms=3500,
+        mh_payload_kilograms=876,
+        automatic=AutomaticVariant(
+            mro_kilograms=2639,
+            payload_kilograms=861,
+            rrp_pounds=60995,
+            price_min_range_pounds=60995,
+        ),
+    )
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93950)], [baseline]),
+    )
+
+    corrected = [
+        e.change.field
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.old_value != e.change.new_value
+    ]
+    assert "automatic.payload_kilograms" not in corrected
+    assert "mh_payload_kilograms" not in corrected

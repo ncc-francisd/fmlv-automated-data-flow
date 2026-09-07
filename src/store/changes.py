@@ -156,71 +156,109 @@ LIST_SEPARATOR = ", "
 #: two masses came from, because "no source found this run" and "here is a corrected
 #: payload" look contradictory side by side unless the arithmetic is spelled out.
 PAYLOAD_ARITHMETIC_SNIPPET = (
-    "Derived, not read from the site: {mtplm}kg MTPLM - {mro}kg MRO = {derived}kg, "
-    "against the {held}kg on record. {basis}. Accepting this makes the three figures "
-    "agree; rejecting it leaves FMLV as it is."
+    "Derived {label}, not read from the site: {mtplm}kg MTPLM - {mro}kg MRO = "
+    "{derived}kg, against the {held}kg on record. {basis}. Accepting this makes the "
+    "three figures agree; rejecting it leaves FMLV as it is."
 )
 
 
-def _derived_payload_proposal(
-    diff: ProductDiff,
-) -> tuple[int, int, int, int, str] | None:
-    """`(derived, held, mtplm, mro, basis)` where a matched motorhome's payload disagrees.
+#: The payloads that are MTPLM minus an MRO, as `(payload path, MRO path, label)`. The
+#: automatic variant has no MTPLM of its own — it is the same chassis with a different
+#: gearbox — so both derive from the one `mtplm_kilograms`, which is what
+#: `validation._validate_automatic` checks too.
+_DERIVED_PAYLOADS: tuple[tuple[str, str, str], ...] = (
+    ("mh_payload_kilograms", "mro_kilograms", "payload"),
+    ("automatic.payload_kilograms", "automatic.mro_kilograms", "automatic payload"),
+)
 
-    Payload is arithmetic — MTPLM minus MRO — so whenever both masses are known the
-    payload is checkable whether or not the site published anything this run. Until now a
-    disagreement only surfaced as a `payload_mismatch` warning in the issues file, after
-    the upload had been generated.
+
+def _derived_payload_proposals(
+    diff: ProductDiff,
+) -> list[tuple[str, int, int, str]]:
+    """`(field path, derived, held, explanation)` for each payload the masses contradict.
+
+    Payload is arithmetic — MTPLM minus MRO — so it is checkable whether or not the
+    manufacturer published anything this run. Until now a disagreement only surfaced as a
+    `payload_mismatch` warning in the issues file, after the upload had been generated.
 
     The requester, 7 September 2026, on Horus 38: *"that figure for the payload should be
     876. So should be presenting a correction to the payload figure of 676, because if the
     MRO and MTPLM are correct, the figure should be 876. Even though you have no source to
     prove what the actual MRO and MTPLM are, you've simply carried it over from FMLV."*
+    Extended to the automatic variant the same day, on the same reasoning — Horus 38 and
+    40, Kilig 77 Plus, Sailer 69 and Sarus 66 Plus all disagree there too.
 
     Each mass is taken from the site where the adapter found one and from FMLV where it
-    did not, which is what the upload row will hold. Skipped when the adapter is already
-    proposing a payload of its own — it computes the same arithmetic — and skipped for
-    caravans, whose `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the
-    personal-effects half of a split.
+    did not, which is what the upload row will hold, and the explanation says which.
+    Skipped where the adapter is already proposing that payload — it does the same
+    arithmetic, with a real source behind it — and skipped for caravans, whose
+    `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the personal-effects
+    half of a split.
     """
     baseline, extracted = diff.baseline, diff.extracted
     if baseline is None or extracted is None:
-        return None
+        return []
     if isinstance(baseline, Caravan) or isinstance(extracted.product, Caravan):
-        return None
-    if any(change.field == "mh_payload_kilograms" for change in diff.changes):
-        return None
+        return []
 
-    def effective(field_name: str) -> tuple[int | None, bool]:
-        scraped = field_value(extracted.product, field_name)
+    def effective(field_path: str) -> tuple[int | None, bool]:
+        scraped = field_value(extracted.product, field_path)
         if scraped is not None:
             return scraped, True
-        return field_value(baseline, field_name), False
+        return field_value(baseline, field_path), False
 
     mtplm, mtplm_scraped = effective("mtplm_kilograms")
-    mro, mro_scraped = effective("mro_kilograms")
-    held = field_value(baseline, "mh_payload_kilograms")
-    if mtplm is None or mro is None or held is None:
-        return None
+    if mtplm is None:
+        return []
 
-    derived = mtplm - mro
-    if derived == held:
-        return None
+    found: list[tuple[str, int, int, str]] = []
+    for payload_path, mro_path, label in _DERIVED_PAYLOADS:
+        if any(change.field == payload_path for change in diff.changes):
+            continue
+        mro, mro_scraped = effective(mro_path)
+        held = field_value(baseline, payload_path)
+        if mro is None or held is None:
+            continue
+        derived = mtplm - mro
+        if derived == held:
+            continue
+        found.append(
+            (
+                payload_path,
+                derived,
+                held,
+                PAYLOAD_ARITHMETIC_SNIPPET.format(
+                    label=label,
+                    mtplm=mtplm,
+                    mro=mro,
+                    derived=derived,
+                    held=held,
+                    basis=_mass_basis(mtplm_scraped, mro_scraped, label),
+                ),
+            )
+        )
+    return found
 
-    basis = {
-        (True, True): "Both masses come from the manufacturer's site this run",
-        (False, False): (
+
+def _mass_basis(mtplm_scraped: bool, mro_scraped: bool, label: str) -> str:
+    """Where each of the two masses came from, in words."""
+    mro_name = "MRO" if label == "payload" else "automatic MRO"
+    if mtplm_scraped and mro_scraped:
+        return "Both masses come from the manufacturer's site this run"
+    if not mtplm_scraped and not mro_scraped:
+        return (
             "Neither mass was published this run, so both are FMLV's own figures "
             "carried over"
-        ),
-        (True, False): (
-            "The MTPLM comes from the site this run; the MRO is FMLV's own, carried over"
-        ),
-        (False, True): (
-            "The MRO comes from the site this run; the MTPLM is FMLV's own, carried over"
-        ),
-    }[(mtplm_scraped, mro_scraped)]
-    return derived, held, mtplm, mro, basis
+        )
+    if mtplm_scraped:
+        return (
+            f"The MTPLM comes from the site this run; the {mro_name} is FMLV's own, "
+            f"carried over"
+        )
+    return (
+        f"The {mro_name} comes from the site this run; the MTPLM is FMLV's own, "
+        f"carried over"
+    )
 
 
 def _missing_field_snippet(missing: MissingField) -> str:
@@ -670,39 +708,36 @@ def persist_diff(
 
         # Payload is arithmetic, so a disagreement is checkable even when nothing was
         # read this run — see `_derived_payload_proposal`.
-        derived_payload_offered = False
-        if (found := _derived_payload_proposal(diff)) is not None:
-            derived, held, mtplm, mro, basis = found
+        derived_payloads_offered: set[str] = set()
+        for payload_path, derived, held, explanation in _derived_payload_proposals(diff):
             new_value = _serialize(derived)
             if was_previously_rejected(
                 connection,
                 product_id=product.id,
-                field="mh_payload_kilograms",
+                field=payload_path,
                 new_value=new_value,
             ):
                 suppressed += 1
-            else:
-                record_proposed_change(
-                    connection,
-                    run_id=run_id,
-                    product_id=product.id,
-                    field="mh_payload_kilograms",
-                    old_value=_serialize(held),
-                    new_value=new_value,
-                    source_url=None,
-                    source_snippet=PAYLOAD_ARITHMETIC_SNIPPET.format(
-                        mtplm=mtplm, mro=mro, derived=derived, held=held, basis=basis
-                    ),
-                )
-                proposed += 1
-                derived_payload_offered = True
+                continue
+            record_proposed_change(
+                connection,
+                run_id=run_id,
+                product_id=product.id,
+                field=payload_path,
+                old_value=_serialize(held),
+                new_value=new_value,
+                source_url=None,
+                source_snippet=explanation,
+            )
+            proposed += 1
+            derived_payloads_offered.add(payload_path)
 
         for field_name in diff.confirmed_fields:
             record_verification(connection, run_id=run_id, product_id=product.id, field=field_name)
             verified += 1
 
         for missing in diff.missing_fields:
-            if derived_payload_offered and missing.field == "mh_payload_kilograms":
+            if missing.field in derived_payloads_offered:
                 # The derived proposal above already offers this field, with the
                 # arithmetic behind it. A second row saying "confirm the existing figure"
                 # would sit right beneath one saying the existing figure is wrong.
