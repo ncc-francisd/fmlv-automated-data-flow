@@ -16,6 +16,7 @@ from src.product_model import validation
 from src.product_model.io import read_csv, write_csv
 from src.product_model.model import Motorhome
 from src.output import build_upload_motorhomes, generate_upload
+from src.output.build import write_upload_csv
 from src.registry.models import Manufacturer, Status, TriState
 
 
@@ -553,3 +554,42 @@ def test_a_blanked_field_reaches_the_csv_as_an_empty_cell(
         [row] = list(csv.DictReader(handle))
 
     assert row["mh_height_mm"] == ""
+
+
+def test_a_readable_copy_is_written_beside_the_upload(tmp_path: Path) -> None:
+    """The upload's header sits on row 3, so Excel opens it as a one-column sheet.
+
+    Requested 7 September 2026, after run 86's Rimor export could not be read. The copy
+    carries the same rows with the header on row 1 and is explicitly not for uploading.
+    """
+    path = tmp_path / "run1_upload.csv"
+    issues, _issues_path, readable_path = write_upload_csv(
+        [Motorhome(manufacturer="Rimor", manufacturer_range="Kilig", model="66 Plus")], path
+    )
+
+    assert readable_path is not None
+    assert readable_path.name == "run1_upload-readable.csv"
+    assert readable_path.exists()
+
+    upload = path.read_bytes()
+    readable = readable_path.read_bytes()
+    assert upload.startswith(b"-\r\n-\r\nproduct_id,")
+    assert readable.startswith(b"product_id,")
+    # Same rows, so the two differ only by those two lines.
+    assert readable == upload[len(b"-\r\n-\r\n") :]
+    # Validation still runs and still reports — writing a readable copy changes nothing
+    # about what the upload says. A bare `Motorhome` is missing required fields, so there
+    # is something to report here.
+    assert isinstance(issues, list)
+
+
+def test_the_readable_copy_keeps_the_run_prefix_the_download_route_checks(
+    tmp_path: Path,
+) -> None:
+    """`download_upload` refuses a filename not starting `run<id>_`, so the copy needs it."""
+    path = tmp_path / "run86_2026-09-07_1302_motorhome-campervans.csv"
+    _issues, _issues_path, readable_path = write_upload_csv(
+        [Motorhome(manufacturer="Rimor", model="66 Plus")], path
+    )
+    assert readable_path.name.startswith("run86_")
+    assert readable_path.name.endswith("-readable.csv")

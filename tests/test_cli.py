@@ -737,9 +737,14 @@ def test_generate_upload_writes_a_timestamped_csv_from_reviewed_decisions(
 
     assert exit_code == 0
     assert "wrote 1 product(s)" in capsys.readouterr().out
-    written = list(paths.uploads_dir(root=data_root).glob(f"run{summary.run.id}_*.csv"))
-    assert len(written) == 1
-    assert written[0].name.startswith(f"run{summary.run.id}_")
+    written = sorted(paths.uploads_dir(root=data_root).glob(f"run{summary.run.id}_*.csv"))
+    # Two files: the upload itself, and the spreadsheet-readable copy written beside it.
+    assert len(written) == 2
+    assert all(path.name.startswith(f"run{summary.run.id}_") for path in written)
+    upload = next(path for path in written if not path.name.endswith("-readable.csv"))
+    readable = next(path for path in written if path.name.endswith("-readable.csv"))
+    assert upload.read_bytes().startswith(b"-\r\n-\r\n")
+    assert readable.read_bytes().startswith(b"product_id,")
 
 
 def test_generate_upload_refuses_a_run_that_has_not_succeeded(

@@ -140,6 +140,21 @@ def upload_issues_path(csv_path: Path) -> Path:
     return csv_path.with_name(f"{csv_path.stem}-issues.txt")
 
 
+def upload_readable_path(csv_path: Path) -> Path:
+    """Where the spreadsheet-readable copy of one generated upload CSV goes.
+
+    Identical rows to the upload itself, but with the header on row 1 instead of row 3 —
+    the upload proper carries two `-` rows above it because the FMLV site wants the header
+    there, which means Excel opens it as a one-column sheet and a reviewer cannot read it.
+    Requested 7 September 2026, after run 86's Rimor export.
+
+    **Not for uploading.** It sits next to its CSV in `uploads_dir` and keeps the same
+    `run<run>_...` prefix the download route checks for, but the name says what it is so
+    the two cannot be confused in a downloads folder.
+    """
+    return csv_path.with_name(f"{csv_path.stem}-readable.csv")
+
+
 def db_path(*, root: Path = DATA_DIR) -> Path:
     """The SQLite run store file."""
     return root / "run_store.sqlite3"

@@ -651,6 +651,14 @@ def create_app(
                 "has_errors": result.has_errors,
                 "issues": [f"{issue.severity}: {issue.message}" for issue in result.issues],
                 "download_url": f"/runs/{run.id}/uploads/{result.path.name}",
+                # The same rows with the header on row 1, for reading in a spreadsheet.
+                # The upload proper keeps its two `-` rows, which Excel cannot make a
+                # table of. See `paths.upload_readable_path`.
+                "readable_download_url": (
+                    f"/runs/{run.id}/uploads/{result.readable_path.name}"
+                    if result.readable_path
+                    else None
+                ),
                 "issues_filename": result.issues_path.name if result.issues_path else None,
                 "issues_download_url": (
                     f"/runs/{run.id}/uploads/{result.issues_path.name}"
