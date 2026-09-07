@@ -48,6 +48,13 @@ Bailey caravans in FMLV. The micro rule (manufacturer's own naming *and* MTPLM �
 never fires here: Bailey market nothing as a micro, and the four products under that
 weight are all held as rigid.
 
+The reason given in the provenance is deliberately the **general** rule rather than a claim
+about what Bailey happen to build: a caravan is rigid unless its *walls* fold or rise, so a
+lifting roof does not change the type even where the manufacturer's own spec sheet calls it
+a pop-up (NCC, 7 September 2026 — see `docs/adapters/README.md`). Stating it as "Bailey
+build only rigid caravans" would read as falsified the first time they ship a pop-top, and
+would invite someone to change this line when the rule says not to.
+
 **Two range names are abbreviated in the spec table.** It gives `Pegasus Black` and
 `Phoenix Black`; FMLV holds `Pegasus Black Edition` and `Phoenix Black Edition`. The
 requester confirmed the longer form is the real name — the brochure and the URL slug both
@@ -285,7 +292,12 @@ def build_extracted(product: BaileyCaravan, source_url: str) -> ExtractedCaravan
     # read off the page, and a reviewer should see that stated rather than infer it from
     # a value appearing with no source.
     record("twin_axle", f"Axle: {'Twin' if product.twin_axle else 'Single'}")
-    record("body_type", "Bailey build only rigid caravans — no folding, pop-up or micro")
+    record(
+        "body_type",
+        "A touring caravan is rigid unless its walls fold or rise — a lifting roof does "
+        "not change the type, even where a manufacturer calls it a pop-up (NCC rule, "
+        "7 September 2026). Bailey market no micro, and nothing here folds.",
+    )
 
     return ExtractedCaravan(caravan=caravan, provenance=provenance)
 

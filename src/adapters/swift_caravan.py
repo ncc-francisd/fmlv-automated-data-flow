@@ -124,6 +124,11 @@ the weight, and Swift market nothing as a micro. Their one genuinely small vehic
 Basecamp (1043kg), was held by FMLV as rigid too and is discontinued for 2027, so it will
 be reported as disappeared.
 
+As in `bailey_caravan.py`, the provenance gives the **general** rule rather than a claim
+about this brand's current range: a caravan is rigid unless its *walls* fold or rise, so a
+lifting roof does not change the type even where the manufacturer calls it a pop-up (NCC,
+7 September 2026 — see `docs/adapters/README.md`).
+
 **Headroom is scraped, not assumed.** Every range page states `1.95m (6'5") headroom` in
 its own highlights, and FMLV holds 1950mm on all 26. It is read off each page rather than
 hard-coded so that a range which changes it, or a page which stops saying it, comes out
@@ -519,8 +524,9 @@ def build_extracted(
     record("twin_axle", f"axleType: {product.axle_evidence or 'not stated'}")
     record(
         "body_type",
-        "Swift's 2027 caravans are all rigid — no folding or pop-up, and nothing marketed "
-        "as a micro",
+        "A touring caravan is rigid unless its walls fold or rise — a lifting roof does "
+        "not change the type, even where a manufacturer calls it a pop-up (NCC rule, "
+        "7 September 2026). Swift market no micro, and nothing here folds.",
     )
 
     return ExtractedCaravan(caravan=caravan, provenance=provenance)

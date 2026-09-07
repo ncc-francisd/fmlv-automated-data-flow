@@ -258,7 +258,13 @@ def test_the_body_type_and_axle_carry_provenance_even_though_asserted() -> None:
     """A reviewer should see why a value is there, not infer it from its bare presence."""
     extracted = bailey_caravan.build_extracted(parsed(MESSINA), "https://example.test")
 
-    assert "only rigid caravans" in extracted.provenance["body_type"].snippet
+    snippet = extracted.provenance["body_type"].snippet
+    assert "rigid" in snippet
+    # The reason has to be the general rule, not "Bailey build only rigid caravans" — that
+    # reads as falsified the first time they ship a pop-top, and the rule says the type
+    # does not change when they do. See docs/adapters/README.md, 7 September 2026.
+    assert "pop-up" in snippet
+    assert "walls fold or rise" in snippet
     assert "Axle: Twin" in extracted.provenance["twin_axle"].snippet
 
 

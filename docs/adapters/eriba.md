@@ -235,29 +235,29 @@ not this figure.
 
 ## Roof type and body type <a id="roof-type-and-body-type-open"></a>
 
-**Open, and it must be settled before the adapter emits a body type.** The requester's first
-answer, 7 September 2026, was `type_rigid` on all eighteen — given before the FMLV export had
-been fetched, because the supplier name was not yet known. The export contradicts it:
+**Settled: `type_rigid` on all eighteen, and the adapter corrects FMLV on fifteen of them.**
 
-> **FMLV holds `type_pop_up` = Yes on 15 of the 21 current Eriba caravans** — all twelve
+The requester's first answer, 7 September 2026, was `type_rigid`, given before the export
+could be fetched. The export appeared to contradict it:
+
+> **FMLV held `type_pop_up` = Yes on 15 of the 21 current Eriba caravans** — all twelve
 > Touring layouts and all three Feeling — and `type_rigid` on the six Novaline. Not one
-> current row is `type_folding` or `type_micro`.
+> current row was `type_folding` or `type_micro`.
 
 That maps **exactly** onto the `Roof type` row below: the 15 are the ones reading `Pop-up
-roof` or `Sleeping roof`, the 6 are the ones reading `Fix roof`. So FMLV's existing answer is
-that **any raisable roof is a pop-up**, applied consistently across two model years and by
-whoever entered the data. It is also the reading Eriba's own wording invites.
+roof` or `Sleeping roof`, the 6 are the `Fix roof` Novalines. So the baseline had followed
+Eriba's own wording, consistently, across two model years.
 
-Emitting `type_rigid` would therefore propose a change on 15 products at once, which is the
-shape [`README.md`](README.md) says to treat as a question about the parse rather than as 15
-stale records. Nothing here suggests the baseline is wrong: it is internally consistent, it
-agrees with the manufacturer's own vocabulary, and it predates this survey.
+Put back to the requester with that in hand, the answer was unchanged and was widened to a
+rule for every brand: **the type is rigid even where the name is pop up**, because
+`type_pop_up` describes a *kind of caravan* — the folding sort — and not a roof. It is now in
+[`README.md`](README.md#a-lifting-roof-does-not-change-a-caravans-body-type), and the same
+requester instruction applied it to Bailey and Swift, both of which already asserted `RIGID`
+and now give the general rule as the reason rather than a claim about their own ranges.
 
-The argument for `type_rigid` remains a real one — an Eriba is a hard-sided caravan with a
-lifting panel, and a UK buyer filtering for "pop up" may well be looking for a folding
-camper. But it is an argument for changing FMLV's convention across an existing 15 products,
-not for reading the source differently, and that is a bigger decision than an adapter should
-make on its own. **Put back to the requester with the export in hand.**
+So this is a deliberate correction of FMLV's data on 15 products, not a divergence to
+investigate — which is worth saying plainly in the run, because 15 identical changes to one
+field is otherwise exactly the shape [`README.md`](README.md) tells a reviewer to distrust.
 
 Every layout carries a `Roof type` row, and it does not follow the range:
 
@@ -504,9 +504,6 @@ So the expected first run is **18 collected, 18 matched, 0 new, 3 disappeared.**
 
 ## What is still unverified
 
-- **`body_type` on 15 of 18**, per [above](#roof-type-and-body-type-open). The one genuinely
-  blocking item now: FMLV says `type_pop_up`, the requester's first answer was `type_rigid`,
-  and the export was not available when that answer was given.
 - **The positional habitation fields** — `sleeping_area`, `kitchen_location`,
   `lounge_location`, `bathroom_layout`. The price list gives bed *dimensions* but no
   positions, so these need `reviewer_reference` pointers at a drawing, and **only nine of the
