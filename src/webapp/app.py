@@ -134,6 +134,27 @@ def _format_datetime_short(value: str | None) -> str:
     return local.strftime("%Y-%m-%d | %H:%M")
 
 
+def _selection_differs(change: store.ProposedChange, submitted: str) -> bool:
+    """Whether a submitted selection says something other than what was proposed.
+
+    Compared as a **set** for a multi-select field, because the tick boxes submit in the
+    enum's order while the adapter proposes in the order the copy named the beds —
+    "drop_down_bed, transverse_bed" and "transverse_bed, drop_down_bed" are the same
+    answer, and treating the reordering as an edit would turn every Accept into a
+    correction.
+
+    An empty submission is not an edit: it is what an untouched dropdown sends when its
+    "choose a value…" option is still selected.
+    """
+    if not submitted:
+        return False
+    proposed = change.new_value or ""
+    if choices.is_multi_select(change.field):
+        parts = lambda value: {p.strip() for p in value.split(LIST_SEPARATOR) if p.strip()}
+        return parts(submitted) != parts(proposed)
+    return submitted != proposed
+
+
 def _run_duration(run: store.Run) -> str | None:
     """`mm:ss` elapsed between `started_at` and `finished_at`, or `None` while running."""
     if not run.finished_at:
@@ -726,6 +747,18 @@ def create_app(
             # Joined the way `output.build.apply_field` splits it again.
             ticked = [value.strip() for value in corrected_values if value.strip()]
             corrected_value = LIST_SEPARATOR.join(ticked)
+
+        # "Accept" records the *proposed* value, and the tick boxes and dropdowns sit
+        # right beside it pre-filled from that proposal — so editing one and pressing
+        # Accept looked like it saved the edit and did not. Francis, 7 September 2026:
+        # "if I go to change it and add one or remove one and click accept, it doesn't
+        # change. Surely I should be able to edit it."
+        #
+        # An edited selection is an explicit statement of intent, so it is honoured
+        # whichever button carried it. Untouched, the two agree and this does nothing.
+        if action == "accept" and _selection_differs(change, corrected_value):
+            action = "correct"
+
         selectable = choices.field_choices(change.field, run.vehicle_class)
         known_reviewers: set[str] = app.state.reviewer_names_lower
         if known_reviewers and reviewer_name.lower() not in known_reviewers:

@@ -19,7 +19,7 @@ from src import paths, store
 from src.adapters.base import ExtractedMotorhome, Provenance
 from src.diff.classify import diff_products
 from src.product_model import io
-from src.product_model.enums import BedType
+from src.product_model.enums import BedType, BodyType
 from src.product_model.model import Motorhome
 from src.vehicle_class import VehicleClass
 from src.webapp import create_app
@@ -1605,3 +1605,147 @@ def test_a_new_products_weight_can_be_typed_in_instead(
     assert decision is not None
     assert decision.action == "correct"
     assert decision.corrected_value == "3005"
+
+
+def test_editing_the_bed_type_boxes_and_pressing_accept_saves_the_edit(
+    client: TestClient, db_path: Path
+) -> None:
+    """Francis, 7 September 2026, on Kilig 66 Plus: *"if I go to change it and add one or
+    remove one and click accept, it doesn't change. Surely I should be able to edit it."*
+
+    The boxes sit beside Accept, pre-ticked from the proposal, so editing them and
+    pressing Accept looked like it saved and did not — Accept recorded the proposal.
+    """
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "accept",
+            "reviewer_name": "ben",
+            # Proposed was drop_down_bed alone; the reviewer adds the island bed.
+            "corrected_values": ["island_bed", "drop_down_bed"],
+        },
+    )
+
+    assert response.status_code == 200
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision is not None
+    assert decision.action == "correct"
+    assert decision.corrected_value == "island_bed, drop_down_bed"
+
+
+def test_pressing_accept_with_the_boxes_untouched_is_still_a_plain_accept(
+    client: TestClient, db_path: Path
+) -> None:
+    """Nothing was edited, so nothing is reinterpreted."""
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+
+    client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "accept",
+            "reviewer_name": "ben",
+            "corrected_values": ["drop_down_bed"],  # exactly what was proposed
+        },
+    )
+
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision.action == "accept"
+    assert decision.corrected_value is None
+
+
+def test_reordered_bed_types_are_not_treated_as_an_edit(
+    client: TestClient, db_path: Path
+) -> None:
+    """The boxes submit in enum order; the adapter proposes in the order the copy named
+    them. Same set, so pressing Accept must stay an accept rather than a correction."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    baseline = Motorhome(
+        manufacturer="Rimor", manufacturer_range="Sarus", model="66 Plus", product_id=7927,
+        bed_types=[BedType.MAKE_UP],
+    )
+    extracted = make_extracted(
+        rrp_pounds=64995,
+        manufacturer_range="Sarus",
+        model="66 Plus",
+        bed_types=[BedType.ISLAND, BedType.DROP_DOWN],
+    )
+    extracted.provenance["bed_types"] = Provenance(
+        "https://mnc.test/x", "Rear double island bed / Electric drop-down double bed"
+    )
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [baseline])
+    )
+    change_id = next(
+        e.change.id
+        for e in store.list_change_queue(connection, run_id=run.id)
+        if e.change.field == "bed_types"
+    )
+    connection.close()
+
+    client.post(
+        f"/runs/{run.id}/changes/{change_id}/decide",
+        data={
+            "action": "accept",
+            "reviewer_name": "ben",
+            # Enum order puts island before drop-down; the proposal happens to agree here,
+            # so submit them the other way round to prove the comparison is set-based.
+            "corrected_values": ["drop_down_bed", "island_bed"],
+        },
+    )
+
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision.action == "accept"
+
+
+def test_changing_a_single_select_and_pressing_accept_saves_the_change(
+    client: TestClient, db_path: Path
+) -> None:
+    """The same trap on a dropdown, so the same answer."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    baseline = Motorhome(
+        manufacturer="Rimor", manufacturer_range="Horus", model="38", product_id=5992,
+        body_type=BodyType.CAMPERVAN,
+    )
+    extracted = make_extracted(
+        rrp_pounds=59995, manufacturer_range="Horus", model="38",
+        body_type=BodyType.CAMPERVAN_HIGH_TOP,
+    )
+    extracted.provenance["body_type"] = Provenance("https://rimor.it/x", "listed under /vans")
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [baseline])
+    )
+    change_id = next(
+        e.change.id
+        for e in store.list_change_queue(connection, run_id=run.id)
+        if e.change.field == "body_type"
+    )
+    connection.close()
+
+    client.post(
+        f"/runs/{run.id}/changes/{change_id}/decide",
+        data={
+            "action": "accept",
+            "reviewer_name": "ben",
+            "corrected_value": "type_campervan_high_top_elevating_roof",
+        },
+    )
+
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision.action == "correct"
+    assert decision.corrected_value == "type_campervan_high_top_elevating_roof"
