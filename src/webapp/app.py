@@ -65,7 +65,7 @@ from ..cli import (
 )
 from ..diff.compare import LAYOUT_FIELDS
 from ..output import generate_upload
-from ..registry import loader
+from ..registry import Manufacturer, loader
 from ..store.decisions import Action
 from ..store.changes import LIST_SEPARATOR
 from ..vehicle_class import DEFAULT as DEFAULT_VEHICLE_CLASS
@@ -164,6 +164,17 @@ def _run_duration(run: store.Run) -> str | None:
     total_seconds = int((finished - started).total_seconds())
     minutes, seconds = divmod(total_seconds, 60)
     return f"{minutes:02d}m{seconds:02d}s"
+
+
+def _display_name_sort_key(manufacturer: Manufacturer) -> str:
+    """Sort manufacturers by the name shown on screen, case-insensitively.
+
+    The same expression the trigger template renders — `fmlv_display_name` falling back to
+    `fmlv_manufacturer` — so the list reads in the order it is displayed in. `casefold`
+    rather than `lower` keeps `MOTO-TREK` beside `Morelo` instead of ahead of every
+    lower-cased name.
+    """
+    return (manufacturer.fmlv_display_name or manufacturer.fmlv_manufacturer or "").casefold()
 
 
 _templates.env.filters["fmt_dt"] = _format_datetime
@@ -312,10 +323,19 @@ def create_app(
 
         `adapters_for` rather than `adapter_for`, so a manufacturer that only ever gains a
         caravan adapter still appears. The product area is a separate choice on the form.
+
+        **Sorted by the name the reader actually sees**, which is `fmlv_display_name` and
+        not `fmlv_manufacturer` — seven of the nineteen differ, and two of them would land
+        nowhere near where someone would look for them: `Knaus Tabbert AG` shows as
+        *Weinsberg*, `Trigano VDL Chausson` as *Chausson*. Sorting on the stored name would
+        leave the list looking unsorted to the only person reading it. Without any sort at
+        all the order is whatever the CSV happens to be in, which is the order adapters were
+        written.
         """
         result = loader.load(app.state.registry_path)
         errors = [issue.message for issue in result.issues if issue.severity == "error"]
         runnable = [m for m in result.manufacturers if adapters_for(m.fmlv_manufacturer)]
+        runnable.sort(key=_display_name_sort_key)
         return runnable, errors
 
     def _areas_by_manufacturer(manufacturers: list) -> dict[str, list[VehicleClass]]:

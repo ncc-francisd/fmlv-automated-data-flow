@@ -8,6 +8,7 @@ the same path a reviewer actually hits.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -129,6 +130,72 @@ def test_home_page_links_to_trigger_and_runs(client: TestClient) -> None:
     assert response.status_code == 200
     assert 'href="/trigger"' in response.text
     assert 'href="/runs"' in response.text
+
+
+def _manufacturer_options(html: str) -> list[str]:
+    """The labels in the trigger form's manufacturer dropdown, in rendered order."""
+    block = re.search(r'<select id="manufacturer_name".*?</select>', html, re.DOTALL)
+    assert block is not None, "the manufacturer dropdown is missing from /trigger"
+    labels = re.findall(r"<option[^>]*>(.*?)</option>", block.group(0), re.DOTALL)
+    return [label.strip() for label in labels if label.strip()]
+
+
+def test_the_manufacturer_dropdown_is_alphabetical(db_path: Path) -> None:
+    """Sorted by the name on screen, which is not the name in the registry.
+
+    The five here are written to the CSV in deliberately wrong order, and three of them
+    display as something other than their `fmlv_manufacturer`: sorting on the stored name
+    would put Weinsberg under K and Chausson under T, which is exactly where nobody would
+    look for them. `MOTO-TREK` is here for the case: an ASCII sort puts every capitalised
+    name ahead of every lower-cased one, so it would land before Morelo.
+    """
+    (db_path.parent / "manufacturers.csv").write_text(
+        "manufacturer_id,fmlv_manufacturer,fmlv_display_name,website_url\n"
+        "252,Knaus Tabbert AG,Weinsberg,https://example.invalid/a\n"
+        "76,MOTO-TREK LIMITED,MOTO-TREK,https://example.invalid/b\n"
+        "3,Adria Mobil,Adria,https://example.invalid/c\n"
+        "53,Trigano VDL Chausson,Chausson,https://example.invalid/d\n"
+        "46,Morelo,Morelo,https://example.invalid/e\n",
+        encoding="utf-8",
+    )
+    client = TestClient(
+        create_app(
+            db_path,
+            registry_path=db_path.parent / "manufacturers.csv",
+            reviewers_path=db_path.parent / "reviewers.csv",
+        )
+    )
+
+    options = _manufacturer_options(client.get("/trigger").text)
+
+    assert options == ["Adria", "Chausson", "Morelo", "MOTO-TREK", "Weinsberg"]
+
+
+def test_a_manufacturer_with_no_display_name_sorts_on_the_name_shown_instead(
+    db_path: Path,
+) -> None:
+    """The template falls back to `fmlv_manufacturer` when the display name is blank, so
+    the sort has to make the same fallback or the two disagree."""
+    (db_path.parent / "manufacturers.csv").write_text(
+        "manufacturer_id,fmlv_manufacturer,fmlv_display_name,website_url\n"
+        "144,Wingamm,,https://example.invalid/a\n"
+        "46,Morelo,,https://example.invalid/b\n"
+        "28,Bailey,,https://example.invalid/c\n",
+        encoding="utf-8",
+    )
+    client = TestClient(
+        create_app(
+            db_path,
+            registry_path=db_path.parent / "manufacturers.csv",
+            reviewers_path=db_path.parent / "reviewers.csv",
+        )
+    )
+
+    assert _manufacturer_options(client.get("/trigger").text) == [
+        "Bailey",
+        "Morelo",
+        "Wingamm",
+    ]
 
 
 def test_run_list_is_empty_with_no_runs(client: TestClient) -> None:
