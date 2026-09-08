@@ -93,7 +93,9 @@ _STR_FIELDS: frozenset[str] = frozenset(
 #: not here — it's a carry-through field no proposal ever touches; a `DISAPPEARED`
 #: product gets a `disappearance_notice` (`store/changes.py`) instead, not a proposed
 #: CSV change.
-_BOOL_FIELDS: frozenset[str] = frozenset({"rear_garage", "microwave"})
+_BOOL_FIELDS: frozenset[str] = frozenset(
+    {"rear_garage", "microwave", "shower_toilet_separated"}
+)
 
 #: Single-select layout groups (DESIGN.md §4.3), field name -> enum class.
 _ENUM_FIELDS: dict[str, type[ColumnEnum]] = {
@@ -144,7 +146,9 @@ _CARAVAN_STR_FIELDS: frozenset[str] = frozenset(
     {"manufacturer", "manufacturer_display_name", "manufacturer_range", "model"}
 )
 
-_CARAVAN_BOOL_FIELDS: frozenset[str] = frozenset({"twin_axle", "microwave"})
+_CARAVAN_BOOL_FIELDS: frozenset[str] = frozenset(
+    {"twin_axle", "microwave", "shower_toilet_separated"}
+)
 
 _CARAVAN_ENUM_FIELDS: dict[str, type[ColumnEnum]] = {
     "body_type": CaravanBodyType,
@@ -368,6 +372,9 @@ class UploadResult:
     motorhomes: list[Product] = field(default_factory=list)
     issues: list[Issue] = field(default_factory=list)
     issues_path: Path | None = None
+    #: A spreadsheet-readable copy of the same rows, header on row 1. Not for uploading —
+    #: see `paths.upload_readable_path`.
+    readable_path: Path | None = None
 
     @property
     def has_errors(self) -> bool:
@@ -379,7 +386,7 @@ def write_upload_csv(
     path: Path | str,
     *,
     vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLASS,
-) -> tuple[list[Issue], Path | None]:
+) -> tuple[list[Issue], Path | None, Path]:
     """Validate then write the upload CSV. Never blocks the write — see `validation.py`:
     problems are reported as data so a reviewer can see exactly what's wrong with which
     row, not silently dropped or raised past the point where they'd be useful.
@@ -391,24 +398,32 @@ def write_upload_csv(
     Any issues found are also written to a human-readable text file alongside the CSV
     (`paths.upload_issues_path`), so a reviewer can download and read them rather than
     the JSON shape `Issue` itself has — no file is written when there's nothing to
-    report."""
+    report.
+
+    A **readable copy** is written every time too (`paths.upload_readable_path`): the same
+    rows with the header on row 1, because the two `-` rows make the upload proper open as
+    a one-column sheet in Excel. Returned third so the review page can offer both.
+    """
+    readable_path = paths.upload_readable_path(Path(path))
     if VehicleClass(vehicle_class) is VehicleClass.CARAVAN:
         caravans = [p for p in products if isinstance(p, Caravan)]
         assert len(caravans) == len(products), "a caravan upload cannot carry motorhome rows"
         issues = validate_all_caravans(caravans)
         write_caravan_csv(caravans, path, leading_blank_rows=2)
+        write_caravan_csv(caravans, readable_path)
     else:
         motorhomes = [p for p in products if isinstance(p, Motorhome)]
         assert len(motorhomes) == len(products), "a motorhome upload cannot carry caravan rows"
         issues = validate_all(motorhomes)
         write_fmlv_csv(motorhomes, path, leading_blank_rows=2)
+        write_fmlv_csv(motorhomes, readable_path)
 
     issues_path: Path | None = None
     if issues:
         issues_path = paths.upload_issues_path(Path(path))
         issues_path.write_text(format_issues(issues), encoding="utf-8")
 
-    return issues, issues_path
+    return issues, issues_path, readable_path
 
 
 def generate_upload(
@@ -432,7 +447,13 @@ def generate_upload(
         baseline=baseline,
         vehicle_class=vehicle_class,
     )
-    issues, issues_path = write_upload_csv(products, path, vehicle_class=vehicle_class)
+    issues, issues_path, readable_path = write_upload_csv(
+        products, path, vehicle_class=vehicle_class
+    )
     return UploadResult(
-        path=Path(path), motorhomes=products, issues=issues, issues_path=issues_path
+        path=Path(path),
+        motorhomes=products,
+        issues=issues,
+        issues_path=issues_path,
+        readable_path=readable_path,
     )

@@ -46,10 +46,16 @@ class Feature:
     `snippet` is what a reviewer reads next to the proposal, so it is the manufacturer's
     own wording verbatim rather than a paraphrase — the requester asked for "a source
     which takes me to precisely that section of text".
+
+    `note` is how that quote is introduced when the reasoning is not simply "it says so":
+    an adapter's own wording is used when it is `None`. `refrigeration` needs it because
+    a fridge freezer is now recorded from a line that says only "fridge", and a reviewer
+    who cannot see why would read that as a mistake.
     """
 
     value: Any
     snippet: str
+    note: str | None = None
 
 #: A spec line describing a priced extra rather than standard equipment. The price is the
 #: giveaway — Rimor's "Rear Adjustable Bed Option: £1,500" and "Alloy wheel option:
@@ -89,21 +95,63 @@ def _first_match(lines: Iterable[str], pattern: re.Pattern[str]) -> str | None:
 #: compartment". Reading the summary alone would silently downgrade it.
 _FREEZER = re.compile(r"\bfreezer\b|\bfreezer compartment\b|\bfridge[-/ ]freezer\b", re.I)
 
+#: A page saying there is **no** freezer. This is now the only thing that makes a plain
+#: `fridge`, so it has to catch the ways a spec denies one — "no freezer", "without a
+#: freezer compartment", "freezer not fitted" — while never matching the far commoner
+#: line that states one. It is tested before `_FREEZER` because "fridge without freezer
+#: compartment" contains both.
+#:
+#: The denial has to sit in **one clause**, which is why the gaps exclude a comma as well
+#: as a full stop: "141L fridge with freezer compartment, oven not fitted" and "no oven,
+#: 141 L freezer" both put a negative within a few words of a freezer that is really
+#: there, and matching either would flip a fridge freezer to a fridge on a page that
+#: states one outright.
+_NO_FREEZER = re.compile(
+    r"\bno\b[^.,]{0,25}\bfreezer\b|\bwithout\b[^.,]{0,25}\bfreezer\b"
+    r"|\bfreezer\b[^.,]{0,25}\bnot\b[^.,]{0,15}\b(?:included|fitted|available|supplied)\b",
+    re.I,
+)
+
 #: Any refrigeration at all. `refrigerator column` is Rimor's phrasing for a tall fridge.
 _FRIDGE = re.compile(r"\bfridge\b|\brefrigerator\b|\brefrigeration\b", re.I)
 
 
-def refrigeration_from(lines: Iterable[str]) -> tuple[Refrigeration, str] | None:
-    """`(Refrigeration, the line that said so)`, or `None` if no fridge is mentioned.
+def refrigeration_from(lines: Iterable[str]) -> Feature | None:
+    """The refrigeration a page evidences, or `None` if no fridge is mentioned at all.
 
-    A freezer anywhere on the page wins, since a page that mentions one both has one and
-    has a fridge to put it in.
+    Three cases, in the order they are tested:
+
+    * **A freezer is denied** — a plain `fridge`. Explicit, and rare.
+    * **A freezer is stated** anywhere on the page — a `fridge_freezer`. Any line will
+      do, since a page mentioning a freezer both has one and has a fridge to put it in.
+    * **A fridge, with the freezer neither stated nor denied** — also a `fridge_freezer`.
+
+    That third case reverses the earlier reading, on the requester's ruling of 7
+    September 2026: *"eighty to ninety percent of fridges supplied to caravan and motor
+    home providers actually come with a freezer compartment […] unless it says it doesn't
+    have a freezer compartment, we should be basically saying it has a fridge freezer
+    even if the specification just says it has a ninety litre or a hundred and forty
+    litre fridge, because the freezer compartment often goes unsaid."* The trade fits
+    Dometic units, which almost all have one. FMLV's own hand-filled baseline agrees:
+    `fridge_freezer` is Yes on 89% of the 1,590 rows in `data/exports`, so proposing
+    `fridge` from a silent spec was contradicting the reviewers most of the time.
+
+    This is the one feature here asserted from something other than the words on the
+    page, so it carries a `note` saying so rather than letting a reviewer discover a
+    "141 L fridge" quote under a fridge-freezer proposal and read it as a bug.
     """
     usable = usable_lines(lines)
+    if denied := _first_match(usable, _NO_FREEZER):
+        return Feature(Refrigeration.FRIDGE, denied, "the specification rules out a freezer")
     if freezer_line := _first_match(usable, _FREEZER):
-        return Refrigeration.FRIDGE_FREEZER, freezer_line
+        return Feature(Refrigeration.FRIDGE_FREEZER, freezer_line, "a freezer is mentioned")
     if fridge_line := _first_match(usable, _FRIDGE):
-        return Refrigeration.FRIDGE, fridge_line
+        return Feature(
+            Refrigeration.FRIDGE_FREEZER,
+            fridge_line,
+            "a fridge, with a freezer neither stated nor ruled out — nearly all of these "
+            "have a freezer compartment, so a fridge freezer",
+        )
     return None
 
 
@@ -208,19 +256,29 @@ _WET_ROOM = re.compile(r"\bwet[- ]room\b|\bshower over (?:the )?toilet\b", re.I)
 _EXTERNAL_SHOWER = re.compile(r"\bexternal\b[^.]{0,30}\bshower\b|\boutdoor shower\b", re.I)
 
 
-def bathroom_from(lines: Iterable[str]) -> tuple[BathroomLayout, str] | None:
-    """`(BathroomLayout, the line that said so)`, or `None` when the copy cannot settle it.
+def shower_toilet_separated_from(lines: Iterable[str]) -> Feature | None:
+    """Whether a partition divides the shower from the toilet, or `None` if unsaid.
 
-    Only the **separated** case is decided here, because it is the only one the words
-    determine. A combined washroom still needs a location — `BathroomLayout` offers
-    `rear_shower_toilet` and `side_shower_toilet`, and nothing in the prose says which —
-    so a wet room returns `None` and goes to the reviewer with the floorplan.
+    This is a **separate fact from where the washroom is**, and not one of
+    `BathroomLayout`'s values. The requester, 7 September 2026, on a Kilig 66 Plus
+    proposed as `separate_shower_toilet` over a held `side_shower_toilet`: *"those are not
+    mutually exclusive. The location is mutually exclusive. But if the type or the
+    construction or layout of the shower and toilet is that it is separate, those are two
+    values."* FMLV holds both together on 84 of its 1,590 motorhome rows.
+
+    So the words answer this, and the floorplan answers the location — `bathroom_layout`
+    is never proposed from prose. Reading "separate shower cubicle and cassette toilet" as
+    a *location* was the bug: it overwrote a side washroom with a construction detail and
+    lost the location a reviewer had set by hand.
+
+    A wet room is the explicit negative — one space, shower over the toilet — so it
+    returns `False` rather than nothing.
     """
     usable = [line for line in usable_lines(lines) if not _EXTERNAL_SHOWER.search(line)]
-    if _first_match(usable, _WET_ROOM):
-        return None
+    if wet := _first_match(usable, _WET_ROOM):
+        return Feature(value=False, snippet=wet, note="one wet space, undivided")
     if line := _first_match(usable, _SEPARATE_BATHROOM):
-        return BathroomLayout.SEPARATE_SHOWER_TOILET, line
+        return Feature(value=True, snippet=line, note="the copy says they are separated")
     return None
 
 
@@ -259,7 +317,6 @@ BED_PHRASES: tuple[tuple[str, BedType], ...] = (
     ("permanent bed", BedType.FIXED),
 )
 
-#: A bed made up rather than permanently there.
 #: A bed made up rather than permanently there. `lift` is here alongside the folding
 #: words because it is the same claim in different clothes: Rimor's Horus 12 bed "lifts to
 #: create more storage space for travel", so it is not standing made up.
@@ -267,6 +324,25 @@ _MAKE_UP = re.compile(
     r"\bconvert\w*\b|\bmakes? (?:up )?(?:into )?a?\s*(?:double|single|bed)"
     r"|\bmake[- ]up bed\b|\bfold[- ]?(?:s|ing)?[- ]away\b|\bpull[- ]out bed\b"
     r"|\blifts?\b|\blift[- ]up\b|\bstow\w*\b",
+    re.I,
+)
+
+#: A bed named *as* the seating it is made from — "double bed rear dinette", "half dinette
+#: bed", "settee bed". The same claim as `_MAKE_UP` with the verb left out, which is how
+#: the trade usually writes it, and `_MAKE_UP` cannot catch it because there is no verb to
+#: match. Rimor's Kilig 77 Plus is the case in point: "Consists of double bed rear
+#: dinette, a front & rear drop-down bed", where the dinette double went unrecorded and
+#: the requester supplied the answer on 8 September 2026 — *"the correct answer is a drop
+#: down bed and a makeup bed."*
+#:
+#: Adjacency is what keeps this honest. The seating word has to follow the bed word
+#: directly, allowing only a position word between, so "Rear drop-down bed above lounge"
+#: and "Fixed rear double bed and a front lounge" do not match: in those the lounge is
+#: where the bed is or what else the vehicle has, not what the bed is made from.
+_SEATING_BED = re.compile(
+    r"\bbeds?\b[\s&,]*(?:front|rear|side|centre|center|middle)?[\s&,]*"
+    r"(?:dinette|lounge|settee)\b"
+    r"|\b(?:dinette|lounge|settee)\s+beds?\b",
     re.I,
 )
 
@@ -310,9 +386,14 @@ def bed_types_from(lines: Iterable[str]) -> tuple[list[BedType], list[str]]:
 
         matches: list[BedType] = []
         makes_up = bool(_MAKE_UP.search(line))
-        if makes_up:
+        if makes_up or _SEATING_BED.search(line):
             matches.append(BedType.MAKE_UP)
         # A shape is only credited when it is not merely what the seating turns into.
+        # Keyed to the verb form alone: "Rear lounge which converts into single beds"
+        # describes one arrangement, so the singles belong to the converted lounge. A line
+        # naming a seating bed *among others* — "double bed rear dinette, a front & rear
+        # drop-down bed" — is a list of distinct beds, and suppressing the drop-down there
+        # would lose a type the copy plainly states.
         if not (makes_up and _SEATING.search(line)):
             for phrase, bed_type in BED_PHRASES:
                 if phrase in lowered:
@@ -341,14 +422,16 @@ def features_from(lines: Iterable[str]) -> dict[str, Feature]:
     usable = usable_lines(lines)
     features: dict[str, Feature] = {}
 
-    if found := refrigeration_from(usable):
-        features["refrigeration"] = Feature(found[0], found[1])
+    if refrigeration := refrigeration_from(usable):
+        features["refrigeration"] = refrigeration
     if found := heating_from(usable):
         features["heating"] = Feature(found[0], found[1])
     if found := microwave_from(usable):
         features["microwave"] = Feature(found[0], found[1])
-    if found := bathroom_from(usable):
-        features["bathroom_layout"] = Feature(found[0], found[1])
+    # Deliberately **not** `bathroom_layout`: that column holds the washroom's location,
+    # which only a drawing can give. See `shower_toilet_separated_from`.
+    if found := shower_toilet_separated_from(usable):
+        features["shower_toilet_separated"] = found
 
     bed_types, quotes = bed_types_from(usable)
     if bed_types:

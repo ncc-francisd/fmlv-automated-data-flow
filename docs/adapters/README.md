@@ -173,6 +173,89 @@ publishes no price anywhere in the world, and its products still carry one, beca
 exclusive UK importer prices every layout it sells. See [Rimor](rimor.md), which reads the
 importer for the price and the range and the factory for the specifications.
 
+### A side-by-side PDF table may still yield the one row you need
+
+The standing warning about brochure spec tables is that columns cannot be recovered:
+pypdf returns each row as a single text run, a row prints a value once where it spans
+several columns, and every run starts at the same x so the coordinates give nothing. That
+is why Rimor's catalogue was rejected for dimensions in August 2026, and it is still
+right.
+
+But the rule is per **row**, not per document. A row whose value differs for every column
+carries exactly as many values as the page has columns, and position is then enough.
+Rimor's `MRO (kg) 2770 2866 2714` is that row, on a page whose `Outside length (mm) 5998
+5413` is not.
+
+So where a document is the only source for a field, it is worth asking whether *that
+field's* row is attributable, rather than dismissing the table. The safe shape is three
+cases and no fourth:
+
+* **values == columns** — read positionally;
+* **exactly one value** — applies to every column (Rimor's Kilig 669 and 695 really do
+  share an MRO);
+* **anything else** — skip it, because that is the only case that can misattribute.
+
+**Prove it against a second source before trusting it.** Rimor's catalogue was checked
+against the 30 MROs the website itself had published before withdrawing the field: 30
+agreed, none differed. Without that the attribution would have been plausible rather than
+established, and a silently transposed column is the failure this whole warning exists
+about.
+
+### A one-layout range's leaflet is a spec sheet, not marketing
+
+The reason brochure tables are hard is that they put layouts side by side. A range with
+**one** layout has nothing to put side by side, so its leaflet prints one value per row
+and the whole difficulty disappears.
+
+That is worth knowing because the product with no model page is often exactly the odd
+one-off that gets its own range: Rimor gives the Van 238 a marketing page with no spec
+table, and its leaflet turned out to carry every figure FMLV asks for — MTPLM, MRO,
+dimensions in exact millimetres, certified seats, berths split into fixed and made-up.
+Four sibling leaflets for multi-layout ranges carry no technical table at all.
+
+So when a layout has no page of its own, check the range's own documents before recording
+it as unspecifiable. Two cautions:
+
+* **Read the layout name out of the document and check it against the one you are joining
+  to.** A leaflet is a range document: if the manufacturer adds a second model, the file
+  at that URL becomes a different vehicle's data sheet, and handing the first one someone
+  else's weights is a silent, plausible-looking error.
+* **Say in the provenance which document it was.** The link opens a PDF, and a reviewer
+  who clicked expecting a model page needs to know what they are looking at.
+
+### Payload is arithmetic, so it is checkable even when nothing was published
+
+`mh_payload_kilograms` is MTPLM minus MRO. That means a payload can be checked against
+the other two whether or not the manufacturer published anything this run — and where it
+disagrees, the pipeline proposes the derived figure rather than only warning about it.
+
+Rimor's Horus 38 is the case that prompted it: FMLV holds MRO 2624, MTPLM 3500 and
+payload 676, which is 200kg out, and Rimor withdrew MRO from its site the day after
+publishing it. So nothing was read, both masses were carried over from FMLV, and the
+mismatch had been reaching the issues file as a `payload_mismatch` warning *after* the
+upload was generated. The requester, 7 September 2026: *"even though you have no source to
+prove what the actual MRO and MTPLM are, you've simply carried it over from FMLV"* — the
+figures are still the figures, and the arithmetic still holds.
+
+This covers the **automatic variant too**, on the same reasoning: it has no MTPLM of its
+own — the same chassis with a different gearbox — so `automatic.payload_kilograms`
+derives from the one `mtplm_kilograms` and its own MRO. Horus 38 and 40, Kilig 77 Plus,
+Sailer 69 and Sarus 66 Plus were all out there as well.
+
+`store.changes._derived_payload_proposals` takes each mass from the site where the adapter
+found one and from FMLV where it did not, which is what the upload row will actually hold,
+and says which in the snippet. It stands down in three cases:
+
+* **the adapter already proposed a payload** — it does the same arithmetic itself, so its
+  figure, with its real source, wins;
+* **the arithmetic already agrees** — nothing to say;
+* **caravans** — `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the
+  personal-effects half of a split, and one published figure may be the total. Deriving it would be wrong.
+
+Each is gated by `was_previously_rejected` like any other proposal, and suppresses the
+confirm-or-replace row for its own field, so a reviewer never sees "the existing figure
+is wrong" directly above "confirm the existing figure".
+
 ### A figure that could not be found must be visible, and must never be inherited
 
 Where a manufacturer normally publishes a spec and it is **absent for a particular model**,
@@ -351,6 +434,37 @@ baseline was **wrong** and the manufacturer right. The rule is not "trust the ba
 it is that a systematic disagreement is a question to answer, and often only the requester
 can answer it.
 
+### A fridge is a fridge freezer unless the freezer is ruled out
+
+FMLV has two refrigeration columns and the guide says not to put Yes in both. Where a
+specification names a freezer, that settles it. Where it names only a fridge — "90 L
+compressor fridge", "141 L refrigerator column" — record **`fridge_freezer` anyway.**
+
+The requester's ruling, 7 September 2026: *"eighty to ninety percent of fridges supplied
+to caravan and motor home providers actually come with a freezer compartment […] unless
+it says it doesn't have a freezer compartment, we should be basically saying it has a
+fridge freezer even if the specification just says it has a ninety litre or a hundred and
+forty litre fridge, because the freezer compartment often goes unsaid."* The trade fits
+Dometic units, nearly all of which have one. FMLV's hand-filled baseline agrees:
+`fridge_freezer` is Yes on 89% of its 1,590 rows, so reading a silent spec as a plain
+fridge was contradicting the reviewers most of the time — it produced a downgrade
+proposal on every Rimor van, the Horus 12 among them, which is what surfaced this.
+
+A plain `fridge` is therefore proposed only where the page **denies** the freezer — "no
+freezer compartment", "without a freezer", "freezer not fitted". `habitation._NO_FREEZER`
+is that test, and it runs *before* the freezer test because "fridge without freezer
+compartment" matches both.
+
+This is the one habitation feature asserted from something other than the words on the
+page, so it is not allowed to be silent about that: the `Feature` carries a `note` saying
+which of the three cases applied, and the reviewer reads "a fridge, with a freezer neither
+stated nor ruled out …" above the manufacturer's own quote rather than finding a
+fridge-freezer proposal under a line that says "fridge" and reading it as a bug.
+
+Positive evidence is still required to propose anything at all. A page that never mentions
+refrigeration still proposes nothing: the assumption is about what a stated fridge
+includes, not about what every vehicle has.
+
 ### Habitation features split into the factual and the subjective
 
 `schema.LAYOUT` holds twenty-odd Yes/No columns describing the inside of the vehicle, and
@@ -408,7 +522,34 @@ Three traps worth knowing before writing the next one:
   freezer compartment". Read *every* line for a freezer, and put the itemised list ahead
   of the marketing paragraph when choosing which line to quote — `rimor._spec_lines` does
   that reordering, and it is why the quoted line is a bullet and not a hundred words of
-  prose.
+  prose. The stakes on the freezer itself are lower now that an unstated one is assumed
+  either way, but the precedence still decides *which line the reviewer is shown*, and it
+  still governs every other feature.
+
+**A washroom's location and its construction are two facts, not one choice.**
+`BathroomLayout` looks like a single-select group of seven, and the field guide says
+"select one", but two of its members answer different questions: `rear_shower_toilet` and
+`side_shower_toilet` say *where*, while `separate_shower_toilet` says *whether a partition
+divides the shower from the toilet*. A washroom can be both, and FMLV's own data is: **84
+of the 1,590 motorhome rows** in `data/exports` carry a location and the separated flag
+together — Sunlight's T69L is `side_shower_toilet` and separate at once.
+
+So both products carry `shower_toilet_separated: bool | None` beside `bathroom_layout`,
+read from the export's `separate_shower_toilet` column as its own fact and written back on
+its own terms. The requester settled it for caravans on 3 September 2026 and for
+motorhomes on 7 September, after a Kilig 66 Plus was proposed as `separate_shower_toilet`
+over a held `side_shower_toilet`: *"those are not mutually exclusive. The location is
+mutually exclusive. But if the type or the construction or layout of the shower and toilet
+is that it is separate, those are two values."*
+
+For an adapter that means: **read the construction from the copy, and never the location.**
+`habitation.shower_toilet_separated_from` does the first; the location goes to the
+floorplan with everything else positional. Proposing the separated value as a *location*
+is the bug to avoid — it overwrites a side washroom with a construction detail and loses
+what a reviewer set by hand.
+
+This is the second time a "select one" group has turned out not to be exclusive, so treat
+the guide's wording as advice to the typist and query the export before believing it.
 
 **Hand the reviewer the floorplan for the subjective half.** An adapter that cannot know
 a positional field can still say *where to look*, and should: record provenance whose

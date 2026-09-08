@@ -11,7 +11,7 @@ import pytest
 from src import store
 from src.adapters.base import ExtractedMotorhome, Provenance
 from src.diff.classify import diff_products
-from src.product_model.model import Motorhome
+from src.product_model.model import AutomaticVariant, Motorhome
 
 
 @pytest.fixture
@@ -135,11 +135,28 @@ def test_new_product_persists_every_extracted_field_with_no_old_value(
         connection, run_id=run_id, manufacturer_id=3, diffs=diffs
     )
 
-    assert result.proposed == 1
+    # The extracted field, plus one row per single-select layout group the product has no
+    # value for — a new product needs a choice from each, and without a row the reviewer
+    # never sees it. See `LAYOUT_GROUP_UNSET_SNIPPET`.
+    unset_count = sum(
+        1
+        for f in store.changes.fields_needing_a_choice(extracted.product)
+        if f not in extracted.provenance
+        and getattr(extracted.product, f, None) is None
+    )
+    assert result.proposed == 1 + unset_count
     queue = store.list_change_queue(connection, run_id)
-    assert queue[0].change.old_value is None
-    assert queue[0].change.new_value == "45000"
-    assert queue[0].product.fmlv_product_id is None
+    rrp = next(e for e in queue if e.change.field == "rrp_pounds")
+    assert rrp.change.old_value is None
+    assert rrp.change.new_value == "45000"
+    assert rrp.product.fmlv_product_id is None
+
+    unset = {e.change.field for e in queue if e.change.reviewer_reference}
+    assert "mro_kilograms" in unset
+    assert "sleeping_area" in unset
+    assert all(
+        e.change.new_value is None for e in queue if e.change.reviewer_reference
+    )
 
 
 def test_disappeared_product_gets_a_disappearance_notice_not_a_proposed_change(
@@ -557,7 +574,280 @@ def test_a_new_product_is_still_asked_about_an_empty_in_scope_field(
         connection, run_id=run.id, manufacturer_id=26, diffs=diff_products([scraped], [])
     )
 
-    [entry] = store.list_change_queue(connection, run.id)
+    queue = store.list_change_queue(connection, run.id)
+    entry = next(e for e in queue if e.change.field == "body_type")
 
-    assert entry.change.field == "body_type"
     assert entry.change.new_value is None
+    # The adapter's own row, carrying the evidence it did find — not one of the
+    # "nothing here at all" rows a new product also gets for its blank columns.
+    assert entry.change.source_snippet is not None
+    assert "subtype unstated" in entry.change.source_snippet
+
+
+def test_a_new_product_is_asked_about_every_column_it_has_nothing_for(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """The Rimor Van 238, which shipped blank in run 87 with no row to warn anyone.
+
+    It has no factory page, so the adapter found no weights and nothing positional — not
+    even a floorplan to point at. Before this the only sign was `required field
+    'mro_kilograms' is missing` in the issues file, after the upload was generated.
+    """
+    scraped = ExtractedMotorhome(
+        motorhome=Motorhome(
+            manufacturer="Rimor",
+            manufacturer_range="Horus",
+            model="Van 238",
+            rrp_pounds=56995,
+            mh_length_mm=5980,
+        ),
+        provenance={
+            "rrp_pounds": Provenance(source_url="https://mnc.test/x", snippet="£56,995"),
+            "mh_length_mm": Provenance(source_url="https://mnc.test/x", snippet="Length: 5.98m"),
+        },
+    )
+    store.persist_diff(
+        connection, run_id=run_id, manufacturer_id=75, diffs=diff_products([scraped], [])
+    )
+
+    rows = {e.change.field: e.change for e in store.list_change_queue(connection, run_id)}
+
+    # The weights it could not find, each needing a figure typed in.
+    for field_name in ("mro_kilograms", "mtplm_kilograms", "mh_payload_kilograms"):
+        assert field_name in rows, field_name
+        assert rows[field_name].new_value is None
+        assert rows[field_name].reviewer_reference is True
+
+    # And the positional groups, which no wording could ever settle.
+    for field_name in ("sleeping_area", "kitchen_location", "lounge_location"):
+        assert field_name in rows, field_name
+        assert rows[field_name].new_value is None
+
+    # What it did find is a normal proposal, not one of these.
+    assert rows["rrp_pounds"].new_value == "56995"
+    assert rows["rrp_pounds"].reviewer_reference is False
+    # And nothing is invented for a column it already has.
+    assert rows["mh_length_mm"].new_value == "5980"
+
+
+def test_an_existing_product_is_not_asked_about_columns_it_already_holds(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """Only new products get these rows: a matched one has a baseline value to keep."""
+    baseline = make_baseline()
+    scraped = make_extracted(rrp_pounds=93920)
+    store.persist_diff(
+        connection, run_id=run_id, manufacturer_id=3, diffs=diff_products([scraped], [baseline])
+    )
+
+    fields = [e.change.field for e in store.list_change_queue(connection, run_id)]
+    assert fields == ["rrp_pounds"]
+
+
+def test_a_payload_that_disagrees_with_the_two_masses_is_corrected(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """Horus 38: FMLV holds 2624 MRO, 3500 MTPLM and 676 payload, which is 200kg out.
+
+    The requester, 7 September 2026: *"that figure for the payload should be 876 […] even
+    though you have no source to prove what the actual MRO and MTPLM are, you've simply
+    carried it over from FMLV."* Payload is arithmetic, so a disagreement is checkable
+    whether or not the site published anything.
+    """
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=676
+    )
+    scraped = make_extracted(rrp_pounds=93950)  # nothing about the masses this run
+    store.persist_diff(
+        connection, run_id=run_id, manufacturer_id=3, diffs=diff_products([scraped], [baseline])
+    )
+
+    payload_rows = [
+        e.change
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.field == "mh_payload_kilograms"
+    ]
+    # Exactly one row, not a correction sitting beneath a "confirm the existing figure".
+    assert len(payload_rows) == 1
+    assert payload_rows[0].old_value == "676"
+    assert payload_rows[0].new_value == "876"
+    assert "3500kg MTPLM - 2624kg MRO = 876kg" in payload_rows[0].source_snippet
+    # Nothing was read, so nothing is cited as a source.
+    assert payload_rows[0].source_url is None
+
+
+def test_a_payload_that_already_agrees_is_left_alone(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=876
+    )
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93950)], [baseline]),
+    )
+
+    # A confirm-or-replace row is still right — the site published nothing, and payload
+    # is in scope — but nothing is *corrected*, because the arithmetic already agrees.
+    payload_rows = [
+        e.change
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.field == "mh_payload_kilograms"
+    ]
+    assert [r.new_value for r in payload_rows] == ["876"]
+    assert all(r.old_value == r.new_value for r in payload_rows)
+
+
+def test_the_adapters_own_payload_wins_over_the_derived_one(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """When the site publishes both masses the adapter does this arithmetic itself."""
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=676
+    )
+    scraped = make_extracted(
+        rrp_pounds=93950,
+        mro_kilograms=2770,
+        mtplm_kilograms=3500,
+        mh_payload_kilograms=730,
+    )
+    scraped.provenance["mro_kilograms"] = Provenance("https://x.test", "MRO: 2770 kg")
+    scraped.provenance["mh_payload_kilograms"] = Provenance("https://x.test", "3500 - 2770")
+    store.persist_diff(
+        connection, run_id=run_id, manufacturer_id=3, diffs=diff_products([scraped], [baseline])
+    )
+
+    payload_rows = [
+        e.change
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.field == "mh_payload_kilograms"
+    ]
+    assert len(payload_rows) == 1
+    assert payload_rows[0].new_value == "730"
+    assert payload_rows[0].source_url == "https://x.test"
+
+
+def test_a_rejected_derived_payload_is_not_offered_again(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """A reviewer who has judged the arithmetic wrong is not asked every run."""
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=676
+    )
+    diffs = diff_products([make_extracted(rrp_pounds=93950)], [baseline])
+    store.persist_diff(connection, run_id=run_id, manufacturer_id=3, diffs=diffs)
+    entry = next(
+        e
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.field == "mh_payload_kilograms"
+    )
+    store.record_decision(
+        connection, proposed_change_id=entry.change.id, action="reject", decided_by="ben"
+    )
+
+    later = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    result = store.persist_diff(
+        connection, run_id=later.id, manufacturer_id=3, diffs=diffs
+    )
+
+    # The confirm-or-replace row survives by design — a missing in-scope field keeps
+    # being asked about — but the rejected 876 is not proposed again.
+    proposed = [
+        e.change.new_value
+        for e in store.list_change_queue(connection, later.id)
+        if e.change.field == "mh_payload_kilograms"
+    ]
+    assert "876" not in proposed
+    assert result.suppressed_rejections >= 1
+
+
+def test_the_automatic_payload_is_derived_too(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """Horus 38's automatic figures are 200kg out in exactly the same way.
+
+    The variant has no MTPLM of its own — same chassis, different gearbox — so it derives
+    from the one `mtplm_kilograms`, which is what `validation._validate_automatic` checks.
+    """
+    baseline = make_baseline(
+        mro_kilograms=2624,
+        mtplm_kilograms=3500,
+        mh_payload_kilograms=676,
+        automatic=AutomaticVariant(
+            mro_kilograms=2639,
+            payload_kilograms=661,
+            rrp_pounds=60995,
+            price_min_range_pounds=60995,
+        ),
+    )
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93950)], [baseline]),
+    )
+
+    rows = {
+        e.change.field: e.change for e in store.list_change_queue(connection, run_id)
+    }
+    assert rows["mh_payload_kilograms"].new_value == "876"
+    assert rows["automatic.payload_kilograms"].new_value == "861"
+    assert "3500kg MTPLM - 2639kg MRO = 861kg" in (
+        rows["automatic.payload_kilograms"].source_snippet
+    )
+    # The wording distinguishes the two, so a reviewer reading both knows which is which.
+    assert "Derived automatic payload" in rows["automatic.payload_kilograms"].source_snippet
+    assert "Derived payload" in rows["mh_payload_kilograms"].source_snippet
+
+
+def test_a_product_with_no_automatic_variant_gets_no_automatic_proposal(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """Most products have no automatic figures at all, and none are invented."""
+    baseline = make_baseline(
+        mro_kilograms=2624, mtplm_kilograms=3500, mh_payload_kilograms=676
+    )
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93950)], [baseline]),
+    )
+
+    fields = [e.change.field for e in store.list_change_queue(connection, run_id)]
+    assert "mh_payload_kilograms" in fields
+    assert "automatic.payload_kilograms" not in fields
+
+
+def test_an_automatic_payload_that_already_agrees_is_left_alone(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    baseline = make_baseline(
+        mro_kilograms=2624,
+        mtplm_kilograms=3500,
+        mh_payload_kilograms=876,
+        automatic=AutomaticVariant(
+            mro_kilograms=2639,
+            payload_kilograms=861,
+            rrp_pounds=60995,
+            price_min_range_pounds=60995,
+        ),
+    )
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93950)], [baseline]),
+    )
+
+    corrected = [
+        e.change.field
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.old_value != e.change.new_value
+    ]
+    assert "automatic.payload_kilograms" not in corrected
+    assert "mh_payload_kilograms" not in corrected

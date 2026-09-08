@@ -67,6 +67,7 @@ from ..diff.compare import LAYOUT_FIELDS
 from ..output import generate_upload
 from ..registry import loader
 from ..store.decisions import Action
+from ..store.changes import LIST_SEPARATOR
 from ..vehicle_class import DEFAULT as DEFAULT_VEHICLE_CLASS
 from ..vehicle_class import VehicleClass
 from . import choices
@@ -83,12 +84,24 @@ _templates.env.globals["is_layout_field"] = lambda field: field in LAYOUT_FIELDS
 _templates.env.globals["is_year_field"] = lambda field: field == "year"
 _templates.env.globals["field_choices"] = choices.field_choices
 _templates.env.globals["choice_label"] = choices.label_for
+_templates.env.globals["is_multi_select"] = choices.is_multi_select
+_templates.env.globals["needs_selection"] = lambda change: choices.needs_selection(
+    change.old_value, change.new_value
+)
 # A `MissingField` proposal (store.changes.persist_diff) always has `old_value ==
 # new_value` and this exact snippet — same "match on the snippet text" trick as the
 # archive/year-rollover proposals above, since there's no DB column for "why".
 _templates.env.globals["is_missing_field"] = lambda change: (change.source_snippet or "").startswith(
     (store.MISSING_FIELD_SNIPPET, store.UNDETERMINED_FIELD_SNIPPET)
 )
+#: A row for a column a **new** product has nothing for, from
+#: `store.changes.NEEDS_A_CHOICE_SNIPPET`. Rendered differently again from a missing
+#: field: there is no existing value, so "keep it" is not one of the answers. The two
+#: answers are "set one" and "leave it blank", and the reviewer has to pick.
+_templates.env.globals["is_unset_field"] = lambda change: (
+    change.source_snippet or ""
+).startswith(store.NEEDS_A_CHOICE_SNIPPET)
+
 #: Whether the "Leave blank" button is offered for a field — see `choices.can_be_blanked`.
 #: A guard, not a preference: blanking a boolean writes `No` and blanking an identity
 #: string orphans the product's FMLV id, so neither is offered.
@@ -119,6 +132,27 @@ def _format_datetime_short(value: str | None) -> str:
         return "—"
     local = datetime.fromisoformat(value).astimezone(_LOCAL_TZ)
     return local.strftime("%Y-%m-%d | %H:%M")
+
+
+def _selection_differs(change: store.ProposedChange, submitted: str) -> bool:
+    """Whether a submitted selection says something other than what was proposed.
+
+    Compared as a **set** for a multi-select field, because the tick boxes submit in the
+    enum's order while the adapter proposes in the order the copy named the beds —
+    "drop_down_bed, transverse_bed" and "transverse_bed, drop_down_bed" are the same
+    answer, and treating the reordering as an edit would turn every Accept into a
+    correction.
+
+    An empty submission is not an edit: it is what an untouched dropdown sends when its
+    "choose a value…" option is still selected.
+    """
+    if not submitted:
+        return False
+    proposed = change.new_value or ""
+    if choices.is_multi_select(change.field):
+        parts = lambda value: {p.strip() for p in value.split(LIST_SEPARATOR) if p.strip()}
+        return parts(submitted) != parts(proposed)
+    return submitted != proposed
 
 
 def _run_duration(run: store.Run) -> str | None:
@@ -581,6 +615,9 @@ def create_app(
                 "pending": pending,
                 "decided": decided,
                 "disappearance_notices": disappearance_notices,
+                # So a field with no row is not ambiguous: it either matched, or the
+                # adapter never reached it. See `store.verified_fields_by_product`.
+                "verified_fields": store.verified_fields_by_product(connection, run_id),
                 "reviewers": app.state.reviewers,
             },
         )
@@ -649,6 +686,14 @@ def create_app(
                 "has_errors": result.has_errors,
                 "issues": [f"{issue.severity}: {issue.message}" for issue in result.issues],
                 "download_url": f"/runs/{run.id}/uploads/{result.path.name}",
+                # The same rows with the header on row 1, for reading in a spreadsheet.
+                # The upload proper keeps its two `-` rows, which Excel cannot make a
+                # table of. See `paths.upload_readable_path`.
+                "readable_download_url": (
+                    f"/runs/{run.id}/uploads/{result.readable_path.name}"
+                    if result.readable_path
+                    else None
+                ),
                 "issues_filename": result.issues_path.name if result.issues_path else None,
                 "issues_download_url": (
                     f"/runs/{run.id}/uploads/{result.issues_path.name}"
@@ -683,6 +728,10 @@ def create_app(
         connection: ConnectionDep,
         action: Action = Form(...),
         corrected_value: str = Form(""),
+        # A multi-select submits one of these per ticked box. Kept as its own field name
+        # rather than making `corrected_value` a list, so the single-select and free-text
+        # paths are untouched.
+        corrected_values: list[str] = Form([]),  # noqa: B006 — FastAPI reads the default
         reviewer_name: str = Form(""),
     ) -> HTMLResponse:
         run = _run_or_404(connection, run_id)
@@ -697,6 +746,22 @@ def create_app(
         reviewer_name = reviewer_name.strip()
         error = None
         run = store.get_run(connection, change.run_id)
+        if choices.is_multi_select(change.field):
+            # Joined the way `output.build.apply_field` splits it again.
+            ticked = [value.strip() for value in corrected_values if value.strip()]
+            corrected_value = LIST_SEPARATOR.join(ticked)
+
+        # "Accept" records the *proposed* value, and the tick boxes and dropdowns sit
+        # right beside it pre-filled from that proposal — so editing one and pressing
+        # Accept looked like it saved the edit and did not. Francis, 7 September 2026:
+        # "if I go to change it and add one or remove one and click accept, it doesn't
+        # change. Surely I should be able to edit it."
+        #
+        # An edited selection is an explicit statement of intent, so it is honoured
+        # whichever button carried it. Untouched, the two agree and this does nothing.
+        if action == "accept" and _selection_differs(change, corrected_value):
+            action = "correct"
+
         selectable = choices.field_choices(change.field, run.vehicle_class)
         known_reviewers: set[str] = app.state.reviewer_names_lower
         if known_reviewers and reviewer_name.lower() not in known_reviewers:
@@ -775,12 +840,28 @@ def create_app(
         if known_reviewers and reviewer_name.lower() not in known_reviewers:
             error = "Select your name from the reviewer list before deciding."
         else:
+            # Rows with nothing to accept are left pending deliberately: accepting one
+            # would mark a field reviewed and leave it blank, which is how run 86 went
+            # out with its layout columns unset. See `choices.needs_selection`.
+            skipped = [
+                entry
+                for entry in target_entries
+                if choices.needs_selection(entry.change.old_value, entry.change.new_value)
+            ]
             for entry in target_entries:
+                if entry in skipped:
+                    continue
                 store.record_decision(
                     connection,
                     proposed_change_id=entry.change.id,
                     action="accept",
                     decided_by=reviewer_name or None,
+                )
+            if skipped:
+                fields = ", ".join(sorted(entry.change.field for entry in skipped))
+                error = (
+                    f"Accepted the rest. {len(skipped)} field(s) still need a choice "
+                    f"because there is nothing to accept: {fields}."
                 )
 
         # The whole product's group, not just the entries just decided — so a second
@@ -797,6 +878,7 @@ def create_app(
                 "product": product,
                 "entries": entries,
                 "error": error,
+                "verified_fields": store.verified_fields_by_product(connection, run_id),
                 "reviewers": app.state.reviewers,
             },
         )

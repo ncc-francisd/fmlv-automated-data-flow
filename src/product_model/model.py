@@ -119,6 +119,25 @@ class Motorhome(BaseModel):
     rear_garage: bool | None = None
     microwave: bool | None = None
 
+    #: Whether a door or a firm partition divides the toilet from the shower.
+    #:
+    #: **The export's `separate_shower_toilet` column, read as its own fact**, exactly as
+    #: `Caravan.shower_toilet_separated` has been since 3 September 2026. It is not an
+    #: alternative to `bathroom_layout`: the requester, 7 September 2026 — "those are not
+    #: mutually exclusive. The location is mutually exclusive. But if the type or the
+    #: construction or layout of the shower and toilet is that it is separate, those are
+    #: two values." A washroom sits somewhere *and* separately either does or does not
+    #: divide the two.
+    #:
+    #: FMLV's own motorhome data proves it holds both: 84 of the 1,590 rows in
+    #: `data/exports` carry a location and `separate_shower_toilet` together — Sunlight's
+    #: T69L is `side_shower_toilet` and separate at once.
+    #:
+    #: So `bathroom_layout` takes the location and this takes the construction. `None`
+    #: means the column was blank, which is not the same as somebody having looked and
+    #: found one room.
+    shower_toilet_separated: bool | None = None
+
     automatic: AutomaticVariant | None = None
 
     @property

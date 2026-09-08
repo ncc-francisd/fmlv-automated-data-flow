@@ -12,6 +12,7 @@ collapse.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -899,13 +900,15 @@ def test_every_positional_field_gets_the_floorplan(
     assert all(name in rimor.FLOORPLAN_FIELDS for name in links)
 
 
-def test_a_floorplan_pointer_never_overwrites_a_value_the_copy_settled(
+def test_the_copy_settles_the_construction_and_the_drawing_the_location(
     mnc_kilig_66: str, factory_kilig_66_plus: str
 ) -> None:
-    """Kilig 66 Plus says "separate", so its bathroom is decided and needs no drawing.
+    """Kilig 66 Plus, the case that prompted the split.
 
-    The other three positional fields still get one — a pointer is recorded per field the
-    copy left open, not per product.
+    Its copy says "separate shower cubicle and cassette toilet", which is the
+    construction. FMLV holds `side_shower_toilet`, which is the location. Both are true,
+    so the adapter proposes the construction and hands the drawing over for the location
+    rather than overwriting one with the other.
     """
     listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
     model = rimor.parse_model_page(
@@ -913,9 +916,11 @@ def test_a_floorplan_pointer_never_overwrites_a_value_the_copy_settled(
     )
     extracted = rimor._build_extracted_motorhome(listing, model)
 
-    assert extracted.motorhome.bathroom_layout is BathroomLayout.SEPARATE_SHOWER_TOILET
-    assert extracted.provenance["bathroom_layout"].reviewer_reference is False
-    assert extracted.provenance["sleeping_area"].reviewer_reference is True
+    assert extracted.motorhome.shower_toilet_separated is True
+    assert extracted.provenance["shower_toilet_separated"].reviewer_reference is False
+    # The location is never proposed, only pointed at.
+    assert extracted.motorhome.bathroom_layout is None
+    assert extracted.provenance["bathroom_layout"].reviewer_reference is True
 
 
 def test_no_factory_page_means_no_floorplan(mnc_van_238: str) -> None:
@@ -989,3 +994,289 @@ def test_an_anchor_is_cut_on_a_word_boundary() -> None:
 
 def test_an_empty_snippet_leaves_the_url_alone() -> None:
     assert rimor.anchored("https://example.test/p/", "") == "https://example.test/p/"
+
+
+# --------------------------------------------------------------------------- #
+# The season catalogue — the only source of MRO since 7 September 2026
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture(scope="module")
+def catalogue_text() -> str:
+    return _fixture("rimor_catalogue_technical_data_text.txt")
+
+
+def test_the_catalogue_gives_an_mro_per_layout(catalogue_text: str) -> None:
+    """Positional, because every layout's MRO differs so the row is never short."""
+    mro = rimor.parse_catalogue_mro(catalogue_text)
+    assert mro["HORUS 38"] == 2770
+    assert mro["HORUS 45"] == 2866
+    assert mro["HORUS 54"] == 2714
+    assert mro["KILIG 77 PLUS"] == 3005
+    assert mro["KILIG 78 PLUS"] == 2877
+    assert mro["KILIG 79 PLUS"] == 2803
+
+
+def test_one_value_across_a_page_applies_to_every_layout_on_it(
+    catalogue_text: str,
+) -> None:
+    """Kilig 669 and 695 really do share 3024 — the site published both as 3024."""
+    mro = rimor.parse_catalogue_mro(catalogue_text)
+    assert mro["KILIG 669"] == 3024
+    assert mro["KILIG 695"] == 3024
+
+
+def test_nothing_but_mro_is_read_out_of_the_catalogue(catalogue_text: str) -> None:
+    """The dimension rows are exactly the trap that made the catalogue unusable in August.
+
+    The Horus page heads three layouts and prints
+
+        Wheelbase (mm) 4035 3450
+        Outside length (mm) 5998 5413
+
+    — two values for three columns, with nothing to say which column the shared one
+    covers. `parse_catalogue_mro` returns only MRO, so there is nothing to misattribute.
+    """
+    mro = rimor.parse_catalogue_mro(catalogue_text)
+    assert all(isinstance(value, int) for value in mro.values())
+    # 5998 and 5413 are lengths from that short row; neither is anyone's MRO.
+    assert 5998 not in mro.values()
+    assert 5413 not in mro.values()
+
+
+def test_an_ambiguous_mro_row_is_skipped_rather_than_guessed() -> None:
+    """Two values for three columns cannot be placed, so nothing is recorded."""
+    text = "\n".join(
+        [
+            "KILIG 5   KILIG 9   KILIG 50   ",
+            "DIMENSIONS AND WEIGHTS",
+            "MRO (kg) 2961 2869",
+        ]
+    )
+    assert rimor.parse_catalogue_mro(text) == {}
+
+
+def test_catalogue_key_matches_the_headings() -> None:
+    assert rimor.catalogue_key("Kilig", "77 Plus") == "KILIG 77 PLUS"
+    assert rimor.catalogue_key("Super Brig", "677 TC") == "SUPER BRIG 677 TC"
+    assert rimor.catalogue_key("Super Brig", "Suite") == "SUPER BRIG SUITE"
+    assert rimor.catalogue_key("Kilig", "5") == "KILIG 5"
+
+
+def test_the_catalogue_fills_the_mro_the_site_withdrew(
+    mnc_kilig_66: str, factory_kilig_66_plus: str, catalogue_text: str
+) -> None:
+    """A layout page with no MRO still gets one, and says where it came from.
+
+    The requester found the catalogue on 8 September 2026, the day after Rimor removed
+    MRO from its model pages.
+    """
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = rimor.parse_model_page(
+        factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+    )
+    # The fixture predates the withdrawal, so blank its MRO to match today's live page.
+    model = replace(model, mro_kilograms=None)
+    catalogue = rimor.parse_catalogue_mro(catalogue_text)
+    catalogue["KILIG 66 PLUS"] = 3017
+
+    extracted = rimor._build_extracted_motorhome(listing, model, catalogue)
+
+    assert extracted.motorhome.mro_kilograms == 3017
+    assert extracted.motorhome.mh_payload_kilograms == 3500 - 3017
+    assert "from the season catalogue" in extracted.provenance["mro_kilograms"].snippet
+    assert "rimor-download" in extracted.provenance["mro_kilograms"].source_url
+
+
+def test_the_model_page_still_wins_when_it_publishes_an_mro(
+    mnc_kilig_66: str, factory_kilig_66_plus: str
+) -> None:
+    """If Rimor republishes MRO, the layout's own page is the better source again."""
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = rimor.parse_model_page(
+        factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+    )
+    assert model.mro_kilograms == 3017  # the fixture has it
+
+    extracted = rimor._build_extracted_motorhome(
+        listing, model, {"KILIG 66 PLUS": 9999}
+    )
+
+    assert extracted.motorhome.mro_kilograms == 3017
+    assert "season catalogue" not in extracted.provenance["mro_kilograms"].snippet
+
+
+def test_no_catalogue_leaves_the_mro_unset(
+    mnc_kilig_66: str, factory_kilig_66_plus: str
+) -> None:
+    """A failed catalogue fetch costs a figure, never a run."""
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = replace(
+        rimor.parse_model_page(
+            factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+        ),
+        mro_kilograms=None,
+    )
+
+    extracted = rimor._build_extracted_motorhome(listing, model, {})
+
+    assert extracted.motorhome.mro_kilograms is None
+    assert extracted.motorhome.mh_payload_kilograms is None
+    assert extracted.motorhome.mtplm_kilograms == 3500
+
+
+# --------------------------------------------------------------------------- #
+# The Rimor Van leaflet — the Van 238's only specification
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def van_leaflet_text() -> str:
+    return _fixture("rimor_van_leaflet_text.txt")
+
+
+#: Where the leaflet sits on the site, as `_VAN_LEAFLET_LINK` returns it.
+VAN_LEAFLET_PATH = (
+    "/public/local/simplex/Marchi/rimor/Veicoli/Gamme/BrochureGamme/brochure/raw/"
+    "RIM_Pieghevole Rimor Van 2026-27 EU_V2_WEB.pdf"
+)
+
+
+def test_the_leaflet_specifies_the_layout_the_factory_gives_no_page(
+    van_leaflet_text: str,
+) -> None:
+    """Every figure the Van 238 used to reach the reviewer without."""
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    assert model is not None
+    assert (model.range_label, model.model) == ("Horus", "Van 238")
+    assert (model.mh_length_mm, model.mh_width_mm, model.mh_height_mm) == (5981, 2059, 2800)
+    assert model.mh_passenger_seats_inc_driver == 4
+    assert model.mtplm_kilograms == 3500
+    assert model.mro_kilograms == 2765
+    assert model.mh_payload_kilograms == 735
+
+
+def test_the_leaflet_counts_a_made_up_berth_as_a_standard_one(
+    van_leaflet_text: str,
+) -> None:
+    """"Fixed berths 2" plus "Assemblable berths 1" is the 3 the leaflet's prose gives.
+
+    Neither is a paid option, so neither is an extra berth to leave out — and MNC's own
+    listing says "3 berth" independently.
+    """
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    assert model is not None
+    assert model.berths == 3
+    assert model.berths_text == "2 fixed + 1 assemblable"
+
+
+def test_the_leaflets_height_settles_the_high_top_question(van_leaflet_text: str) -> None:
+    """2800 mm is above the 2300 mm threshold, and exact rather than truncated."""
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    assert model is not None
+    assert model.body_type is BodyType.CAMPERVAN_HIGH_TOP
+
+
+def test_a_leaflet_naming_no_layout_specifies_nothing(van_leaflet_text: str) -> None:
+    """A leaflet is a range document, so the layout it is about has to be read from it.
+
+    Rimor Van is a one-layout range today. If a second van arrives, the file at this URL
+    becomes a different vehicle's data sheet, and handing the 238 someone else's weights
+    is the failure worth designing out — so the caller checks the name it finds.
+    """
+    assert rimor.parse_van_leaflet("Outside length (mm) 5981", VAN_LEAFLET_PATH) is None
+
+
+def test_a_marketing_leaflet_with_no_height_specifies_nothing() -> None:
+    """The other four ranges' leaflets carry no technical table — checked 8 September 2026.
+
+    Height is what decides a van's body type, and its absence is also how a marketing
+    leaflet is told from a data sheet.
+    """
+    text = "Rimor Van 238 is designed for those who choose maximum freedom.\n"
+    assert rimor.parse_van_leaflet(text, VAN_LEAFLET_PATH) is None
+
+
+def test_the_leaflet_agrees_with_mnc_on_every_dimension(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """The join's self-check, and a genuine second source: the two sites are independent.
+
+    MNC publishes truncated metres here (5.98 m, 2.05 m, 2.80 m), so the leaflet's exact
+    millimetres should sit within the 9 mm truncation allows — and they do, on all three.
+    """
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    assert model is not None
+    assert rimor.dimension_conflicts(listing, model) == []
+
+
+def test_a_leaflet_sourced_figure_says_so_in_its_provenance(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """The link goes to a PDF, so the snippet has to say what the reviewer is opening."""
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    extracted = rimor._build_extracted_motorhome(listing, model)
+
+    assert extracted.motorhome.mh_payload_kilograms == 735
+    for field_name in ("mro_kilograms", "mtplm_kilograms", "mh_payload_kilograms",
+                       "mh_length_mm", "mh_passenger_seats_inc_driver", "berths"):
+        assert "from the range leaflet" in extracted.provenance[field_name].snippet
+
+
+def test_the_leaflet_beats_mncs_truncated_dimensions(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """The factory settles every figure, so the fallback only fills what would be empty.
+
+    MNC's 2.05 m width truncates to 2050 mm and the real figure is 2059 — the whole
+    reason the fallback is a plan B.
+    """
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    product = rimor._build_extracted_motorhome(listing, model).motorhome
+
+    assert (product.mh_length_mm, product.mh_width_mm) == (5981, 2059)
+
+
+def test_the_leaflet_leaves_the_habitation_features_to_mnc(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """MNC names the beds better: a transverse bed *and* the dinette that makes up a single.
+
+    The leaflet's prose only says "transverse", so taking beds from it would lose a type.
+    Same division of labour as everywhere else — the factory settles figures, the
+    importer's prose settles fittings.
+    """
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    product = rimor._build_extracted_motorhome(listing, model).motorhome
+
+    assert product.bed_types == [BedType.TRANSVERSE, BedType.MAKE_UP]
+
+
+def test_the_leaflet_gives_the_van_a_drawing_to_read_the_layout_off(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """Before this the Van 238's positional fields had no row, so nothing to flag.
+
+    The requester, 7 September 2026: *"I didn't see any flags saying that that wasn't
+    completed."* Correct at the time — no factory page meant no reference to offer.
+    """
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    provenance = rimor._build_extracted_motorhome(listing, model).provenance
+
+    for field_name in ("sleeping_area", "kitchen_location", "lounge_location", "bathroom_layout"):
+        assert provenance[field_name].reviewer_reference is True
+        assert "the layout drawing in the range leaflet" in provenance[field_name].snippet
+        assert provenance[field_name].source_url.endswith(".pdf")

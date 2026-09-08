@@ -49,6 +49,12 @@ from typing import Any
 from ..diff.classify import ChangeKind, ProductDiff
 from ..diff.compare import MissingField, field_value, profile_for
 from ..diff.year_rollover import bump_year, can_bump_year
+from ..product_model import caravan_schema, schema
+from ..product_model.caravan import Caravan
+from ..product_model.validation import (
+    CARAVAN_LAYOUT_GROUP_FIELDS,
+    LAYOUT_GROUP_FIELDS,
+)
 from ..vehicle_class import DEFAULT as DEFAULT_VEHICLE_CLASS
 from ..vehicle_class import VehicleClass
 from . import products as products_store
@@ -95,10 +101,164 @@ UNDETERMINED_FIELD_SNIPPET = (
     "or choose a replacement."
 )
 
+#: `source_snippet` for a field a new product would otherwise reach FMLV blank on.
+#: Nothing was read off the site — the adapter could not determine it and there is no
+#: baseline to keep — so the reviewer has to choose, and `choices.needs_selection` marks
+#: the row accordingly.
+NEEDS_A_CHOICE_SNIPPET = (
+    "Nothing was found for this field and there is no existing value to keep, so it "
+    "needs one. Left unset, FMLV receives the product with this column blank."
+)
+
+
+def fields_needing_a_choice(product: Product) -> tuple[str, ...]:
+    """Fields a **new** product must not reach FMLV blank, in the order to show them.
+
+    Two kinds, and both were shipping blank without the reviewer ever seeing a row:
+
+    * **Required columns** the adapter could not fill. `Kilig 55 Plus` went out with no
+      MRO, MTPLM or payload, and the only sign was `required field 'mro_kilograms' is
+      missing` in the issues file after the upload was generated.
+    * **Single-select layout groups.** The `Rimor Van 238` has no factory page at all, so
+      the adapter recorded nothing for sleeping area, kitchen, lounge or washroom — not
+      even a floorplan to point at — and there was no row to flag.
+
+    The identity strings are excluded: `manufacturer`, `model` and their kin are always
+    set on a product that exists at all, and a reviewer cannot usefully be asked to
+    choose one.
+    """
+    layout = (
+        CARAVAN_LAYOUT_GROUP_FIELDS
+        if isinstance(product, Caravan)
+        else LAYOUT_GROUP_FIELDS
+    )
+    required = caravan_schema.REQUIRED if isinstance(product, Caravan) else schema.REQUIRED
+    return (
+        *(f for f in sorted(required) if f not in _IDENTITY_FIELDS),
+        *layout,
+    )
+
+
+#: Never asked about: a product with no manufacturer or model does not exist, and these
+#: are what `diff.matching` keys on.
+_IDENTITY_FIELDS: frozenset[str] = frozenset(
+    {"manufacturer", "manufacturer_display_name", "manufacturer_range", "model"}
+)
+
+
 #: How `_serialize` joins a multi-valued field (e.g. `bed_types`) into one TEXT column.
 #: `output.build.apply_field` is `_serialize`'s inverse and splits on this same
 #: constant — keep them in sync.
 LIST_SEPARATOR = ", "
+
+
+#: `source_snippet` for a payload the pipeline derived rather than read. Says where the
+#: two masses came from, because "no source found this run" and "here is a corrected
+#: payload" look contradictory side by side unless the arithmetic is spelled out.
+PAYLOAD_ARITHMETIC_SNIPPET = (
+    "Derived {label}, not read from the site: {mtplm}kg MTPLM - {mro}kg MRO = "
+    "{derived}kg, against the {held}kg on record. {basis}. Accepting this makes the "
+    "three figures agree; rejecting it leaves FMLV as it is."
+)
+
+
+#: The payloads that are MTPLM minus an MRO, as `(payload path, MRO path, label)`. The
+#: automatic variant has no MTPLM of its own — it is the same chassis with a different
+#: gearbox — so both derive from the one `mtplm_kilograms`, which is what
+#: `validation._validate_automatic` checks too.
+_DERIVED_PAYLOADS: tuple[tuple[str, str, str], ...] = (
+    ("mh_payload_kilograms", "mro_kilograms", "payload"),
+    ("automatic.payload_kilograms", "automatic.mro_kilograms", "automatic payload"),
+)
+
+
+def _derived_payload_proposals(
+    diff: ProductDiff,
+) -> list[tuple[str, int, int, str]]:
+    """`(field path, derived, held, explanation)` for each payload the masses contradict.
+
+    Payload is arithmetic — MTPLM minus MRO — so it is checkable whether or not the
+    manufacturer published anything this run. Until now a disagreement only surfaced as a
+    `payload_mismatch` warning in the issues file, after the upload had been generated.
+
+    The requester, 7 September 2026, on Horus 38: *"that figure for the payload should be
+    876. So should be presenting a correction to the payload figure of 676, because if the
+    MRO and MTPLM are correct, the figure should be 876. Even though you have no source to
+    prove what the actual MRO and MTPLM are, you've simply carried it over from FMLV."*
+    Extended to the automatic variant the same day, on the same reasoning — Horus 38 and
+    40, Kilig 77 Plus, Sailer 69 and Sarus 66 Plus all disagree there too.
+
+    Each mass is taken from the site where the adapter found one and from FMLV where it
+    did not, which is what the upload row will hold, and the explanation says which.
+    Skipped where the adapter is already proposing that payload — it does the same
+    arithmetic, with a real source behind it — and skipped for caravans, whose
+    `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the personal-effects
+    half of a split.
+    """
+    baseline, extracted = diff.baseline, diff.extracted
+    if baseline is None or extracted is None:
+        return []
+    if isinstance(baseline, Caravan) or isinstance(extracted.product, Caravan):
+        return []
+
+    def effective(field_path: str) -> tuple[int | None, bool]:
+        scraped = field_value(extracted.product, field_path)
+        if scraped is not None:
+            return scraped, True
+        return field_value(baseline, field_path), False
+
+    mtplm, mtplm_scraped = effective("mtplm_kilograms")
+    if mtplm is None:
+        return []
+
+    found: list[tuple[str, int, int, str]] = []
+    for payload_path, mro_path, label in _DERIVED_PAYLOADS:
+        if any(change.field == payload_path for change in diff.changes):
+            continue
+        mro, mro_scraped = effective(mro_path)
+        held = field_value(baseline, payload_path)
+        if mro is None or held is None:
+            continue
+        derived = mtplm - mro
+        if derived == held:
+            continue
+        found.append(
+            (
+                payload_path,
+                derived,
+                held,
+                PAYLOAD_ARITHMETIC_SNIPPET.format(
+                    label=label,
+                    mtplm=mtplm,
+                    mro=mro,
+                    derived=derived,
+                    held=held,
+                    basis=_mass_basis(mtplm_scraped, mro_scraped, label),
+                ),
+            )
+        )
+    return found
+
+
+def _mass_basis(mtplm_scraped: bool, mro_scraped: bool, label: str) -> str:
+    """Where each of the two masses came from, in words."""
+    mro_name = "MRO" if label == "payload" else "automatic MRO"
+    if mtplm_scraped and mro_scraped:
+        return "Both masses come from the manufacturer's site this run"
+    if not mtplm_scraped and not mro_scraped:
+        return (
+            "Neither mass was published this run, so both are FMLV's own figures "
+            "carried over"
+        )
+    if mtplm_scraped:
+        return (
+            f"The MTPLM comes from the site this run; the {mro_name} is FMLV's own, "
+            f"carried over"
+        )
+    return (
+        f"The {mro_name} comes from the site this run; the MTPLM is FMLV's own, "
+        f"carried over"
+    )
 
 
 def _missing_field_snippet(missing: MissingField) -> str:
@@ -296,6 +456,28 @@ def record_proposed_change(
     return get_proposed_change(connection, cursor.lastrowid)
 
 
+def verified_fields_by_product(
+    connection: sqlite3.Connection, run_id: int
+) -> dict[int, list[str]]:
+    """Which fields were checked and found unchanged, per product, for one run.
+
+    A field with no proposal is ambiguous to a reviewer — it may have been checked and
+    matched, or never looked at, or withheld because the same value was rejected before.
+    The requester, 8 September 2026, on Kilig 77 Plus: *"I noticed that there's no
+    proposal on bed types. Is this because there is no change in the bed types?"* This is
+    what lets the review page answer that, from the `verification` rows `persist_diff`
+    already writes.
+    """
+    rows = connection.execute(
+        "SELECT product_id, field FROM verification WHERE run_id = ? ORDER BY field",
+        (run_id,),
+    ).fetchall()
+    verified: dict[int, list[str]] = {}
+    for row in rows:
+        verified.setdefault(row["product_id"], []).append(row["field"])
+    return verified
+
+
 def record_verification(
     connection: sqlite3.Connection, *, run_id: int, product_id: int, field: str
 ) -> None:
@@ -473,6 +655,28 @@ def persist_diff(
                     reviewer_reference=provenance.reviewer_reference,
                 )
                 proposed += 1
+
+            # Anything a new product would otherwise reach FMLV blank on gets a row,
+            # whether the adapter mentioned it or not — see `fields_needing_a_choice`.
+            # Without this the only sign was a line in the issues file, after the upload
+            # had been generated.
+            for field_name in fields_needing_a_choice(diff.extracted.product):
+                if field_name in diff.extracted.provenance:
+                    continue
+                if field_value(diff.extracted.product, field_name) is not None:
+                    continue
+                record_proposed_change(
+                    connection,
+                    run_id=run_id,
+                    product_id=product.id,
+                    field=field_name,
+                    old_value=None,
+                    new_value=None,
+                    source_url=None,
+                    source_snippet=NEEDS_A_CHOICE_SNIPPET,
+                    reviewer_reference=True,
+                )
+                proposed += 1
             continue
 
         for change in diff.changes:
@@ -524,11 +728,42 @@ def persist_diff(
                 proposed += 1
                 year_rollover_proposed += 1
 
+        # Payload is arithmetic, so a disagreement is checkable even when nothing was
+        # read this run — see `_derived_payload_proposal`.
+        derived_payloads_offered: set[str] = set()
+        for payload_path, derived, held, explanation in _derived_payload_proposals(diff):
+            new_value = _serialize(derived)
+            if was_previously_rejected(
+                connection,
+                product_id=product.id,
+                field=payload_path,
+                new_value=new_value,
+            ):
+                suppressed += 1
+                continue
+            record_proposed_change(
+                connection,
+                run_id=run_id,
+                product_id=product.id,
+                field=payload_path,
+                old_value=_serialize(held),
+                new_value=new_value,
+                source_url=None,
+                source_snippet=explanation,
+            )
+            proposed += 1
+            derived_payloads_offered.add(payload_path)
+
         for field_name in diff.confirmed_fields:
             record_verification(connection, run_id=run_id, product_id=product.id, field=field_name)
             verified += 1
 
         for missing in diff.missing_fields:
+            if missing.field in derived_payloads_offered:
+                # The derived proposal above already offers this field, with the
+                # arithmetic behind it. A second row saying "confirm the existing figure"
+                # would sit right beneath one saying the existing figure is wrong.
+                continue
             # No `was_previously_rejected` gate here, unlike an ordinary proposal:
             # "reject" isn't a coherent action for a field that's simply missing —
             # the review UI only offers "keep existing" (accept) or "replace"

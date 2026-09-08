@@ -494,6 +494,11 @@
       const filename = escapeHtml(data.filename);
       const downloadLink = `<a href="${data.download_url}" download>Download CSV</a>`;
       let message = `Generated upload CSV (${count}): <code>${filename}</code> — ${downloadLink}`;
+      // The upload's header sits on row 3, above two `-` rows the FMLV site wants, so
+      // Excel opens it as a single column. This is the same rows, readable.
+      if (data.readable_download_url) {
+        message += ` — <a href="${data.readable_download_url}" download>Readable copy</a> (do not upload)`;
+      }
       if (data.issues_download_url) {
         const issuesLink = `<a href="${data.issues_download_url}" download>Download Issue Log</a>`;
         message += data.has_errors

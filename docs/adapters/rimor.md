@@ -236,10 +236,15 @@ recorded anyway, so a reviewer gets a confirm-or-replace saying the specificatio
 mention a microwave, rather than a proposed `No` quietly deleting a fact nobody disproved.
 See `UNCONFIRMED_FEATURES`.
 
-**Bathroom is proposed only when the words settle it.** 23 of 34 say "separate" of the
-shower or toilet. The rest say "Wet room" or "Central washroom", which are combined — but
-`BathroomLayout` then wants *rear* or *side*, and the prose never says which, so those 11
-go to a reviewer with the floorplan.
+**The washroom is two fields, and the copy settles only one of them.** 23 of 34 say
+"separate" of the shower or toilet and 7 say "Wet room", so `shower_toilet_separated` is
+proposed True or False on 30 of them from the words. The *location* — `bathroom_layout`'s
+rear or side — is never read from prose and always goes to the floorplan.
+
+Getting that wrong was a real regression: Kilig 66 Plus was proposed as
+`separate_shower_toilet` over a `side_shower_toilet` FMLV already held, which overwrote
+the location with a construction detail. Both are true at once, and FMLV holds both on 84
+of its rows. See the habitation section of `README.md`.
 
 ### The floorplan is the source for everything positional
 
@@ -270,12 +275,27 @@ vans the drawing shows a lounge that becomes a bed at night, which is a *made-up
 instead. `Transverse bed`, `Bunk beds` and `Central bed` name shapes only a built-in bed
 has, and stay usable.
 
+**A bed can be named without a verb.** Kilig 77 Plus reads *"Consists of double bed rear
+dinette, a front & rear drop-down bed and a Front & rear dinette"*, and the dinette double
+went unrecorded: the copy names it as the seating it is made from rather than saying it
+converts, so there was no verb for the make-up pattern to match. `habitation._SEATING_BED`
+catches that idiom — "double bed rear dinette", "half dinette bed", "settee bed" — and the
+requester supplied the answer on 8 September 2026: *"the correct answer is a drop down bed
+and a makeup bed."* One of the 34 layouts changed.
+
+It deliberately does **not** suppress the other beds on its line, which is where it
+differs from the converting-lounge case: in *"lounge which converts into single beds"* the
+singles **are** the converted lounge, so the shape is not credited; in Kilig 77's sentence
+the drop-down is its own bed listed alongside, so it is.
+
 This is latent rather than live: MNC's prose names the beds on all 34 layouts today, so
 the factory fallback never fires. It was live before 5 September 2026, when bed types came
 from the factory word alone — which is what produced the wrong `fixed_bed` proposals on
 the Horus vans.
 
-The Van 238 and Horus 12 get none, having no factory page and therefore no drawing.
+Horus 12 gets none, having no factory page and therefore no drawing. The Van 238 has no
+page either, but its range leaflet carries the layout drawing, so its four positional
+fields point there instead — see below.
 
 **Marking these fields `in_scope` would have been the wrong way to do it**, even though
 that is the other route to showing an empty field on a new product. FMLV holds
@@ -321,21 +341,21 @@ destroys the closing marker.
 note. `_spec_row` allows for that and for the padding described below, which is why all
 five table fields are built from one helper rather than written out five times.
 
-## The two products with no factory page
-
-Both keep MNC's price, body type, base vehicle and dimensions:
+## The products with no factory model page
 
 * **Horus 12** — `/int/en/gamma/horus/modello/12` now 302s to `/`. MNC sells it as a 2027
-  and publishes its dimensions in the exact millimetre form, `5413 × 2050 × 2659 mm`.
+  and publishes its dimensions in the exact millimetre form, `5413 × 2050 × 2659 mm`. It
+  keeps MNC's price, body type, base vehicle and dimensions, and nothing else.
 * **Rimor Van 238** — the factory gives it a standalone `/int/en/special/rimor-van` page
   with no spec table. MNC files it under its **Horus** category, and MNC decides the
-  range, so `manufacturer_range` is Horus and the model is `Van 238`. Its dimensions come
-  from MNC's truncated metres, which the run flags.
+  range, so `manufacturer_range` is Horus and the model is `Van 238`. It has no model
+  page either, but since 8 September 2026 it is fully specified anyway — from the range
+  leaflet. See [The Van 238's leaflet](#the-van-238s-leaflet-is-a-spec-sheet).
 
-For these two, MNC's seats and berths are taken **only when the two figures differ**
-(both publish `3 berth with 4 travel seats`). Two equal figures cannot be told apart from
-the repeat-the-seat-count bug, so they are left empty rather than guessed. Masses are
-never taken from MNC, which publishes no MRO at all and no MTPLM for these two.
+Where MNC is the only source, its seats and berths are taken **only when the two figures
+differ** (both of these publish `3 berth with 4 travel seats`). Two equal figures cannot
+be told apart from the repeat-the-seat-count bug, so they are left empty rather than
+guessed. Masses are never taken from MNC, which publishes no MRO at all and no MTPLM.
 
 Worth a second look one day: Horus 12's MNC dimensions are **identical to Horus 54's**,
 and MNC demonstrably copy-pastes between layouts elsewhere. Both are sub-6m Ducato vans
@@ -370,6 +390,13 @@ only for MTPLM and the chassis; the chassis now comes from MNC's `Vehicle:` line
 catalogue and leaflet machinery is gone entirely**, along with its season-and-version URL
 probing, its unrecoverable column alignment, and the four leaflet fetches per run.
 
+> Both came back within three days, and neither for the reason it was dropped. Rimor
+> withdrew the MRO row on 7 September, so the catalogue is the only source of that figure
+> again — but for one row, not the whole table. And the Rimor Van leaflet turned out to be
+> a single-layout spec sheet, which is the Van 238's only specification. The URL probing
+> did not come back: both PDFs are now linked from a real download page. See
+> [Rimor withdrew MRO](#rimor-withdrew-mro-on-7-september-2026) below.
+
 The old cross-document check (each range's leaflet republishing every layout's
 `length × width`, compared as an unordered multiset) is replaced by the cross-site
 dimension check, which is cheaper, needs no PDF parsing, and immediately found two errors
@@ -399,6 +426,155 @@ factory is truncation, within tolerance, and is what confirms the rename join is
 Horus 54 is the useful case for the other direction: its MNC page gives exact
 millimetres, so the check runs at **zero tolerance**, and the two sites agree on all three
 axes exactly.
+
+## Rimor withdrew MRO on 7 September 2026
+
+One day after it appeared. The overview block now reads:
+
+```
+outside length 7338 mm
+outside width - inside width 2340 - 2200 mm
+maximum outside height inside height 2845 - 2060 mm
+maximum overall weight 3500 / 3550 / 4100 kg
+4  4  1150x850
+Bedding solution : Transverse bed
+```
+
+Both `MRO` and `available mass for optional equipment installation` are gone, as are the
+footnote markers. So **`mro_kilograms` and `mh_payload_kilograms` are unavailable again**,
+and the payload arithmetic with them. Everything else still parses — dimensions, the
+homologated seat count, berths, MTPLM, the bedding solution and the garage were all
+checked against the live pages the same day.
+
+Nothing in the adapter changed for this and nothing needed to: the run reports the field
+as unfound, a matched product keeps whatever FMLV holds, and the figure is not silently
+inherited into anything that would look collected. That is
+`docs/adapters/README.md`'s rule on a withdrawn spec working as intended.
+
+**It leaves a real gap on new products**, though, and this is where it hurts: a layout
+FMLV has never held has no MRO from anywhere, so its upload row carries none and
+`validation` reports `required field 'mro_kilograms' is missing`. That is honest but it
+used to surface only in the issues file, after the upload was generated — which is why
+`store.changes.fields_needing_a_choice` now puts a row in the review for it instead.
+
+`_MRO` still matches the markup it had, so a republished figure is picked up without a
+code change — and the model page stays preferred over the catalogue below whenever it has
+one.
+
+### The catalogue is the source of MRO again
+
+Found on 8 September 2026, the day after the withdrawal. `/int/en/rimor-download` links
+the season catalogue (`RIM_Catalogo 2026-27 EU_V6.pdf`, 6 MB) plus five range leaflets,
+and its technical-data tables carry MRO for **35 layouts** — every one MNC sells, and five
+it does not.
+
+**It is linked from a real page now**, which is what changed: in August the catalogue sat
+at an unadvertised path and had to be probed by season and version. The URL is
+rediscovered per run like any other, matched on `catalogo` rather than a filename, since
+the name carries both a season and a version.
+
+**Only MRO is read out of it, and that restriction is the whole design.** The tables put
+two or three layouts side by side and pypdf returns each row as one text run, so a row
+printing a value once where it spans several columns cannot be split — every run starts at
+the same x, so the coordinates give nothing either. The Horus page is the illustration:
+three layouts, but
+
+```
+Wheelbase (mm) 4035 3450
+Outside length (mm) 5998 5413
+MRO (kg) 2770 2866 2714
+```
+
+Two values for three columns on the first two rows, and nothing to say which column the
+shared one covers. That is what made the catalogue useless for dimensions in August, and
+still does.
+
+MRO escapes it because **every layout's is distinct**, so its row always carries exactly
+as many values as the page has columns. `parse_catalogue_mro` therefore reads a row
+positionally when the counts match, applies it to every layout on the page when there is
+exactly one value — Kilig 669 and 695 genuinely share 3024 — and **skips it otherwise**,
+that being the only case that could misattribute.
+
+**Validated against the site's own figures**, which is what makes this trustworthy rather
+than merely plausible: of the 30 MROs `rimor.it` published before withdrawing the field,
+the catalogue agrees on **30 and differs on none**. The provenance says the figure came
+from the catalogue and that the model page no longer carries it, so a reviewer clicking
+through to the layout does not find it absent and read it as invented.
+
+Four of the 34 still have no MRO, and none of them is a parsing failure:
+
+| Layout | Why |
+| --- | --- |
+| Horus 40 | Not in the catalogue's technical-data tables — it carries Horus 38, 45, 54 and 95 only |
+| Horus 66 | Same |
+| Horus 12 | No factory page, and no catalogue row |
+| Van 238 | No factory page — but the leaflet supplies it, so this one is closed |
+
+Horus 40 and 66 are named in the Horus leaflet's prose, so they are current models the
+catalogue's spec tables simply omit. Both have an MTPLM from their model pages, so a
+published MRO is all that stands between them and a payload.
+
+### The Van 238's leaflet is a spec sheet
+
+The same download page links five range leaflets alongside the catalogue. Four are
+marketing — the Horus and Kilig ones were checked on 8 September 2026 and carry no
+technical table at all, no MRO row, no weights, no dimensions rows. The Horus one prints
+six unlabelled `5998x2050`-style pairs for six layouts, which is exactly the attribution
+problem the catalogue has and `parse_catalogue_mro` refuses to guess at.
+
+`RIM_Pieghevole Rimor Van 2026-27 EU_V2_WEB.pdf` is different, because **Rimor Van is a
+one-layout range**, so its leaflet doubles as the layout's data sheet: one value per row,
+nothing side by side, nothing to misattribute.
+
+```
+Outside length (mm) 5981
+Outside width - inside width (mm) 2059 - 1850
+Maximum outside height - inside height (mm)2800 - 2070
+Certified seats 4
+Maximum overall weight (kg) 3500
+MRO (kg) 2765
+Fixed berths 2
+Assemblable berths 1
+```
+
+That closed the last product with no factory specification. The Van 238 went from price,
+body type and three truncated dimensions to every figure FMLV asks for:
+
+| | Before | From the leaflet |
+| --- | --- | --- |
+| Length | 5980 mm, MNC truncated | **5981 mm** |
+| Width | 2050 mm, MNC truncated | **2059 mm** |
+| Height | 2800 mm, MNC truncated | 2800 mm, exact |
+| MTPLM | — | **3500 kg** |
+| MRO | — | **2765 kg** |
+| Payload | — | **735 kg** |
+| Berths | 3, from MNC | 3 — `2 fixed + 1 assemblable` |
+
+The width is the case for the leaflet in one line: MNC's `2.05 m` truncates to 2050 and
+the vehicle is 2059. It also **agrees with MNC on all three axes** within the 9 mm
+truncation allows, which is a genuine cross-check — the two sites publish independently.
+
+Three things the implementation is careful about:
+
+* **The layout is read from the leaflet, not assumed.** A leaflet is a range document. If
+  Rimor adds a second van, the file at that URL becomes a different vehicle's data sheet,
+  and quietly handing the 238 someone else's weights is the failure worth designing out.
+  `parse_van_leaflet` reads `Rimor Van 238` and the caller checks it against the layout
+  MNC listed.
+* **Numbers only.** The leaflet's prose does name beds and equipment, but MNC's names them
+  better and already does: MNC gives the Van 238 a transverse bed *and* a made-up one off
+  "middle dinette, which converts into a single bed", where the leaflet says only
+  "transverse". Same division of labour as everywhere else — the factory settles every
+  figure, the importer's prose settles the fittings.
+* **The provenance says it is a leaflet.** Every snippet it sourced ends `from the range
+  leaflet`, because the link opens a PDF and a reviewer who clicked expecting a model page
+  has to be told what they are looking at.
+
+The leaflet also carries the layout drawing, beside the technical data and captioned with
+the bed sizes and the `5981x2059` overall callout. It is not a `/public/...piantina...`
+image like the model pages carry, so the four positional fields point at the PDF. Before
+this the Van 238's positional fields had no row at all, which is what the requester saw on
+7 September 2026: *"I didn't see any flags saying that that wasn't completed."*
 
 ## What is unverified
 

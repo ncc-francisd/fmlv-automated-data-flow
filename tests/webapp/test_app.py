@@ -19,6 +19,7 @@ from src import paths, store
 from src.adapters.base import ExtractedMotorhome, Provenance
 from src.diff.classify import diff_products
 from src.product_model import io
+from src.product_model.enums import BedType, BodyType
 from src.product_model.model import Motorhome
 from src.vehicle_class import VehicleClass
 from src.webapp import create_app
@@ -1250,3 +1251,570 @@ def test_a_product_with_no_floorplan_gets_no_header_link(
 
     assert response.status_code == 200
     assert 'class="product-floorplan"' not in response.text
+
+
+def _run_with_a_bed_types_change(db_path: Path) -> tuple[int, int]:
+    """A pending `bed_types` proposal on a matched product, for the multi-select tests."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    baseline = Motorhome(
+        manufacturer="Adria Mobil",
+        manufacturer_range="Matrix",
+        model="Supreme 670 DC",
+        product_id=1,
+        bed_types=[BedType.ISLAND],
+    )
+    extracted = make_extracted(rrp_pounds=45000, bed_types=[BedType.DROP_DOWN])
+    extracted.provenance["bed_types"] = Provenance(
+        source_url="https://example.test/p", snippet="Front electric drop-down double bed"
+    )
+    diffs = diff_products([extracted], [baseline])
+    store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
+    store.finish_run(connection, run.id)
+    change = next(
+        entry.change
+        for entry in store.list_change_queue(connection, run_id=run.id)
+        if entry.change.field == "bed_types"
+    )
+    connection.close()
+    return run.id, change.id
+
+
+def test_bed_types_is_offered_as_tick_boxes_not_one_choice(
+    client: TestClient, db_path: Path
+) -> None:
+    """The requester, 7 September 2026: *"we need the option to be able to select all the
+    types that apply rather than correct the value with one other value."*
+    """
+    run_id, _change_id = _run_with_a_bed_types_change(db_path)
+
+    response = client.get(f"/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert 'class="choice-checks"' in response.text
+    assert 'name="corrected_values"' in response.text
+    assert 'value="island_bed"' in response.text
+    assert 'value="drop_down_bed"' in response.text
+    # And the labels, not the column names, since a reviewer reads these.
+    assert "Drop-down bed" in response.text
+
+
+def test_correcting_bed_types_records_every_type_ticked(
+    client: TestClient, db_path: Path
+) -> None:
+    """A four-berth coachbuilt has a fixed bed at the back and a drop-down over the cab."""
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "correct",
+            "reviewer_name": "ben",
+            "corrected_values": ["island_bed", "drop_down_bed"],
+        },
+    )
+
+    assert response.status_code == 200
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision is not None
+    assert decision.action == "correct"
+    assert decision.corrected_value == "island_bed, drop_down_bed"
+
+
+def test_a_corrected_bed_type_list_survives_into_the_upload(
+    client: TestClient, db_path: Path
+) -> None:
+    """The whole point: `apply_field` has always split this, so the list has to reach it."""
+    from src.output.build import apply_field
+
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+    client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "correct",
+            "reviewer_name": "ben",
+            "corrected_values": ["fixed_bed", "drop_down_bed"],
+        },
+    )
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+
+    product = apply_field(Motorhome(manufacturer="Adria Mobil"), "bed_types", decision.corrected_value)
+    assert product.bed_types == [BedType.FIXED, BedType.DROP_DOWN]
+
+
+def test_an_unrecognised_bed_type_is_refused_at_review_not_at_upload(
+    client: TestClient, db_path: Path
+) -> None:
+    """One bad part would make `apply_field` raise for the whole row, hours later."""
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "correct",
+            "reviewer_name": "ben",
+            "corrected_values": ["island_bed", "hammock"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert "not one of the values" in response.text
+    connection = store.connect(db_path)
+    assert store.latest_decision(connection, change_id) is None
+    connection.close()
+
+
+def _run_with_an_unset_field(db_path: Path) -> tuple[int, int]:
+    """A new product carrying a floorplan pointer: no value either side, so no answer yet."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    extracted = make_extracted(rrp_pounds=45000)
+    extracted.provenance["sleeping_area"] = Provenance(
+        source_url="https://example.test/floorplan.jpg",
+        snippet="read which end the beds are at off the floorplan",
+        reviewer_reference=True,
+    )
+    diffs = diff_products([extracted], [])
+    store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
+    store.finish_run(connection, run.id)
+    product_id = next(
+        entry.product.id
+        for entry in store.list_change_queue(connection, run_id=run.id)
+        if entry.change.field == "sleeping_area"
+    )
+    connection.close()
+    return run.id, product_id
+
+
+def test_a_field_with_nothing_to_accept_is_flagged_in_red(
+    client: TestClient, db_path: Path
+) -> None:
+    """The requester, 7 September 2026: *"we need a flag saying selection needed in red"*."""
+    run_id, _product_id = _run_with_an_unset_field(db_path)
+
+    response = client.get(f"/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert "selection needed" in response.text
+    assert "selection-needed-row" in response.text
+
+
+def test_accept_all_leaves_a_field_that_needs_a_choice_pending(
+    client: TestClient, db_path: Path
+) -> None:
+    """Accepting it would mark the field reviewed and leave it blank — how run 86 shipped
+    with its layout columns unset. So it stays pending and the reviewer is told."""
+    run_id, product_id = _run_with_an_unset_field(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/products/{product_id}/accept-all",
+        data={"reviewer_name": "ben"},
+    )
+
+    assert response.status_code == 200
+    assert "still need a choice" in response.text
+    assert "sleeping_area" in response.text
+
+    connection = store.connect(db_path)
+    pending = [
+        entry
+        for entry in store.list_change_queue(connection, run_id=run_id)
+        if entry.decision is None
+    ]
+    connection.close()
+    # The pointer is still pending, along with every other column this new product has
+    # nothing for — see `store.changes.fields_needing_a_choice`. Everything with a real
+    # value was accepted.
+    assert "sleeping_area" in [entry.change.field for entry in pending]
+    assert "rrp_pounds" not in [entry.change.field for entry in pending]
+
+
+def test_accept_all_still_accepts_everything_when_nothing_needs_a_choice(
+    client: TestClient, db_path: Path, run_with_one_change: tuple[int, int]
+) -> None:
+    """The ordinary case has to be untouched."""
+    run_id, change_id = run_with_one_change
+    connection = store.connect(db_path)
+    product_id = next(
+        entry.product.id for entry in store.list_change_queue(connection, run_id=run_id)
+    )
+    connection.close()
+
+    response = client.post(
+        f"/runs/{run_id}/products/{product_id}/accept-all",
+        data={"reviewer_name": "ben"},
+    )
+
+    assert response.status_code == 200
+    assert "still need a choice" not in response.text
+    connection = store.connect(db_path)
+    assert store.latest_decision(connection, change_id) is not None
+    connection.close()
+
+
+def test_needs_selection_only_fires_when_both_sides_are_empty() -> None:
+    """On a matched product, accepting is a real answer: keep what FMLV holds."""
+    from src.webapp import choices
+
+    assert choices.needs_selection(None, None) is True
+    assert choices.needs_selection("", "  ") is True
+    assert choices.needs_selection("side_shower_toilet", None) is False
+    assert choices.needs_selection(None, "island_bed") is False
+
+
+def test_accept_all_does_accept_a_new_products_weights(
+    client: TestClient, db_path: Path
+) -> None:
+    """Regression guard for run 87: MRO and payload must not be caught by the new skip.
+
+    The `needs_selection` guard only skips rows with nothing on either side. A new
+    product's MRO is a real proposed value, so Accept all has to take it — otherwise the
+    upload reports `required field 'mro_kilograms' is missing`.
+    """
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    extracted = make_extracted(
+        rrp_pounds=61995,
+        manufacturer_range="Kilig",
+        model="55 Plus",
+        mro_kilograms=3051,
+        mtplm_kilograms=3500,
+        mh_payload_kilograms=449,
+    )
+    for name, snippet in (
+        ("mro_kilograms", "MRO: 3051 kg"),
+        ("mtplm_kilograms", "Maximum overall weight: 3500"),
+        ("mh_payload_kilograms", "3500 kg MTPLM - 3051 kg MRO"),
+    ):
+        extracted.provenance[name] = Provenance("https://www.rimor.it/x", snippet)
+    extracted.provenance["sleeping_area"] = Provenance(
+        "https://www.rimor.it/plan.jpg", "read it off the floorplan", reviewer_reference=True
+    )
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [])
+    )
+    store.finish_run(connection, run.id)
+    product_id = next(
+        e.product.id for e in store.list_change_queue(connection, run_id=run.id)
+    )
+    connection.close()
+
+    client.post(
+        f"/runs/{run.id}/products/{product_id}/accept-all", data={"reviewer_name": "ben"}
+    )
+
+    connection = store.connect(db_path)
+    decided = {
+        e.change.field: e.decision.action
+        for e in store.list_change_queue(connection, run_id=run.id)
+        if e.decision is not None
+    }
+    pending = [
+        e.change.field
+        for e in store.list_change_queue(connection, run_id=run.id)
+        if e.decision is None
+    ]
+    connection.close()
+
+    assert decided.get("mro_kilograms") == "accept"
+    assert decided.get("mh_payload_kilograms") == "accept"
+    assert decided.get("mtplm_kilograms") == "accept"
+    # Held back: the floorplan pointer, and the other columns this new product has no
+    # value for at all. Nothing with a real figure is.
+    assert "sleeping_area" in pending
+    assert not {"mro_kilograms", "mtplm_kilograms", "mh_payload_kilograms"} & set(pending)
+
+
+def _run_with_a_new_products_missing_weight(db_path: Path) -> tuple[int, int, int]:
+    """A new product with no MRO from anywhere: `(run, product, mro change)`."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    extracted = make_extracted(
+        rrp_pounds=69995, manufacturer_range="Super Brig", model="Suite"
+    )
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [])
+    )
+    store.finish_run(connection, run.id)
+    queue = store.list_change_queue(connection, run_id=run.id)
+    mro = next(e for e in queue if e.change.field == "mro_kilograms")
+    connection.close()
+    return run.id, mro.product.id, mro.change.id
+
+
+def test_a_new_products_missing_weight_offers_blank_or_a_value(
+    client: TestClient, db_path: Path
+) -> None:
+    """There is no existing figure, so "keep it" is not one of the answers."""
+    run_id, _product_id, _change_id = _run_with_a_new_products_missing_weight(db_path)
+
+    response = client.get(f"/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert "no value from the site, and none on record" in response.text
+    assert 'value="blank"' in response.text
+    assert "Leave blank" in response.text
+    # Not offered: there is nothing on record to keep.
+    assert "Keep existing value" not in response.text
+
+
+def test_a_new_products_weight_can_be_left_blank(
+    client: TestClient, db_path: Path
+) -> None:
+    """Francis, 7 September 2026: *"I can choose to leave it blank, I assume."*"""
+    run_id, _product_id, change_id = _run_with_a_new_products_missing_weight(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={"action": "blank", "reviewer_name": "ben"},
+    )
+
+    assert response.status_code == 200
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision is not None
+    assert decision.action == "blank"
+
+
+def test_a_new_products_weight_can_be_typed_in_instead(
+    client: TestClient, db_path: Path
+) -> None:
+    run_id, _product_id, change_id = _run_with_a_new_products_missing_weight(db_path)
+
+    client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={"action": "correct", "corrected_value": "3005", "reviewer_name": "ben"},
+    )
+
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision is not None
+    assert decision.action == "correct"
+    assert decision.corrected_value == "3005"
+
+
+def test_editing_the_bed_type_boxes_and_pressing_accept_saves_the_edit(
+    client: TestClient, db_path: Path
+) -> None:
+    """Francis, 7 September 2026, on Kilig 66 Plus: *"if I go to change it and add one or
+    remove one and click accept, it doesn't change. Surely I should be able to edit it."*
+
+    The boxes sit beside Accept, pre-ticked from the proposal, so editing them and
+    pressing Accept looked like it saved and did not — Accept recorded the proposal.
+    """
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "accept",
+            "reviewer_name": "ben",
+            # Proposed was drop_down_bed alone; the reviewer adds the island bed.
+            "corrected_values": ["island_bed", "drop_down_bed"],
+        },
+    )
+
+    assert response.status_code == 200
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision is not None
+    assert decision.action == "correct"
+    assert decision.corrected_value == "island_bed, drop_down_bed"
+
+
+def test_pressing_accept_with_the_boxes_untouched_is_still_a_plain_accept(
+    client: TestClient, db_path: Path
+) -> None:
+    """Nothing was edited, so nothing is reinterpreted."""
+    run_id, change_id = _run_with_a_bed_types_change(db_path)
+
+    client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={
+            "action": "accept",
+            "reviewer_name": "ben",
+            "corrected_values": ["drop_down_bed"],  # exactly what was proposed
+        },
+    )
+
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision.action == "accept"
+    assert decision.corrected_value is None
+
+
+def test_reordered_bed_types_are_not_treated_as_an_edit(
+    client: TestClient, db_path: Path
+) -> None:
+    """The boxes submit in enum order; the adapter proposes in the order the copy named
+    them. Same set, so pressing Accept must stay an accept rather than a correction."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    baseline = Motorhome(
+        manufacturer="Rimor", manufacturer_range="Sarus", model="66 Plus", product_id=7927,
+        bed_types=[BedType.MAKE_UP],
+    )
+    extracted = make_extracted(
+        rrp_pounds=64995,
+        manufacturer_range="Sarus",
+        model="66 Plus",
+        bed_types=[BedType.ISLAND, BedType.DROP_DOWN],
+    )
+    extracted.provenance["bed_types"] = Provenance(
+        "https://mnc.test/x", "Rear double island bed / Electric drop-down double bed"
+    )
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [baseline])
+    )
+    change_id = next(
+        e.change.id
+        for e in store.list_change_queue(connection, run_id=run.id)
+        if e.change.field == "bed_types"
+    )
+    connection.close()
+
+    client.post(
+        f"/runs/{run.id}/changes/{change_id}/decide",
+        data={
+            "action": "accept",
+            "reviewer_name": "ben",
+            # Enum order puts island before drop-down; the proposal happens to agree here,
+            # so submit them the other way round to prove the comparison is set-based.
+            "corrected_values": ["drop_down_bed", "island_bed"],
+        },
+    )
+
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision.action == "accept"
+
+
+def test_changing_a_single_select_and_pressing_accept_saves_the_change(
+    client: TestClient, db_path: Path
+) -> None:
+    """The same trap on a dropdown, so the same answer."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    baseline = Motorhome(
+        manufacturer="Rimor", manufacturer_range="Horus", model="38", product_id=5992,
+        body_type=BodyType.CAMPERVAN,
+    )
+    extracted = make_extracted(
+        rrp_pounds=59995, manufacturer_range="Horus", model="38",
+        body_type=BodyType.CAMPERVAN_HIGH_TOP,
+    )
+    extracted.provenance["body_type"] = Provenance("https://rimor.it/x", "listed under /vans")
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [baseline])
+    )
+    change_id = next(
+        e.change.id
+        for e in store.list_change_queue(connection, run_id=run.id)
+        if e.change.field == "body_type"
+    )
+    connection.close()
+
+    client.post(
+        f"/runs/{run.id}/changes/{change_id}/decide",
+        data={
+            "action": "accept",
+            "reviewer_name": "ben",
+            "corrected_value": "type_campervan_high_top_elevating_roof",
+        },
+    )
+
+    connection = store.connect(db_path)
+    decision = store.latest_decision(connection, change_id)
+    connection.close()
+    assert decision.action == "correct"
+    assert decision.corrected_value == "type_campervan_high_top_elevating_roof"
+
+
+def test_a_field_checked_and_unchanged_is_shown_so_a_missing_row_is_not_ambiguous(
+    client: TestClient, db_path: Path
+) -> None:
+    """Kilig 77 Plus had no `bed_types` row, and no way to tell why.
+
+    The requester, 8 September 2026: *"I noticed that there's no proposal on bed types. Is
+    this because there is no change in the bed types?"* A field with no row may have
+    matched, or never been looked at, and those mean opposite things.
+    """
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    baseline = Motorhome(
+        manufacturer="Rimor",
+        manufacturer_range="Kilig",
+        model="77 Plus",
+        product_id=7940,
+        rrp_pounds=59995,
+        bed_types=[BedType.DROP_DOWN],
+    )
+    # Same beds, a changed price: the beds are checked and match, the price does not.
+    extracted = make_extracted(
+        rrp_pounds=61995,
+        manufacturer_range="Kilig",
+        model="77 Plus",
+        bed_types=[BedType.DROP_DOWN],
+    )
+    extracted.provenance["bed_types"] = Provenance(
+        "https://mnc.test/x", "Front electric drop-down double bed"
+    )
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [baseline])
+    )
+    store.finish_run(connection, run.id)
+    connection.close()
+
+    response = client.get(f"/runs/{run.id}")
+
+    assert response.status_code == 200
+    assert "checked and unchanged" in response.text
+    assert "bed_types" in response.text
+    # And the price, which did change, is still a row to decide.
+    assert "61995" in response.text
+
+
+def test_a_product_with_nothing_verified_shows_no_such_line(
+    client: TestClient, db_path: Path
+) -> None:
+    """A new product has no baseline, so nothing can be confirmed unchanged."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    store.persist_diff(
+        connection,
+        run_id=run.id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=45000)], []),
+    )
+    store.finish_run(connection, run.id)
+    connection.close()
+
+    response = client.get(f"/runs/{run.id}")
+
+    assert response.status_code == 200
+    assert "checked and unchanged" not in response.text

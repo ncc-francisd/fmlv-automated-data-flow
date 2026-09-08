@@ -26,8 +26,9 @@ The two halves of that are separate, and only this half needed new code:
 from __future__ import annotations
 
 from ..output.build import CARAVAN_UPLOAD, MOTORHOME_UPLOAD, upload_profile
+from ..store.changes import LIST_SEPARATOR
 from ..product_model import caravan_schema, schema
-from ..product_model.enums import BodyType, CaravanBodyType
+from ..product_model.enums import BedType, BodyType, CaravanBodyType
 from ..vehicle_class import DEFAULT as DEFAULT_VEHICLE_CLASS
 from ..vehicle_class import VehicleClass
 
@@ -46,6 +47,14 @@ _LABELS: dict[str, str] = {
     # Touring caravans. `type_micro` is shared with the motorhome list above and means
     # something different here: a caravan is a micro only where the manufacturer calls it
     # one *and* its MTPLM is 1250kg or lower — it should be towable by a very small car.
+    # Bed types — the one multi-select group, so a reviewer ticks every one that applies.
+    "make_up_beds": "Make-up bed",
+    "fixed_bed": "Fixed bed",
+    "transverse_bed": "Transverse bed",
+    "island_bed": "Island bed",
+    "fixed_separate_beds": "Fixed separate beds",
+    "fixed_bunks": "Fixed bunks",
+    "drop_down_bed": "Drop-down bed",
     "type_rigid": "Rigid",
     "type_folding": "Folding",
     "type_pop_up": "Pop up",
@@ -66,6 +75,22 @@ _BODY_TYPE_GROUPS: dict[str, str] = {
 }
 
 
+#: Fields a reviewer picks **several** values for, not one. `bed_types` is the schema's
+#: only multi-select group and the reason this exists: the requester, 7 September 2026 —
+#: *"usually, when there are more than two berths, there are more than one bed type. So we
+#: need the option to be able to select all the types that apply rather than correct the
+#: value with one other value."* A four-berth coachbuilt routinely has a fixed bed at the
+#: back and a drop-down over the cab, and the form could only take one of them.
+#:
+#: Both product areas share `BedType`, so this needs no per-area split.
+MULTI_SELECT_FIELDS: frozenset[str] = frozenset({"bed_types"})
+
+
+def is_multi_select(field: str) -> bool:
+    """Whether `field` takes several values at once rather than one."""
+    return field in MULTI_SELECT_FIELDS
+
+
 def field_choices(
     field: str, vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLASS
 ) -> list[tuple[str, list[tuple[str, str]]]]:
@@ -82,6 +107,11 @@ def field_choices(
     # while meaning different enums, so the area has to be stated rather than guessed. A
     # caravan reviewer offered `type_a_class` would be able to submit a value the caravan
     # importer has no column for.
+    if is_multi_select(field):
+        # Not in `enum_fields` — it is a list, not a single-select group — but its options
+        # are an enum all the same, and the form needs them to render tick boxes.
+        return [("", [(member.value, label_for(member.value)) for member in BedType])]
+
     profile = CARAVAN_UPLOAD if VehicleClass(vehicle_class) is VehicleClass.CARAVAN else MOTORHOME_UPLOAD
     enum_cls = profile.enum_fields.get(field)
     if enum_cls is None:
@@ -103,9 +133,18 @@ def field_choices(
 
 
 def label_for(value: str | None) -> str:
-    """The reviewer-facing wording for one stored value."""
+    """The reviewer-facing wording for one stored value, or for a joined list of them.
+
+    `bed_types` reaches the template as `"island_bed, drop_down_bed"`, and showing that
+    verbatim next to a set of tick boxes labelled "Island bed" and "Drop-down bed" would
+    make the reviewer translate between the two.
+    """
     if not value:
         return "—"
+    if LIST_SEPARATOR in value:
+        return LIST_SEPARATOR.join(
+            _LABELS.get(part.strip(), part.strip()) for part in value.split(LIST_SEPARATOR)
+        )
     return _LABELS.get(value, value)
 
 
@@ -117,12 +156,20 @@ def is_valid_choice(
     Guards the decide endpoint: a select can only submit a real option, but the endpoint
     is a plain POST and nothing stops a malformed one reaching `apply_field`, which would
     raise at upload time rather than at review time.
+
+    For a multi-select field `value` is the joined list the form submitted, and **every**
+    part has to be a real option — `apply_field` maps each through `BedType(...)` and one
+    bad part raises for the whole row.
     """
-    return any(
-        value == option
+    allowed = {
+        option
         for _group, options in field_choices(field, vehicle_class)
         for option, _ in options
-    )
+    }
+    if is_multi_select(field):
+        parts = [part.strip() for part in value.split(LIST_SEPARATOR) if part.strip()]
+        return bool(parts) and all(part in allowed for part in parts)
+    return value in allowed
 
 
 def is_required_field(field: str, vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLASS) -> bool:
@@ -180,3 +227,20 @@ def can_be_blanked(field: str, vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLA
         or field in profile.enum_fields
         or field in profile.automatic_fields
     )
+
+
+def needs_selection(old_value: str | None, new_value: str | None) -> bool:
+    """Whether a row has nothing to accept, so a reviewer must actually choose something.
+
+    Both sides empty means the adapter could not determine the field *and* FMLV holds
+    nothing to fall back on — a new product's floorplan-only fields are exactly this. The
+    requester, 7 September 2026, after an upload went out with layout columns unset:
+    *"we need a flag saying selection needed in red so that we don't... even though you
+    accept all, if there are inputs required, it stops you doing that or it flags it
+    red."*
+
+    "Accept" on such a row is not a decision, it is a way of losing one: it marks the
+    field reviewed and leaves it blank. On a *matched* product accepting is a real answer
+    — keep what FMLV holds — so those are not flagged.
+    """
+    return not (old_value or "").strip() and not (new_value or "").strip()

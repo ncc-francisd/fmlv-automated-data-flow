@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from src.adapters import habitation
-from src.product_model.enums import BathroomLayout, BedType, Heating, Refrigeration
+from src.product_model.enums import BedType, Heating, Refrigeration
 
 # --------------------------------------------------------------------------- #
 # Refrigeration
@@ -23,8 +23,9 @@ def test_a_freezer_compartment_makes_it_a_fridge_freezer() -> None:
         ["Kitchen unit equipped with 3 burner hob, sink, and a 141L fridge with freezer compartment"]
     )
     assert found is not None
-    assert found[0] is Refrigeration.FRIDGE_FREEZER
-    assert "freezer compartment" in found[1]
+    assert found.value is Refrigeration.FRIDGE_FREEZER
+    assert "freezer compartment" in found.snippet
+    assert found.note == "a freezer is mentioned"
 
 
 def test_a_freezer_anywhere_on_the_page_wins() -> None:
@@ -41,27 +42,72 @@ def test_a_freezer_anywhere_on_the_page_wins() -> None:
         ]
     )
     assert found is not None
-    assert found[0] is Refrigeration.FRIDGE_FREEZER
+    assert found.value is Refrigeration.FRIDGE_FREEZER
+    # The line that actually names the freezer is the one quoted, not the abbreviated one.
+    assert "freezer compartment" in found.snippet
 
 
-def test_a_plain_fridge_stays_a_fridge() -> None:
+def test_an_unstated_freezer_is_still_a_fridge_freezer() -> None:
+    """The requester's ruling, 7 September 2026: the freezer compartment goes unsaid.
+
+    Eighty to ninety percent of fridges fitted to UK caravans and motorhomes have one,
+    and FMLV's own baseline says Yes on 89% of rows, so a spec that mentions only a
+    fridge is not evidence against a freezer.
+    """
     found = habitation.refrigeration_from(
         ["Kitchen unit equipped with 2 burner hob, sink, and a 90 L compressor fridge"]
     )
     assert found is not None
-    assert found[0] is Refrigeration.FRIDGE
+    assert found.value is Refrigeration.FRIDGE_FREEZER
+    # The reviewer has to be able to see why, since the quote says only "fridge".
+    assert found.note is not None
+    assert "neither stated nor ruled out" in found.note
 
 
-def test_a_refrigerator_column_is_a_fridge() -> None:
+def test_a_refrigerator_column_is_refrigeration_too() -> None:
     """Rimor's wording for a tall fridge, which never says "fridge"."""
     found = habitation.refrigeration_from(
         ["141 L refrigerator column, which can be opened from both sides"]
     )
     assert found is not None
-    assert found[0] is Refrigeration.FRIDGE
+    assert found.value is Refrigeration.FRIDGE_FREEZER
+
+
+def test_a_denied_freezer_is_the_one_thing_that_makes_a_plain_fridge() -> None:
+    for line in (
+        "Kitchen with a 90 L fridge, no freezer compartment",
+        "Kitchen with a 90 L fridge without a freezer",
+        "84 L fridge (freezer compartment not fitted)",
+    ):
+        found = habitation.refrigeration_from([line])
+        assert found is not None, line
+        assert found.value is Refrigeration.FRIDGE, line
+        assert found.note == "the specification rules out a freezer"
+
+
+def test_a_negative_about_something_else_does_not_deny_the_freezer() -> None:
+    """The denial has to be about the freezer, and in the same clause.
+
+    Both of these state a freezer outright and deny something else a few words away.
+    Reading the negative as the freezer's would downgrade a page that could not be
+    clearer.
+    """
+    for line in (
+        "Kitchen unit with a 141L fridge with freezer compartment, oven not fitted",
+        "Kitchen unit with no oven, and a 141 L freezer compartment",
+    ):
+        found = habitation.refrigeration_from([line])
+        assert found is not None, line
+        assert found.value is Refrigeration.FRIDGE_FREEZER, line
 
 
 def test_no_refrigeration_mentioned_is_not_a_guess() -> None:
+    """The fridge-freezer default needs a fridge to start from.
+
+    A page that never mentions refrigeration says nothing, and still proposes nothing —
+    the assumption is about what a stated fridge includes, not about what every vehicle
+    has.
+    """
     assert habitation.refrigeration_from(["Cab air conditioning", "Oven"]) is None
 
 
@@ -166,29 +212,56 @@ def test_no_microwave_mentioned_never_asserts_there_is_none() -> None:
         "The new layout consists of a Shower cubicle and separate cassette toilet with a washbasin",
     ],
 )
-def test_separated_shower_and_toilet_is_read_from_the_words(line: str) -> None:
-    found = habitation.bathroom_from([line])
+def test_a_separated_shower_and_toilet_is_read_from_the_words(line: str) -> None:
+    """The construction, which the copy does state — not the location, which it never does."""
+    found = habitation.shower_toilet_separated_from([line])
     assert found is not None
-    assert found[0] is BathroomLayout.SEPARATE_SHOWER_TOILET
+    assert found.value is True
 
 
-def test_a_wet_room_is_left_to_the_reviewer() -> None:
-    """Combined, but `BathroomLayout` then wants rear or side and the prose cannot say."""
-    assert habitation.bathroom_from(["Wet room Shower and cassette toilet with washbasin"]) is None
+def test_a_wet_room_is_an_explicit_negative() -> None:
+    """One space with the shower over the toilet: not unknown, actually undivided."""
+    found = habitation.shower_toilet_separated_from(
+        ["Wet room Shower and cassette toilet with washbasin"]
+    )
+    assert found is not None
+    assert found.value is False
 
 
-def test_a_combined_washroom_is_left_to_the_reviewer() -> None:
+def test_a_combined_washroom_says_nothing_either_way() -> None:
+    """"Central washroom equipped with shower cubicle, washbasin and toilet" — one room,
+    but it does not say whether anything divides the two, so nothing is asserted."""
     assert (
-        habitation.bathroom_from(
+        habitation.shower_toilet_separated_from(
             ["Central washroom equipped with shower cubicle, washbasin, and a cassette toilet"]
         )
         is None
     )
 
 
+def test_the_location_is_never_read_from_prose() -> None:
+    """`bathroom_layout` holds rear-versus-side, and no wording gives it.
+
+    The requester, 7 September 2026: *"those are not mutually exclusive. The location is
+    mutually exclusive. But if the type or the construction or layout of the shower and
+    toilet is that it is separate, those are two values."* Proposing the separated value
+    as a *location* overwrote a side washroom FMLV already held.
+    """
+    features = habitation.features_from(
+        ["The new layout consists of a separate shower cubicle and cassette toilet"]
+    )
+    assert features["shower_toilet_separated"].value is True
+    assert "bathroom_layout" not in features
+
+
 def test_an_external_shower_says_nothing_about_the_bathroom() -> None:
     """Four Rimor products offer one, and it is not the vehicle's washroom."""
-    assert habitation.bathroom_from(["External water supply with shower as standard"]) is None
+    assert (
+        habitation.shower_toilet_separated_from(
+            ["External water supply with shower as standard"]
+        )
+        is None
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -243,6 +316,42 @@ def test_a_fixed_bed_that_also_converts_is_both() -> None:
         ["Rear Twin single beds, which can make a double bed"]
     )
     assert beds == [BedType.MAKE_UP, BedType.FIXED_SEPARATE]
+
+
+def test_a_bed_named_as_its_seating_is_a_make_up_bed() -> None:
+    """"double bed rear dinette" is the make-up claim with the verb left out.
+
+    Kilig 77 Plus: the requester supplied the answer on 8 September 2026 — *"the correct
+    answer is a drop down bed and a makeup bed"* — and the dinette double was the half
+    being missed, because there is no verb for `_MAKE_UP` to match.
+    """
+    beds, _quotes = habitation.bed_types_from(["Rear dinette bed"])
+    assert beds == [BedType.MAKE_UP]
+
+
+def test_a_seating_bed_does_not_suppress_the_other_beds_on_its_line() -> None:
+    """A list of distinct beds, not one arrangement, so the drop-down survives.
+
+    This is where the seating bed differs from "lounge which converts into single beds":
+    there the singles *are* the converted lounge, here the drop-down is its own bed.
+    """
+    beds, _quotes = habitation.bed_types_from(
+        ["Consists of double bed rear dinette, a front & rear drop-down bed"]
+    )
+    assert beds == [BedType.MAKE_UP, BedType.DROP_DOWN]
+
+
+def test_seating_the_bed_merely_sits_above_is_not_what_it_is_made_from() -> None:
+    """Kilig 77's own "Rear drop-down bed above lounge" — the lounge is the location.
+
+    Adjacency is the whole guard: only a position word may sit between the bed and the
+    seating, so "above" and "and a front" both fail to match.
+    """
+    beds, _quotes = habitation.bed_types_from(["Rear drop-down bed above lounge"])
+    assert beds == [BedType.DROP_DOWN]
+
+    beds, _quotes = habitation.bed_types_from(["Rear double bed and a front lounge"])
+    assert BedType.MAKE_UP not in beds
 
 
 def test_a_fold_away_bed_is_a_make_up_bed() -> None:
@@ -301,7 +410,7 @@ def test_features_from_returns_only_what_the_copy_settles() -> None:
     )
     assert features["heating"].value is Heating.BLOWN_AIR
     assert features["refrigeration"].value is Refrigeration.FRIDGE_FREEZER
-    assert features["bathroom_layout"].value is BathroomLayout.SEPARATE_SHOWER_TOILET
+    assert features["shower_toilet_separated"].value is True
     assert features["bed_types"].value == [BedType.ISLAND, BedType.DROP_DOWN]
     # No microwave on the page, so no key at all — not a False.
     assert "microwave" not in features
