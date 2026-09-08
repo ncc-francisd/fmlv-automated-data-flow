@@ -317,6 +317,51 @@ BED_PHRASES: tuple[tuple[str, BedType], ...] = (
     ("permanent bed", BedType.FIXED),
 )
 
+#: Fixed bed types that say more than `fixed_bed` does. **One bed takes one description,
+#: the most specific that fits**, so a bed already recorded as one of these is not also
+#: recorded as `fixed_bed` — the requester, 8 September 2026:
+#:
+#: > *"Transverse beds are always fixed, so that should go down as a transverse bed. If it
+#: > is an island bed, so you can walk all the way around it and it's located in the
+#: > centre, you would call it an island bed. If it is other than those two, and it is a
+#: > fixed double bed, it would be a fixed bed. […] I don't want to double up and tick
+#: > both transverse bed and fixed bed — it implies there are more beds than there are in
+#: > the vehicle."*
+#:
+#: So `fixed_bed` is the **fallback** for a bed that is fixed but none of these, not a
+#: general "this bed is fixed" flag. `bed_types` stays multi-select for a vehicle with
+#: several beds; what it must not do is describe one bed twice and inflate the count.
+_MORE_SPECIFIC_THAN_FIXED: frozenset[BedType] = frozenset(
+    {BedType.TRANSVERSE, BedType.ISLAND, BedType.FIXED_SEPARATE, BedType.FIXED_BUNKS}
+)
+
+#: Where one bed's description ends and the next begins. Crude on purpose: it only has to
+#: keep two beds named in one sentence from being read as one, and the copy reliably joins
+#: them with a connective — "a rear double island bed, and an electric drop-down double
+#: bed at the front".
+_BED_CLAUSE = re.compile(r",|\band\b|\bplus\b|/|&")
+
+
+def _fixed_is_covered_by_a_specific_type(lowered: str) -> bool:
+    """True when every "fixed" wording on the line sits with a more specific type.
+
+    Scoped per clause rather than per line, because a line usually describes more than one
+    bed. "Rear fixed double transverse bed" is one bed and records `transverse_bed` alone;
+    "fixed double bed and twin single beds" is two beds and keeps both types, since the
+    fixed double is not the twins.
+
+    Conservative where the wording is ambiguous: a single clause asserting fixedness with
+    nothing more specific in it keeps `fixed_bed`, which is the fallback doing its job.
+    """
+    fixed_phrases = [p for p, bed_type in BED_PHRASES if bed_type is BedType.FIXED]
+    specific = [p for p, bed_type in BED_PHRASES if bed_type in _MORE_SPECIFIC_THAN_FIXED]
+    for clause in _BED_CLAUSE.split(lowered):
+        if any(phrase in clause for phrase in fixed_phrases) and not any(
+            phrase in clause for phrase in specific
+        ):
+            return False
+    return True
+
 #: A bed made up rather than permanently there. `lift` is here alongside the folding
 #: words because it is the same claim in different clothes: Rimor's Horus 12 bed "lifts to
 #: create more storage space for travel", so it is not standing made up.
@@ -398,6 +443,11 @@ def bed_types_from(lines: Iterable[str]) -> tuple[list[BedType], list[str]]:
             for phrase, bed_type in BED_PHRASES:
                 if phrase in lowered:
                     matches.append(bed_type)
+
+        # One bed, one description — see `_MORE_SPECIFIC_THAN_FIXED`. Dropped last so the
+        # more specific type is credited from whichever phrase named it.
+        if BedType.FIXED in matches and _fixed_is_covered_by_a_specific_type(lowered):
+            matches = [b for b in matches if b is not BedType.FIXED]
 
         new = [b for b in dict.fromkeys(matches) if b not in found]
         if new:

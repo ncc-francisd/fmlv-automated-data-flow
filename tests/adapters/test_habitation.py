@@ -360,6 +360,46 @@ def test_a_fold_away_bed_is_a_make_up_bed() -> None:
     assert beds == [BedType.MAKE_UP]
 
 
+def test_one_bed_takes_only_its_most_specific_type() -> None:
+    """A transverse bed is always fixed, so `fixed_bed` alongside it invents a bed.
+
+    The requester, 8 September 2026: *"I don't want to double up and tick both transverse
+    bed and fixed bed, it implies there are more beds than there are in the vehicle."*
+    """
+    beds, _quotes = habitation.bed_types_from(["Rear fixed double transverse bed"])
+    assert beds == [BedType.TRANSVERSE]
+
+    beds, _quotes = habitation.bed_types_from(["Fixed double island bed"])
+    assert beds == [BedType.ISLAND]
+
+
+def test_fixed_bed_is_the_fallback_when_nothing_more_specific_applies() -> None:
+    """*"If it is other than those two, and it is a fixed double bed, it would be a fixed
+    bed."* So the type is not dropped, only deferred to a more specific one."""
+    beds, _quotes = habitation.bed_types_from(["Fixed double bed"])
+    assert beds == [BedType.FIXED]
+
+
+def test_two_beds_in_one_sentence_each_keep_their_own_type() -> None:
+    """The specificity rule is per bed, not per line — the copy names both in one breath.
+
+    The fixed double is not the island bed, so suppressing `fixed_bed` here would lose a
+    bed rather than avoid inventing one.
+    """
+    beds, _quotes = habitation.bed_types_from(
+        ["Rear fixed double bed and a front island bed"]
+    )
+    assert beds == [BedType.ISLAND, BedType.FIXED]
+
+
+def test_a_drop_down_does_not_cover_a_fixed_bed_named_beside_it() -> None:
+    """A drop-down is not a fixed bed, so it cannot be the more specific description."""
+    beds, _quotes = habitation.bed_types_from(
+        ["Fixed double bed and a front electric drop-down bed"]
+    )
+    assert beds == [BedType.DROP_DOWN, BedType.FIXED]
+
+
 def test_a_priced_bed_option_is_not_standard_equipment() -> None:
     beds, quotes = habitation.bed_types_from(
         ["Rear Adjustable Bed Option: £1,500", "Height Adjustable Rear Bed- £1,500"]

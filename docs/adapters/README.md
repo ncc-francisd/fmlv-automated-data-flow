@@ -510,6 +510,42 @@ Two rules run through it, both learned on Rimor's 34 products:
 * **Never read a paid option as standard.** "Rear Adjustable Bed Option: £1,500" is a bed
   the buyer may not have, and the price is what gives it away.
 
+### One bed takes one description, the most specific that fits
+
+`bed_types` is the schema's only multi-select group, and it is multi-select because a
+vehicle has **several beds** — not so that one bed can be described several ways. Ticking
+two types for a single bed makes the vehicle look like it sleeps more people than it does.
+
+So the fixed types form a hierarchy, and the most specific one wins:
+
+| Bed | Record |
+|---|---|
+| Transverse — across the vehicle | `transverse_bed`; a transverse bed is always fixed, so **not** also `fixed_bed` |
+| Island — central, walk round it | `island_bed`, and not also `fixed_bed` |
+| Twin singles | `fixed_separate_beds` |
+| Bunks | `fixed_bunks` |
+| Fixed, but none of the above | `fixed_bed` |
+
+`fixed_bed` is therefore a **fallback**, not a general "this bed is fixed" flag. The
+requester, 8 September 2026:
+
+> *"Transverse beds are always fixed, so that should go down as a transverse bed. If it is
+> an island bed, so you can walk all the way around it and it's located in the centre, you
+> would call it an island bed. If it is other than those two, and it is a fixed double bed,
+> it would be a fixed bed. […] I don't want to double up and tick both transverse bed and
+> fixed bed, it implies there are more beds than there are in the vehicle."*
+
+**Scope the rule per bed, not per line.** One sentence usually names several: *"a rear
+fixed double bed and a front island bed"* is two beds and keeps both types, where *"rear
+fixed double transverse bed"* is one bed and records only `transverse_bed`.
+`habitation._fixed_is_covered_by_a_specific_type` splits on the connectives for that
+reason, and keeps `fixed_bed` wherever a clause asserts fixedness with nothing more
+specific in it.
+
+This is separate from the make-up question, which asks whether the bed exists when nobody
+is making it up. A bed can be both `fixed_separate_beds` and `make_up_beds` — twins that
+join into a double — because those are two facts about one bed, not two names for it.
+
 Three traps worth knowing before writing the next one:
 
 * **A bare "wet" is not wet central heating.** "Wet room Shower and cassette toilet"
