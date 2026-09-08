@@ -141,6 +141,7 @@ __all__ = [
     "cross_check",
     "find_price_list_url",
     "heating_from_spec_page",
+    "microwave_absence_note",
     "parse_configurator_models",
     "parse_configurator_series_id",
     "parse_range_page",
@@ -678,6 +679,43 @@ _ANY_HEATER_WORD = re.compile(r"\bheating\b|\bheater\b", re.I)
 _HEATING_LABEL = "Heating type"
 
 
+#: Why a microwave is recorded as **absent** rather than left unanswered, which is the one
+#: place this adapter departs from `README.md`'s "only ever assert a feature from positive
+#: evidence". That rule exists because a marketing page not mentioning a microwave is not a
+#: page saying there is none. This document is not a marketing page:
+#:
+#: * the equipment table **itemises the kitchen** — `Burner hob`, `Refrigerator volume incl.
+#:   freezer (l)`, `Warm water tank (l)` — so an appliance has a row when it is fitted;
+#: * Eriba name an **oven** in the same document, and only as optional equipment;
+#: * and `microwave` appears **nowhere in the price list at all**, in any context.
+#:
+#: So the silence is the document saying there is none. The requester, 9 September 2026:
+#: *"on the microwave side, it should probably just recommend no, and [say] we couldn't find
+#: any evidence or mention of microwave, and I would just default to accepting a no."*
+#:
+#: It is a *recommendation*, not a silent write. A reviewer sees the proposal with this
+#: reasoning beside it, and on a product FMLV holds `Yes` for they see `Yes -> No` and can
+#: refuse it — which is the difference from the case the rule guards against.
+_MICROWAVE_ABSENT = (
+    "no microwave anywhere in the price list, in any context. The equipment table itemises "
+    "the hob, the fridge and the water heater, and Eriba name an oven only as optional "
+    "equipment — so this is the document saying there is none, not the document not saying"
+)
+
+
+def microwave_absence_note(document_text: str) -> str | None:
+    """The reason to record `microwave = False`, or `None` to leave the field alone.
+
+    A mention **anywhere** stops the assertion: a microwave named in an options list is not
+    one the buyer has, and telling those apart from a PDF's text is a human's job. Absence
+    is the only thing read here.
+    """
+    if habitation.microwave_from(document_text.splitlines()) is not None:
+        return None
+    return _MICROWAVE_ABSENT
+
+
+
 def _heating_row(page_text: str) -> str:
     """The whole `Heating type` row, continuation lines included, whitespace collapsed.
 
@@ -968,6 +1006,7 @@ def build_extracted(
     floorplan_url: str | None = None,
     configurator: ConfiguratorLayout | None = None,
     heating: tuple[Heating, str] | None = None,
+    microwave_absent: str | None = None,
 ) -> ExtractedCaravan:
     """One layout as a `Caravan` plus the provenance a reviewer sees beside each field.
 
@@ -1013,6 +1052,10 @@ def build_extracted(
     # One system for every layout on the page — see `heating_from_spec_page`.
     if heating is not None:
         caravan.heating = heating[0]
+
+    # Recommended, not silently written — see `_MICROWAVE_ABSENT`.
+    if microwave_absent is not None:
+        caravan.microwave = False
 
     provenance: dict[str, Provenance] = {}
 
@@ -1146,6 +1189,9 @@ def build_extracted(
                     source_url=existing.source_url,
                     snippet=f"{existing.snippet}. {corroboration}",
                 )
+
+    if microwave_absent is not None:
+        record("microwave", microwave_absent)
 
     if heating is not None:
         record(
@@ -1335,6 +1381,15 @@ def collect(
     site = _site_layouts(http, wanted, on_progress)
     configurator = _configurator_layouts(http, wanted, on_progress)
 
+    # Read once for the whole document, not per layout: a microwave would be a row in the
+    # equipment table, and `spec_lines` only carries the rows FMLV needs.
+    microwave_absent = microwave_absence_note(document.text)
+    if microwave_absent is None:
+        on_progress(
+            "the price list mentions a microwave — not asserting one either way, since a "
+            "microwave in an options list is not one the buyer has"
+        )
+
     spec_pages = [
         (number, page.text)
         for number, page in enumerate(document.pages, start=1)
@@ -1422,6 +1477,7 @@ def collect(
                     floorplan_url=floorplan,
                     configurator=layout,
                     heating=heating,
+                    microwave_absent=microwave_absent,
                 )
             )
 

@@ -854,3 +854,79 @@ def test_without_a_readable_row_the_heating_stays_unset() -> None:
 
     assert extracted.caravan.heating is None
     assert "heating" not in extracted.provenance
+
+
+# --------------------------------------------------------------------------- #
+# Microwave — the one field asserted from absence, and why that is safe here
+# --------------------------------------------------------------------------- #
+
+
+def test_a_document_that_never_mentions_a_microwave_says_there_is_none() -> None:
+    """The one departure from "only assert a feature from positive evidence".
+
+    Safe because this is an itemised equipment table rather than a marketing page: it
+    lists the hob, the fridge and the water heater, and Eriba name an oven in the same
+    document as optional equipment. The requester, 9 September 2026: *"it should probably
+    just recommend no, and [say] we couldn't find any evidence or mention of microwave."*
+    """
+    note = eriba_caravan.microwave_absence_note(fixture(TOURING_P5))
+
+    assert note is not None
+    assert "no microwave anywhere in the price list" in note
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Microwave oven fitted above the hob",
+        "Combination oven / microwave",
+    ],
+)
+def test_a_microwave_mentioned_as_fitted_stops_the_assertion(text: str) -> None:
+    """One that is named needs a human, so the field is left alone rather than set `True`.
+
+    Absence is the only thing this reads. Whether a named microwave is standard is a
+    judgement, and getting it wrong in either direction is worse than asking.
+    """
+    assert eriba_caravan.microwave_absence_note(text) is None
+
+
+def test_a_priced_microwave_option_still_means_no_microwave() -> None:
+    """Because the vehicle *as standard* has none — the standing paid-option rule.
+
+    `habitation.usable_lines` drops a priced line before anything reads it, so this falls
+    through to absence, which is the right answer rather than a lucky one.
+    """
+    note = eriba_caravan.microwave_absence_note("Microwave: £450")
+
+    assert note is not None
+
+
+def test_the_recommendation_reaches_the_reviewer_with_its_reasoning() -> None:
+    """A `No` asserted from silence has to show its working, or it is indistinguishable
+    from a `No` nobody checked."""
+    product = layouts(TOURING_P5)["Touring 310"]
+
+    extracted = eriba_caravan.build_extracted(
+        product,
+        "https://example.invalid/price-list.pdf",
+        microwave_absent=eriba_caravan.microwave_absence_note(fixture(TOURING_P5)),
+    )
+
+    assert extracted.caravan.microwave is False
+    snippet = extracted.provenance["microwave"].snippet
+    assert "no microwave anywhere in the price list" in snippet
+    # A recommendation, not a reviewer reference: it carries a value to accept or refuse.
+    assert extracted.provenance["microwave"].reviewer_reference is False
+
+
+def test_no_note_leaves_the_microwave_alone() -> None:
+    """`None` has to stay `None`, so a mention never becomes a silent `No`."""
+    product = layouts(TOURING_P5)["Touring 310"]
+
+    extracted = eriba_caravan.build_extracted(
+        product, "https://example.invalid/price-list.pdf"
+    )
+
+    assert extracted.caravan.microwave is None
+    assert "microwave" not in extracted.provenance

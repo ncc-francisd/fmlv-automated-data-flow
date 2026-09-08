@@ -565,6 +565,30 @@ Two rules run through it, both learned on Rimor's 34 products:
 * **Never read a paid option as standard.** "Rear Adjustable Bed Option: £1,500" is a bed
   the buyer may not have, and the price is what gives it away.
 
+**The one exception, and what earns it: an itemised equipment table.** The positive-evidence
+rule exists because a *marketing page* that does not mention a microwave is not a page
+saying there is none. A price list's equipment table is a different kind of document: it
+gives an appliance a row when the appliance is fitted, so silence there is a statement.
+Eriba's is the case — it itemises `Burner hob`, `Refrigerator volume incl. freezer (l)` and
+`Warm water tank (l)`, names an *oven* only as optional equipment, and never mentions a
+microwave in any context — so `microwave` is recorded `False`, with all of that in the
+provenance. The requester, 9 September 2026: *"it should probably just recommend no, and
+[say] we couldn't find any evidence or mention of microwave, and I would just default to
+accepting a no."*
+
+Three conditions before doing this on another brand, all of which matter:
+
+* **The document has to itemise, not describe.** A brochure paragraph earns nothing.
+* **A mention anywhere cancels it.** One named in an options list is not one the buyer has,
+  and telling those apart is a human's job — so a mention leaves the field alone rather
+  than flipping it to `True`. Absence is the only thing read. (A *priced* mention is
+  already dropped by `habitation.usable_lines`, so it correctly falls through to absence:
+  the vehicle as standard has none.)
+* **It is a recommendation, never a silent write.** The reviewer gets a proposal with the
+  reasoning beside it, and on a product FMLV holds `Yes` for they see `Yes → No` and can
+  refuse it. That visibility is the whole difference from the failure the rule guards
+  against — every adapter writing "No" for a microwave it never looked for.
+
 ### One bed takes one description, the most specific that fits
 
 `bed_types` is the schema's only multi-select group, and it is multi-select because a

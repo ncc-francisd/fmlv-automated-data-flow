@@ -593,7 +593,10 @@ evidence that the positional attribution is right.
 
 ### What it still does not give
 
-No microwave, and nothing about the washroom. So `kitchen_location`,
+Nothing about the washroom, so `shower_toilet_separated` is asked about explicitly rather
+than going out as a silent `No` (see `store.changes.OPEN_HABITATION_FIELDS`). `microwave` is
+the opposite case and is recorded `False` — see [microwave](#microwave-asserted-from-absence).
+So `kitchen_location`,
 `lounge_location` and `bathroom_layout` remain a reviewer's call — but now with a drawing
 on every product, and `shower_toilet_separated` is asked about explicitly rather than
 going out as a silent `No` (see `store.changes.OPEN_HABITATION_FIELDS`).
@@ -703,6 +706,32 @@ cardinality failure means *"this row cannot be read one line at a time"*, which 
 same as *"cells are missing"* — and the difference decides whether the row is recoverable.
 `heating_from_spec_page` reads to the next printed label instead, and
 `test_a_cell_wrapped_over_three_lines_is_still_one_cell` pins it.
+
+### Microwave: asserted from absence <a id="microwave-asserted-from-absence"></a>
+
+`microwave` is recorded **`False`** on all eighteen, which is this adapter's one departure
+from `README.md`'s "only ever assert a feature from positive evidence". What earns the
+exception is the kind of document this is:
+
+* the equipment table **itemises the kitchen** — `Burner hob`, `Refrigerator volume incl.
+  freezer (l)`, `Warm water tank (l)` — so an appliance gets a row when it is fitted;
+* Eriba name an **oven** in the same document, and only as optional equipment;
+* and `microwave` appears **nowhere in the price list at all**, in any context.
+
+So the silence is the document saying there is none, not the document failing to say. The
+requester settled it on 9 September 2026: *"it should probably just recommend no, and [say]
+we couldn't find any evidence or mention of microwave, and I would just default to
+accepting a no."*
+
+It is a recommendation rather than a silent write: the reasoning is in the provenance, and
+on a product FMLV held `Yes` for a reviewer would see `Yes → No` and could refuse it. In
+practice FMLV holds `No` on every caravan model, so all eighteen come back
+**checked-and-unchanged** and raise no review rows at all.
+
+A mention of any kind cancels the assertion — one named in an options list is not one the
+buyer has, and that is a judgement rather than a parse. A *priced* mention is dropped by
+`habitation.usable_lines` before anything reads it, so it falls through to absence, which
+is the right answer: the caravan as standard has no microwave.
 
 ### Heating is warm air on all eighteen
 
