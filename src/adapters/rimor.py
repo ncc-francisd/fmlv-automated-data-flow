@@ -84,8 +84,9 @@ SLUG_RANGES: tuple[str, ...] = ("super-brig", "horus", "kilig", "sarus", "sailer
 
 #: The range each slug prefix names. `van` is deliberately mapped to Horus: MNC files the
 #: Van 238 under `All Camper Vans, Horus`, and MNC is what decides the UK range. The
-#: factory instead gives it a standalone `/special/rimor-van` page with no spec table,
-#: which is why it has no factory join at all.
+#: factory instead gives it a standalone `/special/rimor-van` page with no spec table, so
+#: it has no model page to join to — its specification comes from the range leaflet
+#: instead, via `parse_van_leaflet`.
 RANGE_LABELS: dict[str, str] = {
     "horus": "Horus",
     "kilig": "Kilig",
@@ -128,6 +129,40 @@ _CATALOGUE_MODEL = re.compile(
 
 #: The one row worth reading out of it — see `parse_catalogue_mro` for why only this one.
 _CATALOGUE_MRO_ROW = re.compile(r"^MRO \(kg\)(.*)$")
+
+#: The Rimor Van leaflet on the same download page. The Van 238 is the one layout MNC
+#: sells that the factory gives no model page — `/special/rimor-van` is marketing with no
+#: spec table — so it had no factory specification at all, and every number came from MNC
+#: or from nowhere. Its leaflet is a full spec sheet, and that is the gap it closes.
+#:
+#: **Only this leaflet, of the five.** Rimor Van is a one-layout range, so its leaflet
+#: doubles as the layout's data sheet. The Horus and Kilig leaflets were checked on the
+#: same day and carry no technical table at all — no MRO, no weights, no dimensions rows —
+#: and the Horus one prints six unlabelled dimension pairs for six layouts, which is the
+#: attribution problem `parse_catalogue_mro` refuses to guess at.
+#:
+#: Matched on `Rimor Van` rather than a filename, since the name carries a season and a
+#: version (`RIM_Pieghevole Rimor Van 2026-27 EU_V2_WEB.pdf`) and both move.
+_VAN_LEAFLET_LINK = re.compile(r'href="(/public/[^"]*Rimor Van[^"]*\.pdf)"')
+
+#: How the leaflet names the layout, e.g. `Rimor Van 238`. Read rather than assumed, so a
+#: leaflet for a future Van 2xx cannot hand its weights to the 238 — see
+#: `parse_van_leaflet`.
+_VAN_LEAFLET_MODEL = re.compile(r"\bRimor Van\s+(\d+)\b")
+
+#: The leaflet's own spec rows. Same labels as the model pages use, differently laid out:
+#: one value per row, because the range has one layout, so none of the side-by-side
+#: ambiguity that limits the catalogue to MRO applies here.
+_VAN_LEAFLET_ROWS: dict[str, re.Pattern[str]] = {
+    "length": re.compile(r"Outside length \(mm\)\s*(\d+)"),
+    "width": re.compile(r"Outside width[^(]*\(mm\)\s*(\d+)"),
+    "height": re.compile(r"Maximum outside height[^(]*\(mm\)\s*(\d+)"),
+    "seats": re.compile(r"Certified seats\s*(\d+)"),
+    "mtplm": re.compile(r"Maximum overall weight \(kg\)\s*(\d+)"),
+    "mro": re.compile(r"MRO \(kg\)\s*(\d+)"),
+    "fixed_berths": re.compile(r"Fixed berths\s*(\d+)"),
+    "made_up_berths": re.compile(r"Assemblable berths\s*(\d+)"),
+}
 
 #: A campervan taller than this is a high top — the roof line materially above the side
 #: windows. The same threshold as `auto_trail.HIGH_TOP_ABOVE_MM`, set by the NCC side on
@@ -474,6 +509,11 @@ class RimorModel:
     #: Path to the layout's floorplan drawing, for the reviewer to read the
     #: positional fields off — see `FLOORPLAN_FIELDS`.
     floorplan_path: str | None = None
+    #: What the specification was read from, when it was not the layout's own model page.
+    #: Named in every provenance snippet it sourced, because `url` then points at a PDF
+    #: and a reviewer who clicked expecting a model page has to be told what they opened.
+    #: `None` for the ordinary case, which is the model page.
+    read_from: str | None = None
 
     @property
     def mh_payload_kilograms(self) -> int | None:
@@ -835,24 +875,30 @@ def parse_catalogue_mro(catalogue_text: str) -> dict[str, int]:
     return found
 
 
-def _fetch_catalogue_mro(
-    http: Fetcher, on_progress: Callable[[str], None]
-) -> dict[str, int]:
-    """Every MRO the season's catalogue publishes, or `{}` if it cannot be read.
+def _fetch_download_page(http: Fetcher, on_progress: Callable[[str], None]) -> str:
+    """The download page's HTML, or `""` if it cannot be read.
 
-    A run-level fetch, not a per-range one: one download page and one PDF for the whole
-    manufacturer. Every failure is narrated and returns `{}` — the catalogue is the only
-    source of MRO now that the site has withdrawn it, but a product without one is still
-    a product, and the reviewer is offered the field either way.
+    Fetched once for the whole manufacturer, since it is where both PDFs the adapter
+    needs are linked: the season catalogue that MRO now comes from, and the Rimor Van
+    leaflet that is the Van 238's only specification.
     """
     page = http.fetch(BASE_URL + CATALOGUE_PAGE)
     if page.status_code != 200:
-        on_progress(f"catalogue page returned {page.status_code} — no MRO this run")
-        return {}
+        on_progress(f"download page returned {page.status_code} — no catalogue, no leaflet")
+        return ""
+    return page.file_path.read_text(encoding="utf-8", errors="replace")
 
-    link = _CATALOGUE_LINK.search(
-        page.file_path.read_text(encoding="utf-8", errors="replace")
-    )
+
+def _fetch_catalogue_mro(
+    http: Fetcher, download_page: str, on_progress: Callable[[str], None]
+) -> dict[str, int]:
+    """Every MRO the season's catalogue publishes, or `{}` if it cannot be read.
+
+    Every failure is narrated and returns `{}` — the catalogue is the only source of MRO
+    now that the site has withdrawn it, but a product without one is still a product, and
+    the reviewer is offered the field either way.
+    """
+    link = _CATALOGUE_LINK.search(download_page)
     if link is None:
         on_progress("no catalogue PDF linked from the download page — no MRO this run")
         return {}
@@ -866,6 +912,114 @@ def _fetch_catalogue_mro(
     name = link.group(1).rsplit("/", 1)[-1]
     on_progress(f"catalogue {name}: MRO for {len(mro)} layout(s)")
     return mro
+
+
+def parse_van_leaflet(leaflet_text: str, url: str) -> RimorModel | None:
+    """The Rimor Van's specification, from its range leaflet instead of a model page.
+
+    The Van 238 is the only layout MNC sells that the factory publishes no model page
+    for, so it reached the reviewer with MNC's truncated dimensions, no MTPLM, no MRO, no
+    payload and nothing to flag on the layout fields. The leaflet publishes all of it, in
+    the same wording the model pages use, one value per row.
+
+    The layout number is **read from the leaflet**, not assumed, and the caller checks it
+    against the layout MNC listed. A leaflet is a range document: if Rimor adds a second
+    van the file at this URL becomes a different vehicle's data sheet, and silently
+    handing the 238 someone else's weights is the one failure worth designing out.
+
+    Returns `None` when the leaflet names no layout or publishes no height — height is
+    what decides a van's body type on the 2300 mm threshold, and it is also the signal
+    that this is a spec sheet rather than the marketing leaflets the other four ranges
+    get.
+
+    **Numbers only.** The leaflet's prose does name beds and equipment, but MNC's listing
+    names them better and already does: MNC gives the Van 238 a transverse bed *and* a
+    made-up one off "middle dinette, which converts into a single bed", where the leaflet
+    only says "transverse". That is the same division of labour as everywhere else in this
+    adapter — the factory settles every figure, the importer's prose settles the fittings.
+    """
+    named = _VAN_LEAFLET_MODEL.search(leaflet_text)
+    if named is None:
+        return None
+
+    def row(name: str) -> int | None:
+        found = _VAN_LEAFLET_ROWS[name].search(leaflet_text)
+        return int(found.group(1)) if found else None
+
+    height = row("height")
+    if height is None:
+        return None
+
+    # Standard berths, made up or not: "Fixed berths 2" plus "Assemblable berths 1" is
+    # the 3 the leaflet's own prose gives ("3 sleeping berths, including one assemblable
+    # bed"). Neither needs paying for, so neither is an optional extra berth to leave out.
+    fixed_berths, made_up_berths = row("fixed_berths"), row("made_up_berths")
+    berths = (
+        (fixed_berths or 0) + (made_up_berths or 0)
+        if fixed_berths is not None or made_up_berths is not None
+        else None
+    )
+    berths_text = (
+        f"{fixed_berths or 0} fixed + {made_up_berths or 0} assemblable"
+        if berths is not None
+        else None
+    )
+
+    seats, mtplm = row("seats"), row("mtplm")
+    return RimorModel(
+        range_label=RANGE_LABELS["van"],
+        model=f"Van {named.group(1)}",
+        url=url,
+        body_type=body_type_for("vans", height),
+        body_style="vans",
+        mh_passenger_seats_inc_driver=seats,
+        seats_text=str(seats) if seats is not None else None,
+        berths=berths,
+        berths_text=berths_text,
+        mh_length_mm=row("length"),
+        mh_width_mm=row("width"),
+        mh_height_mm=height,
+        mtplm_kilograms=mtplm,
+        mtplm_text=str(mtplm) if mtplm is not None else None,
+        mro_kilograms=row("mro"),
+        # The leaflet is also where the Van 238's layout drawing is — the plan sits beside
+        # the technical data, captioned with the bed sizes and the `5981x2059` overall
+        # callout. It is not a `/public/...piantina...` image like the model pages carry,
+        # so the reviewer is sent to the PDF; before this they were sent nowhere, and the
+        # four positional fields had no row to flag.
+        floorplan_path=url,
+        read_from="the range leaflet",
+    )
+
+
+def _fetch_van_leaflet(
+    http: Fetcher, download_page: str, on_progress: Callable[[str], None]
+) -> RimorModel | None:
+    """The Van's specification from the leaflet linked on the download page, or `None`.
+
+    Shares the download page with `_fetch_catalogue_mro` rather than fetching it twice.
+    Every failure is narrated and returns `None`: the Van 238 was a product without a
+    factory specification before this leaflet was found and it can be one again.
+    """
+    link = _VAN_LEAFLET_LINK.search(download_page)
+    if link is None:
+        on_progress("no Rimor Van leaflet linked from the download page")
+        return None
+
+    pdf = http.fetch(BASE_URL + link.group(1).replace(" ", "%20"))
+    if pdf.status_code != 200:
+        on_progress(f"Rimor Van leaflet returned {pdf.status_code}")
+        return None
+
+    model = parse_van_leaflet(extract_text(pdf.file_path).text, link.group(1))
+    if model is None:
+        on_progress("Rimor Van leaflet names no layout or publishes no height")
+        return None
+    on_progress(
+        f"leaflet {link.group(1).rsplit('/', 1)[-1]}: {model.range_label} {model.model} "
+        f"specification"
+    )
+    return model
 
 
 def rear_garage_from(overview: str, body_style: str | None) -> tuple[bool, str] | None:
@@ -1084,11 +1238,15 @@ def _build_extracted_motorhome(
 ) -> ExtractedMotorhome:
     """One product: MNC's range membership and price, the factory's specification.
 
-    `model` is `None` for a layout MNC sells that the factory has no page for — the
-    Rimor Van 238, and a Horus 12 the factory has withdrawn. Those keep MNC's price,
-    body type and base vehicle, and take seats and berths from MNC *only* when the two
-    differ: MNC repeats its travel-seat count in the berth position on the coachbuilts,
-    so two equal figures cannot be told apart from that bug and are left empty.
+    `model` is `None` for a layout MNC sells that the factory specifies nowhere — the
+    Horus 12, which the factory has withdrawn. Those keep MNC's price, body type and base
+    vehicle, and take seats and berths from MNC *only* when the two differ: MNC repeats
+    its travel-seat count in the berth position on the coachbuilts, so two equal figures
+    cannot be told apart from that bug and are left empty.
+
+    A `model` need not have come from a model page: the Rimor Van 238's is read from the
+    range leaflet, since the factory gives that layout no page. `RimorModel.read_from`
+    says so, and every snippet it sourced repeats it.
 
     **Dimensions fall back to MNC** where the factory has none, rather than being left
     blank (the requester's ruling, 5 September 2026: "if you can't get the specification
@@ -1175,6 +1333,10 @@ def _build_extracted_motorhome(
 
     mnc_source = listing.url
     factory_source = BASE_URL + model.url if model else None
+    # Named in every snippet the factory sourced, when the factory source was not the
+    # layout's own page — the Van 238's is a PDF leaflet, and a reviewer who clicks
+    # expecting a model page has to be told what they are looking at.
+    read_from = f", from {model.read_from}" if model and model.read_from else ""
     label = f"{range_label} {model_name}"
     provenance: dict[str, Provenance] = {}
 
@@ -1225,9 +1387,10 @@ def _build_extracted_motorhome(
             # `bed_types` is a list, so its "unset" is empty rather than None.
             if settled is not None and settled != []:
                 continue  # already settled from the copy — bed_types on all 34
+            where = f"the layout drawing in {model.read_from}" if model.read_from else "the floorplan"
             provenance[name] = Provenance(
                 source_url=floorplan,
-                snippet=f"{label} — read {_FLOORPLAN_NOTES[name]} off the floorplan",
+                snippet=f"{label} — read {_FLOORPLAN_NOTES[name]} off {where}",
                 reviewer_reference=True,
             )
 
@@ -1271,7 +1434,7 @@ def _build_extracted_motorhome(
         if value is None:
             continue
         if factory_value is not None:
-            record(field_name, f"{axis}: {value} mm", url=factory_source or mnc_source)
+            record(field_name, f"{axis}: {value} mm{read_from}", url=factory_source or mnc_source)
         elif listing.dimensions_are_exact:
             record(field_name, f"{axis}: {value} mm, from MNC", url=mnc_source)
         else:
@@ -1294,15 +1457,23 @@ def _build_extracted_motorhome(
 
     assert factory_source is not None
     if model.mh_passenger_seats_inc_driver is not None:
+        # The model pages label these in Italian under an icon; the leaflet spells them
+        # out in English. Quote whichever this product's source actually used.
+        seats_label = (
+            "Certified seats" if model.read_from else "numero posti omologati (certified seats)"
+        )
         record(
             "mh_passenger_seats_inc_driver",
-            f"numero posti omologati (certified seats): {model.seats_text}",
+            f"{seats_label}: {model.seats_text}{read_from}",
             url=factory_source,
         )
     if model.berths is not None:
         # The cell text is kept verbatim: "4 (+1 opt)" says something the integer cannot,
         # namely that the fifth berth needs optional equipment.
-        record("berths", f"numero posti letto (berths): {model.berths_text}", url=factory_source)
+        berths_label = "standard berths" if model.read_from else "numero posti letto (berths)"
+        record(
+            "berths", f"{berths_label}: {model.berths_text}{read_from}", url=factory_source
+        )
     # `bed_types` is deliberately not recorded here. It is one of the habitation features
     # now, recorded above from whichever source named the beds — MNC's prose where it
     # names any, the factory's single word only as a fallback. Recording it again here
@@ -1311,7 +1482,7 @@ def _build_extracted_motorhome(
         note = f"Maximum overall weight: {model.mtplm_text} kg"
         if model.mtplm_text and "/" in model.mtplm_text:
             note += " — the standard chassis, the rest being uprated options"
-        record("mtplm_kilograms", note, url=factory_source)
+        record("mtplm_kilograms", note + read_from, url=factory_source)
     if mro is not None:
         if mro_from_catalogue:
             # The catalogue, not the model page — the site withdrew MRO on 7 September
@@ -1324,11 +1495,11 @@ def _build_extracted_motorhome(
                 url=BASE_URL + CATALOGUE_PAGE,
             )
         else:
-            record("mro_kilograms", f"MRO: {mro} kg", url=factory_source)
+            record("mro_kilograms", f"MRO: {mro} kg{read_from}", url=factory_source)
     if payload is not None:
         record(
             "mh_payload_kilograms",
-            f"{mtplm} kg MTPLM - {mro} kg MRO",
+            f"{mtplm} kg MTPLM - {mro} kg MRO{read_from}",
             url=(BASE_URL + CATALOGUE_PAGE) if mro_from_catalogue else factory_source,
         )
 
@@ -1391,10 +1562,13 @@ def collect(
     """
     results: list[ExtractedMotorhome] = []
 
-    # One download page and one PDF for the whole manufacturer, before the ranges: the
-    # site stopped publishing MRO on 7 September 2026 and the catalogue is the only
-    # source for it now. An empty result is narrated and never fatal.
-    catalogue_mro = _fetch_catalogue_mro(http, on_progress)
+    # One download page and its two PDFs for the whole manufacturer, before the ranges:
+    # the site stopped publishing MRO on 7 September 2026 and the catalogue is the only
+    # source for it now, and the Rimor Van leaflet is the Van 238's only specification of
+    # any kind. Both are narrated and neither is ever fatal.
+    download_page = _fetch_download_page(http, on_progress)
+    catalogue_mro = _fetch_catalogue_mro(http, download_page, on_progress)
+    van_model = _fetch_van_leaflet(http, download_page, on_progress) if download_page else None
 
     for mnc_slug, factory_slug, range_label in ranges:
         category_url = f"{MNC_BASE_URL}{MNC_CATEGORY}/{mnc_slug}/"
@@ -1446,10 +1620,24 @@ def collect(
             model: RimorModel | None = None
             factory_layout = _factory_slug(listing.layout, available)
             if factory_layout is None:
-                on_progress(
-                    f"    {listing.title} — no rimor.it page for layout "
-                    f"{listing.layout!r}; MNC price and body type only"
-                )
+                # The Van 238's specification lives in the range leaflet, because the
+                # factory gives it no model page. Only if the leaflet is about the layout
+                # MNC listed — see `parse_van_leaflet`.
+                if (
+                    listing.range_slug == "van"
+                    and van_model is not None
+                    and van_model.model == f"Van {listing.layout}"
+                ):
+                    model = van_model
+                    on_progress(
+                        f"    {listing.title} — no rimor.it page; specification from "
+                        f"{van_model.read_from}"
+                    )
+                else:
+                    on_progress(
+                        f"    {listing.title} — no rimor.it page for layout "
+                        f"{listing.layout!r}; MNC price and body type only"
+                    )
             else:
                 matched.add(factory_layout)
                 model_path = f"/int/en/gamma/{factory_slug}/modello/{factory_layout}"
@@ -1478,7 +1666,9 @@ def collect(
                     f"{listing.mnc_height_mm} mm, {precision})"
                 )
             if model is not None:
-                if factory_layout != listing.layout:
+                # A rename is only a rename when there was a model page to match. The Van
+                # 238 has none, so `factory_layout` is None and there is nothing to report.
+                if factory_layout is not None and factory_layout != listing.layout:
                     on_progress(
                         f"    {listing.title} — matched rimor.it "
                         f"{factory_slug}/{factory_layout} (MNC still lists the "

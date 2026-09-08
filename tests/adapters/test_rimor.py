@@ -1123,3 +1123,160 @@ def test_no_catalogue_leaves_the_mro_unset(
     assert extracted.motorhome.mro_kilograms is None
     assert extracted.motorhome.mh_payload_kilograms is None
     assert extracted.motorhome.mtplm_kilograms == 3500
+
+
+# --------------------------------------------------------------------------- #
+# The Rimor Van leaflet — the Van 238's only specification
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def van_leaflet_text() -> str:
+    return _fixture("rimor_van_leaflet_text.txt")
+
+
+#: Where the leaflet sits on the site, as `_VAN_LEAFLET_LINK` returns it.
+VAN_LEAFLET_PATH = (
+    "/public/local/simplex/Marchi/rimor/Veicoli/Gamme/BrochureGamme/brochure/raw/"
+    "RIM_Pieghevole Rimor Van 2026-27 EU_V2_WEB.pdf"
+)
+
+
+def test_the_leaflet_specifies_the_layout_the_factory_gives_no_page(
+    van_leaflet_text: str,
+) -> None:
+    """Every figure the Van 238 used to reach the reviewer without."""
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    assert model is not None
+    assert (model.range_label, model.model) == ("Horus", "Van 238")
+    assert (model.mh_length_mm, model.mh_width_mm, model.mh_height_mm) == (5981, 2059, 2800)
+    assert model.mh_passenger_seats_inc_driver == 4
+    assert model.mtplm_kilograms == 3500
+    assert model.mro_kilograms == 2765
+    assert model.mh_payload_kilograms == 735
+
+
+def test_the_leaflet_counts_a_made_up_berth_as_a_standard_one(
+    van_leaflet_text: str,
+) -> None:
+    """"Fixed berths 2" plus "Assemblable berths 1" is the 3 the leaflet's prose gives.
+
+    Neither is a paid option, so neither is an extra berth to leave out — and MNC's own
+    listing says "3 berth" independently.
+    """
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    assert model is not None
+    assert model.berths == 3
+    assert model.berths_text == "2 fixed + 1 assemblable"
+
+
+def test_the_leaflets_height_settles_the_high_top_question(van_leaflet_text: str) -> None:
+    """2800 mm is above the 2300 mm threshold, and exact rather than truncated."""
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    assert model is not None
+    assert model.body_type is BodyType.CAMPERVAN_HIGH_TOP
+
+
+def test_a_leaflet_naming_no_layout_specifies_nothing(van_leaflet_text: str) -> None:
+    """A leaflet is a range document, so the layout it is about has to be read from it.
+
+    Rimor Van is a one-layout range today. If a second van arrives, the file at this URL
+    becomes a different vehicle's data sheet, and handing the 238 someone else's weights
+    is the failure worth designing out — so the caller checks the name it finds.
+    """
+    assert rimor.parse_van_leaflet("Outside length (mm) 5981", VAN_LEAFLET_PATH) is None
+
+
+def test_a_marketing_leaflet_with_no_height_specifies_nothing() -> None:
+    """The other four ranges' leaflets carry no technical table — checked 8 September 2026.
+
+    Height is what decides a van's body type, and its absence is also how a marketing
+    leaflet is told from a data sheet.
+    """
+    text = "Rimor Van 238 is designed for those who choose maximum freedom.\n"
+    assert rimor.parse_van_leaflet(text, VAN_LEAFLET_PATH) is None
+
+
+def test_the_leaflet_agrees_with_mnc_on_every_dimension(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """The join's self-check, and a genuine second source: the two sites are independent.
+
+    MNC publishes truncated metres here (5.98 m, 2.05 m, 2.80 m), so the leaflet's exact
+    millimetres should sit within the 9 mm truncation allows — and they do, on all three.
+    """
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    assert model is not None
+    assert rimor.dimension_conflicts(listing, model) == []
+
+
+def test_a_leaflet_sourced_figure_says_so_in_its_provenance(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """The link goes to a PDF, so the snippet has to say what the reviewer is opening."""
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    extracted = rimor._build_extracted_motorhome(listing, model)
+
+    assert extracted.motorhome.mh_payload_kilograms == 735
+    for field_name in ("mro_kilograms", "mtplm_kilograms", "mh_payload_kilograms",
+                       "mh_length_mm", "mh_passenger_seats_inc_driver", "berths"):
+        assert "from the range leaflet" in extracted.provenance[field_name].snippet
+
+
+def test_the_leaflet_beats_mncs_truncated_dimensions(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """The factory settles every figure, so the fallback only fills what would be empty.
+
+    MNC's 2.05 m width truncates to 2050 mm and the real figure is 2059 — the whole
+    reason the fallback is a plan B.
+    """
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    product = rimor._build_extracted_motorhome(listing, model).motorhome
+
+    assert (product.mh_length_mm, product.mh_width_mm) == (5981, 2059)
+
+
+def test_the_leaflet_leaves_the_habitation_features_to_mnc(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """MNC names the beds better: a transverse bed *and* the dinette that makes up a single.
+
+    The leaflet's prose only says "transverse", so taking beds from it would lose a type.
+    Same division of labour as everywhere else — the factory settles figures, the
+    importer's prose settles fittings.
+    """
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    product = rimor._build_extracted_motorhome(listing, model).motorhome
+
+    assert product.bed_types == [BedType.TRANSVERSE, BedType.MAKE_UP]
+
+
+def test_the_leaflet_gives_the_van_a_drawing_to_read_the_layout_off(
+    van_leaflet_text: str, mnc_van_238: str
+) -> None:
+    """Before this the Van 238's positional fields had no row, so nothing to flag.
+
+    The requester, 7 September 2026: *"I didn't see any flags saying that that wasn't
+    completed."* Correct at the time — no factory page meant no reference to offer.
+    """
+    listing = rimor.parse_mnc_listing(mnc_van_238, "rimor-van-238-2026-automatic", "u")
+    model = rimor.parse_van_leaflet(van_leaflet_text, VAN_LEAFLET_PATH)
+
+    provenance = rimor._build_extracted_motorhome(listing, model).provenance
+
+    for field_name in ("sleeping_area", "kitchen_location", "lounge_location", "bathroom_layout"):
+        assert provenance[field_name].reviewer_reference is True
+        assert "the layout drawing in the range leaflet" in provenance[field_name].snippet
+        assert provenance[field_name].source_url.endswith(".pdf")

@@ -201,6 +201,28 @@ agreed, none differed. Without that the attribution would have been plausible ra
 established, and a silently transposed column is the failure this whole warning exists
 about.
 
+### A one-layout range's leaflet is a spec sheet, not marketing
+
+The reason brochure tables are hard is that they put layouts side by side. A range with
+**one** layout has nothing to put side by side, so its leaflet prints one value per row
+and the whole difficulty disappears.
+
+That is worth knowing because the product with no model page is often exactly the odd
+one-off that gets its own range: Rimor gives the Van 238 a marketing page with no spec
+table, and its leaflet turned out to carry every figure FMLV asks for — MTPLM, MRO,
+dimensions in exact millimetres, certified seats, berths split into fixed and made-up.
+Four sibling leaflets for multi-layout ranges carry no technical table at all.
+
+So when a layout has no page of its own, check the range's own documents before recording
+it as unspecifiable. Two cautions:
+
+* **Read the layout name out of the document and check it against the one you are joining
+  to.** A leaflet is a range document: if the manufacturer adds a second model, the file
+  at that URL becomes a different vehicle's data sheet, and handing the first one someone
+  else's weights is a silent, plausible-looking error.
+* **Say in the provenance which document it was.** The link opens a PDF, and a reviewer
+  who clicked expecting a model page needs to know what they are looking at.
+
 ### Payload is arithmetic, so it is checkable even when nothing was published
 
 `mh_payload_kilograms` is MTPLM minus MRO. That means a payload can be checked against
