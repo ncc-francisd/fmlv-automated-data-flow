@@ -1335,6 +1335,14 @@ and the requester reads that as an industry trend rather than one brand's omissi
 (3 September 2026). Do not add it back for a manufacturer that happens to publish it
 without asking first — whatever FMLV already holds is left untouched.
 
+> **Asked for the first time on Eriba, 7 September 2026, and the answer was yes.** So the
+> rule is a requirement to *ask*, not a prohibition — and the question is cheap enough to be
+> worth asking whenever a brand publishes the figure distinctly. Eriba does: `Body length
+> (exterior) (cm)` sits in the same table as the shipping length and the interior length,
+> under three separate labels, so there is no risk of the confusion the scope rule protects
+> against. Note this does **not** re-open it for a brand that publishes one ambiguous
+> "length" — ask again, per case.
+
 **The payload check is `mtplm - mro == published_payload`, and `published_payload` is not
 always one column.** There are two — `personal_effects_payload_kilograms` and
 `optional_equipment_payload_kilograms` — and they must *sum* to `mtplm - mro`. On Bailey's
@@ -1343,6 +1351,35 @@ the personal-effects figure alone. **Swift's four Elegance Grandes are the count
 (3 September 2026): FMLV holds 160kg personal effects plus 41kg optional equipment against
 a 201kg derived payload. Report a mismatch rather than dropping the product: six of Bailey's
 81 fail it on FMLV's own published figures.
+
+**Counted across every caravan export on disk, 7 September 2026 — 515 rows over Bailey,
+Swift and Eriba — the split is vanishingly rare and worth knowing exactly:**
+
+| How the two columns are filled | Rows |
+|---|---|
+| `personal_effects` only | **487** |
+| `optional_equipment` only | 21 |
+| **both** | **7** |
+| neither | 0 |
+
+- **All 7 splits are one Swift range**, and they are the *same* split repeated: `160 + 41 =
+  201` on the four 2026 Elegance Grandes and the three 2022 Elegance rows. The 41kg is
+  identical on every one, so it is a published range-level figure rather than anything
+  computed per layout. There is no second brand doing this.
+- **Three of the 7 do not sum.** The 2022 Elegance rows carry `160 + 41 = 201` against a
+  derived `231` — 30kg unaccounted. They are superseded rows, but it is a reminder that a
+  split found in the baseline is not self-evidently right.
+- **The 21 `optional_equipment`-only rows are all Eriba, and they are the wrong column.**
+  Every one holds precisely that row's own `mtplm - mro`, with the REQUIRED
+  `personal_effects` column left blank — the inverse of what the field guide asks for and of
+  what Bailey and Swift do. See [`eriba.md`](eriba.md#what-the-fmlv-baseline-holds).
+
+So the default is unambiguous: **the derived payload goes in `personal_effects`, and
+`optional_equipment` gets provenance with no value** so a reviewer can clear a stale figure.
+Populating both is for a manufacturer that publishes a genuine split, and no surveyed one
+does — Eriba publishes an optional-equipment *allowance*, which is a ceiling on what may be
+ordered and not weight that is present, exactly as the motorhome rule for that same label
+says.
 
 **A manufacturer's single published payload figure may be the total rather than the
 personal-effects half — emit it anyway, and know which four products it will argue with.**
@@ -1376,3 +1413,42 @@ manufacturer's own naming **and** MTPLM of 1250kg or lower — a micro should be
 a very small car. Weight alone would have mislabelled thirteen products across Bailey and
 Adria; Bailey's Discovery D4-2 is 995kg and FMLV holds it as rigid, as is Swift's 1043kg
 Basecamp. Folding and pop-up exist in the schema but no surveyed brand builds one yet.
+
+### A lifting roof does not change a caravan's body type
+
+**Rule from the NCC side, 7 September 2026: the type is rigid even where the manufacturer's
+own name for the roof is "pop up". It holds for every brand — asked and confirmed for Eriba,
+Bailey and Swift together.**
+
+Eriba is the case that raised it, and it is the strongest possible version of the question,
+because nothing here has to be inferred from a photograph: Eriba publishes a `Roof type` row
+in the same table as the weights, reading **`Pop-up roof`** on six Touring layouts,
+`Sleeping roof` on six more, and `Fix roof` on the six Novaline. FMLV's own baseline had
+followed that wording — `type_pop_up` on 15 of the 21 current rows, exactly the 15 with a
+raisable roof.
+
+**That baseline is wrong and the adapter corrects it.** The reasoning, in the requester's
+terms: an Eriba is a hard-sided caravan whose roof panel lifts, and `type_pop_up` is not a
+description of a roof — it is a description of a *kind of caravan*, the folding sort a UK
+buyer means by the term. So the manufacturer's vocabulary loses to FMLV's.
+
+Three consequences worth keeping straight:
+
+- **`type_folding` and `type_pop_up` still have no product behind them**, and the bar for
+  either is a caravan whose **walls** fold or rise, not its roof. Together with the micro
+  rule above, `type_rigid` is now the answer for every caravan surveyed — 21 Eriba, 23
+  Bailey, 26 Swift.
+- **The manufacturer's own naming is decisive for `type_micro` and for nothing else.** That
+  asymmetry is deliberate and it is easy to over-read: the micro rule spells out "the
+  manufacturer calls it one", so a brand's vocabulary is *part* of that test. No other value
+  in the enum works that way.
+- **Say where the roof went.** It is a real feature and often the reason a range exists, so
+  quote the manufacturer's row in the `body_type` provenance. `bailey_caravan.py` and
+  `swift_caravan.py` both assert `RIGID` unconditionally and say so in the snippet; the
+  wording should cite this rule rather than a claim about what one brand happens to build,
+  which would look falsified the first time that brand ships a pop-top.
+
+> **This replaces an earlier, narrower version of this note** written on 7 September before
+> the Eriba export had been fetched, which reached the same answer from the wrong evidence
+> and was withdrawn for a day when the baseline turned out to disagree. The lesson stands on
+> its own: **fetch the baseline before writing a rule about what a field means.**
