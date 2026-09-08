@@ -34,6 +34,7 @@ from src.product_model.enums import (
     BedType,
     CaravanBodyType,
     CaravanSleepingArea,
+    Heating,
     Refrigeration,
 )
 from src.vehicle_class import VehicleClass
@@ -762,3 +763,94 @@ def test_without_the_configurator_nothing_regresses() -> None:
     assert extracted.caravan.sleeping_area is None
     assert extracted.caravan.mtplm_kilograms == 1000
     assert "bed_types" not in extracted.provenance
+
+
+# --------------------------------------------------------------------------- #
+# Heating — one system per page, because one system is all the document has
+# --------------------------------------------------------------------------- #
+
+
+def test_heating_is_read_from_the_clean_page() -> None:
+    """Four models, four identical cells, nothing to attribute."""
+    found = eriba_caravan.heating_from_spec_page(fixture(TOURING_P5))
+
+    assert found is not None
+    assert found[0] is Heating.BLOWN_AIR
+    assert "Gas heating, 3.5 kW" in found[1]
+
+
+def test_a_cell_wrapped_over_three_lines_is_still_one_cell() -> None:
+    """Page 6, the row that was read as three layouts stating no heating.
+
+    They state a longer value — `Gas heating, integrated boiler, 4 kW` — which pypdf
+    returns as `Gas heating,` / `integrated boiler, 4` / `kW`. Reading a line at a time
+    saw two cells against five models and gave up. The row ends at the next printed
+    label, so `SPEC_LABELS` bounds it rather than a guess at the line shape.
+    """
+    row = eriba_caravan._heating_row(fixture(TOURING_P6))
+
+    assert row.count("Gas heating") == 5
+    assert "integrated boiler, 4 kW" in row
+    # The next printed row must not have been swept in with it.
+    assert "Gas bottle storage" not in row
+
+
+def test_both_of_eribas_heaters_are_the_same_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Which is why the row needs no splitting: the two forms differ only in the water.
+
+    The 3.5 kW pairs with a separate `Electric boiler 5 l`; the 4 kW has the boiler inside
+    the heater, `Gas boiler 10 l`. Neither is water-borne *space* heating — and Alde, the
+    wet-central brand, appears once in the whole document as an example of optional
+    equipment.
+    """
+    del monkeypatch  # only here to keep the signature uniform with the parametrised ones
+    for name in (TOURING_P5, TOURING_P6, FEELING_NOVALINE_P16):
+        found = eriba_caravan.heating_from_spec_page(fixture(name))
+        assert found is not None, name
+        assert found[0] is Heating.BLOWN_AIR, name
+
+
+@pytest.mark.parametrize(
+    ("row", "why"),
+    [
+        ("Heating type Alde wet central heating\nBerths 3 3\n", "a wet system"),
+        ("Heating type Gas heating, 3.5 kW Alde 3010\nBerths 3 3\n", "one of each"),
+        ("Heating type Diesel heating 4 kW\nBerths 3 3\n", "not the gas one"),
+        ("Berths 3 3 3\n", "no such row"),
+    ],
+)
+def test_anything_but_one_gas_system_is_left_to_fmlv(row: str, why: str) -> None:
+    """The moment two systems could be on one row, which layout has which matters again.
+
+    And that is exactly what cannot be recovered from a row whose cells wrap, so nothing
+    is recorded rather than something guessed.
+    """
+    assert eriba_caravan.heating_from_spec_page(row) is None, why
+
+
+def test_a_page_heating_value_reaches_the_product_with_its_reasoning() -> None:
+    """A reviewer seeing `blown_air_heating` from "Gas heating" needs the why beside it."""
+    product = layouts(TOURING_P5)["Touring 310"]
+
+    extracted = eriba_caravan.build_extracted(
+        product,
+        "https://example.invalid/price-list.pdf",
+        heating=eriba_caravan.heating_from_spec_page(fixture(TOURING_P5)),
+    )
+
+    assert extracted.caravan.heating is Heating.BLOWN_AIR
+    snippet = extracted.provenance["heating"].snippet
+    assert "gas warm air" in snippet
+    assert "Alde" in snippet
+
+
+def test_without_a_readable_row_the_heating_stays_unset() -> None:
+    """FMLV's own value stands, and the run says why."""
+    product = layouts(TOURING_P5)["Touring 310"]
+
+    extracted = eriba_caravan.build_extracted(
+        product, "https://example.invalid/price-list.pdf"
+    )
+
+    assert extracted.caravan.heating is None
+    assert "heating" not in extracted.provenance

@@ -593,7 +593,7 @@ evidence that the positional attribution is right.
 
 ### What it still does not give
 
-No heating type, no microwave, and nothing about the washroom. So `kitchen_location`,
+No microwave, and nothing about the washroom. So `kitchen_location`,
 `lounge_location` and `bathroom_layout` remain a reviewer's call — but now with a drawing
 on every product, and `shower_toilet_separated` is asked about explicitly rather than
 going out as a silent `No` (see `store.changes.OPEN_HABITATION_FIELDS`).
@@ -667,10 +667,11 @@ plain fridge. Not a parse artefact: the other 11 came back confirmed.
 
 Three narrations exist because silence would have been misread:
 
-* **`heating type not collected`**, said every run. Eriba print `Gas heating, 3.5 kW`, which
-  names the fuel and the output but not whether the system is warm-air or water-based — the
-  only distinction FMLV's column draws. A field an adapter never attempts is invisible to
-  the pipeline, so this is the only place it can be explained.
+* **`heating type not collected`**, naming the pages — expected to be silent now that the
+  row is read, so if it speaks the price list has changed shape. A field an adapter cannot
+  fill is invisible to the pipeline, which is why it is said at all.
+* **`price list page N: heating is blown_air_heating for all N layout(s)`**, once per spec
+  page, because a value applied to a whole page rather than read per layout should say so.
 * **`Touring: the range page publishes no technical data`**, so a reader does not mistake
   the missing cross-check for a fetch failure.
 * **`9 layout(s) have no floorplan to link`**, naming them — now expected to be silent,
@@ -679,18 +680,53 @@ Three narrations exist because silence would have been misread:
 * **`<Range>: configurator series <id> gives N layout(s), N with bed types and N with a
   drawing`**, once per range.
 
-### The trap the first run found that the survey did not
+### The trap the first run found, and what it actually was
 
 The survey checked which rows blank and concluded it was only the bed dimensions and the
-storage-compartment clearance. It missed one: **page 6 prints `Heating type` twice against
-five models.** Three of the five Tourings state no heating and which three cannot be
-recovered from the line.
+storage-compartment clearance. The cardinality check then caught `Heating type` on the
+first live run, refused the row and named it — which is the job that check exists to do,
+and the reason it is worth writing before the parser looks finished.
 
-The cardinality check caught it on the first live run, refused the row, and named it —
-which is exactly the job that check exists to do, and the reason it is worth writing before
-the parser looks finished. Heating is now a boundary label rather than a parsed field, and
-`test_a_row_with_the_wrong_number_of_values_is_dropped_and_reported` keeps the defence
-honest on a row that *is* parsed.
+**The diagnosis was wrong, though, and worth recording as a lesson.** It was read as *page
+6 printing two values against five models*, so three layouts stating no heating. They state
+a **longer** value:
+
+```
+Heating type Gas heating, 3.5 kW Gas heating, 3.5 kW
+Gas heating,
+integrated boiler, 4
+kW                              <- one cell, three lines, x3
+```
+
+Five cells, five models. A line-based reader sees the first line and counts two. So a
+cardinality failure means *"this row cannot be read one line at a time"*, which is not the
+same as *"cells are missing"* — and the difference decides whether the row is recoverable.
+`heating_from_spec_page` reads to the next printed label instead, and
+`test_a_cell_wrapped_over_three_lines_is_still_one_cell` pins it.
+
+### Heating is warm air on all eighteen
+
+The row has exactly two forms in the 2027 list:
+
+| Printed | Layouts | Water heated by |
+| --- | --- | --- |
+| `Gas heating, 3.5 kW` | 15 | a separate `Electric boiler 5 l` |
+| `Gas heating, integrated boiler, 4 kW` | 3 | the heater itself, `Gas boiler 10 l` |
+
+The requester settled the first on 9 September 2026: *"the three point five kilowatt heater
+is a gas, but a blown air, warm blown air system, not a wet central heating system."* The
+second follows, because the only difference between the two is **how the hot water is
+made** — the larger Tourings put the boiler inside the gas heater, which is the Truma Combi
+arrangement this project already records as warm air rather than a wet system. Two
+corroborations: the `Warm water tank` row splits 15/3 the same way and names a boiler in
+both cases, never a radiator; and **Alde, the wet-central brand, appears once in the whole
+document, as an example of optional equipment** — never as a standard fitment.
+
+That both forms give the same FMLV answer is also what makes the row usable at all: the
+wrapped cell cannot be attributed positionally, and does not need to be. The same reasoning
+as `rimor.parse_catalogue_mro`'s shared-value case, from the other end. `heating_from_spec_page`
+returns nothing the moment a wet marker or a second, non-gas system appears on the row,
+because then which layout has which matters again and is exactly what cannot be recovered.
 
 ## What this adds to the general pattern
 

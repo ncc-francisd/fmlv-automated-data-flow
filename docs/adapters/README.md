@@ -201,6 +201,33 @@ agreed, none differed. Without that the attribution would have been plausible ra
 established, and a silently transposed column is the failure this whole warning exists
 about.
 
+### A cardinality failure is not proof that cells are missing
+
+A row with fewer values than the page has columns is the standing signal that cells are
+blank and unattributable — the reason Rimor's catalogue gives only MRO, and the reason
+Eriba's bed-dimension rows are never parsed. But it has a second cause that looks
+identical to a line-based reader, and the two have opposite consequences.
+
+Eriba's `Heating type` on page 6 reported two values against five models, read as three
+layouts stating no heating. They state a *longer* value, which pypdf wraps:
+
+```
+Heating type Gas heating, 3.5 kW Gas heating, 3.5 kW
+Gas heating,
+integrated boiler, 4
+kW                              <- one cell over three lines, three times
+```
+
+Five cells, five models, perfectly attributable — just not one line at a time. So read a
+cardinality failure as *"this row cannot be read the way I am reading it"* before
+concluding *"this row is incomplete"*. Reading to the next known label instead of to the
+end of the line distinguishes them, and it is the same technique the surrounding parser
+already uses for labels that wrap.
+
+Worth checking a neighbouring row when you suspect it: Eriba's `Warm water tank` splits
+15/3 exactly as the heating row does, which confirmed the split before any of it was
+trusted.
+
 ### A configurator is a data source, not a dead end
 
 A "needs JavaScript" page is not the same as unreachable data. Eriba's configurator renders

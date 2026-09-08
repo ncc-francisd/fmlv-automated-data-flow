@@ -90,11 +90,19 @@ and the title**, never on the footnote — the inverse of the Weinsberg trap, wh
 reassuring "UK" label hid a euro document. The basis, from the website's own tooltip, is
 GBP including VAT and On The Road charges.
 
-**Floorplans exist for only nine of eighteen.** Feeling and Novaline slides carry a
-per-layout SVG; all nine predicted Touring URLs return a genuine 404 and no Touring drawing
-appears anywhere on the site. So the positional fields get a `reviewer_reference` pointer on
-the nine that have one and nothing on the nine that do not, which is narrated rather than
-left to look like an oversight.
+**The configurator API supplies what neither document does.** The range pages carry a
+per-layout SVG for Feeling and Novaline and none for Touring, which is why this adapter
+first shipped with a drawing on nine of eighteen and the Touring layouts recorded as having
+none reachable anywhere. They do: the configurator renders nothing server-side, but hands
+its JavaScript a `seriesId` and calls a public JSON endpoint, and that gives all eighteen a
+drawing, a per-layout URL, and — as *structured* records rather than prose —
+`bed_types` and `sleeping_area`. It also republishes the berth count and both masses, which
+`collect` cross-checks: all eighteen agree, corroborating the positional reading of the
+columnar price list, the one genuinely fragile thing here.
+
+So `kitchen_location`, `lounge_location` and `bathroom_layout` are the only fields still
+left to a reviewer with a `reviewer_reference` pointer, and every product now has a drawing
+to offer them.
 """
 
 from __future__ import annotations
@@ -110,7 +118,12 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.caravan import Caravan
-from ..product_model.enums import BedType, CaravanBodyType, CaravanSleepingArea
+from ..product_model.enums import (
+    BedType,
+    CaravanBodyType,
+    CaravanSleepingArea,
+    Heating,
+)
 from ..vehicle_class import VehicleClass
 from . import habitation
 from .base import ExtractedCaravan, Provenance
@@ -127,6 +140,7 @@ __all__ = [
     "collect",
     "cross_check",
     "find_price_list_url",
+    "heating_from_spec_page",
     "parse_configurator_models",
     "parse_configurator_series_id",
     "parse_range_page",
@@ -262,20 +276,18 @@ _VALUE_PATTERNS: dict[str, str] = {
     "refrigerator volume incl freezer": r"(\d+ \(\d+\))",
 }
 
-#: `Heating type` is deliberately **not** parsed, and this is the second row in the document
-#: to earn that treatment for the bed dimensions' reason. Page 6 prints
-#: `Gas heating, 3.5 kW` **twice against five models**, so three of the five Tourings state
-#: no heating and which three cannot be recovered from the line. The cardinality check found
-#: it on the first live run, which is what that check is for.
+#: `Heating type` is not in the table above, because it is not read per layout at all —
+#: `heating_from_spec_page` reads it per *page*, for two reasons that cancel each other out.
+#: The row cannot be split positionally, since one cell wraps over three lines on page 6;
+#: but every cell on every page gives the same FMLV answer, so nothing needs splitting.
 #:
-#: Nothing is lost either way: `Gas heating, 3.5 kW` names the fuel and the output but not
-#: whether the system is warm-air or water-based, and that distinction is the only thing
-#: FMLV's `heating` column records. So the field would have been left unset even where the
-#: value did parse.
+#: The first live run reported this row as five models with two values, and read that as
+#: three layouts stating no heating. They state a *longer* value — see
+#: `heating_from_spec_page`.
 _HEATING_NOT_COLLECTED = (
-    "heating type not collected: Eriba print 'Gas heating, 3.5 kW', which does not say "
-    "whether it is blown air or wet central, and the row is blank on some Touring layouts "
-    "in a way that cannot be attributed to a column. FMLV's own value stands"
+    "heating type not collected: the Heating type row is absent, names a wet system, or "
+    "names a second system beside the gas one, so which layout has which cannot be "
+    "recovered. FMLV's own value stands"
 )
 
 #: The positional fields no specification table can settle — they need the layout drawing.
@@ -632,6 +644,79 @@ _FLOORPLAN_SRC = re.compile(r'(?:src|data-src)="([^"]*grundriss[^"]*\.svg)"', re
 _EQUIPMENT_MARKER = re.compile(r"\s*\((?:○|●|–|-)\)\s*$")
 
 
+#: Eriba's standard space heating. Two forms appear in the 2027 list and **both are warm
+#: air**, which is what makes the row usable at all: page 6 wraps one cell over three lines
+#: and so cannot be attributed positionally, but attribution does not matter when every
+#: cell gives the same FMLV answer. The same reasoning as `rimor.parse_catalogue_mro`'s
+#: shared-value case, from the other end.
+#:
+#: | Printed | Layouts | Water heated by |
+#: | --- | --- | --- |
+#: | `Gas heating, 3.5 kW` | 15 | a separate `Electric boiler 5 l` |
+#: | `Gas heating, integrated boiler, 4 kW` | 3 | the heater itself, `Gas boiler 10 l` |
+#:
+#: So the only difference between the two is **how the hot water is made**, not how the
+#: space is heated — the bigger Tourings have the boiler inside the gas heater, which is
+#: the Truma Combi arrangement this project already treats as warm air rather than a wet
+#: system. The requester settled the 3.5 kW form on 9 September 2026: *"the three point
+#: five kilowatt heater is a gas, but a blown air, warm blown air system, not a wet central
+#: heating system."*
+#:
+#: Two independent corroborations that neither is water-borne: the `Warm water tank` row
+#: splits 15/3 exactly the same way, naming a boiler in both cases and never a radiator;
+#: and **Alde — the wet-central brand — appears once in the whole document, as an example
+#: of optional equipment** ("e.g. awning, smooth panel, Alde heating system, oven"). A
+#: standard fitment it is not.
+_GAS_HEATING = re.compile(r"\bgas heating\b", re.I)
+
+#: What would make the row something other than one warm-air system for every layout. A
+#: wet marker anywhere, or a second heating system that is not the gas one, and the row
+#: goes back to being unattributable — which is the honest answer, not a guess.
+_WET_SYSTEM_MARKER = re.compile(r"\balde\b|\bwet central\b|\bradiator", re.I)
+_ANY_HEATER_WORD = re.compile(r"\bheating\b|\bheater\b", re.I)
+
+_HEATING_LABEL = "Heating type"
+
+
+def _heating_row(page_text: str) -> str:
+    """The whole `Heating type` row, continuation lines included, whitespace collapsed.
+
+    A long cell wraps onto its own lines, so the row cannot be read one line at a time —
+    which is what made it look, on the first live run, as though three of five layouts
+    stated no heating. They state a *longer* value. The row ends at the next printed
+    label, so `SPEC_LABELS` is what bounds it rather than a guess at the line shape.
+    """
+    others = tuple(label for label in SPEC_LABELS if label != _HEATING_LABEL)
+    lines = page_text.split("\n")
+    for index, line in enumerate(lines):
+        if not line.startswith(_HEATING_LABEL):
+            continue
+        collected = [line[len(_HEATING_LABEL) :]]
+        for following in lines[index + 1 :]:
+            if following.startswith(others):
+                break
+            collected.append(following)
+        return " ".join(" ".join(collected).split())
+    return ""
+
+
+def heating_from_spec_page(page_text: str) -> tuple[Heating, str] | None:
+    """The one heating system every layout on this page has, or `None`.
+
+    `None` where the row is absent, names a wet system, or names a second system beside
+    the gas one — in each of those cases the value differs by layout and the row is not
+    attributable, so nothing is recorded and FMLV's own value stands.
+    """
+    row = _heating_row(page_text)
+    if not row or _WET_SYSTEM_MARKER.search(row) or not _GAS_HEATING.search(row):
+        return None
+    # Every heating phrase on the row has to be the gas one. Otherwise two systems are
+    # being described and which layout has which is exactly what cannot be recovered.
+    if _ANY_HEATER_WORD.search(_GAS_HEATING.sub(" ", row)):
+        return None
+    return Heating.BLOWN_AIR, f"{_HEATING_LABEL} {row}"
+
+
 def parse_range_page(html: str) -> list[tuple[str, dict[str, str], str | None]]:
     """Each layout a range page publishes, as `(layout name, {label: value}, floorplan)`.
 
@@ -882,6 +967,7 @@ def build_extracted(
     corroboration: str | None = None,
     floorplan_url: str | None = None,
     configurator: ConfiguratorLayout | None = None,
+    heating: tuple[Heating, str] | None = None,
 ) -> ExtractedCaravan:
     """One layout as a `Caravan` plus the provenance a reviewer sees beside each field.
 
@@ -923,6 +1009,10 @@ def build_extracted(
             caravan.bed_types = list(configurator.bed_types)
         if configurator.sleeping_area is not None:
             caravan.sleeping_area = configurator.sleeping_area
+
+    # One system for every layout on the page — see `heating_from_spec_page`.
+    if heating is not None:
+        caravan.heating = heating[0]
 
     provenance: dict[str, Provenance] = {}
 
@@ -1056,6 +1146,15 @@ def build_extracted(
                     source_url=existing.source_url,
                     snippet=f"{existing.snippet}. {corroboration}",
                 )
+
+    if heating is not None:
+        record(
+            "heating",
+            f"{heating[1]} — gas warm air. The larger Tourings have the water boiler "
+            f"inside the heater rather than beside it, which is the only difference "
+            f"between the two forms; Alde, the wet-central option, is not fitted as "
+            f"standard to any layout",
+        )
 
     # Read from the configurator, so it links there rather than to the drawing: a reviewer
     # checking a bed type wants the record that states it, and the drawing is one click on.
@@ -1244,12 +1343,23 @@ def collect(
     on_progress(f"found {len(spec_pages)} specification page(s) in the price list")
 
     extracted: list[ExtractedCaravan] = []
+    unreadable_heating: list[int] = []
     for number, page_text in spec_pages:
         layouts, problems = parse_spec_page(page_text)
         for note in problems:
             on_progress(f"price list page {number}: {note}")
         if not layouts:
             continue
+
+        # Per page, not per layout: the row cannot be split but does not need to be.
+        heating = heating_from_spec_page(page_text)
+        if heating is None:
+            unreadable_heating.append(number)
+        else:
+            on_progress(
+                f"price list page {number}: heating is {heating[0].value} for all "
+                f"{len(layouts)} layout(s) on the page"
+            )
 
         for range_name, model, rows in layouts:
             product = EribaCaravan.from_rows(range_name, model, rows)
@@ -1311,14 +1421,15 @@ def collect(
                     corroboration=corroboration,
                     floorplan_url=floorplan,
                     configurator=layout,
+                    heating=heating,
                 )
             )
 
-    if extracted:
-        # Said once, every run, rather than left as a silent gap. A field the adapter never
-        # attempts is invisible to the pipeline, so the only place this can be explained is
-        # here — see the constant for the two independent reasons it is not collected.
-        on_progress(_HEATING_NOT_COLLECTED)
+    if unreadable_heating:
+        # Said rather than left as a silent gap: a field the adapter cannot fill is
+        # invisible to the pipeline, so this is the only place it can be explained.
+        pages = ", ".join(str(number) for number in unreadable_heating)
+        on_progress(f"{_HEATING_NOT_COLLECTED} (page(s) {pages})")
 
     without_plan = [
         item.caravan.model
