@@ -275,6 +275,19 @@ vans the drawing shows a lounge that becomes a bed at night, which is a *made-up
 instead. `Transverse bed`, `Bunk beds` and `Central bed` name shapes only a built-in bed
 has, and stay usable.
 
+**A bed can be named without a verb.** Kilig 77 Plus reads *"Consists of double bed rear
+dinette, a front & rear drop-down bed and a Front & rear dinette"*, and the dinette double
+went unrecorded: the copy names it as the seating it is made from rather than saying it
+converts, so there was no verb for the make-up pattern to match. `habitation._SEATING_BED`
+catches that idiom — "double bed rear dinette", "half dinette bed", "settee bed" — and the
+requester supplied the answer on 8 September 2026: *"the correct answer is a drop down bed
+and a makeup bed."* One of the 34 layouts changed.
+
+It deliberately does **not** suppress the other beds on its line, which is where it
+differs from the converting-lounge case: in *"lounge which converts into single beds"* the
+singles **are** the converted lounge, so the shape is not credited; in Kilig 77's sentence
+the drop-down is its own bed listed alongside, so it is.
+
 This is latent rather than live: MNC's prose names the beds on all 34 layouts today, so
 the factory fallback never fires. It was live before 5 September 2026, when bed types came
 from the factory word alone — which is what produced the wrong `fixed_bed` proposals on

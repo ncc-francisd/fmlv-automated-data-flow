@@ -317,7 +317,6 @@ BED_PHRASES: tuple[tuple[str, BedType], ...] = (
     ("permanent bed", BedType.FIXED),
 )
 
-#: A bed made up rather than permanently there.
 #: A bed made up rather than permanently there. `lift` is here alongside the folding
 #: words because it is the same claim in different clothes: Rimor's Horus 12 bed "lifts to
 #: create more storage space for travel", so it is not standing made up.
@@ -325,6 +324,25 @@ _MAKE_UP = re.compile(
     r"\bconvert\w*\b|\bmakes? (?:up )?(?:into )?a?\s*(?:double|single|bed)"
     r"|\bmake[- ]up bed\b|\bfold[- ]?(?:s|ing)?[- ]away\b|\bpull[- ]out bed\b"
     r"|\blifts?\b|\blift[- ]up\b|\bstow\w*\b",
+    re.I,
+)
+
+#: A bed named *as* the seating it is made from — "double bed rear dinette", "half dinette
+#: bed", "settee bed". The same claim as `_MAKE_UP` with the verb left out, which is how
+#: the trade usually writes it, and `_MAKE_UP` cannot catch it because there is no verb to
+#: match. Rimor's Kilig 77 Plus is the case in point: "Consists of double bed rear
+#: dinette, a front & rear drop-down bed", where the dinette double went unrecorded and
+#: the requester supplied the answer on 8 September 2026 — *"the correct answer is a drop
+#: down bed and a makeup bed."*
+#:
+#: Adjacency is what keeps this honest. The seating word has to follow the bed word
+#: directly, allowing only a position word between, so "Rear drop-down bed above lounge"
+#: and "Fixed rear double bed and a front lounge" do not match: in those the lounge is
+#: where the bed is or what else the vehicle has, not what the bed is made from.
+_SEATING_BED = re.compile(
+    r"\bbeds?\b[\s&,]*(?:front|rear|side|centre|center|middle)?[\s&,]*"
+    r"(?:dinette|lounge|settee)\b"
+    r"|\b(?:dinette|lounge|settee)\s+beds?\b",
     re.I,
 )
 
@@ -368,9 +386,14 @@ def bed_types_from(lines: Iterable[str]) -> tuple[list[BedType], list[str]]:
 
         matches: list[BedType] = []
         makes_up = bool(_MAKE_UP.search(line))
-        if makes_up:
+        if makes_up or _SEATING_BED.search(line):
             matches.append(BedType.MAKE_UP)
         # A shape is only credited when it is not merely what the seating turns into.
+        # Keyed to the verb form alone: "Rear lounge which converts into single beds"
+        # describes one arrangement, so the singles belong to the converted lounge. A line
+        # naming a seating bed *among others* — "double bed rear dinette, a front & rear
+        # drop-down bed" — is a list of distinct beds, and suppressing the drop-down there
+        # would lose a type the copy plainly states.
         if not (makes_up and _SEATING.search(line)):
             for phrase, bed_type in BED_PHRASES:
                 if phrase in lowered:

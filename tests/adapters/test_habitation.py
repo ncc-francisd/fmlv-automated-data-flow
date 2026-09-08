@@ -318,6 +318,42 @@ def test_a_fixed_bed_that_also_converts_is_both() -> None:
     assert beds == [BedType.MAKE_UP, BedType.FIXED_SEPARATE]
 
 
+def test_a_bed_named_as_its_seating_is_a_make_up_bed() -> None:
+    """"double bed rear dinette" is the make-up claim with the verb left out.
+
+    Kilig 77 Plus: the requester supplied the answer on 8 September 2026 — *"the correct
+    answer is a drop down bed and a makeup bed"* — and the dinette double was the half
+    being missed, because there is no verb for `_MAKE_UP` to match.
+    """
+    beds, _quotes = habitation.bed_types_from(["Rear dinette bed"])
+    assert beds == [BedType.MAKE_UP]
+
+
+def test_a_seating_bed_does_not_suppress_the_other_beds_on_its_line() -> None:
+    """A list of distinct beds, not one arrangement, so the drop-down survives.
+
+    This is where the seating bed differs from "lounge which converts into single beds":
+    there the singles *are* the converted lounge, here the drop-down is its own bed.
+    """
+    beds, _quotes = habitation.bed_types_from(
+        ["Consists of double bed rear dinette, a front & rear drop-down bed"]
+    )
+    assert beds == [BedType.MAKE_UP, BedType.DROP_DOWN]
+
+
+def test_seating_the_bed_merely_sits_above_is_not_what_it_is_made_from() -> None:
+    """Kilig 77's own "Rear drop-down bed above lounge" — the lounge is the location.
+
+    Adjacency is the whole guard: only a position word may sit between the bed and the
+    seating, so "above" and "and a front" both fail to match.
+    """
+    beds, _quotes = habitation.bed_types_from(["Rear drop-down bed above lounge"])
+    assert beds == [BedType.DROP_DOWN]
+
+    beds, _quotes = habitation.bed_types_from(["Rear double bed and a front lounge"])
+    assert BedType.MAKE_UP not in beds
+
+
 def test_a_fold_away_bed_is_a_make_up_bed() -> None:
     """Horus 38: the factory calls this "Double bed", and MNC is the accurate one."""
     beds, _quotes = habitation.bed_types_from(["Rear fold-away double bed"])
