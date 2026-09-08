@@ -391,3 +391,34 @@ classified as new`, which is the unconfirmed join key below doing exactly what i
   seatbelts, total seats, length and width per model — is documented here but **not
   implemented**. The in-document checks proved sufficient, and using it would cost 37
   extra fetches per run. It is the obvious next defence if a parse ever looks wrong.
+
+
+## Floorplans: 37 of 37, and no ambiguity
+
+Every model page carries one drawing, under an `<h3>620S Internal Layout</h3>` heading:
+
+```html
+<img class="w-full max-w-[1200px] z-20 relative internal_layout_main_image"
+     src="https://www.auto-trail.co.uk/wp-content/uploads/2026-excel-620S-e1766059036420.png">
+```
+
+It is a **rendered interior view** rather than a line schematic, which is the more readable
+of the two for reading a layout off — the requester's preference, 9 September 2026.
+
+**One image per page on all 37, each filename naming its own range and model.** So unlike
+Dethleffs there is nothing to filter: a page shows only its own drawing, and the failure
+mode that adapter has to guard against — taking a neighbouring layout's plan — does not
+arise here. Checked page by page across every range before wiring it.
+
+**The join is the price's join.** The drawing is on the *website*; the product comes from
+the *specification PDF*; and the two name the same vehicle differently, which is what
+`_match_key` already exists to resolve. `parse_model_page_urls` reads the same `_CARD`
+matches `parse_prices` does, so a drawing reaches a model exactly as its price does, and
+`floorplan_for` refuses an ambiguous match rather than guessing — for a stronger reason
+than the price has, since a wrong price is at least a number a reviewer might recognise
+while a wrong drawing is read as fact.
+
+**Cost: one fetch per model page, 37 in total.** The model pages were already being walked
+to find the specification PDF, but only until the first page that had it. This is new
+traffic, and it buys the only source Auto-Trail has for the five positional fields — the
+documents settle none of them.

@@ -644,3 +644,89 @@ def test_an_unmatched_model_yields_no_price_rather_than_a_guess() -> None:
 def test_price_is_read_as_whole_pounds() -> None:
     assert auto_trail._pounds("69,005.00") == 69005
     assert auto_trail._pounds("129,784.00") == 129784
+
+
+# --------------------------------------------------------------------------- #
+# Floorplans — one per model page, joined to the document the way the price is
+# --------------------------------------------------------------------------- #
+
+LAYOUT_PAGE = "auto_trail_excel_620s_layout.html"
+
+
+def test_the_layout_drawing_is_read_off_a_model_page() -> None:
+    """Auto-Trail publish one per page, a rendered interior rather than a schematic."""
+    html = (FIXTURES / LAYOUT_PAGE).read_text(encoding="utf-8")
+
+    assert auto_trail.parse_floorplan(html) == (
+        "https://www.auto-trail.co.uk/wp-content/uploads/2026-excel-620S-e1766059036420.png"
+    )
+
+
+def test_a_page_without_one_offers_nothing() -> None:
+    assert auto_trail.parse_floorplan("<html><body>no layout here</body></html>") is None
+
+
+def test_the_drawing_joins_to_the_document_model_like_the_price_does() -> None:
+    """Same cards, same key. The range page says `V-Line Sport 610`, the document
+    `V-Line 610 Sport`, and neither is a prefix of the other — see `_match_key`."""
+    range_html = (
+        '<a href="https://www.auto-trail.co.uk/motorhomes/v-line-sport-610/" class="card">'
+        '<h4 class="card-title">V-Line Sport 610</h4>'
+        '<div class="card-price"> Price from £ 62,000'
+    )
+
+    urls = auto_trail.parse_model_page_urls(range_html, "V-Line Sport")
+
+    assert auto_trail.floorplan_for(
+        "V-Line 610 Sport", "V-Line Sport", {key: "plan.png" for key in urls}
+    ) == "plan.png"
+
+
+def test_an_ambiguous_match_yields_no_drawing() -> None:
+    """A wrong drawing is worse than none: a reviewer reads a layout off it as fact.
+
+    Stricter than the price for that reason, though the rule is the same — `price_for`
+    also refuses to guess.
+    """
+    plans = {"VAN68": "sixty-eight.png", "OTHER68": "another.png"}
+
+    assert auto_trail.floorplan_for("68", "Expedition", plans) is None
+
+
+def test_a_variant_does_not_take_its_shorter_siblings_drawing() -> None:
+    """`VAN68XL` does not end with `68`, which is what keeps the overlap safe."""
+    plans = {"VAN68": "sixty-eight.png", "VAN68XL": "sixty-eight-xl.png"}
+
+    assert auto_trail.floorplan_for("68", "Expedition", plans) == "sixty-eight.png"
+    assert auto_trail.floorplan_for("68 XL", "Expedition", plans) == "sixty-eight-xl.png"
+
+
+def test_the_drawing_becomes_a_pointer_on_every_positional_field() -> None:
+    """Auto-Trail's documents settle none of them, so all five go to the reviewer."""
+    product = AutoTrailProduct(range_label="Excel", model="620S", berths=4)
+
+    extracted = auto_trail._build_extracted_motorhome(
+        product, "https://example.invalid/spec.pdf", "https://example.invalid/range",
+        floorplan_url="https://example.invalid/620S.png",
+    )
+
+    pointers = {
+        name for name, entry in extracted.provenance.items() if entry.reviewer_reference
+    }
+    assert pointers == {
+        "sleeping_area",
+        "kitchen_location",
+        "lounge_location",
+        "bathroom_layout",
+        "bed_types",
+    }
+
+
+def test_no_drawing_means_no_pointers() -> None:
+    product = AutoTrailProduct(range_label="Excel", model="620S", berths=4)
+
+    extracted = auto_trail._build_extracted_motorhome(
+        product, "https://example.invalid/spec.pdf", "https://example.invalid/range"
+    )
+
+    assert not [e for e in extracted.provenance.values() if e.reviewer_reference]

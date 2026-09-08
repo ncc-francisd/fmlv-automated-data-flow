@@ -53,7 +53,7 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
+from .base import ExtractedMotorhome, Provenance, floorplan_provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.auto-trail.co.uk"
 MANUFACTURER = "Auto-Trail"
@@ -110,6 +110,19 @@ _CARD = re.compile(
     r'<div class="card-price">\s*Price from\s*£\s*(?P<price>[\d,]+(?:\.\d{2})?)',
     re.S,
 )
+
+#: The layout drawing on a model page. Auto-Trail publish one per page under an
+#: `<h3>620S Internal Layout</h3>` heading, and it is a rendered interior view rather than
+#: a line schematic — the more readable of the two, per the requester on 9 September 2026.
+#:
+#: **One per page, on all 37**, each filename naming its own range and model
+#: (`2026-excel-620S-…png`, `2027-Expedition-68-XL-Flex.png`). So unlike Dethleffs there is
+#: no neighbour's-drawing trap here: nothing has to be filtered out, because a page shows
+#: only its own.
+_LAYOUT_IMAGE = re.compile(
+    r'<img[^>]*class="[^"]*internal_layout_main_image[^"]*"[^>]*src="([^"]+)"'
+)
+
 
 #: The roster each document states about itself, e.g.
 #: `Applicable to Expedition Coachbuilt C63, C71, C72, C73`. This is the manufacturer's
@@ -512,6 +525,42 @@ def price_for(model: str, range_label: str, prices: dict[str, int]) -> int | Non
     return matched[0] if len(matched) == 1 else None
 
 
+def parse_floorplan(model_html: str) -> str | None:
+    """The layout drawing on one model page, or `None`."""
+    match = _LAYOUT_IMAGE.search(model_html)
+    return match.group(1) if match else None
+
+
+def parse_model_page_urls(range_html: str, range_label: str) -> dict[str, str]:
+    """`{match key: model page URL}` from a range page's cards.
+
+    The same cards `parse_prices` reads and the same key, so the drawing joins to a
+    document model exactly as its price does — see `_match_key` for why the key is the
+    range's own words removed rather than a prefix trim.
+    """
+    urls: dict[str, str] = {}
+    for match in _CARD.finditer(range_html):
+        name = re.sub(r"\s+", " ", unescape(match.group("name"))).strip()
+        key = _match_key(name, range_label)
+        if key:
+            urls.setdefault(key, match.group("url"))
+    return urls
+
+
+def floorplan_for(model: str, range_label: str, plans: dict[str, str]) -> str | None:
+    """One model's drawing, matched exactly as `price_for` matches its price.
+
+    Suffix on the range-stripped key, and an ambiguous match yields `None` rather than a
+    guess — for a stronger reason than the price has. A wrong price is at least visible as
+    a number a reviewer may recognise; a wrong drawing is read as fact and recorded.
+    """
+    key = _match_key(model, range_label)
+    if not key:
+        return None
+    matched = [plan for card_key, plan in plans.items() if card_key.endswith(key)]
+    return matched[0] if len(matched) == 1 else None
+
+
 # --------------------------------------------------------------------------- #
 # Parsing
 # --------------------------------------------------------------------------- #
@@ -715,7 +764,10 @@ def parse_models(text: str, range_label: str) -> list[AutoTrailProduct]:
 
 
 def _build_extracted_motorhome(
-    product: AutoTrailProduct, spec_url: str, range_url: str
+    product: AutoTrailProduct,
+    spec_url: str,
+    range_url: str,
+    floorplan_url: str | None = None,
 ) -> ExtractedMotorhome:
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -790,7 +842,42 @@ def _build_extracted_motorhome(
             ),
         )
 
+    # The positional fields no specification table settles. Auto-Trail publish nothing
+    # about them, so every one is a reviewer's to read off the drawing.
+    if floorplan_url:
+        provenance.update(floorplan_provenance(motorhome, floorplan_url, product.label))
+
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
+
+
+def _fetch_floorplans(
+    http: Fetcher,
+    range_html: str,
+    label: str,
+    on_progress: Callable[[str], None],
+) -> dict[str, str]:
+    """`{match key: drawing URL}` for one range, one fetch per model page.
+
+    The model pages were already being walked to find the specification PDF, but only
+    until the first one that had it — so this is new traffic, one page per model. Worth it:
+    the drawing is the only source for the five positional fields, and without it a
+    reviewer is asked where the kitchen is with nothing to look at.
+
+    A page that cannot be read costs its own drawing and nothing else.
+    """
+    plans: dict[str, str] = {}
+    for key, url in parse_model_page_urls(range_html, label).items():
+        page = http.fetch(url)
+        if page.status_code != 200:
+            on_progress(f"[{label}] {url} returned {page.status_code}, so no floorplan")
+            continue
+        plan = parse_floorplan(page.file_path.read_text(encoding="utf-8", errors="replace"))
+        if plan is None:
+            on_progress(f"[{label}] no layout drawing on {url}")
+            continue
+        plans[key] = plan
+    on_progress(f"[{label}] {len(plans)} floorplan(s) found")
+    return plans
 
 
 def _fetch_range_page(
@@ -862,6 +949,8 @@ def collect(
         range_html = _fetch_range_page(http, range_url, label, on_progress)
         if range_html is None:
             continue
+
+        plans = _fetch_floorplans(http, range_html, label, on_progress)
 
         prices = parse_prices(range_html, label)
         if not prices:
@@ -945,7 +1034,14 @@ def collect(
                     f"max gross != {product.towing_kilograms}kg max towing. Auto-Trail's own "
                     f"figures disagree; the weights below are still as published"
                 )
-            results.append(_build_extracted_motorhome(product, spec_url, range_url))
+            results.append(
+                _build_extracted_motorhome(
+                    product,
+                    spec_url,
+                    range_url,
+                    floorplan_url=floorplan_for(product.model, label, plans),
+                )
+            )
 
     on_progress(f"{len(results)} product(s) collected")
     return results
