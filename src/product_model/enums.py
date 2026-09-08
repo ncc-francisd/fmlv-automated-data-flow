@@ -102,7 +102,22 @@ class KitchenLocation(ColumnEnum):
 
 
 class BathroomLayout(ColumnEnum):
-    """Guide: SELECT 'YES' AGAINST ONE BATHROOM LAYOUT."""
+    """Guide: SELECT 'YES' AGAINST ONE BATHROOM LAYOUT.
+
+    What the washroom **is and where it is** — and nothing about whether a partition
+    divides the shower from the toilet. That is `separate_shower_toilet`, which is a
+    column of its own held by `shower_toilet_separated`, and it is deliberately **not** a
+    member here: the two are not alternatives. The requester, 7 September 2026 — *"those
+    are not mutually exclusive"* — and again on 9 September, after a review offered them as
+    one choice: *"You can have a separated toilet and shower and have it located on the
+    side or the rear or whatever."*
+
+    Keeping it in this group cost two things, which is why it came out. The review renders
+    a single-select group as one exclusive list, so a side washroom that divides could not
+    be recorded as both. And `_select_single` read a correct FMLV row — a location plus
+    `separate_shower_toilet` — as two options set in one group and warned about it every
+    time. The column still ships in the same position; see `schema.COLUMNS`.
+    """
 
     NO_TOILET = "no_toilet"
     NO_SHOWER = "no_shower"
@@ -110,7 +125,6 @@ class BathroomLayout(ColumnEnum):
     SHOWER_ONLY = "shower_only"
     REAR_SHOWER_TOILET = "rear_shower_toilet"
     SIDE_SHOWER_TOILET = "side_shower_toilet"
-    SEPARATE_SHOWER_TOILET = "separate_shower_toilet"
 
 
 class LoungeLocation(ColumnEnum):

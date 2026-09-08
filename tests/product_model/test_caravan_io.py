@@ -116,6 +116,7 @@ def test_row_to_caravan_reads_the_layout_groups() -> None:
             make_up_beds="Yes",
             island_bed="Yes",
             side_kitchen="Yes",
+            side_shower_toilet="Yes",
             separate_shower_toilet="Yes",
             front_lounge="Yes",
             blown_air_heating="Yes",
@@ -130,7 +131,8 @@ def test_row_to_caravan_reads_the_layout_groups() -> None:
     assert caravan.sleeping_area is CaravanSleepingArea.BOTH
     assert set(caravan.bed_types) == {BedType.MAKE_UP, BedType.ISLAND}
     assert caravan.kitchen_location is KitchenLocation.SIDE
-    assert caravan.bathroom_layout is BathroomLayout.SEPARATE_SHOWER_TOILET
+    assert caravan.bathroom_layout is BathroomLayout.SIDE_SHOWER_TOILET
+    assert caravan.shower_toilet_separated is True
     assert caravan.lounge_location is LoungeLocation.FRONT
     assert caravan.heating is Heating.BLOWN_AIR
     assert caravan.refrigeration is Refrigeration.FRIDGE_FREEZER
@@ -159,22 +161,24 @@ def test_row_to_caravan_reads_the_four_lengths_apart() -> None:
 
 
 def test_an_ambiguous_layout_group_is_reported_and_kept() -> None:
-    """FMLV holds real caravans with two bathroom flags set — four in Bailey's export.
+    """A washroom cannot be both rear and side, so a row saying so is really ambiguous.
 
     Same rule as the motorhome side: keep the first, record the rest so writing back
-    re-asserts them, and report rather than raise.
+    re-asserts them, and report rather than raise. Note the example is two *locations* —
+    a location plus `separate_shower_toilet` used to land here and no longer does, that
+    being two compatible facts rather than one contradiction.
     """
     caravan, issues = caravan_io.row_to_caravan(
-        _row(model="Ancona", rear_shower_toilet="Yes", separate_shower_toilet="Yes")
+        _row(model="Ancona", rear_shower_toilet="Yes", side_shower_toilet="Yes")
     )
 
     assert [issue.code for issue in issues] == ["ambiguous_layout_group"]
     assert caravan.bathroom_layout is BathroomLayout.REAR_SHOWER_TOILET
-    assert "separate_shower_toilet" in caravan.extra_column_flags
+    assert "side_shower_toilet" in caravan.extra_column_flags
 
     written = caravan_io.caravan_to_row(caravan)
     assert written["rear_shower_toilet"] == "Yes"
-    assert written["separate_shower_toilet"] == "Yes"
+    assert written["side_shower_toilet"] == "Yes"
 
 
 def test_caravan_to_row_fills_every_column() -> None:
@@ -266,12 +270,21 @@ def test_validation_flags_only_fmlvs_own_gaps_and_discrepancies() -> None:
     The six payload mismatches are FMLV's published figures disagreeing with themselves
     (two by 1kg, one by 21kg, one by 49kg), and the missing required fields are the
     caravan export's own blanks. An adapter is what will fill those.
+
+    The `layout_group_unset` warnings are a real gap this project used to hide: seven
+    Bailey rows record `separate_shower_toilet` and no location at all. While that column
+    was a `BathroomLayout` member it counted as though it answered the location question,
+    so the group looked satisfied. It never was — those rows do not say whether the
+    washroom is rear or side, and now they say so.
     """
     result = caravan_io.read_xlsx(_REAL_EXPORT)
     issues = validation.validate_all_caravans(result.caravans)
 
     codes = {issue.code for issue in issues}
-    assert codes <= {"missing_required", "payload_mismatch"}
+    assert codes <= {"missing_required", "payload_mismatch", "layout_group_unset"}
+    unset = [issue for issue in issues if issue.code == "layout_group_unset"]
+    assert {issue.field for issue in unset} == {"bathroom_layout"}
+    assert len(unset) == 7
     assert sum(issue.code == "payload_mismatch" for issue in issues) == 6
     assert not [issue for issue in issues if issue.code == "shipping_length_not_longer"]
 
@@ -303,7 +316,8 @@ def _complete(**overrides: object) -> Caravan:
         body_type=CaravanBodyType.RIGID,
         sleeping_area=CaravanSleepingArea.BOTH,
         kitchen_location=KitchenLocation.SIDE,
-        bathroom_layout=BathroomLayout.SEPARATE_SHOWER_TOILET,
+        bathroom_layout=BathroomLayout.REAR_SHOWER_TOILET,
+        shower_toilet_separated=True,
         lounge_location=LoungeLocation.FRONT,
         heating=Heating.BLOWN_AIR,
     )
@@ -429,10 +443,12 @@ def test_separation_reads_from_the_column_the_export_already_has() -> None:
     row = _row(model="Porto", side_shower_toilet="Yes", separate_shower_toilet="Yes")
     caravan, issues = caravan_io.row_to_caravan(row)
 
-    # Location and construction, both kept, from one row.
+    # Location and construction, both kept, from one row — and no longer reported as
+    # an ambiguous group, since `separate_shower_toilet` left `BathroomLayout` on
+    # 9 September 2026. It never was a contradiction; the enum made it look like one.
     assert caravan.bathroom_layout is BathroomLayout.SIDE_SHOWER_TOILET
     assert caravan.shower_toilet_separated is True
-    assert [i.code for i in issues] == ["ambiguous_layout_group"]
+    assert issues == []
 
 
 def test_a_side_washroom_that_divides_keeps_both_flags_on_write() -> None:

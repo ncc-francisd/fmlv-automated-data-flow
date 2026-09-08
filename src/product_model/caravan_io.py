@@ -188,11 +188,10 @@ def caravan_to_row(caravan: Caravan) -> dict[str, str]:
     set_int("awning_length_mm", caravan.awning_length_mm)
     set_int("headroom_mm", caravan.headroom_mm)
 
-    # After the single-select loop, which will have written this column off unless
-    # `bathroom_layout` happened to be the separate value. Separation is its own fact, so
-    # it is asserted on its own terms — a side washroom that divides keeps both flags.
-    if caravan.shower_toilet_separated:
-        row["separate_shower_toilet"] = schema.YES
+    # Its own column, written from its own field — `bathroom_layout` no longer has a
+    # member for it, so the single-select loop leaves it alone entirely. A side washroom
+    # that divides carries both flags, which is the point.
+    set_yes_no("separate_shower_toilet", caravan.shower_toilet_separated)
 
     set_yes_no("twin_axle", caravan.twin_axle)
     set_yes_no("microwave", caravan.microwave)

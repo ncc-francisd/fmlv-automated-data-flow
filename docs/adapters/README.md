@@ -563,12 +563,29 @@ Three traps worth knowing before writing the next one:
   still governs every other feature.
 
 **A washroom's location and its construction are two facts, not one choice.**
-`BathroomLayout` looks like a single-select group of seven, and the field guide says
-"select one", but two of its members answer different questions: `rear_shower_toilet` and
+`BathroomLayout` used to look like a single-select group of seven, and the field guide says
+"select one", but its members answered two different questions: `rear_shower_toilet` and
 `side_shower_toilet` say *where*, while `separate_shower_toilet` says *whether a partition
 divides the shower from the toilet*. A washroom can be both, and FMLV's own data is: **84
 of the 1,590 motorhome rows** in `data/exports` carry a location and the separated flag
 together — Sunlight's T69L is `side_shower_toilet` and separate at once.
+
+**`separate_shower_toilet` is therefore not a member of `BathroomLayout` at all.** Modelling
+the field as its own column was not enough on its own, because the enum still drove two
+things and both got it wrong: the review renders a single-select group as one exclusive
+list, so a reviewer could pick a location *or* separation but never both; and `_select_single`
+read a perfectly good FMLV row as two options set in one group and warned about it every
+time. It came out of the enum on 9 September 2026, after a reviewer worked through a whole
+Rimor run unable to record what he could plainly see — *"I've consistently said side
+bathroom because that's where it is, but I haven't been able to add separated bathroom and
+shower where I know on some of the Sarus vehicles it is separated."* The column still ships
+in its original position, pinned explicitly in `schema.COLUMNS`; only its membership of the
+exclusive group is gone.
+
+Taking it out also stopped the group masking a real gap: seven of the 81 Bailey caravan
+rows record separation and **no location**, which the enum had been counting as though the
+location question were answered. They now raise `layout_group_unset`, which is what they
+always deserved.
 
 So both products carry `shower_toilet_separated: bool | None` beside `bathroom_layout`,
 read from the export's `separate_shower_toilet` column as its own fact and written back on

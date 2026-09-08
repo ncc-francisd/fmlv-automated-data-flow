@@ -98,6 +98,11 @@ def test_a_column_the_model_cannot_represent_is_given_back_unchanged(tmp_path: P
     `refrigeration` can only hold one value, so reading a row with `fridge` and
     `fridge_freezer` both set keeps the first and records the second in
     `extra_column_flags`. Writing must then re-assert it. 37 Chausson rows look like this.
+
+    The bathroom pair in this row is deliberately **not** an example of it any more:
+    `separate_shower_toilet` left `BathroomLayout` on 9 September 2026, so a location plus
+    a separation flag is two facts rather than one ambiguous group, and it round-trips
+    through `shower_toilet_separated` without an issue or an extra flag.
     """
     row = dict.fromkeys(schema.COLUMNS, "")
     row.update(
@@ -115,8 +120,9 @@ def test_a_column_the_model_cannot_represent_is_given_back_unchanged(tmp_path: P
 
     motorhome, issues = io.row_to_motorhome(row)
 
-    assert sorted(motorhome.extra_column_flags) == ["fridge_freezer", "separate_shower_toilet"]
-    assert len(issues) == 2  # still reported, because the source data really is ambiguous
+    assert sorted(motorhome.extra_column_flags) == ["fridge_freezer"]
+    assert [issue.code for issue in issues] == ["ambiguous_layout_group"]
+    assert motorhome.shower_toilet_separated is True
 
     written = io.motorhome_to_row(motorhome)
 

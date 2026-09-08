@@ -59,6 +59,10 @@ COLUMNS: tuple[str, ...] = (
     *BedType.columns(),
     *KitchenLocation.columns(),
     *BathroomLayout.columns(),
+    # Not a member of that group — the washroom's construction, not its location or
+    # provision, so it is not an alternative to any of them. Listed here to keep the
+    # column in the exact position FMLV's template has it. See `BathroomLayout`.
+    "separate_shower_toilet",
     *LoungeLocation.columns(),
     *Heating.columns(),
     "rear_garage",
@@ -138,6 +142,7 @@ LAYOUT: frozenset[str] = frozenset(
         *BedType.columns(),
         *KitchenLocation.columns(),
         *BathroomLayout.columns(),
+        "separate_shower_toilet",
         *LoungeLocation.columns(),
         *Heating.columns(),
         *Refrigeration.columns(),
