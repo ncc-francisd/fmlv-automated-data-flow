@@ -338,6 +338,44 @@ def create_app(
         runnable.sort(key=_display_name_sort_key)
         return runnable, errors
 
+    def _run_manufacturer_options(
+        connection: sqlite3.Connection,
+    ) -> list[tuple[int, str]]:
+        """`(manufacturer_id, label)` for the runs page's filter, labelled and ordered
+        the same way the trigger dropdown is.
+
+        `store.list_run_manufacturers` gives the name runs were *recorded* under, which is
+        `fmlv_manufacturer` — so without this the same brand reads as "Chausson" on one page
+        and "Trigano VDL Chausson" on the other, and sorts under C in one and T in the
+        other. Sorting alone would not fix that: a reviewer looking for Chausson under C
+        would still not find it.
+
+        A manufacturer with runs but no registry row keeps its recorded name rather than
+        disappearing — the filter is drawn from run history precisely so it stays correct
+        when the registry changes, and dropping a brand from it would lose access to its
+        old runs.
+
+        For the same reason an unreadable registry only costs the *labels*: this page
+        listed runs perfectly well before it consulted the registry at all, and a missing
+        or broken CSV must not take it down. That is not hypothetical — `/trigger` and
+        `/schedules` both require the file and are entitled to, because neither means
+        anything without it; the runs list is not in that position.
+        """
+        try:
+            manufacturers = loader.load(app.state.registry_path).manufacturers
+        except OSError:
+            manufacturers = []
+        display = {
+            m.manufacturer_id: (m.fmlv_display_name or m.fmlv_manufacturer)
+            for m in manufacturers
+        }
+        options = [
+            (manufacturer_id, display.get(manufacturer_id) or recorded_name)
+            for manufacturer_id, recorded_name in store.list_run_manufacturers(connection)
+        ]
+        options.sort(key=lambda option: option[1].casefold())
+        return options
+
     def _areas_by_manufacturer(manufacturers: list) -> dict[str, list[VehicleClass]]:
         """Which product areas each manufacturer can actually be run for.
 
@@ -432,7 +470,7 @@ def create_app(
                 "runs": runs,
                 "review_summaries": review_summaries,
                 "limit": limit,
-                "manufacturers": store.list_run_manufacturers(connection),
+                "manufacturers": _run_manufacturer_options(connection),
                 "selected_manufacturer_id": manufacturer_id_filter,
                 "selected_status": status,
                 "selected_start_date": start_date_filter.isoformat() if start_date_filter else "",

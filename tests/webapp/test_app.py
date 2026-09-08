@@ -198,6 +198,122 @@ def test_a_manufacturer_with_no_display_name_sorts_on_the_name_shown_instead(
     ]
 
 
+def _runs_filter_options(html: str) -> list[str]:
+    """The labels in the runs page's manufacturer filter, minus the "All" entry."""
+    block = re.search(r'<select name="manufacturer_id".*?</select>', html, re.DOTALL)
+    assert block is not None, "the manufacturer filter is missing from /runs"
+    labels = [
+        label.strip()
+        for label in re.findall(r"<option[^>]*>(.*?)</option>", block.group(0), re.DOTALL)
+    ]
+    return [label for label in labels if label and label != "All manufacturers"]
+
+
+def test_the_runs_filter_uses_the_same_names_as_the_trigger_page(db_path: Path) -> None:
+    """Runs are recorded under `fmlv_manufacturer`, which is not what the app displays.
+
+    Left alone, the same brand reads as "Chausson" on the trigger page and "Trigano VDL
+    Chausson" here — and sorts under C there and T here, so a reviewer looking under C
+    would not find it. Sorting alone would not have fixed that.
+    """
+    (db_path.parent / "manufacturers.csv").write_text(
+        "manufacturer_id,fmlv_manufacturer,fmlv_display_name,website_url\n"
+        "53,Trigano VDL Chausson,Chausson,https://example.invalid/a\n"
+        "252,Knaus Tabbert AG,Weinsberg,https://example.invalid/b\n"
+        "3,Adria Mobil,Adria,https://example.invalid/c\n",
+        encoding="utf-8",
+    )
+    connection = store.connect(db_path)
+    try:
+        for manufacturer_id, recorded in (
+            (252, "Knaus Tabbert AG"),
+            (3, "Adria Mobil"),
+            (53, "Trigano VDL Chausson"),
+        ):
+            store.start_run(
+                connection,
+                manufacturer_id=manufacturer_id,
+                fmlv_manufacturer=recorded,
+                trigger="manual",
+            )
+    finally:
+        connection.close()
+    client = TestClient(
+        create_app(
+            db_path,
+            registry_path=db_path.parent / "manufacturers.csv",
+            reviewers_path=db_path.parent / "reviewers.csv",
+        )
+    )
+
+    assert _runs_filter_options(client.get("/runs").text) == [
+        "Adria",
+        "Chausson",
+        "Weinsberg",
+    ]
+
+
+def test_a_manufacturer_with_runs_but_no_registry_row_keeps_its_recorded_name(
+    db_path: Path,
+) -> None:
+    """The filter is drawn from run history so it survives the registry changing. A brand
+    dropped from the registry must still be selectable, or its old runs become unreachable.
+    """
+    (db_path.parent / "manufacturers.csv").write_text(
+        "manufacturer_id,fmlv_manufacturer,fmlv_display_name,website_url\n"
+        "3,Adria Mobil,Adria,https://example.invalid/a\n",
+        encoding="utf-8",
+    )
+    connection = store.connect(db_path)
+    try:
+        store.start_run(
+            connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+        )
+        store.start_run(
+            connection, manufacturer_id=999, fmlv_manufacturer="Zenith Vans", trigger="manual"
+        )
+    finally:
+        connection.close()
+    client = TestClient(
+        create_app(
+            db_path,
+            registry_path=db_path.parent / "manufacturers.csv",
+            reviewers_path=db_path.parent / "reviewers.csv",
+        )
+    )
+
+    assert _runs_filter_options(client.get("/runs").text) == ["Adria", "Zenith Vans"]
+
+
+def test_the_runs_list_still_works_with_no_registry_file(db_path: Path) -> None:
+    """Labelling the filter must not make the whole page depend on the registry.
+
+    This page listed runs long before it consulted the registry at all, so a missing or
+    unreadable CSV costs the display names and nothing else. Regression test: adding the
+    lookup without this guard broke fourteen existing tests, all of which reach `/runs`
+    without writing a registry file.
+    """
+    connection = store.connect(db_path)
+    try:
+        store.start_run(
+            connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+        )
+    finally:
+        connection.close()
+    client = TestClient(
+        create_app(
+            db_path,
+            registry_path=db_path.parent / "nonexistent.csv",
+            reviewers_path=db_path.parent / "reviewers.csv",
+        )
+    )
+
+    response = client.get("/runs")
+
+    assert response.status_code == 200
+    assert _runs_filter_options(response.text) == ["Adria Mobil"]
+
+
 def test_run_list_is_empty_with_no_runs(client: TestClient) -> None:
     response = client.get("/runs")
     assert response.status_code == 200
