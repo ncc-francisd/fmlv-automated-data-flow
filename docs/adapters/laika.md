@@ -1,7 +1,7 @@
 # Laika — site survey
 
-Surveyed 9 September 2026. **No adapter written yet** — this is the stage 1 survey and the
-checkpoint findings. FMLV manufacturer id **52**, name `Laika`.
+Surveyed and built 9 September 2026. FMLV manufacturer id **52**, name `Laika`, NCC
+supplier name `Laika`.
 
 Italian, part of the Erwin Hymer Group — but **not on the EHG configurator platform** that
 Eriba, Dethleffs, Bürstner and Carado share. Laika's own site is better than that API, so
@@ -117,14 +117,33 @@ worse than none: a reviewer would read a layout off a different manufacturer's v
 floorplan pointer must be **name-checked against the layout** rather than taken as the
 first image in the slider, and `L 5009 MB` gets none until Laika fix it.
 
-## What is unverified, and needs the requester
+## Settled by the requester, 9 September 2026
 
-* **`ncc_supplier_name`** — not guessable, and the registry row cannot be written without
-  it. It is the exact string in the supplier drop-down at
-  [Export Products by Supplier](https://findmyleisurevehicle.co.uk/nova/resources/products).
-* **The FMLV range names.** `vehicleConfiguration` distinguishes `Ecovip Titanio` from
-  `Ecovip Titanio I`, and `Kreos` from `Kreos I` — the `I` being the A-class. Whether FMLV
-  wants one range with the body type telling them apart, or two, is an FMLV-side decision.
-* **The coachbuilt body type.** A-class is unambiguous. The coachbuilt pages say nothing
-  about an over-cab bed or an alcove anywhere in their copy, which points to low profile,
-  but the standing rule is not to guess across the eight exclusive body-type columns.
+* **`ncc_supplier_name` is `Laika`** — plain, unlike Niesmann+Bischoff's, which is
+  "Niesmann + Bischoff shown by Travelworld".
+* **Two ranges, models beneath them.** `Ecovip Titanio` and `Kreos`. Laika's
+  `vehicleConfiguration` distinguishes `Ecovip Titanio I` from `Ecovip Titanio`, the `I`
+  marking the integrated (A-class) build — but that is a body type FMLV already has a
+  column for, so the suffix is dropped. The same precedent as Adria's 60Y editions filing
+  under `Matrix` rather than `Matrix 60Y`.
+* **Low profile, not over-cab.** *"I don't see any over-cab bed"* — which agrees with
+  Laika's own index description, *"Low-profile and A-class"*. **No campervans** in the UK
+  line-up either, which the sitemap confirms: only `/a-class/` and `/coachbuilt/`.
+
+## First run
+
+9 September 2026. **10 products across 2 ranges, none dropped, 155 fields with
+provenance**, and no blank among price, both masses, payload, all three dimensions, seats,
+berths, chassis or body type. Four A-class, six low profile. **9 of 10 carry a floorplan
+pointer** — `L 5009 MB` is the Carado-photograph bug above, and the run says so by name.
+
+## Still unverified
+
+* **The FMLV baseline join.** `fmlv_manufacturer` is `Laika` from
+  `resources/manufacturers-full-list.csv` (id 52) but has not been checked against a real
+  FMLV export, so the first run will classify all ten as new until it is.
+* **When the model year turns over.** Not established for Laika; per
+  [`README.md`](README.md) the sector rolls July to early September, so re-check at the end
+  of September with the rest.
+* **Whether the Carado floorplan is ever corrected.** If it is, `L 5009 MB` picks up its
+  pointer with no code change — the filename check is what gates it.
