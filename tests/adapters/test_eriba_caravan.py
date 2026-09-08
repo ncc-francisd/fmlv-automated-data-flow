@@ -514,7 +514,8 @@ def test_the_floorplan_is_a_reviewer_pointer_on_the_positional_fields() -> None:
     for name in eriba_caravan.FLOORPLAN_FIELDS:
         assert extracted.provenance[name].reviewer_reference is True
         assert extracted.provenance[name].source_url.endswith("_hoch.svg")
-        assert getattr(extracted.caravan, name) is None
+        # `bathroom_layout` is a list, so its unanswered state is `[]`.
+        assert getattr(extracted.caravan, name) in (None, [])
 
 
 def test_a_touring_layout_gets_no_positional_pointer_at_all() -> None:

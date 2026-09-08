@@ -40,10 +40,18 @@ _SINGLE_SELECT_FIELDS: tuple[tuple[str, type[ColumnEnum]], ...] = (
     ("body_type", BodyType),
     ("sleeping_area", SleepingArea),
     ("kitchen_location", KitchenLocation),
-    ("bathroom_layout", BathroomLayout),
     ("lounge_location", LoungeLocation),
     ("heating", Heating),
     ("refrigeration", Refrigeration),
+)
+
+#: (canonical field name, enum class) for every group where a product may hold **more than
+#: one**. `bed_types` has always been one. `bathroom_layout` joined it on 9 September 2026:
+#: a vehicle with no washroom is `no_toilet` *and* `no_shower`, which 32 rows of
+#: `data/exports` carry — see `BathroomLayout`.
+_MULTI_SELECT_FIELDS: tuple[tuple[str, type[ColumnEnum]], ...] = (
+    ("bed_types", BedType),
+    ("bathroom_layout", BathroomLayout),
 )
 
 
@@ -140,7 +148,10 @@ def row_to_motorhome(row: dict[str, Any]) -> tuple[Motorhome, list[Issue]]:
         extra_column_flags.extend(extras)
         issues.extend(group_issues)
 
-    bed_types = _select_many(row, BedType)
+    multi = {
+        field_name: _select_many(row, enum_cls)
+        for field_name, enum_cls in _MULTI_SELECT_FIELDS
+    }
 
     automatic = AutomaticVariant(
         mro_kilograms=_to_int(row.get("automatic_mro_kilograms")),
@@ -178,7 +189,8 @@ def row_to_motorhome(row: dict[str, Any]) -> tuple[Motorhome, list[Issue]]:
         mh_length_mm=_to_int(row.get("mh_length_mm")),
         mh_width_mm=_to_int(row.get("mh_width_mm")),
         mh_height_mm=_to_int(row.get("mh_height_mm")),
-        bed_types=bed_types,
+        bed_types=multi["bed_types"],
+        bathroom_layout=multi["bathroom_layout"],
         # Read alongside `bathroom_layout`, not instead of it: the two answer
         # different questions, and 84 export rows set both.
         shower_toilet_separated=_is_yes(row.get("separate_shower_toilet")),
@@ -229,15 +241,19 @@ def motorhome_to_row(motorhome: Motorhome) -> dict[str, str]:
         for member in enum_cls:
             row[member.value] = schema.YES if member is selected_member else schema.NO
 
+    # Written before the flags below, so a flag FMLV set on one of these columns still
+    # wins: these loops write every member of the group, `No` included.
+    for field_name, enum_cls in _MULTI_SELECT_FIELDS:
+        chosen = getattr(motorhome, field_name)
+        for member in enum_cls:
+            row[member.value] = schema.YES if member in chosen else schema.NO
+
     # Re-assert flags FMLV holds that the single-select fields above have just written off.
     # Without this, writing back a row that had two members of one group set clears the
     # second one — see `Motorhome.extra_column_flags`.
     for column in motorhome.extra_column_flags:
         if column in row:
             row[column] = schema.YES
-
-    for member in BedType:
-        row[member.value] = schema.YES if member in motorhome.bed_types else schema.NO
 
     set_int("mh_passenger_seats_inc_driver", motorhome.mh_passenger_seats_inc_driver)
     set_int("berths", motorhome.berths)

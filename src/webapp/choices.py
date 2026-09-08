@@ -87,7 +87,11 @@ _BODY_TYPE_GROUPS: dict[str, str] = {
 #: back and a drop-down over the cab, and the form could only take one of them.
 #:
 #: Both product areas share `BedType`, so this needs no per-area split.
-MULTI_SELECT_FIELDS: frozenset[str] = frozenset({"bed_types"})
+#: Groups a reviewer ticks rather than picks one of. `bathroom_layout` joined `bed_types`
+#: on 9 September 2026 — a vehicle with no washroom is `no_toilet` *and* `no_shower*`, and
+#: the requester could only select one: *"I need to tick two boxes, but I only get the
+#: option to select one in the bathroom layout."*
+MULTI_SELECT_FIELDS: frozenset[str] = frozenset({"bed_types", "bathroom_layout"})
 
 
 def is_multi_select(field: str) -> bool:
@@ -111,12 +115,13 @@ def field_choices(
     # while meaning different enums, so the area has to be stated rather than guessed. A
     # caravan reviewer offered `type_a_class` would be able to submit a value the caravan
     # importer has no column for.
-    if is_multi_select(field):
-        # Not in `enum_fields` — it is a list, not a single-select group — but its options
-        # are an enum all the same, and the form needs them to render tick boxes.
-        return [("", [(member.value, label_for(member.value)) for member in BedType])]
-
     profile = CARAVAN_UPLOAD if VehicleClass(vehicle_class) is VehicleClass.CARAVAN else MOTORHOME_UPLOAD
+    multi_cls = profile.multi_enum_fields.get(field)
+    if multi_cls is not None:
+        # Not in `enum_fields` — these are lists, not single-select groups — but their
+        # options are enums all the same, and the form needs them to render tick boxes.
+        return [("", [(member.value, label_for(member.value)) for member in multi_cls])]
+
     if field in profile.bool_fields:
         # A yes/no field is as much a choice as an enum, and offering it as one is what
         # lets a reviewer answer a question the copy left open — the requester,

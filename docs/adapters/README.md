@@ -649,6 +649,20 @@ divides the shower from the toilet*. A washroom can be both, and FMLV's own data
 of the 1,590 motorhome rows** in `data/exports` carry a location and the separated flag
 together — Sunlight's T69L is `side_shower_toilet` and separate at once.
 
+**And what remains of `BathroomLayout` is multi-select.** A vehicle with no washroom is
+`no_toilet` *and* `no_shower` — two boxes, not one — and **32 of the 2,537 rows** in
+`data/exports` already hold that pair. The requester, 9 September 2026: *"if a vehicle or a
+caravan has got no toilet and no shower, I need to tick two boxes, but I only get the
+option to select one in the bathroom layout."* So both products hold it as a `list`, like
+`bed_types`, and the review renders tick boxes.
+
+That took the group out of `_select_single`, which is where the exclusivity check lived —
+so the one pair that **is** genuinely exclusive moved to
+`validation._contradictory_washroom`: a washroom cannot be both rear and side, and 21 rows
+say it is (one of them Bailey's Pegasus Grande GT75 Ancona). Worth noting as a pattern: when
+a group stops being exclusive, check what the old exclusivity check was catching before you
+let it go.
+
 **`separate_shower_toilet` is therefore not a member of `BathroomLayout` at all.** Modelling
 the field as its own column was not enough on its own, because the enum still drove two
 things and both got it wrong: the review renders a single-select group as one exclusive

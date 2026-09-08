@@ -104,6 +104,16 @@ class KitchenLocation(ColumnEnum):
 class BathroomLayout(ColumnEnum):
     """Guide: SELECT 'YES' AGAINST ONE BATHROOM LAYOUT.
 
+    **The guide is wrong about the "one", and the export proves it.** A vehicle with no
+    washroom at all is `no_toilet` *and* `no_shower`, and 32 of the 2,537 rows in
+    `data/exports` carry exactly that pair. The requester, 9 September 2026: *"if a
+    vehicle or a caravan has got no toilet and no shower, I need to tick two boxes, but I
+    only get the option to select one."* So this is a multi-select group like `BedType`,
+    and both products hold it as a list.
+
+    The location members remain mutually exclusive between themselves — a washroom cannot
+    be both rear and side — which `validation` reports rather than the type system.
+
     What the washroom **is and where it is** — and nothing about whether a partition
     divides the shower from the toilet. That is `separate_shower_toilet`, which is a
     column of its own held by `shower_toilet_separated`, and it is deliberately **not** a

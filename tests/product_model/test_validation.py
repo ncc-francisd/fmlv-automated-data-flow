@@ -31,7 +31,7 @@ BASE_FIELDS = {
     "body_type": BodyType.CAMPERVAN_HIGH_TOP,
     "sleeping_area": SleepingArea.BOTH,
     "kitchen_location": KitchenLocation.SIDE,
-    "bathroom_layout": BathroomLayout.SIDE_SHOWER_TOILET,
+    "bathroom_layout": [BathroomLayout.SIDE_SHOWER_TOILET],
     "lounge_location": LoungeLocation.FRONT,
     "heating": Heating.BLOWN_AIR,
 }

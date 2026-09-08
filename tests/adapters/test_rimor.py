@@ -919,7 +919,7 @@ def test_the_copy_settles_the_construction_and_the_drawing_the_location(
     assert extracted.motorhome.shower_toilet_separated is True
     assert extracted.provenance["shower_toilet_separated"].reviewer_reference is False
     # The location is never proposed, only pointed at.
-    assert extracted.motorhome.bathroom_layout is None
+    assert extracted.motorhome.bathroom_layout == []
     assert extracted.provenance["bathroom_layout"].reviewer_reference is True
 
 

@@ -102,7 +102,6 @@ _ENUM_FIELDS: dict[str, type[ColumnEnum]] = {
     "body_type": BodyType,
     "sleeping_area": SleepingArea,
     "kitchen_location": KitchenLocation,
-    "bathroom_layout": BathroomLayout,
     "lounge_location": LoungeLocation,
     "heating": Heating,
     "refrigeration": Refrigeration,
@@ -150,11 +149,18 @@ _CARAVAN_BOOL_FIELDS: frozenset[str] = frozenset(
     {"twin_axle", "microwave", "shower_toilet_separated"}
 )
 
+#: Groups holding **more than one** value. `bed_types` always has; `bathroom_layout` joined
+#: it on 9 September 2026 — a vehicle with no washroom is `no_toilet` *and* `no_shower*`,
+#: which 32 rows of `data/exports` carry. Shared by both areas: the enum is the same one.
+_MULTI_ENUM_FIELDS: dict[str, type[ColumnEnum]] = {
+    "bed_types": BedType,
+    "bathroom_layout": BathroomLayout,
+}
+
 _CARAVAN_ENUM_FIELDS: dict[str, type[ColumnEnum]] = {
     "body_type": CaravanBodyType,
     "sleeping_area": CaravanSleepingArea,
     "kitchen_location": KitchenLocation,
-    "bathroom_layout": BathroomLayout,
     "lounge_location": LoungeLocation,
     "heating": Heating,
     "refrigeration": Refrigeration,
@@ -174,6 +180,8 @@ class UploadProfile:
     str_fields: frozenset[str]
     bool_fields: frozenset[str]
     enum_fields: dict[str, type[ColumnEnum]]
+    #: Groups holding a list rather than one member — see `_MULTI_ENUM_FIELDS`.
+    multi_enum_fields: dict[str, type[ColumnEnum]]
     #: Dotted path -> attribute on the nested variant. Empty for caravans.
     automatic_fields: dict[str, str]
 
@@ -183,6 +191,7 @@ MOTORHOME_UPLOAD = UploadProfile(
     str_fields=_STR_FIELDS,
     bool_fields=_BOOL_FIELDS,
     enum_fields=_ENUM_FIELDS,
+    multi_enum_fields=_MULTI_ENUM_FIELDS,
     automatic_fields=_AUTOMATIC_FIELDS,
 )
 
@@ -191,6 +200,7 @@ CARAVAN_UPLOAD = UploadProfile(
     str_fields=_CARAVAN_STR_FIELDS,
     bool_fields=_CARAVAN_BOOL_FIELDS,
     enum_fields=_CARAVAN_ENUM_FIELDS,
+    multi_enum_fields=_MULTI_ENUM_FIELDS,
     automatic_fields={},
 )
 
@@ -238,11 +248,14 @@ def apply_field(product: Product, field_name: str, raw_value: str | None) -> Pro
         value = enum_cls(raw_value) if raw_value else None
         return product.model_copy(update={field_name: value})
 
-    if field_name == "bed_types":
-        bed_types = (
-            [BedType(part) for part in raw_value.split(LIST_SEPARATOR)] if raw_value else []
+    if field_name in profile.multi_enum_fields:
+        enum_cls = profile.multi_enum_fields[field_name]
+        chosen = (
+            [enum_cls(part.strip()) for part in raw_value.split(LIST_SEPARATOR) if part.strip()]
+            if raw_value
+            else []
         )
-        return product.model_copy(update={"bed_types": bed_types})
+        return product.model_copy(update={field_name: chosen})
 
     if field_name in profile.automatic_fields:
         assert isinstance(product, Motorhome)

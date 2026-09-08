@@ -1321,7 +1321,9 @@ def _build_extracted_motorhome(
         mh_length_mm=length,
         mh_width_mm=width,
         mh_height_mm=height,
-        bathroom_layout=_feature_value(features, "bathroom_layout"),
+        # A list since 9 September 2026, and one no Rimor source fills: `habitation` does
+        # not read a washroom location, so this is always the floorplan's to answer.
+        bathroom_layout=_feature_value(features, "bathroom_layout") or [],
         shower_toilet_separated=_feature_value(features, "shower_toilet_separated"),
         heating=_feature_value(features, "heating"),
         refrigeration=_feature_value(features, "refrigeration"),

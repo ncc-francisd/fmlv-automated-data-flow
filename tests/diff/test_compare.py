@@ -186,9 +186,9 @@ def test_a_floorplan_pointer_with_nothing_on_either_side_is_asked_about() -> Non
     and `store.changes` gives it the same needs-a-choice wording a new product's empty
     column gets.
     """
-    baseline = BASELINE.model_copy(update={"bathroom_layout": None})
+    baseline = BASELINE.model_copy(update={"bathroom_layout": []})
     extracted = ExtractedMotorhome(
-        motorhome=Motorhome(bathroom_layout=None),
+        motorhome=Motorhome(bathroom_layout=[]),
         provenance={
             "bathroom_layout": Provenance(
                 source_url="https://example.com/floorplan.jpg",

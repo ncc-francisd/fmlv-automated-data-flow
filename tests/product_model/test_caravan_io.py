@@ -131,7 +131,7 @@ def test_row_to_caravan_reads_the_layout_groups() -> None:
     assert caravan.sleeping_area is CaravanSleepingArea.BOTH
     assert set(caravan.bed_types) == {BedType.MAKE_UP, BedType.ISLAND}
     assert caravan.kitchen_location is KitchenLocation.SIDE
-    assert caravan.bathroom_layout is BathroomLayout.SIDE_SHOWER_TOILET
+    assert caravan.bathroom_layout == [BathroomLayout.SIDE_SHOWER_TOILET]
     assert caravan.shower_toilet_separated is True
     assert caravan.lounge_location is LoungeLocation.FRONT
     assert caravan.heating is Heating.BLOWN_AIR
@@ -161,24 +161,27 @@ def test_row_to_caravan_reads_the_four_lengths_apart() -> None:
 
 
 def test_an_ambiguous_layout_group_is_reported_and_kept() -> None:
-    """A washroom cannot be both rear and side, so a row saying so is really ambiguous.
+    """A kitchen cannot be in two places, so a row saying so is really ambiguous.
 
     Same rule as the motorhome side: keep the first, record the rest so writing back
-    re-asserts them, and report rather than raise. Note the example is two *locations* —
-    a location plus `separate_shower_toilet` used to land here and no longer does, that
-    being two compatible facts rather than one contradiction.
+    re-asserts them, and report rather than raise.
+
+    The bathroom used to be the example here and no longer can be: `bathroom_layout` is
+    multi-select since 9 September 2026, so two of its members set together is an ordinary
+    reading. Its one genuinely exclusive pair — rear against side — moved to
+    `validation._contradictory_washroom`, which is where that signal lives now.
     """
     caravan, issues = caravan_io.row_to_caravan(
-        _row(model="Ancona", rear_shower_toilet="Yes", side_shower_toilet="Yes")
+        _row(model="Ancona", rear_kitchen="Yes", side_kitchen="Yes")
     )
 
     assert [issue.code for issue in issues] == ["ambiguous_layout_group"]
-    assert caravan.bathroom_layout is BathroomLayout.REAR_SHOWER_TOILET
-    assert "side_shower_toilet" in caravan.extra_column_flags
+    assert caravan.kitchen_location is KitchenLocation.REAR
+    assert "side_kitchen" in caravan.extra_column_flags
 
     written = caravan_io.caravan_to_row(caravan)
-    assert written["rear_shower_toilet"] == "Yes"
-    assert written["side_shower_toilet"] == "Yes"
+    assert written["rear_kitchen"] == "Yes"
+    assert written["side_kitchen"] == "Yes"
 
 
 def test_caravan_to_row_fills_every_column() -> None:
@@ -281,10 +284,24 @@ def test_validation_flags_only_fmlvs_own_gaps_and_discrepancies() -> None:
     issues = validation.validate_all_caravans(result.caravans)
 
     codes = {issue.code for issue in issues}
-    assert codes <= {"missing_required", "payload_mismatch", "layout_group_unset"}
+    assert codes <= {
+        "missing_required",
+        "payload_mismatch",
+        "layout_group_unset",
+        "ambiguous_layout_group",
+    }
     unset = [issue for issue in issues if issue.code == "layout_group_unset"]
     assert {issue.field for issue in unset} == {"bathroom_layout"}
     assert len(unset) == 7
+
+    # One real contradiction, and proof the signal survived `bathroom_layout` becoming
+    # multi-select: the Ancona claims a rear washroom *and* a side one. Until 9 September
+    # 2026 `_select_single` caught this while reading; now that two members set together is
+    # an ordinary reading, `_contradictory_washroom` is what still catches the pair that
+    # really is exclusive.
+    contradictions = [issue for issue in issues if issue.code == "ambiguous_layout_group"]
+    assert len(contradictions) == 1
+    assert "Ancona" in contradictions[0].product_key
     assert sum(issue.code == "payload_mismatch" for issue in issues) == 6
     assert not [issue for issue in issues if issue.code == "shipping_length_not_longer"]
 
@@ -316,7 +333,7 @@ def _complete(**overrides: object) -> Caravan:
         body_type=CaravanBodyType.RIGID,
         sleeping_area=CaravanSleepingArea.BOTH,
         kitchen_location=KitchenLocation.SIDE,
-        bathroom_layout=BathroomLayout.REAR_SHOWER_TOILET,
+        bathroom_layout=[BathroomLayout.REAR_SHOWER_TOILET],
         shower_toilet_separated=True,
         lounge_location=LoungeLocation.FRONT,
         heating=Heating.BLOWN_AIR,
@@ -417,11 +434,11 @@ def test_separation_is_its_own_field_not_a_bathroom_layout_value() -> None:
     """
     porto = Caravan(
         model="Porto",
-        bathroom_layout=BathroomLayout.SIDE_SHOWER_TOILET,
+        bathroom_layout=[BathroomLayout.SIDE_SHOWER_TOILET],
         shower_toilet_separated=True,
     )
 
-    assert porto.bathroom_layout is BathroomLayout.SIDE_SHOWER_TOILET
+    assert porto.bathroom_layout == [BathroomLayout.SIDE_SHOWER_TOILET]
     assert porto.shower_toilet_separated is True
 
 
@@ -446,7 +463,7 @@ def test_separation_reads_from_the_column_the_export_already_has() -> None:
     # Location and construction, both kept, from one row — and no longer reported as
     # an ambiguous group, since `separate_shower_toilet` left `BathroomLayout` on
     # 9 September 2026. It never was a contradiction; the enum made it look like one.
-    assert caravan.bathroom_layout is BathroomLayout.SIDE_SHOWER_TOILET
+    assert caravan.bathroom_layout == [BathroomLayout.SIDE_SHOWER_TOILET]
     assert caravan.shower_toilet_separated is True
     assert issues == []
 
@@ -455,7 +472,7 @@ def test_a_side_washroom_that_divides_keeps_both_flags_on_write() -> None:
     """The correction Bailey's range needs: five products carry one flag and want two."""
     caravan = Caravan(
         model="Porto",
-        bathroom_layout=BathroomLayout.SIDE_SHOWER_TOILET,
+        bathroom_layout=[BathroomLayout.SIDE_SHOWER_TOILET],
         shower_toilet_separated=True,
     )
 
@@ -469,7 +486,7 @@ def test_a_side_washroom_that_divides_keeps_both_flags_on_write() -> None:
 def test_a_combined_rear_washroom_writes_separation_off() -> None:
     caravan = Caravan(
         model="Cadiz",
-        bathroom_layout=BathroomLayout.REAR_SHOWER_TOILET,
+        bathroom_layout=[BathroomLayout.REAR_SHOWER_TOILET],
         shower_toilet_separated=False,
     )
 
@@ -490,5 +507,78 @@ def test_both_washroom_facts_survive_a_round_trip() -> None:
     caravan, _ = caravan_io.row_to_caravan(original)
     returned, _ = caravan_io.row_to_caravan(caravan_io.caravan_to_row(caravan))
 
-    assert returned.bathroom_layout is BathroomLayout.SIDE_SHOWER_TOILET
+    assert returned.bathroom_layout == [BathroomLayout.SIDE_SHOWER_TOILET]
     assert returned.shower_toilet_separated is True
+
+
+# --------------------------------------------------------------------------- #
+# The washroom group holds more than one — see `BathroomLayout`
+# --------------------------------------------------------------------------- #
+
+
+def test_a_caravan_with_no_washroom_carries_both_flags() -> None:
+    """The requester, 9 September 2026, on an Eriba Touring 310.
+
+    *"If a vehicle or a caravan has got no toilet and no shower, I need to tick two boxes,
+    but I only get the option to select one in the bathroom layout."* 32 of the 2,537 rows
+    in `data/exports` already hold exactly that pair, so the guide's "select one" was
+    describing what a typist should usually do, not what the data does.
+    """
+    caravan, issues = caravan_io.row_to_caravan(
+        _row(model="Touring 310", no_toilet="Yes", no_shower="Yes")
+    )
+
+    assert set(caravan.bathroom_layout) == {
+        BathroomLayout.NO_TOILET,
+        BathroomLayout.NO_SHOWER,
+    }
+    # Two members of this group is an ordinary reading now, not a contradiction.
+    assert [issue.code for issue in issues] == []
+
+
+def test_both_washroom_flags_survive_a_write() -> None:
+    caravan = Caravan(
+        manufacturer="Eriba",
+        model="Touring 310",
+        bathroom_layout=[BathroomLayout.NO_TOILET, BathroomLayout.NO_SHOWER],
+    )
+
+    row = caravan_io.caravan_to_row(caravan)
+
+    assert row["no_toilet"] == "Yes"
+    assert row["no_shower"] == "Yes"
+    assert row["side_shower_toilet"] == "No"
+    assert row["rear_shower_toilet"] == "No"
+
+
+def test_a_washroom_cannot_be_both_rear_and_side() -> None:
+    """The one pair that really is exclusive, and the check that kept the signal.
+
+    Reading two members is no longer an `ambiguous_layout_group` at the io layer, so this
+    would have been lost silently. 21 rows of `data/exports` set both.
+    """
+    caravan = Caravan(
+        manufacturer="Bailey",
+        model="Ancona",
+        bathroom_layout=[
+            BathroomLayout.REAR_SHOWER_TOILET,
+            BathroomLayout.SIDE_SHOWER_TOILET,
+        ],
+    )
+
+    codes = [issue.code for issue in validation.validate_caravan(caravan)]
+
+    assert "ambiguous_layout_group" in codes
+
+
+def test_a_location_beside_a_no_flag_is_not_reported() -> None:
+    """Only the rear/side pair contradicts. Everything else is left alone."""
+    caravan = Caravan(
+        manufacturer="Bailey",
+        model="Phoenix",
+        bathroom_layout=[BathroomLayout.SIDE_SHOWER_TOILET, BathroomLayout.NO_TOILET],
+    )
+
+    codes = [issue.code for issue in validation.validate_caravan(caravan)]
+
+    assert "ambiguous_layout_group" not in codes

@@ -108,7 +108,9 @@ class Motorhome(BaseModel):
     sleeping_area: SleepingArea | None = None
     bed_types: list[BedType] = Field(default_factory=list)
     kitchen_location: KitchenLocation | None = None
-    bathroom_layout: BathroomLayout | None = None
+    #: **Several may apply.** A caravan with no washroom carries `no_toilet` *and*
+    #: `no_shower`, which 32 rows of `data/exports` do — see `BathroomLayout`.
+    bathroom_layout: list[BathroomLayout] = Field(default_factory=list)
     lounge_location: LoungeLocation | None = None
     heating: Heating | None = None
     refrigeration: Refrigeration | None = None

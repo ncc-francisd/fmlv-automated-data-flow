@@ -14,6 +14,7 @@ from typing import Literal
 
 from . import caravan_schema, schema
 from .caravan import Caravan
+from .enums import BathroomLayout
 from .model import Motorhome
 
 Severity = Literal["error", "warning"]
@@ -77,12 +78,14 @@ def validate(motorhome: Motorhome) -> list[Issue]:
                 )
             )
 
+    issues.extend(_contradictory_washroom(motorhome, key))
     issues.extend(_validate_payload(motorhome, key))
     issues.extend(_validate_length(motorhome, key))
     issues.extend(_validate_automatic(motorhome, key))
 
     for field_name in LAYOUT_GROUP_FIELDS:
-        if getattr(motorhome, field_name) is None:
+        # `bathroom_layout` is a list, so "nothing chosen" is `[]` rather than `None`.
+        if getattr(motorhome, field_name) in (None, []):
             issues.append(
                 Issue(
                     severity="warning",
@@ -94,6 +97,32 @@ def validate(motorhome: Motorhome) -> list[Issue]:
             )
 
     return issues
+
+
+#: A washroom cannot be both rear and side. `bathroom_layout` became multi-select on
+#: 9 September 2026 because `no_toilet` and `no_shower` genuinely combine, and that took
+#: the whole group out of `_select_single`'s exclusivity check — including this pair, which
+#: really is exclusive and which **21 rows of `data/exports` set together**. So the check
+#: moved here rather than being lost with the rest.
+_EXCLUSIVE_BATHROOM_LOCATIONS: frozenset[BathroomLayout] = frozenset(
+    {BathroomLayout.REAR_SHOWER_TOILET, BathroomLayout.SIDE_SHOWER_TOILET}
+)
+
+
+def _contradictory_washroom(product: object, key: str) -> list[Issue]:
+    """One issue when a product claims its washroom is both rear and side."""
+    chosen = set(getattr(product, "bathroom_layout", []) or [])
+    if not _EXCLUSIVE_BATHROOM_LOCATIONS <= chosen:
+        return []
+    return [
+        Issue(
+            severity="warning",
+            code="ambiguous_layout_group",
+            message="a washroom cannot be both rear and side",
+            product_key=key,
+            field="bathroom_layout",
+        )
+    ]
 
 
 def _validate_payload(motorhome: Motorhome, key: str) -> list[Issue]:
@@ -261,11 +290,12 @@ def validate_caravan(caravan: Caravan) -> list[Issue]:
                 )
             )
 
+    issues.extend(_contradictory_washroom(caravan, key))
     issues.extend(_validate_caravan_payload(caravan, key))
     issues.extend(_validate_caravan_lengths(caravan, key))
 
     for field_name in CARAVAN_LAYOUT_GROUP_FIELDS:
-        if getattr(caravan, field_name) is None:
+        if getattr(caravan, field_name) in (None, []):
             issues.append(
                 Issue(
                     severity="warning",

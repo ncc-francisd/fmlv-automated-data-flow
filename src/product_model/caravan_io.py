@@ -42,10 +42,16 @@ _SINGLE_SELECT_FIELDS: tuple[tuple[str, type[ColumnEnum]], ...] = (
     ("body_type", CaravanBodyType),
     ("sleeping_area", CaravanSleepingArea),
     ("kitchen_location", KitchenLocation),
-    ("bathroom_layout", BathroomLayout),
     ("lounge_location", LoungeLocation),
     ("heating", Heating),
     ("refrigeration", Refrigeration),
+)
+
+#: Groups a caravan may hold more than one of — the same pair as the motorhome side, and
+#: for the same reason. See `io._MULTI_SELECT_FIELDS` and `BathroomLayout`.
+_MULTI_SELECT_FIELDS: tuple[tuple[str, type[ColumnEnum]], ...] = (
+    ("bed_types", BedType),
+    ("bathroom_layout", BathroomLayout),
 )
 
 
@@ -113,6 +119,7 @@ def row_to_caravan(row: dict[str, Any]) -> tuple[Caravan, list[Issue]]:
         height_mm=_to_int(row.get("height_mm")),
         headroom_mm=_to_int(row.get("headroom_mm")),
         bed_types=_select_many(row, BedType),
+        bathroom_layout=_select_many(row, BathroomLayout),
         # Read alongside `bathroom_layout`, not instead of it: the two answer different
         # questions and a row may legitimately set a location flag and this one.
         shower_toilet_separated=_is_yes(row.get("separate_shower_toilet")),
@@ -161,14 +168,18 @@ def caravan_to_row(caravan: Caravan) -> dict[str, str]:
         for member in enum_cls:
             row[member.value] = schema.YES if member is selected_member else schema.NO
 
+    # Written before the flags below, so a flag FMLV set on one of these columns still
+    # wins: these loops write every member of the group, `No` included.
+    for field_name, enum_cls in _MULTI_SELECT_FIELDS:
+        chosen = getattr(caravan, field_name)
+        for member in enum_cls:
+            row[member.value] = schema.YES if member in chosen else schema.NO
+
     # Re-assert flags FMLV holds that the single-select fields above have just written
     # off — see `Motorhome.extra_column_flags`.
     for column in caravan.extra_column_flags:
         if column in row:
             row[column] = schema.YES
-
-    for member in BedType:
-        row[member.value] = schema.YES if member in caravan.bed_types else schema.NO
 
     set_int("berths", caravan.berths)
     set_int("rrp_pounds", caravan.rrp_pounds)

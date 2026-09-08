@@ -297,7 +297,7 @@ def test_no_layout_flag_is_guessed_from_the_marketing_copy() -> None:
     assert caravan.sleeping_area is None
     assert caravan.bed_types == []
     assert caravan.kitchen_location is None
-    assert caravan.bathroom_layout is None
+    assert caravan.bathroom_layout == []
     assert caravan.lounge_location is None
     assert caravan.heating is None
     assert caravan.refrigeration is None

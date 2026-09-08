@@ -45,7 +45,9 @@ def test_known_product_reads_correctly(adria_result: io.ReadResult) -> None:
     # Layout groups collapsed to their enum, not left as 40 raw flags.
     assert supreme_640.sleeping_area.value == "sleeping_area_both"
     assert supreme_640.kitchen_location.value == "side_kitchen"
-    assert supreme_640.bathroom_layout.value == "side_shower_toilet"
+    # A list since 9 September 2026 — see `BathroomLayout`. Compared by value to match
+    # the neighbouring assertions rather than importing the enum for one line.
+    assert [m.value for m in supreme_640.bathroom_layout] == ["side_shower_toilet"]
     assert supreme_640.heating.value == "blown_air_heating"
     assert supreme_640.refrigeration.value == "fridge_freezer"
     assert supreme_640.rear_garage is True
