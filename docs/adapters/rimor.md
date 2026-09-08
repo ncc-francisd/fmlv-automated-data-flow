@@ -435,8 +435,49 @@ FMLV has never held has no MRO from anywhere, so its upload row carries none and
 used to surface only in the issues file, after the upload was generated — which is why
 `store.changes.fields_needing_a_choice` now puts a row in the review for it instead.
 
-Worth re-checking whether MRO comes back, since it lasted a day: if it does,
-`_MRO` still matches the markup it had.
+`_MRO` still matches the markup it had, so a republished figure is picked up without a
+code change — and the model page stays preferred over the catalogue below whenever it has
+one.
+
+### The catalogue is the source of MRO again
+
+Found on 8 September 2026, the day after the withdrawal. `/int/en/rimor-download` links
+the season catalogue (`RIM_Catalogo 2026-27 EU_V6.pdf`, 6 MB) plus five range leaflets,
+and its technical-data tables carry MRO for **35 layouts** — every one MNC sells, and five
+it does not.
+
+**It is linked from a real page now**, which is what changed: in August the catalogue sat
+at an unadvertised path and had to be probed by season and version. The URL is
+rediscovered per run like any other, matched on `catalogo` rather than a filename, since
+the name carries both a season and a version.
+
+**Only MRO is read out of it, and that restriction is the whole design.** The tables put
+two or three layouts side by side and pypdf returns each row as one text run, so a row
+printing a value once where it spans several columns cannot be split — every run starts at
+the same x, so the coordinates give nothing either. The Horus page is the illustration:
+three layouts, but
+
+```
+Wheelbase (mm) 4035 3450
+Outside length (mm) 5998 5413
+MRO (kg) 2770 2866 2714
+```
+
+Two values for three columns on the first two rows, and nothing to say which column the
+shared one covers. That is what made the catalogue useless for dimensions in August, and
+still does.
+
+MRO escapes it because **every layout's is distinct**, so its row always carries exactly
+as many values as the page has columns. `parse_catalogue_mro` therefore reads a row
+positionally when the counts match, applies it to every layout on the page when there is
+exactly one value — Kilig 669 and 695 genuinely share 3024 — and **skips it otherwise**,
+that being the only case that could misattribute.
+
+**Validated against the site's own figures**, which is what makes this trustworthy rather
+than merely plausible: of the 30 MROs `rimor.it` published before withdrawing the field,
+the catalogue agrees on **30 and differs on none**. The provenance says the figure came
+from the catalogue and that the model page no longer carries it, so a reviewer clicking
+through to the layout does not find it absent and read it as invented.
 
 ## What is unverified
 

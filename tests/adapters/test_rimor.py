@@ -12,6 +12,7 @@ collapse.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -993,3 +994,132 @@ def test_an_anchor_is_cut_on_a_word_boundary() -> None:
 
 def test_an_empty_snippet_leaves_the_url_alone() -> None:
     assert rimor.anchored("https://example.test/p/", "") == "https://example.test/p/"
+
+
+# --------------------------------------------------------------------------- #
+# The season catalogue — the only source of MRO since 7 September 2026
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture(scope="module")
+def catalogue_text() -> str:
+    return _fixture("rimor_catalogue_technical_data_text.txt")
+
+
+def test_the_catalogue_gives_an_mro_per_layout(catalogue_text: str) -> None:
+    """Positional, because every layout's MRO differs so the row is never short."""
+    mro = rimor.parse_catalogue_mro(catalogue_text)
+    assert mro["HORUS 38"] == 2770
+    assert mro["HORUS 45"] == 2866
+    assert mro["HORUS 54"] == 2714
+    assert mro["KILIG 77 PLUS"] == 3005
+    assert mro["KILIG 78 PLUS"] == 2877
+    assert mro["KILIG 79 PLUS"] == 2803
+
+
+def test_one_value_across_a_page_applies_to_every_layout_on_it(
+    catalogue_text: str,
+) -> None:
+    """Kilig 669 and 695 really do share 3024 — the site published both as 3024."""
+    mro = rimor.parse_catalogue_mro(catalogue_text)
+    assert mro["KILIG 669"] == 3024
+    assert mro["KILIG 695"] == 3024
+
+
+def test_nothing_but_mro_is_read_out_of_the_catalogue(catalogue_text: str) -> None:
+    """The dimension rows are exactly the trap that made the catalogue unusable in August.
+
+    The Horus page heads three layouts and prints
+
+        Wheelbase (mm) 4035 3450
+        Outside length (mm) 5998 5413
+
+    — two values for three columns, with nothing to say which column the shared one
+    covers. `parse_catalogue_mro` returns only MRO, so there is nothing to misattribute.
+    """
+    mro = rimor.parse_catalogue_mro(catalogue_text)
+    assert all(isinstance(value, int) for value in mro.values())
+    # 5998 and 5413 are lengths from that short row; neither is anyone's MRO.
+    assert 5998 not in mro.values()
+    assert 5413 not in mro.values()
+
+
+def test_an_ambiguous_mro_row_is_skipped_rather_than_guessed() -> None:
+    """Two values for three columns cannot be placed, so nothing is recorded."""
+    text = "\n".join(
+        [
+            "KILIG 5   KILIG 9   KILIG 50   ",
+            "DIMENSIONS AND WEIGHTS",
+            "MRO (kg) 2961 2869",
+        ]
+    )
+    assert rimor.parse_catalogue_mro(text) == {}
+
+
+def test_catalogue_key_matches_the_headings() -> None:
+    assert rimor.catalogue_key("Kilig", "77 Plus") == "KILIG 77 PLUS"
+    assert rimor.catalogue_key("Super Brig", "677 TC") == "SUPER BRIG 677 TC"
+    assert rimor.catalogue_key("Super Brig", "Suite") == "SUPER BRIG SUITE"
+    assert rimor.catalogue_key("Kilig", "5") == "KILIG 5"
+
+
+def test_the_catalogue_fills_the_mro_the_site_withdrew(
+    mnc_kilig_66: str, factory_kilig_66_plus: str, catalogue_text: str
+) -> None:
+    """A layout page with no MRO still gets one, and says where it came from.
+
+    The requester found the catalogue on 8 September 2026, the day after Rimor removed
+    MRO from its model pages.
+    """
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = rimor.parse_model_page(
+        factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+    )
+    # The fixture predates the withdrawal, so blank its MRO to match today's live page.
+    model = replace(model, mro_kilograms=None)
+    catalogue = rimor.parse_catalogue_mro(catalogue_text)
+    catalogue["KILIG 66 PLUS"] = 3017
+
+    extracted = rimor._build_extracted_motorhome(listing, model, catalogue)
+
+    assert extracted.motorhome.mro_kilograms == 3017
+    assert extracted.motorhome.mh_payload_kilograms == 3500 - 3017
+    assert "from the season catalogue" in extracted.provenance["mro_kilograms"].snippet
+    assert "rimor-download" in extracted.provenance["mro_kilograms"].source_url
+
+
+def test_the_model_page_still_wins_when_it_publishes_an_mro(
+    mnc_kilig_66: str, factory_kilig_66_plus: str
+) -> None:
+    """If Rimor republishes MRO, the layout's own page is the better source again."""
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = rimor.parse_model_page(
+        factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+    )
+    assert model.mro_kilograms == 3017  # the fixture has it
+
+    extracted = rimor._build_extracted_motorhome(
+        listing, model, {"KILIG 66 PLUS": 9999}
+    )
+
+    assert extracted.motorhome.mro_kilograms == 3017
+    assert "season catalogue" not in extracted.provenance["mro_kilograms"].snippet
+
+
+def test_no_catalogue_leaves_the_mro_unset(
+    mnc_kilig_66: str, factory_kilig_66_plus: str
+) -> None:
+    """A failed catalogue fetch costs a figure, never a run."""
+    listing = rimor.parse_mnc_listing(mnc_kilig_66, "rimor-kilig-66-2026", "u")
+    model = replace(
+        rimor.parse_model_page(
+            factory_kilig_66_plus, "/int/en/gamma/kilig/modello/66-plus"
+        ),
+        mro_kilograms=None,
+    )
+
+    extracted = rimor._build_extracted_motorhome(listing, model, {})
+
+    assert extracted.motorhome.mro_kilograms is None
+    assert extracted.motorhome.mh_payload_kilograms is None
+    assert extracted.motorhome.mtplm_kilograms == 3500

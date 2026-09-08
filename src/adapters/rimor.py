@@ -47,12 +47,13 @@ from __future__ import annotations
 
 import html
 import re
-from urllib.parse import quote
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import quote
 
 from ..fetch.http import Fetcher
+from ..fetch.pdf import extract_text
 from ..product_model.enums import BedType, BodyType
 from ..product_model.model import Motorhome
 from . import habitation
@@ -107,6 +108,26 @@ SLUG_NOISE: frozenset[str] = frozenset(
 #: thing wrong with it. Both lose to a plain listing of the same layout, but either can
 #: stand in when it is the only listing that layout has.
 STOCK_MARKERS: frozenset[str] = frozenset({"demo", "copy", "spec"})
+
+#: Where the season's catalogue is linked. **Linked from a real page**, which is the one
+#: thing that was awkward about the catalogue in August 2026: it then sat at an
+#: unadvertised path and had to be probed by season and version number. The 2026-27
+#: redesign gave it a download page, so the URL is rediscovered per run like any other.
+CATALOGUE_PAGE = "/int/en/rimor-download"
+
+#: The catalogue PDF on that page. Matched on `catalogo` rather than a filename, since the
+#: name carries a season and a version (`RIM_Catalogo 2026-27 EU_V6.pdf`) and both move.
+#: The same page also links five range leaflets, which this must not pick up.
+_CATALOGUE_LINK = re.compile(r'href="(/public/[^"]*[Cc]atalogo[^"]*\.pdf)"')
+
+#: A model heading in the catalogue's technical-data tables, e.g. `KILIG 77 PLUS`. Each
+#: such page heads two or three layouts side by side and then lists their specs in rows.
+_CATALOGUE_MODEL = re.compile(
+    r"\b(HORUS|KILIG|SARUS|SAILER|SUPER BRIG|RIMOR VAN)\s+(\d+(?:\s+PLUS|\s+TC)?|SUITE)\b"
+)
+
+#: The one row worth reading out of it — see `parse_catalogue_mro` for why only this one.
+_CATALOGUE_MRO_ROW = re.compile(r"^MRO \(kg\)(.*)$")
 
 #: A campervan taller than this is a high top — the roof line materially above the side
 #: windows. The same threshold as `auto_trail.HIGH_TOP_ABOVE_MM`, set by the NCC side on
@@ -762,6 +783,91 @@ def body_type_for(body_style: str | None, height_mm: int | None) -> BodyType | N
     return BodyType.CAMPERVAN_HIGH_TOP if height_mm > HIGH_TOP_ABOVE_MM else BodyType.CAMPERVAN
 
 
+def catalogue_key(range_label: str, model: str) -> str:
+    """How a layout is named in the catalogue's technical-data headings."""
+    return " ".join(f"{range_label} {model}".upper().split())
+
+
+def parse_catalogue_mro(catalogue_text: str) -> dict[str, int]:
+    """`{catalogue key: MRO in kg}` from the catalogue's technical-data tables.
+
+    **Only MRO is read, and only because its rows can be attributed.** The tables put two
+    or three layouts side by side and pypdf returns each row as one text run, so a row
+    printing a value once where it spans several columns cannot be split — every run
+    starts at the same x, so the coordinates give nothing either. The Horus page is the
+    illustration: three layouts, but
+
+        Wheelbase (mm) 4035 3450
+        Outside length (mm) 5998 5413
+
+    carry two values each, and nothing says which column the shared one covers. That is
+    what made the catalogue unusable for dimensions in August 2026, and it has not changed.
+
+    MRO escapes it because **every layout's is distinct**, so its row carries exactly as
+    many values as the page has columns and position is enough:
+
+        MRO (kg) 2770 2866 2714
+
+    So a row is read positionally when the counts match, applied to all when there is
+    exactly one value — Kilig 669 and 695 genuinely share 3024 — and **skipped otherwise**,
+    which is the case that would misattribute.
+
+    Validated on 8 September 2026 against every MRO the site itself published before
+    withdrawing the field: **30 of 30 agree, none differ.**
+    """
+    found: dict[str, int] = {}
+    heading: list[str] = []
+    for line in catalogue_text.split("\n"):
+        names = [
+            f"{match.group(1)} {match.group(2)}"
+            for match in _CATALOGUE_MODEL.finditer(line)
+        ]
+        if names and "DIMENSIONS" not in line:
+            heading = [" ".join(name.split()) for name in names]
+        row = _CATALOGUE_MRO_ROW.match(line.strip())
+        if row is None or not heading:
+            continue
+        values = [int(value) for value in re.findall(r"\d+", row.group(1))]
+        if len(values) == len(heading):
+            found.update(zip(heading, values, strict=True))
+        elif len(values) == 1:
+            found.update(dict.fromkeys(heading, values[0]))
+    return found
+
+
+def _fetch_catalogue_mro(
+    http: Fetcher, on_progress: Callable[[str], None]
+) -> dict[str, int]:
+    """Every MRO the season's catalogue publishes, or `{}` if it cannot be read.
+
+    A run-level fetch, not a per-range one: one download page and one PDF for the whole
+    manufacturer. Every failure is narrated and returns `{}` — the catalogue is the only
+    source of MRO now that the site has withdrawn it, but a product without one is still
+    a product, and the reviewer is offered the field either way.
+    """
+    page = http.fetch(BASE_URL + CATALOGUE_PAGE)
+    if page.status_code != 200:
+        on_progress(f"catalogue page returned {page.status_code} — no MRO this run")
+        return {}
+
+    link = _CATALOGUE_LINK.search(
+        page.file_path.read_text(encoding="utf-8", errors="replace")
+    )
+    if link is None:
+        on_progress("no catalogue PDF linked from the download page — no MRO this run")
+        return {}
+
+    pdf = http.fetch(BASE_URL + link.group(1).replace(" ", "%20"))
+    if pdf.status_code != 200:
+        on_progress(f"catalogue PDF returned {pdf.status_code} — no MRO this run")
+        return {}
+
+    mro = parse_catalogue_mro(extract_text(pdf.file_path).text)
+    name = link.group(1).rsplit("/", 1)[-1]
+    on_progress(f"catalogue {name}: MRO for {len(mro)} layout(s)")
+    return mro
+
+
 def rear_garage_from(overview: str, body_style: str | None) -> tuple[bool, str] | None:
     """`(has a rear garage, the evidence)` from the factory overview, or `None`.
 
@@ -972,7 +1078,9 @@ _FEATURE_NOTES: dict[str, str] = {
 
 
 def _build_extracted_motorhome(
-    listing: MncListing, model: RimorModel | None
+    listing: MncListing,
+    model: RimorModel | None,
+    catalogue_mro: dict[str, int] | None = None,
 ) -> ExtractedMotorhome:
     """One product: MNC's range membership and price, the factory's specification.
 
@@ -991,6 +1099,17 @@ def _build_extracted_motorhome(
     """
     range_label = model.range_label if model else listing.range_label
     body_type = (model.body_type if model else None) or listing.body_type
+
+    # MRO comes from the catalogue where the site does not publish it, which since
+    # 7 September 2026 is everywhere — see `parse_catalogue_mro`. The site is still
+    # preferred when it has a figure, so a republished one wins without a code change.
+    mro = model.mro_kilograms if model else None
+    mro_from_catalogue = False
+    if mro is None and model is not None and catalogue_mro:
+        mro = catalogue_mro.get(catalogue_key(range_label, model.model))
+        mro_from_catalogue = mro is not None
+    mtplm = model.mtplm_kilograms if model else None
+    payload = mtplm - mro if (mtplm is not None and mro is not None) else None
 
     length = (model.mh_length_mm if model else None) or listing.mnc_length_mm
     width = (model.mh_width_mm if model else None) or listing.mnc_width_mm
@@ -1038,9 +1157,9 @@ def _build_extracted_motorhome(
         mh_passenger_seats_inc_driver=seats,
         berths=berths,
         rrp_pounds=listing.rrp_pounds,
-        mtplm_kilograms=model.mtplm_kilograms if model else None,
-        mro_kilograms=model.mro_kilograms if model else None,
-        mh_payload_kilograms=model.mh_payload_kilograms if model else None,
+        mtplm_kilograms=mtplm,
+        mro_kilograms=mro,
+        mh_payload_kilograms=payload,
         mh_length_mm=length,
         mh_width_mm=width,
         mh_height_mm=height,
@@ -1193,13 +1312,24 @@ def _build_extracted_motorhome(
         if model.mtplm_text and "/" in model.mtplm_text:
             note += " — the standard chassis, the rest being uprated options"
         record("mtplm_kilograms", note, url=factory_source)
-    if model.mro_kilograms is not None:
-        record("mro_kilograms", f"MRO: {model.mro_kilograms} kg", url=factory_source)
-    if model.mh_payload_kilograms is not None:
+    if mro is not None:
+        if mro_from_catalogue:
+            # The catalogue, not the model page — the site withdrew MRO on 7 September
+            # 2026 and this is the only source for it now. Say so, or a reviewer clicking
+            # through to the layout's page finds no such figure and reads it as invented.
+            record(
+                "mro_kilograms",
+                f"MRO: {mro} kg, from the season catalogue — the model page no longer "
+                f"publishes it",
+                url=BASE_URL + CATALOGUE_PAGE,
+            )
+        else:
+            record("mro_kilograms", f"MRO: {mro} kg", url=factory_source)
+    if payload is not None:
         record(
             "mh_payload_kilograms",
-            f"{model.mtplm_kilograms} kg MTPLM - {model.mro_kilograms} kg MRO",
-            url=factory_source,
+            f"{mtplm} kg MTPLM - {mro} kg MRO",
+            url=(BASE_URL + CATALOGUE_PAGE) if mro_from_catalogue else factory_source,
         )
 
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
@@ -1260,6 +1390,11 @@ def collect(
     but not its place in the range.
     """
     results: list[ExtractedMotorhome] = []
+
+    # One download page and one PDF for the whole manufacturer, before the ranges: the
+    # site stopped publishing MRO on 7 September 2026 and the catalogue is the only
+    # source for it now. An empty result is narrated and never fatal.
+    catalogue_mro = _fetch_catalogue_mro(http, on_progress)
 
     for mnc_slug, factory_slug, range_label in ranges:
         category_url = f"{MNC_BASE_URL}{MNC_CATEGORY}/{mnc_slug}/"
@@ -1360,7 +1495,9 @@ def collect(
                         f"{model.bedding_solution!r}, bed types left empty"
                     )
 
-            results.append(_build_extracted_motorhome(listing, model))
+            results.append(
+                _build_extracted_motorhome(listing, model, catalogue_mro)
+            )
             collected += 1
 
         for unsold in sorted(available - matched):

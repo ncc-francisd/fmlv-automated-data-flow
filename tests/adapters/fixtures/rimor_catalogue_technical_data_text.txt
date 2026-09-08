@@ -1,0 +1,45 @@
+HORUS 38   HORUS 45   HORUS 54   
+DIMENSIONS AND WEIGHTS
+Wheelbase (mm) 4035 3450
+Outside length (mm) 5998 5413
+Outside width - inside width (mm) 2050 - 1850
+Maximum outside height - inside height (mm) 2659 - 1875
+Certified seats 4
+Maximum overall weight (kg) 3500
+MRO (kg) 2770 2866 2714
+Available mass for optional equipment 
+installation (kg) 405,02 309,02 466,87
+BEDS
+Fixed berths 2 4 2
+Assemblable berths 1
+
+KILIG 669   KILIG 695   
+DIMENSIONS AND WEIGHTS
+Wheelbase (mm) 3954
+Outside length (mm) 7308
+Outside width - inside width (mm) 2340 - 2200
+Maximum outside height - inside height (mm) 3040 - 2060
+Thickness of floor - walls - roof (mm) 56 - 30 - 30
+Certified seats 1 5 5 / 4
+Maximum overall weight (kg) 2 3500 / 3550 / 4100
+MRO (kg) 3024
+Available mass for optional equipment 
+installation (kg) 53
+BEDS
+Fixed berths 4
+
+KILIG 77 PLUS   KILIG 78 PLUS   KILIG 79 PLUS      
+DIMENSIONS AND WEIGHTS
+Wheelbase (mm) 3750
+Outside length (mm) 6970 6758 6970
+Outside width - inside width (mm) 2340 - 2200
+Maximum outside height - inside height (mm) 2845  - 2060
+Thickness of floor - walls - roof (mm) 56 - 30 - 30
+Certified seats 1 5 5 / 4 7 / 6
+Maximum overall weight (kg) 2 3500 / 3550 / 4100
+MRO (kg) 3005 2877 2803
+Available mass for optional equipment 
+installation (kg) 75,3 205,42 107,3
+BEDS
+Fixed berths 4
+

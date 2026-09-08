@@ -173,6 +173,34 @@ publishes no price anywhere in the world, and its products still carry one, beca
 exclusive UK importer prices every layout it sells. See [Rimor](rimor.md), which reads the
 importer for the price and the range and the factory for the specifications.
 
+### A side-by-side PDF table may still yield the one row you need
+
+The standing warning about brochure spec tables is that columns cannot be recovered:
+pypdf returns each row as a single text run, a row prints a value once where it spans
+several columns, and every run starts at the same x so the coordinates give nothing. That
+is why Rimor's catalogue was rejected for dimensions in August 2026, and it is still
+right.
+
+But the rule is per **row**, not per document. A row whose value differs for every column
+carries exactly as many values as the page has columns, and position is then enough.
+Rimor's `MRO (kg) 2770 2866 2714` is that row, on a page whose `Outside length (mm) 5998
+5413` is not.
+
+So where a document is the only source for a field, it is worth asking whether *that
+field's* row is attributable, rather than dismissing the table. The safe shape is three
+cases and no fourth:
+
+* **values == columns** — read positionally;
+* **exactly one value** — applies to every column (Rimor's Kilig 669 and 695 really do
+  share an MRO);
+* **anything else** — skip it, because that is the only case that can misattribute.
+
+**Prove it against a second source before trusting it.** Rimor's catalogue was checked
+against the 30 MROs the website itself had published before withdrawing the field: 30
+agreed, none differed. Without that the attribution would have been plausible rather than
+established, and a silently transposed column is the failure this whole warning exists
+about.
+
 ### Payload is arithmetic, so it is checkable even when nothing was published
 
 `mh_payload_kilograms` is MTPLM minus MRO. That means a payload can be checked against
