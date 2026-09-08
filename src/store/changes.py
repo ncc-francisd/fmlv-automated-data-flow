@@ -456,6 +456,28 @@ def record_proposed_change(
     return get_proposed_change(connection, cursor.lastrowid)
 
 
+def verified_fields_by_product(
+    connection: sqlite3.Connection, run_id: int
+) -> dict[int, list[str]]:
+    """Which fields were checked and found unchanged, per product, for one run.
+
+    A field with no proposal is ambiguous to a reviewer — it may have been checked and
+    matched, or never looked at, or withheld because the same value was rejected before.
+    The requester, 8 September 2026, on Kilig 77 Plus: *"I noticed that there's no
+    proposal on bed types. Is this because there is no change in the bed types?"* This is
+    what lets the review page answer that, from the `verification` rows `persist_diff`
+    already writes.
+    """
+    rows = connection.execute(
+        "SELECT product_id, field FROM verification WHERE run_id = ? ORDER BY field",
+        (run_id,),
+    ).fetchall()
+    verified: dict[int, list[str]] = {}
+    for row in rows:
+        verified.setdefault(row["product_id"], []).append(row["field"])
+    return verified
+
+
 def record_verification(
     connection: sqlite3.Connection, *, run_id: int, product_id: int, field: str
 ) -> None:

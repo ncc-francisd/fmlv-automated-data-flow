@@ -1749,3 +1749,72 @@ def test_changing_a_single_select_and_pressing_accept_saves_the_change(
     connection.close()
     assert decision.action == "correct"
     assert decision.corrected_value == "type_campervan_high_top_elevating_roof"
+
+
+def test_a_field_checked_and_unchanged_is_shown_so_a_missing_row_is_not_ambiguous(
+    client: TestClient, db_path: Path
+) -> None:
+    """Kilig 77 Plus had no `bed_types` row, and no way to tell why.
+
+    The requester, 8 September 2026: *"I noticed that there's no proposal on bed types. Is
+    this because there is no change in the bed types?"* A field with no row may have
+    matched, or never been looked at, and those mean opposite things.
+    """
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    baseline = Motorhome(
+        manufacturer="Rimor",
+        manufacturer_range="Kilig",
+        model="77 Plus",
+        product_id=7940,
+        rrp_pounds=59995,
+        bed_types=[BedType.DROP_DOWN],
+    )
+    # Same beds, a changed price: the beds are checked and match, the price does not.
+    extracted = make_extracted(
+        rrp_pounds=61995,
+        manufacturer_range="Kilig",
+        model="77 Plus",
+        bed_types=[BedType.DROP_DOWN],
+    )
+    extracted.provenance["bed_types"] = Provenance(
+        "https://mnc.test/x", "Front electric drop-down double bed"
+    )
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [baseline])
+    )
+    store.finish_run(connection, run.id)
+    connection.close()
+
+    response = client.get(f"/runs/{run.id}")
+
+    assert response.status_code == 200
+    assert "checked and unchanged" in response.text
+    assert "bed_types" in response.text
+    # And the price, which did change, is still a row to decide.
+    assert "61995" in response.text
+
+
+def test_a_product_with_nothing_verified_shows_no_such_line(
+    client: TestClient, db_path: Path
+) -> None:
+    """A new product has no baseline, so nothing can be confirmed unchanged."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+    )
+    store.persist_diff(
+        connection,
+        run_id=run.id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=45000)], []),
+    )
+    store.finish_run(connection, run.id)
+    connection.close()
+
+    response = client.get(f"/runs/{run.id}")
+
+    assert response.status_code == 200
+    assert "checked and unchanged" not in response.text

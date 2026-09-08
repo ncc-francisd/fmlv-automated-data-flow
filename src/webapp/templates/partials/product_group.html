@@ -49,4 +49,16 @@
     {% set error = None %}
     {% include "partials/change_row.html" %}
   {% endfor %}
+  {#
+    Fields checked against the manufacturer's site and found identical. Shown because a
+    field with no row above is otherwise ambiguous — matched, or never looked at?
+    Requested 8 September 2026, after `bed_types` went missing from a Kilig 77 Plus.
+  #}
+  {% set checked = (verified_fields or {}).get(product.id) %}
+  {% if checked %}
+    <p class="product-verified">
+      <span class="muted">checked and unchanged ({{ checked|length }}):</span>
+      {{ checked|join(", ") }}
+    </p>
+  {% endif %}
 </div>

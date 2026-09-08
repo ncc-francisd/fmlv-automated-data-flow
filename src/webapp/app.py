@@ -615,6 +615,9 @@ def create_app(
                 "pending": pending,
                 "decided": decided,
                 "disappearance_notices": disappearance_notices,
+                # So a field with no row is not ambiguous: it either matched, or the
+                # adapter never reached it. See `store.verified_fields_by_product`.
+                "verified_fields": store.verified_fields_by_product(connection, run_id),
                 "reviewers": app.state.reviewers,
             },
         )
@@ -875,6 +878,7 @@ def create_app(
                 "product": product,
                 "entries": entries,
                 "error": error,
+                "verified_fields": store.verified_fields_by_product(connection, run_id),
                 "reviewers": app.state.reviewers,
             },
         )

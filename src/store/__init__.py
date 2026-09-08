@@ -17,6 +17,7 @@ from .changes import (
     record_disappearance_notice,
     record_proposed_change,
     record_verification,
+    verified_fields_by_product,
     run_review_summary,
     was_previously_rejected,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "record_disappearance_notice",
     "record_proposed_change",
     "record_verification",
+    "verified_fields_by_product",
     "run_review_summary",
     "start_run",
     "upsert_seen",

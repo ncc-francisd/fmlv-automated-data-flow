@@ -46,3 +46,13 @@
   font-size: 0.9rem;
   line-height: 1.6;
 }
+
+/* Fields checked against the site and found identical — so an absent row is not
+   ambiguous. Quiet: it is reassurance, not something to act on. */
+.product-verified {
+  margin: 0.4rem 0 0;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  border-top: 1px solid #eee;
+  color: #555;
+}
