@@ -294,11 +294,17 @@ def _missing_field_snippet(missing: MissingField) -> str:
     identifying what kind of product this is, and `source_url` links to the page it came
     from. Requested 2026-08-29.
     """
-    base = (
-        MISSING_FIELD_SNIPPET
-        if missing.in_scope
-        else UNDETERMINED_FIELD_SNIPPET
-    )
+    if missing.old_value is None:
+        # Nothing on either side, so "keep the existing value" is not one of the answers —
+        # there is no existing value. Same wording, and so the same red flag and the same
+        # set-or-leave-blank buttons, as a new product's empty column.
+        base = NEEDS_A_CHOICE_SNIPPET
+    else:
+        base = (
+            MISSING_FIELD_SNIPPET
+            if missing.in_scope
+            else UNDETERMINED_FIELD_SNIPPET
+        )
     if missing.provenance and missing.provenance.snippet:
         return f"{base} {missing.provenance.snippet}"
     return base

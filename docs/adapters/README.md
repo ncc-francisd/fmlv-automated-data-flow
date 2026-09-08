@@ -697,6 +697,28 @@ dropped on a product that never had one; a floorplan pointer must survive onto a
 product, or its positional fields have nothing to click. `store.changes` is where the two
 part company.
 
+**On a matched product, "checked and unchanged" must not cover a field nobody checked.**
+`compare_fields` compares the adapter's value against FMLV's, and two blanks compare equal
+— so a field the adapter could not fill, on a product FMLV also holds nothing for, was
+reported as *verified* and raised no row. It then uploaded blank again, run after run. An
+Eriba Touring 310 whose washroom neither source describes is the case that surfaced it:
+*"I'm not sure why […] there isn't an option to confirm the bathroom equipment."*
+
+Two blanks now raise a needs-a-choice row instead — **but only where the provenance is a
+`reviewer_reference`**, and that distinction is the whole of it:
+
+* A **pointer** (`reviewer_reference=True`) is the adapter saying *"I cannot know this,
+  here is where to look"*. Blank on both sides means the question is still open, so it is
+  still worth asking.
+* An **ordinary empty-valued provenance** is a claim about the value. `swift_caravan`
+  records one to ask for a stale figure to be *cleared*; on a product that never had one
+  there is nothing to clear and a row would be noise. 22 of its 26 caravans are in exactly
+  that position.
+
+The row carries `old_value=None`, which is what tells `store.changes` there is no "keep it"
+answer to offer — so it gets the same red flag and set-or-leave-blank buttons as a new
+product's empty column.
+
 **A field the copy cannot settle is always the reviewer's to answer — never silently
 `No`.** An adapter recording nothing is not the end of it: `store.changes`
 `fields_needing_a_choice` raises a row for every column a new product would otherwise

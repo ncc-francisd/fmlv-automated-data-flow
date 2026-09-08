@@ -226,6 +226,11 @@ class MissingField:
     provenance: Provenance | None = None
 
 
+def _is_blank(value: Any) -> bool:
+    """Nothing recorded. `bed_types` is a list, so its empty state is `[]` not `None`."""
+    return value is None or value == []
+
+
 def compare_fields(
     baseline: Product, extracted: ExtractedProduct
 ) -> tuple[list[FieldChange], list[str], list[MissingField]]:
@@ -247,6 +252,39 @@ def compare_fields(
     for field_path in extracted.provenance:
         old_value = field_value(baseline, field_path)
         new_value = field_value(extracted.product, field_path)
+        provenance = extracted.provenance.get(field_path)
+        if (
+            _is_blank(old_value)
+            and _is_blank(new_value)
+            and provenance is not None
+            and provenance.reviewer_reference
+        ):
+            # **Not a confirmation.** Nothing was checked and nothing is there, so calling
+            # it "checked and unchanged" tells the reviewer the opposite of the truth: the
+            # field is blank in FMLV, the adapter cannot fill it, and the product uploads
+            # blank again unless somebody answers. A matched product deserves the row a new
+            # one already gets — the requester, 9 September 2026, on an Eriba Touring 310
+            # whose washroom neither source describes: *"I'm not sure why […] there isn't an
+            # option to confirm the bathroom equipment."* There was not one, and this is why.
+            #
+            # **Only for a `reviewer_reference`**, which is the adapter saying *"I cannot
+            # know this — here is where to look"*. An ordinary empty-valued provenance says
+            # something different: `swift_caravan` records one to ask for a stale figure to
+            # be **cleared**, and on a product that never had one there is nothing to clear
+            # and a row would be noise. Same place the two have always parted company.
+            #
+            # `old_value=None` marks it out downstream: a `MissingField` with no old value
+            # has no "keep it" answer, so `store.changes` gives it the needs-a-choice
+            # wording a new product's empty column gets.
+            missing.append(
+                MissingField(
+                    field=field_path,
+                    old_value=None,
+                    in_scope=field_path in profile.in_scope,
+                    provenance=provenance,
+                )
+            )
+            continue
         if old_value == new_value:
             confirmed.append(field_path)
             continue

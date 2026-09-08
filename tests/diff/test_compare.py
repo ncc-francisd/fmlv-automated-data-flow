@@ -174,8 +174,47 @@ def test_an_attempted_but_unfilled_field_never_proposes_blanking_the_baseline() 
     assert entry.provenance.snippet == "choose one"
 
 
+def test_a_floorplan_pointer_with_nothing_on_either_side_is_asked_about() -> None:
+    """"Checked and unchanged" is a false claim when nothing was checked.
+
+    The requester, 9 September 2026, on an Eriba Touring 310 whose washroom neither source
+    describes: *"I'm not sure why […] there isn't an option to confirm the bathroom
+    equipment."* There was not one — the field was blank in FMLV, blank from the adapter,
+    compared equal, and so reported as verified. It would have uploaded blank again.
+
+    `old_value=None` is the marker: with nothing to keep, the row has no "keep it" answer
+    and `store.changes` gives it the same needs-a-choice wording a new product's empty
+    column gets.
+    """
+    baseline = BASELINE.model_copy(update={"bathroom_layout": None})
+    extracted = ExtractedMotorhome(
+        motorhome=Motorhome(bathroom_layout=None),
+        provenance={
+            "bathroom_layout": Provenance(
+                source_url="https://example.com/floorplan.jpg",
+                snippet="read the washroom off the floorplan",
+                reviewer_reference=True,
+            )
+        },
+    )
+
+    _changes, confirmed, missing = compare_fields(baseline, extracted)
+
+    assert "bathroom_layout" not in confirmed
+    gap = next(m for m in missing if m.field == "bathroom_layout")
+    assert gap.old_value is None
+    assert gap.provenance is not None
+    assert gap.provenance.source_url.endswith("floorplan.jpg")
+
+
 def test_an_attempted_unfilled_field_is_ignored_when_the_baseline_is_empty_too() -> None:
-    # Nothing to confirm and nothing to lose, so there is nothing worth asking about.
+    """Nothing to confirm and nothing to lose, so there is nothing worth asking about.
+
+    The difference from the test above is `reviewer_reference`. An ordinary empty-valued
+    provenance is a claim about the value — `swift_caravan` records one to ask for a stale
+    figure to be *cleared*, and on a product that never had one there is nothing to clear.
+    A pointer is the adapter saying it cannot know, which is a question either way.
+    """
     baseline = BASELINE.model_copy(update={"body_type": None})
     extracted = ExtractedMotorhome(
         motorhome=Motorhome(body_type=None),
