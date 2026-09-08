@@ -618,6 +618,33 @@ dropped on a product that never had one; a floorplan pointer must survive onto a
 product, or its positional fields have nothing to click. `store.changes` is where the two
 part company.
 
+**A field the copy cannot settle is always the reviewer's to answer — never silently
+`No`.** An adapter recording nothing is not the end of it: `store.changes`
+`fields_needing_a_choice` raises a row for every column a new product would otherwise
+reach FMLV blank on, blank by default, and `choices.needs_selection` marks it red so
+*Accept all* cannot bury it. That covers the required numerics and the single-select
+layout groups, and since 9 September 2026 `bed_types` and `shower_toilet_separated` as
+well — the two that belong to neither list and so were going out unasked. The requester:
+
+> *"If bed types or indeed separated shower and toilet are not available in the copy, they
+> should be available for a reviewer like myself to either leave the default as blank or
+> input a value. I can sometimes see from the picture of the inside whether or not, or
+> what, the bed types are, and also sometimes whether the shower and toilet are
+> separated. I can also see very clearly whether it's on the side or the rear."*
+
+Two things this needs to work, both easy to get wrong:
+
+* **`bed_types` is empty as `[]`, not `None`.** It is the schema's only list, so the
+  is-it-blank check has to admit both — and an empty list is exactly the case worth
+  asking about, since it writes `No` across all seven bed-type columns and thereby
+  asserts the vehicle has no beds. Eriba surfaced it: its price list publishes bed
+  *dimensions* and never describes the washroom, so all 18 caravans would have gone out
+  claiming no beds and an undivided washroom, with nothing in the review to say so.
+* **A yes/no field needs offering as a choice, not a text box.** `field_choices` returns
+  `Yes`/`No` for anything in the profile's `bool_fields`, storing Python's own
+  `str(bool)` because `output.build.apply_field` parses it back with `raw_value ==
+  "True"`. Left as free text, a reviewer typing "yes" reads back as `False`.
+
 Record a pointer **per field the copy left open**, not per product. Rimor's
 `bathroom_layout` is settled by the words on 23 of its 34 layouts ("separate shower
 cubicle and cassette toilet"); those keep their extracted value and get no drawing. The

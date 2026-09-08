@@ -123,6 +123,18 @@ def fields_needing_a_choice(product: Product) -> tuple[str, ...]:
       the adapter recorded nothing for sleeping area, kitchen, lounge or washroom — not
       even a floorplan to point at — and there was no row to flag.
 
+    * **Fields the copy routinely leaves open.** `bed_types` and
+      `shower_toilet_separated` are neither required columns nor single-select groups, so
+      neither list above reaches them — and FMLV has no third state for either, so a new
+      product wrote `No` across all seven bed-type columns whether or not anyone had
+      looked. Eriba is the case that surfaced it: its price list publishes bed
+      *dimensions* and never describes the washroom, so all 18 caravans would have gone
+      out asserting no beds. The requester, 9 September 2026: *"if bed types or indeed
+      separated shower and toilet are not available in the copy, they should be available
+      for a reviewer like myself to either leave the default as blank or input a value. I
+      can sometimes see from the picture of the inside whether or not, or what, the bed
+      types are, and also sometimes whether the shower and toilet are separated."*
+
     The identity strings are excluded: `manufacturer`, `model` and their kin are always
     set on a product that exists at all, and a reviewer cannot usefully be asked to
     choose one.
@@ -136,7 +148,15 @@ def fields_needing_a_choice(product: Product) -> tuple[str, ...]:
     return (
         *(f for f in sorted(required) if f not in _IDENTITY_FIELDS),
         *layout,
+        *OPEN_HABITATION_FIELDS,
     )
+
+
+#: Held on both products, settled by neither list above, and silently written `No` when
+#: nobody answers — so a new product is asked about them explicitly. Ordered after the
+#: layout groups because that is the order a reviewer works a product in: what it is and
+#: where things are, then how the beds and washroom are built.
+OPEN_HABITATION_FIELDS: tuple[str, ...] = ("bed_types", "shower_toilet_separated")
 
 
 #: Never asked about: a product with no manufacturer or model does not exist, and these
@@ -663,7 +683,12 @@ def persist_diff(
             for field_name in fields_needing_a_choice(diff.extracted.product):
                 if field_name in diff.extracted.provenance:
                     continue
-                if field_value(diff.extracted.product, field_name) is not None:
+                # `bed_types` is the schema's one list, so "nothing recorded" is `[]` and
+                # not `None` — and that is precisely the case to ask about, since an empty
+                # list writes `No` across all seven bed-type columns and so asserts the
+                # vehicle has no beds.
+                value = field_value(diff.extracted.product, field_name)
+                if value is not None and value != []:
                     continue
                 record_proposed_change(
                     connection,

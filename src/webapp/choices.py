@@ -58,6 +58,10 @@ _LABELS: dict[str, str] = {
     "type_rigid": "Rigid",
     "type_folding": "Folding",
     "type_pop_up": "Pop up",
+    # The yes/no fields. `apply_field` parses these back with `raw_value == "True"`, so
+    # the stored value has to be Python's own `str(bool)` and the label is what softens it.
+    "True": "Yes",
+    "False": "No",
 }
 
 #: Which group each body type belongs to, so the four campervan types and the three
@@ -113,6 +117,17 @@ def field_choices(
         return [("", [(member.value, label_for(member.value)) for member in BedType])]
 
     profile = CARAVAN_UPLOAD if VehicleClass(vehicle_class) is VehicleClass.CARAVAN else MOTORHOME_UPLOAD
+    if field in profile.bool_fields:
+        # A yes/no field is as much a choice as an enum, and offering it as one is what
+        # lets a reviewer answer a question the copy left open — the requester,
+        # 9 September 2026: *"if bed types or indeed separated shower and toilet are not
+        # available in the copy, they should be available for a reviewer like myself to
+        # either leave the default as blank or input a value. I can sometimes see from the
+        # picture of the inside […] whether the shower and toilet are separated."*
+        # Without this the row fell back to a free-text box, where "yes" would have been
+        # stored verbatim and read back as `False` by `apply_field`.
+        return [("", [("True", label_for("True")), ("False", label_for("False"))])]
+
     enum_cls = profile.enum_fields.get(field)
     if enum_cls is None:
         return []

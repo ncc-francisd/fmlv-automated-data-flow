@@ -135,14 +135,15 @@ def test_new_product_persists_every_extracted_field_with_no_old_value(
         connection, run_id=run_id, manufacturer_id=3, diffs=diffs
     )
 
-    # The extracted field, plus one row per single-select layout group the product has no
-    # value for — a new product needs a choice from each, and without a row the reviewer
-    # never sees it. See `LAYOUT_GROUP_UNSET_SNIPPET`.
+    # The extracted field, plus one row per field the product would reach FMLV blank on —
+    # a new product needs a choice from each, and without a row the reviewer never sees
+    # it. `bed_types` counts via `[]` rather than `None`, being the schema's one list.
+    # See `LAYOUT_GROUP_UNSET_SNIPPET` and `fields_needing_a_choice`.
     unset_count = sum(
         1
         for f in store.changes.fields_needing_a_choice(extracted.product)
         if f not in extracted.provenance
-        and getattr(extracted.product, f, None) is None
+        and getattr(extracted.product, f, None) in (None, [])
     )
     assert result.proposed == 1 + unset_count
     queue = store.list_change_queue(connection, run_id)
@@ -154,6 +155,10 @@ def test_new_product_persists_every_extracted_field_with_no_old_value(
     unset = {e.change.field for e in queue if e.change.reviewer_reference}
     assert "mro_kilograms" in unset
     assert "sleeping_area" in unset
+    # Neither a required column nor a layout group, and both silently written `No` on a
+    # new product until 9 September 2026 — see `OPEN_HABITATION_FIELDS`.
+    assert "bed_types" in unset
+    assert "shower_toilet_separated" in unset
     assert all(
         e.change.new_value is None for e in queue if e.change.reviewer_reference
     )

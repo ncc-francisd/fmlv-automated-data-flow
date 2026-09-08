@@ -1643,6 +1643,57 @@ def test_accept_all_still_accepts_everything_when_nothing_needs_a_choice(
     connection.close()
 
 
+def test_a_yes_no_field_is_offered_as_a_choice_not_a_text_box() -> None:
+    """A reviewer answering from the floorplan needs options, not free text.
+
+    The requester, 9 September 2026: *"if bed types or indeed separated shower and toilet
+    are not available in the copy, they should be available for a reviewer like myself to
+    either leave the default as blank or input a value."* Before this the row fell back to
+    the free-text box, where "yes" stored verbatim reads back as `False` in `apply_field`.
+    """
+    from src.webapp import choices
+    from src.webapp.choices import VehicleClass
+
+    for vehicle_class in (VehicleClass.MOTORHOME, VehicleClass.CARAVAN):
+        options = choices.field_choices("shower_toilet_separated", vehicle_class)
+        assert options == [("", [("True", "Yes"), ("False", "No")])], vehicle_class
+
+    # The stored values are Python's own `str(bool)`, because that is what `apply_field`
+    # parses back with `raw_value == "True"`.
+    assert choices.is_valid_choice("shower_toilet_separated", "True") is True
+    assert choices.is_valid_choice("shower_toilet_separated", "False") is True
+    assert choices.is_valid_choice("shower_toilet_separated", "yes") is False
+
+
+def test_a_reviewers_yes_reaches_the_upload_as_yes() -> None:
+    """The whole point of the selector: what is chosen has to survive to the CSV."""
+    from src.output.build import apply_field
+    from src.product_model.caravan import Caravan
+    from src.product_model.caravan_io import caravan_to_row
+
+    caravan = Caravan(manufacturer="Eriba", model="Touring 310")
+    assert caravan.shower_toilet_separated is None
+
+    decided = apply_field(caravan, "shower_toilet_separated", "True")
+    assert decided.shower_toilet_separated is True
+    assert caravan_to_row(decided)["separate_shower_toilet"] == "Yes"
+
+
+def test_a_reviewers_bed_types_reach_the_upload() -> None:
+    """`bed_types` is multi-select, so several tick boxes come back as one joined value."""
+    from src.output.build import apply_field
+    from src.product_model.caravan import Caravan
+    from src.product_model.caravan_io import caravan_to_row
+
+    caravan = Caravan(manufacturer="Eriba", model="Novaline 515")
+    assert caravan.bed_types == []
+
+    decided = apply_field(caravan, "bed_types", "fixed_bunks, make_up_beds")
+    row = caravan_to_row(decided)
+    assert (row["fixed_bunks"], row["make_up_beds"]) == ("Yes", "Yes")
+    assert row["island_bed"] == "No"
+
+
 def test_needs_selection_only_fires_when_both_sides_are_empty() -> None:
     """On a matched product, accepting is a real answer: keep what FMLV holds."""
     from src.webapp import choices
