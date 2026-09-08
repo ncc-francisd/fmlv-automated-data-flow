@@ -3,12 +3,9 @@
 Surveyed 7 September 2026 against the **2027 model year** UK site at `www.eriba.com/gb/en`.
 Twenty-first manufacturer, and the third caravan brand after Bailey and Swift.
 
-**No adapter has been written yet.** This document and the `config/manufacturers.csv` row
-are the whole of the work so far; nothing is registered in `src/adapters/`, so Eriba does
-not appear in the review app's trigger dropdown. Two decisions are waiting on the requester
-before stage 2 — [body type](#the-open-question-roof-type-is-not-uniform-and-twelve-of-eighteen-lift)
-and [the NCC supplier name](#what-is-still-unverified) — and one of them changes what is
-emitted on twelve of the eighteen products.
+**Adapter written 8 September 2026** — `src/adapters/eriba_caravan.py`, with
+`tests/adapters/test_eriba_caravan.py`. First run: **18 collected, 18 matched, 0 new,
+3 disappeared**, nothing dropped. See [the first run](#first-run--8-september-2026).
 
 Eriba is an **Erwin Hymer Group** brand, built in Germany. **18 caravan layouts across 3
 ranges.**
@@ -546,6 +543,61 @@ the Touring page carries no `selectedModelId` to build one from. That is a point
 range, not to a layout, and it is weak enough that a `reviewer_reference` citing it may be
 worse than none: it sends a reviewer somewhere they still have to search. Left for the
 requester to weigh.
+
+## First run — 8 September 2026 <a id="first-run--8-september-2026"></a>
+
+```
+classified  18 changed, 0 unchanged, 0 new, 3 disappeared
+proposed    184 changes for review, of which 18 are year bumps
+missing     3 product(s) not found on the site
+verified    194 fields checked and unchanged
+```
+
+Exactly what the survey predicted, down to the three departures. **Nothing was dropped** —
+all 18 pass the tolerance band — and the run cost 4 fetches: the brochures page, the price
+list, and the two range pages that have data.
+
+The 194 verified-unchanged fields are the real result. `berths`, `shipping_length_mm`,
+`internal_length_mm`, `headroom_mm`, `manufacturer_range`, `model` and `twin_axle` came back
+unchanged on **18 of 18**, while price and both masses moved on all 18 — a model-year
+re-rating of carried-over shells, and not something a misaligned column could fake four
+times over.
+
+Three figures FMLV had wrong were corrected, each one an isolated change among 17 unchanged
+siblings: Touring 310's height 2770 → 2270 mm, and Touring 620's exterior body length
+5060 → 5230 mm and width 2000 → 2190 mm. The 620's stored body length was **impossible** —
+shorter than its own interior length.
+
+**One finding the survey missed.** `refrigeration` changed on **7** products — Touring 310
+and all six Novaline — from `fridge` to `fridge_freezer`. Eriba's row is titled
+`Refrigerator volume incl. freezer (l)` and prints the freezer's own volume in brackets on
+every layout, so the freezer is stated in words on all 18 and FMLV holds seven of them as a
+plain fridge. Not a parse artefact: the other 11 came back confirmed.
+
+### What the run had to be told to say
+
+Three narrations exist because silence would have been misread:
+
+* **`heating type not collected`**, said every run. Eriba print `Gas heating, 3.5 kW`, which
+  names the fuel and the output but not whether the system is warm-air or water-based — the
+  only distinction FMLV's column draws. A field an adapter never attempts is invisible to
+  the pipeline, so this is the only place it can be explained.
+* **`Touring: the range page publishes no technical data`**, so a reader does not mistake
+  the missing cross-check for a fetch failure.
+* **`9 layout(s) have no floorplan to link`**, naming them.
+
+### The trap the first run found that the survey did not
+
+The survey checked which rows blank and concluded it was only the bed dimensions and the
+storage-compartment clearance. It missed one: **page 6 prints `Heating type` twice against
+five models.** Three of the five Tourings state no heating and which three cannot be
+recovered from the line.
+
+The cardinality check caught it on the first live run, refused the row, and named it —
+which is exactly the job that check exists to do, and the reason it is worth writing before
+the parser looks finished. Heating is now a boundary label rather than a parsed field, and
+`test_a_row_with_the_wrong_number_of_values_is_dropped_and_reported` keeps the defence
+honest on a row that *is* parsed.
 
 ## What this adds to the general pattern
 
