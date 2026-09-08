@@ -1,0 +1,137 @@
+[
+ {
+  "id": 3827045,
+  "marketingName": "Lyseo TD 594",
+  "layoutImageVertical": {
+   "overlayImageSource": "/buerstner/grundrisse_print/2022/wohnmobile/lyseo-td/image-thumb__22260__fancybox-big/lyseotd_594_print_2022.jpg"
+  },
+  "technicalData": {
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "2",
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "3500",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "599",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   }
+  }
+ },
+ {
+  "id": 3823485,
+  "marketingName": "Lyseo TD 644 G",
+  "layoutImageVertical": {
+   "overlayImageSource": "/buerstner/grundrisse_web/2027/b66-td/image-thumb__214507__fancybox-big/buerstner-b66-644-td-uk-grundriss.png"
+  },
+  "technicalData": {
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "2",
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "3650",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "699",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   }
+  }
+ },
+ {
+  "id": 3824052,
+  "marketingName": "Lyseo TD 684 G",
+  "layoutImageVertical": {
+   "overlayImageSource": "/buerstner/grundrisse_web/2027/b66-td/image-thumb__214510__fancybox-big/buerstner-b66-684-td-uk-grundriss.png"
+  },
+  "technicalData": {
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "2",
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "3650",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "689",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   }
+  }
+ },
+ {
+  "id": 3824612,
+  "marketingName": "Lyseo TD 690 G",
+  "layoutImageVertical": {
+   "overlayImageSource": "/buerstner/grundrisse_web/2027/b66-td/image-thumb__194138__fancybox-big/buerstner-b66-690-td-grundriss.png"
+  },
+  "technicalData": {
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "2",
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "3500",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "699",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   }
+  }
+ },
+ {
+  "id": 3823157,
+  "marketingName": "Lyseo TD 744 ",
+  "layoutImageVertical": {
+   "overlayImageSource": "/buerstner/grundrisse_web/2027/b66-td/image-thumb__214513__fancybox-big/buerstner-b66-744-td-uk-grundriss.png"
+  },
+  "technicalData": {
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "2",
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "4400",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "736",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   }
+  }
+ }
+]

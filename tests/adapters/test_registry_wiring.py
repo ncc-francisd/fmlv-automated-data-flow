@@ -28,10 +28,13 @@ from src.adapters.base import fmlv_base_vehicle
 from src.vehicle_class import VehicleClass
 
 #: Modules in `src/adapters/` that are infrastructure rather than a manufacturer.
+#: `ehg_configurator` is the Erwin Hymer Group's configurator API, shared by Eriba,
+#: Dethleffs, Bürstner and Carado — a platform, not a brand, so it declares no
+#: manufacturer and has no `collect`.
 #: `habitation` is the shared feature vocabulary several adapters read their spec prose
 #: with — industry wording, not one brand's, hence its living beside them rather than
 #: inside one of them.
-_NOT_ADAPTERS = {"base", "habitation"}
+_NOT_ADAPTERS = {"base", "ehg_configurator", "habitation"}
 
 
 def _adapter_modules() -> list[ModuleType]:

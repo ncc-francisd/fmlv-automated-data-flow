@@ -444,6 +444,11 @@ even a readable mark would not by itself mean "standard".
 There are **no floorplan drawings in the PDFs either**: every image in them is a 160x160
 icon or a logo.
 
+> **Superseded on 9 September 2026 — the configurator has all twenty.** The statement above
+> is still true of the PDFs, and the range pages only ever carried drawings for B66, none
+> for Signature. Both were the wrong place to look. See
+> [Floorplans: the configurator](#floorplans-the-configurator) below.
+
 What *can* be read from the documents, per layout:
 
 | Field | Source | Notes |
@@ -551,3 +556,38 @@ Confirmed end to end: `Bürstner` appears in the review app's trigger dropdown, 
 being a stale roster of discontinued model names, the second for being dealer stock with
 duplicate/mixed-condition listings, exactly as the requester warned. The specification
 source is the URL supplied midway through the survey, `buerstner.com/gb/models`.
+
+
+## Floorplans: the configurator <a id="floorplans-the-configurator"></a>
+
+Bürstner's configurator is the **Erwin Hymer Group platform** — the same one Eriba,
+Dethleffs and Carado run — so it is backed by a public JSON API and needs no browser. See
+`adapters/ehg_configurator.py`. The requester found it by hand: *"you have to click on
+configurator […] you then get a floor plan and also some more specifications."*
+
+It covers the whole range: **20 layouts, 20 drawings, and the adapter produces exactly 20
+products.** That includes Signature, which has no drawing anywhere else on the site.
+
+Everything is discovered rather than hardcoded — the brand key and series id off the
+configurator page, the model year as the newest the brand publishes — so a renumbered
+series cannot quietly serve last season's layouts.
+
+### The join is on the model, never the range
+
+The API is the **German** product structure and the UK site renames freely. Five of the
+eight B66 layouts are filed under a series called `Lyseo TD`, and one under `Eliseo C`:
+
+| Adapter product | Configurator publishes it as | Drawing |
+| --- | --- | --- |
+| B66 · TD 644 | `Lyseo TD 644 G` | `buerstner-b66-644-td-uk-grundriss.png` |
+| B66 · C 644 | `B66 644 C` (series `Eliseo C`) | `buerstner-b66-644-c-grundriss.png` |
+| B66 · TD 594 | `Lyseo TD 594` | `lyseotd_594_print_2022.jpg` |
+| Signature · SFT 7.0 | `Signature SFT 7.0` | `buerstner-signature-sft-7-0-grundriss.png` |
+
+So `floorplan_for` matches on the **model's own tokens** and ignores the range entirely:
+`TD 644` is in `Lyseo TD 644 G`, `C 644` is in `B66 644 C`. Joining on the range would fail
+on five of eight. The tokens still separate every pair that matters — `HM 6.0` does not
+match `Habiton HMX 6.0`, because `hmx` is not the token `hm` — and an ambiguous match yields
+nothing rather than a guess, since a wrong drawing is read as fact and recorded.
+
+**Verified against all 20 on 9 September 2026: 20 matched, each uniquely.**

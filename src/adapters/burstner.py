@@ -63,7 +63,13 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
+from . import ehg_configurator
+from .base import (
+    ExtractedMotorhome,
+    Provenance,
+    floorplan_provenance,
+    fmlv_base_vehicle,
+)
 
 BASE_URL = "https://www.buerstner.com"
 MANUFACTURER = "Bürstner"
@@ -596,7 +602,105 @@ def parse_document(text: str, config: _DocumentConfig) -> tuple[list[BurstnerPro
     return products, len(blocks)
 
 
-def _build_extracted_motorhome(product: BurstnerProduct, source_url: str) -> ExtractedMotorhome:
+#: Bürstner's configurator, which is the Erwin Hymer Group platform every EHG brand runs —
+#: see `ehg_configurator`. It is the only source of floorplans that covers the whole UK
+#: range: the range pages carry drawings for B66 only, and Signature none at all.
+#:
+#: The requester found it on 9 September 2026, having opened the configurator by hand:
+#: *"you have to click on configurator […] you then get a floor plan and also some more
+#: specifications."*
+_CONFIGURATOR_PAGE = "/gb/configurator/signature"
+
+
+def _model_tokens(name: str) -> frozenset[str]:
+    """A layout's identity as alphanumeric tokens — `'TD 644'` -> `{'td', '644'}`."""
+    return frozenset(token for token in re.split(r"[^a-z0-9]+", name.lower()) if token)
+
+
+def floorplan_for(model: str, plans: dict[str, str]) -> str | None:
+    """One layout's drawing, matched on the **model** alone, or `None`.
+
+    **The range is deliberately not part of the key.** The configurator is the German
+    product structure and the UK site renames freely: `B66 644 TD` is filed under a series
+    called `Lyseo TD` and published as `Lyseo TD 644 G`, while `B66 644 C` comes from one
+    called `Eliseo C`. Matching on the range would fail on five of eight B66 layouts.
+    The model's own tokens survive the renaming — `TD 644` is in `Lyseo TD 644 G`, and
+    `C 644` is in `B66 644 C` — and they still separate every pair that matters:
+    `HM 6.0` does not match `Habiton HMX 6.0`, because `hmx` is not `hm`.
+    Verified against all 20 layouts on 9 September 2026: 20 matched, each uniquely.
+
+    An ambiguous match yields `None` rather than a guess. A wrong drawing is worse than
+    none — a reviewer reads a layout off it and records it as fact.
+    """
+    wanted = _model_tokens(model)
+    if not wanted:
+        return None
+    matched = [
+        url for name, url in plans.items() if wanted <= _model_tokens(name)
+    ]
+    return matched[0] if len(matched) == 1 else None
+
+
+def _fetch_floorplans(
+    http: Fetcher, on_progress: Callable[[str], None]
+) -> dict[str, str]:
+    """`{marketing name: drawing URL}` for the current model year, or `{}`.
+
+    Three requests plus one per series. Everything is discovered rather than hardcoded —
+    the brand key and series id come off the configurator page, and the model year is the
+    newest the brand publishes — so a renumbered or renamed series cannot silently serve
+    last season's layouts. Failures are narrated and never fatal: this supplies pointers a
+    reviewer can do without, not values.
+    """
+    page = http.fetch(f"{BASE_URL}{_CONFIGURATOR_PAGE}")
+    if page.status_code != 200:
+        on_progress(f"configurator page returned {page.status_code} — no floorplans")
+        return {}
+    brand_key = ehg_configurator.parse_brand_key(
+        page.file_path.read_text(encoding="utf-8", errors="replace")
+    )
+    if brand_key is None:
+        on_progress("no brand key on the configurator page — no floorplans")
+        return {}
+
+    index_url = (
+        f"{BASE_URL}{ehg_configurator.BRAND_SERIES_PATH.format(brand_key=brand_key)}"
+        f"?{ehg_configurator.UK_QUERY}"
+    )
+    index = http.fetch(index_url)
+    if index.status_code != 200:
+        on_progress(f"series index returned {index.status_code} — no floorplans")
+        return {}
+    payload = index.file_path.read_text(encoding="utf-8")
+
+    # The list is cumulative — 44 series back to 2023, names reused across years — so
+    # without this the run collects last season's roster. See `ehg_configurator`.
+    year = ehg_configurator.latest_model_year(payload)
+    series = ehg_configurator.parse_series_index(payload, model_year=year)
+    on_progress(f"configurator: {len(series)} series for model year {year}")
+
+    plans: dict[str, str] = {}
+    for entry in series:
+        models_url = (
+            f"{BASE_URL}{ehg_configurator.SERIES_MODELS_PATH.format(series_id=entry.id)}"
+            f"?{ehg_configurator.UK_QUERY}"
+        )
+        response = http.fetch(models_url)
+        if response.status_code != 200:
+            on_progress(f"series {entry.name} returned {response.status_code}, skipped")
+            continue
+        for model in ehg_configurator.parse_models(
+            response.file_path.read_text(encoding="utf-8")
+        ):
+            if model.floorplan_url:
+                plans[model.marketing_name] = model.floorplan_url
+    on_progress(f"configurator: {len(plans)} floorplan(s) found")
+    return plans
+
+
+def _build_extracted_motorhome(
+    product: BurstnerProduct, source_url: str, floorplan_url: str | None = None
+) -> ExtractedMotorhome:
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -742,6 +846,12 @@ def _build_extracted_motorhome(product: BurstnerProduct, source_url: str) -> Ext
             snippet=f"{product.label} — Sleeping berths standard / max.: {product.berths_published}",
         )
 
+    # The positional fields no technical-data table settles — and Bürstner's settle none:
+    # every layout field lives in standard-equipment tables whose availability marks are
+    # vector graphics rather than text. See docs/adapters/burstner.md.
+    if floorplan_url:
+        provenance.update(floorplan_provenance(motorhome, floorplan_url, product.label))
+
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
@@ -828,6 +938,10 @@ def collect(
     on_progress("finding the current technical-data documents...")
     urls = _discover_document_urls(http, on_progress)
 
+    # Once for the manufacturer, not once per document: the configurator is keyed on the
+    # brand, and its layouts span all five.
+    plans = _fetch_floorplans(http, on_progress)
+
     results: list[ExtractedMotorhome] = []
     for config in DOCUMENTS:
         url = urls.get(config.key)
@@ -866,7 +980,11 @@ def collect(
                     f"'{product.seats_published}' but {_SEATS_ARE_A_CEILING_NOTE}. "
                     f"Fill it from the range's equipment list or from EHG"
                 )
-            results.append(_build_extracted_motorhome(product, url))
+            results.append(
+                _build_extracted_motorhome(
+                    product, url, floorplan_url=floorplan_for(product.model, plans)
+                )
+            )
             kept += 1
         on_progress(f"[{config.key}] {kept} layout(s) collected from {table_count} table(s)")
 

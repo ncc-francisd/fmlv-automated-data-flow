@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from src.adapters import burstner
 from src.product_model.enums import BodyType
 
 from src.adapters.burstner import (
@@ -584,3 +587,125 @@ def test_the_extra_seat_pattern_survives_the_mid_label_line_wrap() -> None:
 
     wrapped = "Additional seat secured" + chr(10) + "with a seatbelt and Isofix"
     assert _EXTRA_BELTED_SEAT.search(wrapped)
+
+
+# --------------------------------------------------------------------------- #
+# Floorplans — from the EHG configurator, joined on the model alone
+# --------------------------------------------------------------------------- #
+
+#: Every layout the configurator publishes for the current model year, exactly as its
+#: `marketingName`s read. Saved live on 9 September 2026. Note how little of this looks
+#: like the UK range: five B66 layouts are filed under `Lyseo TD`, one under `B66 … C`.
+LIVE_PLANS = {
+    "B66 600 C": "b66-600-c.png",
+    "B66 640 C": "b66-640-c.png",
+    "B66 644 C": "b66-644-c.png",
+    "Habiton HM 6.0": "hm-6-0.png",
+    "Habiton HM 6.1": "hm-6-1.png",
+    "Habiton HMX 6.0": "hmx-6-0.png",
+    "Habiton HMX 6.1": "hmx-6-1.png",
+    "Lyseo TD 594": "594.jpg",
+    "Lyseo TD 644 G": "b66-644-td.png",
+    "Lyseo TD 684 G": "b66-684-td.png",
+    "Lyseo TD 690 G": "b66-690-td.png",
+    "Lyseo TD 744": "b66-744-td.png",
+    "Signature SFT 7.0": "sft-7-0.png",
+    "Signature SFT 7.1": "sft-7-1.png",
+    "Signature SFT 7.4": "sft-7-4.png",
+    "Signature SFT 7.5": "sft-7-5.png",
+    "Signature SMT 7.0": "smt-7-0.png",
+    "Signature SMT 7.1": "smt-7-1.png",
+    "Signature SMT 7.4": "smt-7-4.png",
+    "Signature SMT 7.5": "smt-7-5.png",
+}
+
+#: The twenty the adapter produces, `(model, expected drawing)`.
+LIVE_PRODUCTS = [
+    ("TD 594", "594.jpg"),
+    ("TD 644", "b66-644-td.png"),
+    ("TD 684", "b66-684-td.png"),
+    ("TD 690", "b66-690-td.png"),
+    ("TD 744", "b66-744-td.png"),
+    ("C 600", "b66-600-c.png"),
+    ("C 640", "b66-640-c.png"),
+    ("C 644", "b66-644-c.png"),
+    ("SFT 7.0", "sft-7-0.png"),
+    ("SFT 7.1", "sft-7-1.png"),
+    ("SFT 7.4", "sft-7-4.png"),
+    ("SFT 7.5", "sft-7-5.png"),
+    ("SMT 7.0", "smt-7-0.png"),
+    ("SMT 7.1", "smt-7-1.png"),
+    ("SMT 7.4", "smt-7-4.png"),
+    ("SMT 7.5", "smt-7-5.png"),
+    ("HM 6.0", "hm-6-0.png"),
+    ("HM 6.1", "hm-6-1.png"),
+    ("HMX 6.0", "hmx-6-0.png"),
+    ("HMX 6.1", "hmx-6-1.png"),
+]
+
+
+@pytest.mark.parametrize(("model", "expected"), LIVE_PRODUCTS)
+def test_every_layout_finds_its_own_drawing(model: str, expected: str) -> None:
+    """All twenty, each uniquely — the check that made this join trustworthy."""
+    assert burstner.floorplan_for(model, LIVE_PLANS) == expected
+
+
+def test_the_join_survives_the_german_series_names() -> None:
+    """`B66 644 TD` is published as `Lyseo TD 644 G`, and `B66 644 C` as `B66 644 C`.
+
+    Two layouts sharing a number, under two different series, telling apart on `TD` and
+    `C` alone. Joining on the range would have failed on five of the eight B66 layouts.
+    """
+    assert burstner.floorplan_for("TD 644", LIVE_PLANS) == "b66-644-td.png"
+    assert burstner.floorplan_for("C 644", LIVE_PLANS) == "b66-644-c.png"
+
+
+def test_a_longer_variant_does_not_take_its_siblings_drawing() -> None:
+    """`HM 6.0` and `HMX 6.0` differ by one letter and are different vehicles."""
+    assert burstner.floorplan_for("HM 6.0", LIVE_PLANS) == "hm-6-0.png"
+    assert burstner.floorplan_for("HMX 6.0", LIVE_PLANS) == "hmx-6-0.png"
+
+
+def test_an_ambiguous_model_yields_no_drawing() -> None:
+    """A wrong drawing is read as fact, so an unclear match records nothing."""
+    assert burstner.floorplan_for("7.0", LIVE_PLANS) is None
+    assert burstner.floorplan_for("", LIVE_PLANS) is None
+
+
+def test_a_model_the_configurator_does_not_publish_yields_none() -> None:
+    assert burstner.floorplan_for("TD 999", LIVE_PLANS) is None
+
+
+def test_the_drawing_becomes_a_pointer_on_every_positional_field() -> None:
+    """Bürstner's technical-data documents settle none of them — the layout fields live in
+    standard-equipment tables whose marks are vector graphics rather than text."""
+    product = burstner.BurstnerProduct(
+        range_label="Signature", model="SFT 7.0", base_vehicle_manufacturer="Fiat"
+    )
+
+    extracted = burstner._build_extracted_motorhome(
+        product, "https://example.invalid/spec.pdf", floorplan_url="https://x/sft-7-0.png"
+    )
+
+    pointers = {
+        name for name, entry in extracted.provenance.items() if entry.reviewer_reference
+    }
+    assert pointers == {
+        "sleeping_area",
+        "kitchen_location",
+        "lounge_location",
+        "bathroom_layout",
+        "bed_types",
+    }
+
+
+def test_no_drawing_means_no_pointers() -> None:
+    product = burstner.BurstnerProduct(
+        range_label="Signature", model="SFT 7.0", base_vehicle_manufacturer="Fiat"
+    )
+
+    extracted = burstner._build_extracted_motorhome(
+        product, "https://example.invalid/spec.pdf"
+    )
+
+    assert not [e for e in extracted.provenance.values() if e.reviewer_reference]

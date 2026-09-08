@@ -228,6 +228,30 @@ Worth checking a neighbouring row when you suspect it: Eriba's `Warm water tank`
 15/3 exactly as the heating row does, which confirmed the split before any of it was
 trusted.
 
+### The Erwin Hymer Group brands share one configurator API
+
+Eriba, Dethleffs, Bürstner and Carado are all EHG, and all run the same configurator —
+backed by a public, unauthenticated JSON API. `adapters/ehg_configurator.py` is the shared
+client; a brand adapter supplies only the interpretation. Laika and Niesmann+Bischoff are
+also EHG and worth checking against it when their turn comes, though neither answered on
+the domain guessed for them.
+
+```
+/gb/configurator/<slug>                     -> data-config (base64) -> seriesId, brandKey
+/configurator-api/brand/<brandKey>/series   -> every series the brand has ever had
+/configurator-api/series/<seriesId>/models  -> layouts, drawings, technical data
+```
+
+Two things will bite anyone using it:
+
+* **Filter the series index by `modelYear`.** It is cumulative — Bürstner's carries 44
+  series back to 2023, with names reused across years — so taking a series by name alone
+  collects last season's roster.
+* **The series name is not the UK range.** The API is the German product structure and the
+  UK sites rename freely: Bürstner's `B66 644 TD` is published as `Lyseo TD 644 G` under a
+  series called `Lyseo TD`, and its `B66 644 C` under one called `Eliseo C`. Join on the
+  layout, never the series.
+
 ### A configurator is a data source, not a dead end
 
 A "needs JavaScript" page is not the same as unreachable data. Eriba's configurator renders
