@@ -444,6 +444,34 @@ Performance and Performance 4x4 have the same habitation layout on different dri
 (T 16 and T 46), and Globetrail VW Performance 600 DR and 600 DR Classic differ in trim,
 not layout.
 
+**Update, 9 September 2026 — the adapter uses the hero image, not the `is-active` one.**
+The reviewer found no floorplan offered in the review; it had never been wired, and wiring
+it meant choosing between two conventions. Both were measured across all 54 layouts (the
+roster has grown from 48):
+
+* **`m-model-variants__item is-active`** — still structurally sound. Every page has one,
+  and every `href` matches its own page, so the check above still holds.
+* **The hero image**, an `a-image` `<picture>` whose `src` sits under a `grundrisse`
+  directory — what `parse_floorplan` reads.
+
+They **agree on 47 of 54**. The 7 differences are asset *vintage* rather than wrong
+layouts: 42 of the `is-active` images are `/konfigurator/` assets, some of them years old
+and filed under a previous range name — Just Van T 1's is
+`…/konfigurator/motorcaravan/2025/globebus-camp/globebus_camp_t1_2025.svg`, where the hero
+gives the current `…/03_bilddaten_2026-27/…/just-van/grundrisse/just-van-t-001…png`. Since
+a reviewer is being asked to read a layout off the drawing, the current one wins.
+
+What the hero image needs guarding against is the opposite trap, and it is the reason
+`parse_floorplan` filters on the owning tag's class. A page shows up to sixteen plans, and
+unfiltered the first belongs to another layout: `globebus-performance-4x4/t-46` takes the
+**T-16's**, and `xl-a/a-6822-2` takes `xl_family_sg-umbau.svg`, a seating-group conversion
+diagram. `m-model-variants__img` and `m-productteaser__img` are what mark those out.
+
+One naming quirk that looks alarming and is not: `globebus_25_freisteller_i4.png` is a
+floorplan despite "freisteller" (cut-out) in its name — it sits in `03_grundrisse` under the
+same `wls-det-view-w-markers` preset as every confirmed plan, and names its own layout.
+Verified end to end: **48 of 48 collected products carry a pointer.**
+
 **Site bug**: `motorhomes/trend-active/i-7027` points its floorplan at
 `…/2027/trend/grundrisse/neu_trend-i-7027_v2.svg`, which **404s**. The working file is the
 same path without the `neu_` prefix, which is what the sibling Trend pages link to.

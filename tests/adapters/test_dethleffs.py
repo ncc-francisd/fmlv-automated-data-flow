@@ -581,3 +581,106 @@ def test_manufacturer_matches_the_registry() -> None:
     assert row["fmlv_manufacturer"] == dethleffs.MANUFACTURER == "Dethleffs"
     assert row["fmlv_display_name"] == dethleffs.MANUFACTURER_DISPLAY_NAME
     assert row["ncc_supplier_name"] == "Dethleffs"
+
+
+# --------------------------------------------------------------------------- #
+# Floorplans — one per layout, and never a neighbour's
+# --------------------------------------------------------------------------- #
+
+
+def test_the_layouts_own_floorplan_is_the_one_taken() -> None:
+    """Every layout page has one, filed under the German `grundrisse`."""
+    assert dethleffs.parse_floorplan(_read("floorplans_just_van_t1")) == (
+        "/dethleffs/01_DE/03_bilddaten_2026-27/02_wohnmobile/just-van/grundrisse"
+        "/image-thumb__202664__wls-det-view-w-markers/just-van-t-001_2000x1000.png"
+    )
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "expected", "would_have_been"),
+    [
+        # The page shows the whole range's plans in a variant selector, and the T-16's
+        # comes first. Taking the first image would have handed the T-46 the T-16's layout.
+        (
+            "floorplans_globebus_performance_4x4_t46",
+            "globebus-performance-t-46_2026_v2.svg",
+            "globebus-performance-t-16_2026_v2.svg",
+        ),
+        # Here the first is not even a layout: `xl_family_sg-umbau.svg` is a seating-group
+        # conversion diagram.
+        (
+            "floorplans_xl_a_6822_2",
+            "xl_a_6822_2_2000x1000.png",
+            "xl_family_sg-umbau.svg",
+        ),
+    ],
+)
+def test_a_neighbours_floorplan_is_never_taken(
+    fixture_name: str, expected: str, would_have_been: str
+) -> None:
+    """The failure this guards against is silent and looks like success.
+
+    A page carries up to sixteen plans — the other layouts in the range, and a related-range
+    teaser — and only one is the layout's own. A reviewer reads a kitchen position off
+    whatever they are shown and records it as fact, so the wrong drawing is worse than none
+    at all. `m-model-variants__img` and `m-productteaser__img` are what tell them apart.
+    """
+    html = _read(fixture_name)
+
+    picked = dethleffs.parse_floorplan(html)
+
+    assert picked is not None
+    assert picked.rsplit("/", 1)[-1] == expected
+    assert would_have_been in html  # the trap is really in the page, not imagined
+    assert would_have_been not in picked
+
+
+def test_a_page_with_no_floorplan_offers_none() -> None:
+    assert dethleffs.parse_floorplan("<html><body>no plans here</body></html>") is None
+
+
+def test_the_floorplan_becomes_a_pointer_on_every_positional_field() -> None:
+    """The reviewer's five questions, each linked to the drawing that answers it.
+
+    Requested 9 September 2026, on finding Dethleffs offered none: *"all of them have floor
+    plans, I believe, but the floor plan hasn't been offered in the review."* It had never
+    been wired — Dethleffs predates the pattern.
+    """
+    layout = replace(
+        dethleffs.parse_layout(
+            "https://www.dethleffs.co.uk/motorhomes/just-van/t-1", _read("just_van_t1")
+        ),
+        floorplan_path="/dethleffs/some/grundrisse/just-van-t-001.png",
+    )
+
+    provenance = dethleffs._build_extracted_motorhome(layout).provenance
+
+    pointers = {
+        name: entry for name, entry in provenance.items() if entry.reviewer_reference
+    }
+    assert set(pointers) == {
+        "sleeping_area",
+        "kitchen_location",
+        "lounge_location",
+        "bathroom_layout",
+        "bed_types",
+    }
+    for name, entry in pointers.items():
+        assert entry.source_url == (
+            "https://www.dethleffs.co.uk/dethleffs/some/grundrisse/just-van-t-001.png"
+        ), name
+        assert entry.snippet.startswith(layout.label), name
+
+
+def test_no_floorplan_means_no_pointers() -> None:
+    """A layout page that stops publishing one must not leave a dead link behind."""
+    layout = replace(
+        dethleffs.parse_layout(
+            "https://www.dethleffs.co.uk/motorhomes/just-van/t-1", _read("just_van_t1")
+        ),
+        floorplan_path=None,
+    )
+
+    provenance = dethleffs._build_extracted_motorhome(layout).provenance
+
+    assert not [entry for entry in provenance.values() if entry.reviewer_reference]

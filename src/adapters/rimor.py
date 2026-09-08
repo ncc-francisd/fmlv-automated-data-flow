@@ -57,7 +57,12 @@ from ..fetch.pdf import extract_text
 from ..product_model.enums import BedType, BodyType
 from ..product_model.model import Motorhome
 from . import habitation
-from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
+from .base import (
+    ExtractedMotorhome,
+    Provenance,
+    floorplan_provenance,
+    fmlv_base_vehicle,
+)
 
 BASE_URL = "https://www.rimor.it"
 MNC_BASE_URL = "https://motorhomesandcaravansltd.co.uk"
@@ -1383,18 +1388,19 @@ def _build_extracted_motorhome(
     # The floorplan, for every positional field the wording cannot settle. One row each,
     # all pointing at the same drawing, so the link sits beside the field being decided.
     if model is not None and model.floorplan_path:
-        floorplan = BASE_URL + model.floorplan_path
-        for name in FLOORPLAN_FIELDS:
-            settled = getattr(motorhome, name)
-            # `bed_types` is a list, so its "unset" is empty rather than None.
-            if settled is not None and settled != []:
-                continue  # already settled from the copy — bed_types on all 34
-            where = f"the layout drawing in {model.read_from}" if model.read_from else "the floorplan"
-            provenance[name] = Provenance(
-                source_url=floorplan,
-                snippet=f"{label} — read {_FLOORPLAN_NOTES[name]} off {where}",
-                reviewer_reference=True,
+        provenance.update(
+            floorplan_provenance(
+                motorhome,
+                BASE_URL + model.floorplan_path,
+                label,
+                fields=FLOORPLAN_FIELDS,
+                drawing=(
+                    f"the layout drawing in {model.read_from}"
+                    if model.read_from
+                    else "the floorplan"
+                ),
             )
+        )
 
     for name in UNCONFIRMED_FEATURES:
         if name in features:

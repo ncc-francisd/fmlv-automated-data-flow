@@ -48,7 +48,12 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
+from .base import (
+    ExtractedMotorhome,
+    Provenance,
+    floorplan_provenance,
+    fmlv_base_vehicle,
+)
 
 BASE_URL = "https://www.dethleffs.co.uk"
 MANUFACTURER = "Dethleffs"
@@ -316,6 +321,8 @@ class DethleffsLayout:
     range_heading: str
     model: str
     body_tag: str | None = None
+    #: The layout's own floorplan, for the positional fields no table settles.
+    floorplan_path: str | None = None
     rrp_pounds: int | None = None
     berths_published: str | None = None
     seats_published: str | None = None
@@ -626,12 +633,52 @@ def parse_layout(url: str, page_html: str) -> DethleffsLayout | None:
         base_vehicle_manufacturer=fmlv_base_vehicle(chassis.split()[0] if chassis else None),
         poptop_published=specs.get(LABEL_BED_POPTOP) or None,
         card=parse_main_facts(page_html),
+        floorplan_path=parse_floorplan(page_html),
     )
 
 
 # --------------------------------------------------------------------------- #
 # Orchestration
 # --------------------------------------------------------------------------- #
+
+
+#: A floorplan image. Dethleffs file them under the German `grundrisse`, in whatever format
+#: the range was drawn in — `.svg` on some, `.png` on others, sometimes both of the same
+#: drawing.
+_FLOORPLAN = re.compile(r'/dethleffs/[^"\s]*grundrisse[^"\s]*\.(?:png|jpe?g|svg|webp)')
+
+#: The two places a layout page shows a floorplan that is **not its own**, and the reason
+#: this cannot simply take the first image it finds. `m-model-variants__img` is the
+#: other-layouts-in-this-range selector; `m-productteaser__img` is a related-range teaser.
+#: A page carries up to sixteen plans and only one of them is the layout's.
+#:
+#: Getting this wrong is silent and looks like success, which is what makes it worth the
+#: care: unfiltered, `globebus-performance-4x4/t-46` takes the **T-16's** drawing and
+#: `xl-a/a-6822-2` takes a seating-group conversion diagram. A reviewer reads a kitchen
+#: position off whatever they are shown and records it as fact.
+_NOT_THIS_LAYOUT = ("m-model-variants", "m-productteaser")
+
+#: How far back to look for the tag that owns an image. Comfortably clears the `<picture>`
+#: and `<source>` markup Dethleffs wrap each one in.
+_OWNER_WINDOW = 400
+
+
+def parse_floorplan(html: str) -> str | None:
+    """The path to this layout's own floorplan, or `None`.
+
+    Verified across all 54 layouts on 9 September 2026: every one has a drawing, and every
+    one this returns names its own layout. See `_NOT_THIS_LAYOUT` for what is filtered out
+    and why. Where a page offers the same drawing twice — an `.svg` and a `.png`, or two
+    sizes — the first in document order is the one on the page, so that is the one taken.
+    """
+    for match in _FLOORPLAN.finditer(html):
+        window = html[max(0, match.start() - _OWNER_WINDOW) : match.start()]
+        owners = re.findall(r'<(?:picture|img)[^>]*class="([^"]*)"', window)
+        classes = owners[-1] if owners else ""
+        if any(marker in classes for marker in _NOT_THIS_LAYOUT):
+            continue
+        return match.group(0)
+    return None
 
 
 def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
@@ -731,6 +778,13 @@ def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
                 f"{HIGH_TOP_ABOVE_MM}mm) and the elevating roof being {roof}"
             )
         record("body_type", f"from {detail}, not from the model name or the base vehicle")
+
+    # The positional fields no specification table settles. One pointer per field, all at
+    # the same drawing, so the link sits beside the field being decided.
+    if layout.floorplan_path:
+        provenance.update(
+            floorplan_provenance(motorhome, BASE_URL + layout.floorplan_path, layout.label)
+        )
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 

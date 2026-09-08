@@ -705,6 +705,23 @@ drawing, so the link sits beside the field being decided — the requester, 6 Se
 2026: *"the link will be to the same place because that's where a human can interpret the
 diagram"*. `rimor.FLOORPLAN_FIELDS` is the worked example.
 
+**Use `base.floorplan_provenance`, don't hand-roll it.** It takes the product, the URL and
+the label, and returns a pointer for each positional field *that has no answer yet* — so a
+field the adapter did fill drops out on its own. `base.FLOORPLAN_QUESTIONS` holds the
+wording, shared so a reviewer working across manufacturers meets the same five questions
+phrased the same way each time.
+
+**Finding the drawing is the part that needs care, and the failure is silent.** A layout
+page usually shows several plans: the other layouts in the range, and often a related-range
+teaser. Taking the first image you find is how you hand a reviewer someone else's layout,
+which is worse than offering nothing — they read a kitchen position off it and record it as
+fact. On Dethleffs, unfiltered, `globebus-performance-4x4/t-46` takes the **T-16's**
+drawing and `xl-a/a-6822-2` takes a seating-group conversion diagram. The discriminator
+there is the class on the owning tag (`m-model-variants__img`, `m-productteaser__img`);
+elsewhere it may be the filename or the DOM position. Whatever it is, **check it across the
+whole roster before trusting it** — Dethleffs came out 54 of 54, each page's own plan, and
+that number is the reason the pointer is safe to ship.
+
 `reviewer_reference` exists because an empty field is otherwise ambiguous.
 `swift_caravan` records one to ask for a stale figure to be *cleared*, which is rightly
 dropped on a product that never had one; a floorplan pointer must survive onto a new

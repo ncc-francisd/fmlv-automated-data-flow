@@ -14,7 +14,7 @@ snapshotted to disk regardless (DESIGN.md §6.6) and reproducible.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -153,6 +153,53 @@ class Provenance:
     #: empty field to ask for a stale figure to be *cleared*, which is rightly dropped on
     #: a product that never had one.
     reviewer_reference: bool = False
+
+
+#: The positional fields a specification almost never settles and a drawing always does,
+#: with what a reviewer has to read off the plan for each. Shared because every adapter
+#: that hands over a floorplan hands over the same questions, and a reviewer working
+#: across manufacturers should not have to re-read the same instruction five ways.
+FLOORPLAN_QUESTIONS: dict[str, str] = {
+    "sleeping_area": "which end the beds are at",
+    "kitchen_location": "whether the kitchen is rear, side or corner",
+    "lounge_location": "whether the lounge is front, rear or twin",
+    "bathroom_layout": "what the washroom is, and whether it is rear or side",
+    "bed_types": "which beds are built in and which are made up from the seating",
+}
+
+
+def floorplan_provenance(
+    product: Motorhome | Caravan,
+    floorplan_url: str,
+    label: str,
+    *,
+    fields: Iterable[str] | None = None,
+    drawing: str = "the floorplan",
+) -> dict[str, Provenance]:
+    """A reviewer pointer at `floorplan_url`, for each positional field still unanswered.
+
+    One entry per field rather than one per product, so the link sits beside the field
+    being decided — the requester, 6 September 2026: *"the link will be to the same place
+    because that's where a human can interpret the diagram."*
+
+    **A field the adapter has already answered gets no pointer**, because there is nothing
+    left to look up. `bed_types` and `bathroom_layout` are lists, so their unanswered state
+    is `[]` rather than `None` and both count as empty.
+
+    `drawing` names what the reviewer is opening, for the cases where it is not simply a
+    floorplan image — Rimor's Van 238 sends them to a page of a PDF leaflet.
+    """
+    pointers: dict[str, Provenance] = {}
+    for name in fields if fields is not None else FLOORPLAN_QUESTIONS:
+        settled = getattr(product, name, None)
+        if settled is not None and settled != []:
+            continue
+        pointers[name] = Provenance(
+            source_url=floorplan_url,
+            snippet=f"{label} — read {FLOORPLAN_QUESTIONS[name]} off {drawing}",
+            reviewer_reference=True,
+        )
+    return pointers
 
 
 @dataclass

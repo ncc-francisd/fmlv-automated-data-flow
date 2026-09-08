@@ -126,7 +126,7 @@ from ..product_model.enums import (
 )
 from ..vehicle_class import VehicleClass
 from . import habitation
-from .base import ExtractedCaravan, Provenance
+from .base import ExtractedCaravan, Provenance, floorplan_provenance
 
 __all__ = [
     "DEFAULT_RANGES",
@@ -1228,17 +1228,10 @@ def build_extracted(
     # really nice diagram of the inside that could be used to better depict the layout."*
     plan = (configurator.floorplan_url if configurator else None) or floorplan_url
     if plan:
-        for name in FLOORPLAN_FIELDS:
-            if name in provenance:
-                continue  # already answered outright, so there is nothing to send anyone to
-            provenance[name] = Provenance(
-                source_url=plan,
-                snippet=(
-                    f"{product.label} — Eriba's specification does not say where this is. "
-                    f"Open the floorplan to see the layout, then choose"
-                ),
-                reviewer_reference=True,
-            )
+        # Every positional field, not just the four this adapter used to list: the helper
+        # skips whatever has an answer, so `bed_types` and `sleeping_area` drop out of
+        # their own accord on the layouts the configurator settled.
+        provenance.update(floorplan_provenance(caravan, plan, product.label))
 
     return ExtractedCaravan(caravan=caravan, provenance=provenance)
 
