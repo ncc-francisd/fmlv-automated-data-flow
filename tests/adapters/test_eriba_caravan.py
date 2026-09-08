@@ -23,12 +23,19 @@ would return no layouts whatever the parser did.
 
 from __future__ import annotations
 
+import base64
+import json
 from pathlib import Path
 
 import pytest
 
 from src.adapters import ADAPTERS, adapter_for, adapters_for, eriba_caravan
-from src.product_model.enums import CaravanBodyType, Refrigeration
+from src.product_model.enums import (
+    BedType,
+    CaravanBodyType,
+    CaravanSleepingArea,
+    Refrigeration,
+)
 from src.vehicle_class import VehicleClass
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -40,6 +47,7 @@ FRONT_AND_NOTES = "eriba_pricelist_front_and_notes.txt"
 BROCHURES = "eriba_brochures.html"
 RANGE_FEELING = "eriba_range_feeling.html"
 RANGE_TOURING = "eriba_range_touring.html"
+CONFIGURATOR_MODELS = "eriba_configurator_touring_models.json"
 
 
 def fixture(name: str) -> str:
@@ -596,3 +604,161 @@ def test_the_three_spec_pages_hold_thirteen_of_the_eighteen_layouts() -> None:
 
     assert len(everything) == 13
     assert sum(1 for name in everything if name.startswith("Touring")) == 9
+
+
+# --------------------------------------------------------------------------- #
+# The configurator API — bed types, the sleeping area, and a drawing for all 18
+# --------------------------------------------------------------------------- #
+
+
+def configurator_layouts() -> dict[str, eriba_caravan.ConfiguratorLayout]:
+    """Every layout in the saved Touring API response, keyed by its marketing name."""
+    parsed = eriba_caravan.parse_configurator_models(fixture(CONFIGURATOR_MODELS), "touring")
+    return {layout.label: layout for layout in parsed}
+
+
+def configurator_page(series_id: object) -> str:
+    """The one thing the adapter reads off the configurator page: its base64 config."""
+    blob = base64.b64encode(
+        json.dumps({"seriesName": "ERIBA Touring", "seriesId": series_id}).encode()
+    ).decode()
+    return f"""<div id="configurator" data-config='{blob}'></div>"""
+
+
+def test_the_series_id_is_read_from_the_page_not_hardcoded() -> None:
+    """A range Eriba renumbers must not silently serve another range's layouts."""
+    assert eriba_caravan.parse_configurator_series_id(configurator_page(4125120)) == 4125120
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        "<div id='configurator'></div>",
+        """<div data-config='not base64 at all'></div>""",
+        # A string id is not one to trust into a URL path.
+        None,
+    ],
+)
+def test_an_unreadable_config_gives_no_series_id(html: str | None) -> None:
+    page = configurator_page("4125120") if html is None else html
+    assert eriba_caravan.parse_configurator_series_id(page) is None
+
+
+def test_the_configurator_names_each_bed_and_which_end_it_is_at() -> None:
+    """The two fields the price list cannot express, stated rather than inferred.
+
+    Eriba print bed *dimensions* — "Bed dimension: Rear bed, L x W (cm) 188 x 140" — which
+    say nothing about the type. `technicalDataBed` says both type and end.
+    """
+    found = configurator_layouts()
+
+    front_and_rear = found["Touring 310"]
+    assert front_and_rear.bed_types == (BedType.FIXED, BedType.MAKE_UP)
+    assert front_and_rear.sleeping_area is CaravanSleepingArea.BOTH
+
+    rear_only = found["Touring 420"]
+    assert rear_only.bed_types == (BedType.MAKE_UP,)
+    assert rear_only.sleeping_area is CaravanSleepingArea.REAR
+
+
+def test_an_optional_pop_top_bed_is_not_a_bed_the_buyer_has() -> None:
+    """Touring 620 lists a pop-top double as an option; counting it would say `both`.
+
+    The standing rule, and here the source states it outright rather than leaving it to a
+    price in the prose: `isOptional` is `yes`.
+    """
+    layout = configurator_layouts()["Touring 620"]
+
+    assert layout.bed_types == (BedType.FIXED_SEPARATE,)
+    assert layout.sleeping_area is CaravanSleepingArea.REAR
+    assert "pop-top" not in layout.bed_evidence
+
+
+def test_every_layout_gets_a_per_layout_deep_link_and_a_drawing() -> None:
+    """The finding that prompted this: Touring layouts do have a plan, and their own URL.
+
+    The range pages carry an SVG for nine of the eighteen and none for Touring, which is
+    why the survey concluded no Touring drawing was reachable anywhere. The configurator
+    has one for every layout, and `?selectedModelId=` addresses each on its own.
+    """
+    for layout in configurator_layouts().values():
+        assert layout.url == (
+            f"https://www.eriba.com/gb/en/configurator/touring"
+            f"?selectedModelId={layout.model_id}"
+        )
+        assert layout.floorplan_url is not None
+        assert layout.floorplan_url.startswith("https://www.eriba.com/")
+
+
+def test_the_configurator_republishes_the_berths_and_both_masses() -> None:
+    """A third independent source for the figures, so `collect` can cross-check them."""
+    layout = configurator_layouts()["Touring 310"]
+
+    assert (layout.berths, layout.mtplm_kilograms, layout.mro_kilograms) == (3, 1000, 820)
+
+
+@pytest.mark.parametrize("payload", ["", "not json", "{}", "[]", '[{"id": 1}]'])
+def test_an_unusable_api_response_yields_no_layouts(payload: str) -> None:
+    """Narrated and skipped by `collect`: this source supplements, it is never load-bearing."""
+    assert eriba_caravan.parse_configurator_models(payload, "touring") == []
+
+
+def test_the_configurator_agrees_with_the_price_list_on_every_saved_layout() -> None:
+    """The cross-check that makes the rest of it trustworthy.
+
+    Two documents published independently — a sterling PDF price list and a JSON API — and
+    they agree on the berth count and both masses. That also corroborates the *positional*
+    reading of the price list's columnar spread, which is the fragile part of this adapter.
+    """
+    from_price_list = layouts(TOURING_P5)
+    from_api = configurator_layouts()
+
+    compared = 0
+    for label, layout in from_api.items():
+        product = from_price_list.get(label)
+        if product is None:
+            continue
+        compared += 1
+        assert product.berths == layout.berths, label
+        assert product.mtplm_kilograms == layout.mtplm_kilograms, label
+        assert product.mro_kilograms == layout.mro_kilograms, label
+    assert compared >= 2
+
+
+def test_a_configurator_layout_answers_the_fields_and_stops_pointing_at_the_plan() -> None:
+    """An answered field loses its floorplan pointer — there is nothing left to look up.
+
+    The other positional fields keep theirs: the configurator settles where the *beds*
+    are and says nothing about the kitchen, the lounge or the washroom.
+    """
+    product = layouts(TOURING_P5)["Touring 310"]
+    layout = configurator_layouts()[product.label]
+
+    extracted = eriba_caravan.build_extracted(
+        product, "https://example.invalid/price-list.pdf", configurator=layout
+    )
+
+    assert extracted.caravan.bed_types == [BedType.FIXED, BedType.MAKE_UP]
+    assert extracted.caravan.sleeping_area is CaravanSleepingArea.BOTH
+    # Read, not referred: these carry a value and the record that states it.
+    for name in ("bed_types", "sleeping_area"):
+        assert extracted.provenance[name].reviewer_reference is False
+        assert "selectedModelId" in extracted.provenance[name].source_url
+    # Still nobody's call but a reviewer's — now with a drawing to read them off.
+    for name in ("kitchen_location", "lounge_location", "bathroom_layout"):
+        assert extracted.provenance[name].reviewer_reference is True
+        assert extracted.provenance[name].source_url == layout.floorplan_url
+
+
+def test_without_the_configurator_nothing_regresses() -> None:
+    """The API is supplementary, so losing it costs the two fields and nothing else."""
+    product = layouts(TOURING_P5)["Touring 310"]
+
+    extracted = eriba_caravan.build_extracted(
+        product, "https://example.invalid/price-list.pdf"
+    )
+
+    assert extracted.caravan.bed_types == []
+    assert extracted.caravan.sleeping_area is None
+    assert extracted.caravan.mtplm_kilograms == 1000
+    assert "bed_types" not in extracted.provenance

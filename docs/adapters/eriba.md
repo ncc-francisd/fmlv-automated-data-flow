@@ -501,10 +501,12 @@ So the expected first run is **18 collected, 18 matched, 0 new, 3 disappeared.**
 
 ## What is still unverified
 
-- **The positional habitation fields** — `sleeping_area`, `kitchen_location`,
-  `lounge_location`, `bathroom_layout`. The price list gives bed *dimensions* but no
-  positions, so these need `reviewer_reference` pointers at a drawing, and **only nine of the
-  eighteen have one** — see [floorplans](#floorplans-nine-of-eighteen) below.
+- **`kitchen_location`, `lounge_location` and `bathroom_layout`.** The price list gives
+  bed *dimensions* but no positions and never describes the washroom, so these need
+  `reviewer_reference` pointers at a drawing — and since 9 September 2026 **all eighteen
+  have one**, from the configurator. `sleeping_area` and `bed_types` are no longer in this
+  list: the configurator states both outright. See
+  [the configurator API](#the-configurator-api) below.
 - **Whether the three departing Touring layouts should be archived** rather than left as
   live 2026 rows once the 2027 range is uploaded. That is an FMLV-side action, not an
   adapter one.
@@ -515,7 +517,94 @@ So the expected first run is **18 collected, 18 matched, 0 new, 3 disappeared.**
 Settled and recorded above rather than here: the identity strings and the roster (from the
 export), `exterior_body_length_mm` in scope, and the payload columns.
 
-## Floorplans: nine of eighteen <a id="floorplans-nine-of-eighteen"></a>
+## The configurator API <a id="the-configurator-api"></a>
+
+The survey read the range pages and concluded that Touring had no drawing anywhere and
+that the configurator was a range-level pointer with no per-layout link. Both conclusions
+were wrong, and the requester disproved them by hand on 9 September 2026 simply by using
+the thing: *"that pointer does take you to specific model layouts, and then you can click
+technical specification and get more."*
+
+The configurator page renders nothing server-side, which is why searching its HTML found
+nothing. It hands its JavaScript a base64 `data-config` blob carrying a **`seriesId`**, and
+the bundle names the endpoint:
+
+```
+/gb/en/configurator/{slug}                        -> data-config -> seriesId
+/configurator-api/series/{seriesId}/models?locale=en_GB&country=GB&currencyCode=GBP
+```
+
+Public, unauthenticated, plain JSON, **no browser needed**. Three series cover the whole
+roster — Touring `4125120` (9), Feeling `4132358` (3), Novaline `4129427` (6) — which is
+exactly the eighteen the price list gives. The series id is read from the page rather than
+hardcoded, so a range Eriba renumbers cannot silently serve another range's layouts.
+
+### What it gives that the price list cannot
+
+**A per-layout URL and drawing, for all eighteen.** `?selectedModelId=<id>` addresses one
+layout, and `layoutImageVertical` is a rendered interior view rather than the range pages'
+schematic SVG. It is preferred over the SVG on both counts — coverage, and the requester's
+own judgement that it is the more readable: *"if you select layout, you actually get a
+really nice diagram of the inside that could be used to better depict the layout."*
+
+**`bed_types` and `sleeping_area`, stated rather than inferred.** `technicalDataBed` gives
+one record per bed with a `bedType`, an `installedIn` and an `isOptional`. That is a read
+value, not a reading of a drawing, so both fields carry ordinary provenance pointing at
+the configurator and **lose their floorplan pointer** — there is nothing left to look up.
+
+| `bedType` | FMLV |
+| --- | --- |
+| `seating-group-bed` | `make_up_beds` |
+| `twin-bed` | `fixed_separate_beds` |
+| `bunk-bed` | `fixed_bunks` |
+| `double-bed`, `french-bed`, `v-bed` | `fixed_bed` |
+
+The field earns its keep by naming `seating-group-bed` separately: that is the only
+made-up kind, so everything else in the table is a bed that stands there whether or not
+anyone makes it up. Which *fixed* column each takes then follows the requester's hierarchy
+of 8 September — the most specific type that fits, `fixed_bed` as the fallback.
+`french-bed` and `v-bed` are shapes FMLV has no column for, so they take that fallback:
+the shape is not recordable, but the fixedness is, and this field is what establishes it.
+That is a different situation from reading "French bed" out of marketing prose, which
+settles nothing on its own — Rimor's Horus 12 has *"a rear double French bed that also
+lifts to create more storage space"*.
+
+`installedIn` gives the sleeping area: front and rear together means `both`, and `middle`
+maps to neither on purpose, since a bed amidships is not a third answer — Novaline 515 has
+one alongside a front double and rear bunks, and the answer there is `both`.
+
+**Optional beds are excluded**, per the standing rule. Touring 620, 630 and 642 each list
+a pop-top double as an option; counting it would add a bed type *and* move the sleeping
+area from `rear` to `both`. Here the source states it outright — `isOptional: yes` — rather
+than leaving it to a price in the prose.
+
+### It also corroborates the risky part of this adapter
+
+The API republishes the berth count and both masses, so `collect` cross-checks all three
+and narrates any disagreement without resolving it — same policy as the range pages, since
+the price list is the source of record. On the first live run **all eighteen agreed and
+nothing was reported.**
+
+That is worth more than a clean line in the log. This adapter reads a *columnar* price
+list, attributing values to layouts by position across a spread — the one genuinely
+fragile thing it does, and the thing the page-6 `Heating type` trap already caught once. An
+independent JSON source agreeing on three figures for all eighteen layouts is direct
+evidence that the positional attribution is right.
+
+### What it still does not give
+
+No heating type, no microwave, and nothing about the washroom. So `kitchen_location`,
+`lounge_location` and `bathroom_layout` remain a reviewer's call — but now with a drawing
+on every product, and `shower_toilet_separated` is asked about explicitly rather than
+going out as a silent `No` (see `store.changes.OPEN_HABITATION_FIELDS`).
+
+## Floorplans: nine of eighteen from the range pages <a id="floorplans-nine-of-eighteen"></a>
+
+> **Superseded on 9 September 2026.** The conclusion below — that no Touring drawing is
+> reachable — is true of the *range pages* and wrong about the site. Every layout has a
+> drawing, and its own URL, behind the configurator. Read
+> [the configurator API](#the-configurator-api) first; this section is kept because the
+> 404 evidence still explains why the range pages are not the place to look.
 
 The Feeling and Novaline slides carry a per-layout drawing as an SVG on a strictly
 predictable path:
@@ -584,7 +673,11 @@ Three narrations exist because silence would have been misread:
   the pipeline, so this is the only place it can be explained.
 * **`Touring: the range page publishes no technical data`**, so a reader does not mistake
   the missing cross-check for a fetch failure.
-* **`9 layout(s) have no floorplan to link`**, naming them.
+* **`9 layout(s) have no floorplan to link`**, naming them — now expected to be silent,
+  since the configurator supplies a drawing for all eighteen. If it ever speaks again, the
+  configurator fetch failed.
+* **`<Range>: configurator series <id> gives N layout(s), N with bed types and N with a
+  drawing`**, once per range.
 
 ### The trap the first run found that the survey did not
 

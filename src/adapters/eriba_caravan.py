@@ -99,6 +99,8 @@ left to look like an oversight.
 
 from __future__ import annotations
 
+import base64
+import json
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -108,7 +110,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.caravan import Caravan
-from ..product_model.enums import CaravanBodyType
+from ..product_model.enums import BedType, CaravanBodyType, CaravanSleepingArea
 from ..vehicle_class import VehicleClass
 from . import habitation
 from .base import ExtractedCaravan, Provenance
@@ -118,11 +120,15 @@ __all__ = [
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
     "VEHICLE_CLASS",
+    "BED_TYPES_BY_CONFIGURATOR_NAME",
+    "ConfiguratorLayout",
     "EribaCaravan",
     "build_extracted",
     "collect",
     "cross_check",
     "find_price_list_url",
+    "parse_configurator_models",
+    "parse_configurator_series_id",
     "parse_range_page",
     "parse_spec_page",
     "price_list_currency_problem",
@@ -282,6 +288,190 @@ FLOORPLAN_FIELDS: tuple[str, ...] = (
     "lounge_location",
     "bathroom_layout",
 )
+
+
+#: The configurator page for one range. It renders nothing server-side — the layouts, the
+#: drawings and the technical data all arrive from an API — which is why the range pages
+#: were read as the only source and Touring concluded to have no floorplan anywhere. It
+#: does, and so does every other layout; the requester found the per-layout URL by hand on
+#: 9 September 2026: *"that pointer does take you to specific model layouts, and then you
+#: can click technical specification and get more."*
+CONFIGURATOR_PATH = "/gb/en/configurator/{slug}"
+
+#: The base64 JSON the configurator page hands its own JavaScript. It carries the
+#: `seriesId` the API is keyed on, so the id is **read rather than hardcoded** and a range
+#: Eriba renumbers cannot silently point at another range's layouts.
+_CONFIG_BLOB = re.compile(r"data-config='([A-Za-z0-9+/=]+)'")
+
+#: The endpoint the configurator bundle names `fetchModels`. Public, unauthenticated and
+#: plain JSON — no browser needed. The query pins the UK locale, so the marketing names
+#: come back in English and match what the price list calls each layout.
+CONFIGURATOR_MODELS_PATH = "/configurator-api/series/{series_id}/models"
+CONFIGURATOR_MODELS_QUERY = "locale=en_GB&country=GB&currencyCode=GBP"
+
+#: Where a reviewer lands for one layout, which is the whole reason this was worth wiring.
+CONFIGURATOR_LAYOUT_URL = BASE_URL + "/gb/en/configurator/{slug}?selectedModelId={model_id}"
+
+#: The configurator's `bedType` vocabulary, and what FMLV records for each.
+#:
+#: The field earns its keep by naming `seating-group-bed` separately, that being the only
+#: made-up kind: everything else here is a bed that stands there whether or not anyone
+#: makes it up. So the rest are fixed, and which *fixed* column each takes follows the
+#: requester's hierarchy of 8 September 2026 — the most specific type that fits, with
+#: `fixed_bed` as the fallback for a permanent bed that is none of the others.
+#:
+#: `french-bed` and `v-bed` are shapes FMLV has no column for, so they take that fallback
+#: rather than contributing nothing: the shape is not recordable but the *fixedness* is,
+#: and this field is what establishes it. That is different from reading "French bed" out
+#: of marketing prose, which settles nothing on its own — Rimor's Horus 12 has "a rear
+#: double French bed that also lifts to create more storage space".
+BED_TYPES_BY_CONFIGURATOR_NAME: dict[str, BedType] = {
+    "seating-group-bed": BedType.MAKE_UP,
+    "twin-bed": BedType.FIXED_SEPARATE,
+    "bunk-bed": BedType.FIXED_BUNKS,
+    "double-bed": BedType.FIXED,
+    "french-bed": BedType.FIXED,
+    "v-bed": BedType.FIXED,
+}
+
+#: Where the configurator says a bed is installed, and the end that implies. `middle` is
+#: absent on purpose: the column offers front, rear or both, and a bed amidships is not a
+#: third answer — Novaline 515 has one alongside a front double and rear bunks, and the
+#: right answer there is `both`.
+_SLEEPING_ENDS: dict[str, str] = {"front": "front", "rear": "rear"}
+
+
+@dataclass(frozen=True)
+class ConfiguratorLayout:
+    """One layout as the configurator API describes it.
+
+    A second, independent source for what the price list already gives — berths and the
+    two masses — and the *only* source for three things the price list cannot express: a
+    per-layout drawing, the type of each bed, and which end each bed is at.
+    """
+
+    label: str
+    model_id: int
+    url: str
+    floorplan_url: str | None = None
+    bed_types: tuple[BedType, ...] = ()
+    bed_evidence: str = ""
+    sleeping_area: CaravanSleepingArea | None = None
+    berths: int | None = None
+    mtplm_kilograms: int | None = None
+    mro_kilograms: int | None = None
+
+
+def parse_configurator_series_id(page_html: str) -> int | None:
+    """The `seriesId` the configurator page hands its JavaScript, or `None`."""
+    blob = _CONFIG_BLOB.search(page_html)
+    if blob is None:
+        return None
+    try:
+        config = json.loads(base64.b64decode(blob.group(1)))
+    except (ValueError, TypeError):
+        return None
+    series_id = config.get("seriesId")
+    return series_id if isinstance(series_id, int) else None
+
+
+def _technical_value(technical_data: dict, key: str) -> str | None:
+    """One `technicalData` entry's value. Each is `{key, value, unit, unitLong}` or null."""
+    entry = technical_data.get(key)
+    if not isinstance(entry, dict):
+        return None
+    value = entry.get("value")
+    return str(value) if value not in (None, "") else None
+
+
+def _beds_from(
+    technical_data: dict,
+) -> tuple[tuple[BedType, ...], str, CaravanSleepingArea | None]:
+    """`(bed types, the evidence, sleeping area)` from one layout's bed records.
+
+    **Optional beds are excluded**, per the standing rule that a paid extra is not what
+    the buyer has: Touring 620, 630 and 642 each list a pop-top double as an option, and
+    counting it would both add a bed type and move the sleeping area.
+
+    Order follows the document, deduplicated, so the value and its evidence read the same
+    way round.
+    """
+    entry = technical_data.get("technicalDataBed")
+    items = ((entry or {}).get("value") or {}).get("items") or []
+
+    found: list[BedType] = []
+    quoted: list[str] = []
+    ends: set[str] = set()
+    for item in items:
+        values = item.get("values") or {}
+        if values.get("isOptional") == "yes":
+            continue
+        name = values.get("bedType")
+        where = values.get("installedIn")
+        bed_type = BED_TYPES_BY_CONFIGURATOR_NAME.get(name)
+        if bed_type is None:
+            continue
+        quoted.append(f"{name} ({where})" if where else str(name))
+        if bed_type not in found:
+            found.append(bed_type)
+        if where in _SLEEPING_ENDS:
+            ends.add(_SLEEPING_ENDS[where])
+
+    if ends == {"front", "rear"}:
+        sleeping = CaravanSleepingArea.BOTH
+    elif ends == {"front"}:
+        sleeping = CaravanSleepingArea.FRONT
+    elif ends == {"rear"}:
+        sleeping = CaravanSleepingArea.REAR
+    else:
+        sleeping = None
+    return tuple(found), ", ".join(quoted), sleeping
+
+
+def parse_configurator_models(payload: str, slug: str) -> list[ConfiguratorLayout]:
+    """Every layout in one series' API response.
+
+    The label comes from the API's own `marketingName` ("Touring 310"), which is what the
+    price list calls the layout too, so the join needs no translation table.
+    """
+    try:
+        models = json.loads(payload)
+    except ValueError:
+        return []
+    if not isinstance(models, list):
+        return []
+
+    layouts: list[ConfiguratorLayout] = []
+    for model in models:
+        if not isinstance(model, dict):
+            continue
+        name = " ".join(str(model.get("marketingName") or "").split())
+        model_id = model.get("id")
+        if not name or not isinstance(model_id, int):
+            continue
+        technical_data = model.get("technicalData") or {}
+        bed_types, bed_evidence, sleeping = _beds_from(technical_data)
+        plan = model.get("layoutImageVertical") or model.get("layoutImage") or {}
+        source = plan.get("overlayImageSource") if isinstance(plan, dict) else None
+        layouts.append(
+            ConfiguratorLayout(
+                label=name,
+                model_id=model_id,
+                url=CONFIGURATOR_LAYOUT_URL.format(slug=slug, model_id=model_id),
+                floorplan_url=f"{BASE_URL}{source}" if source else None,
+                bed_types=bed_types,
+                bed_evidence=bed_evidence,
+                sleeping_area=sleeping,
+                berths=_int_or_none(_technical_value(technical_data, "sleepingBerths")),
+                mtplm_kilograms=_int_or_none(
+                    _technical_value(technical_data, "weightGrossVehicle")
+                ),
+                mro_kilograms=_int_or_none(
+                    _technical_value(technical_data, "weightRoadworthy")
+                ),
+            )
+        )
+    return layouts
 
 
 def _clean(html: str) -> str:
@@ -691,6 +881,7 @@ def build_extracted(
     payload_basis: str | None = None,
     corroboration: str | None = None,
     floorplan_url: str | None = None,
+    configurator: ConfiguratorLayout | None = None,
 ) -> ExtractedCaravan:
     """One layout as a `Caravan` plus the provenance a reviewer sees beside each field.
 
@@ -723,6 +914,15 @@ def build_extracted(
     )
     if "refrigeration" in features:
         caravan.refrigeration = features["refrigeration"].value  # type: ignore[assignment]
+
+    # The two fields the price list cannot express and the configurator states outright.
+    # Neither is guessed from the drawing — `technicalDataBed` names each bed's type and
+    # which end it is installed at, so these are read values like any other.
+    if configurator is not None:
+        if configurator.bed_types:
+            caravan.bed_types = list(configurator.bed_types)
+        if configurator.sleeping_area is not None:
+            caravan.sleeping_area = configurator.sleeping_area
 
     provenance: dict[str, Provenance] = {}
 
@@ -857,10 +1057,37 @@ def build_extracted(
                     snippet=f"{existing.snippet}. {corroboration}",
                 )
 
-    if floorplan_url:
+    # Read from the configurator, so it links there rather than to the drawing: a reviewer
+    # checking a bed type wants the record that states it, and the drawing is one click on.
+    if configurator is not None:
+        if configurator.bed_types:
+            provenance["bed_types"] = Provenance(
+                source_url=configurator.url,
+                snippet=(
+                    f"{product.label} — the configurator's standard beds: "
+                    f"{configurator.bed_evidence}"
+                ),
+            )
+        if configurator.sleeping_area is not None:
+            provenance["sleeping_area"] = Provenance(
+                source_url=configurator.url,
+                snippet=(
+                    f"{product.label} — which end each standard bed is installed at: "
+                    f"{configurator.bed_evidence}"
+                ),
+            )
+
+    # The configurator's rendered interior in preference to the range page's line drawing:
+    # it exists for all eighteen layouts where the SVG exists for nine, and the requester
+    # judged it the more readable of the two — *"if you select layout, you actually get a
+    # really nice diagram of the inside that could be used to better depict the layout."*
+    plan = (configurator.floorplan_url if configurator else None) or floorplan_url
+    if plan:
         for name in FLOORPLAN_FIELDS:
+            if name in provenance:
+                continue  # already answered outright, so there is nothing to send anyone to
             provenance[name] = Provenance(
-                source_url=floorplan_url,
+                source_url=plan,
                 snippet=(
                     f"{product.label} — Eriba's specification does not say where this is. "
                     f"Open the floorplan to see the layout, then choose"
@@ -913,6 +1140,53 @@ def _site_layouts(
     return found
 
 
+def _configurator_layouts(
+    http: Fetcher,
+    wanted: Sequence[tuple[str, str]],
+    on_progress: Callable[[str], None],
+) -> dict[str, ConfiguratorLayout]:
+    """Every layout the configurator API publishes, keyed `"<Range> <model>"`.
+
+    Two fetches per range: the configurator page for its `seriesId`, then the models
+    endpoint. Failures are narrated and swallowed, exactly as for the range pages — this
+    supplies bed types, the sleeping area and a drawing, all of which a reviewer can
+    answer without, so none of it is worth losing the run's products over.
+    """
+    found: dict[str, ConfiguratorLayout] = {}
+    for slug, range_name in wanted:
+        # The range-page slug carries an `eriba-` prefix the configurator's does not.
+        configurator_slug = slug.removeprefix("eriba-")
+        page_url = f"{BASE_URL}{CONFIGURATOR_PATH.format(slug=configurator_slug)}"
+        try:
+            page = http.fetch(page_url).file_path.read_text(encoding="utf-8", errors="replace")
+            series_id = parse_configurator_series_id(page)
+            if series_id is None:
+                on_progress(f"{range_name}: no series id on {page_url} — no configurator data")
+                continue
+            models_url = (
+                f"{BASE_URL}{CONFIGURATOR_MODELS_PATH.format(series_id=series_id)}"
+                f"?{CONFIGURATOR_MODELS_QUERY}"
+            )
+            payload = http.fetch(models_url).file_path.read_text(encoding="utf-8")
+        except Exception as error:  # noqa: BLE001 - a supplementary source must never fail the run
+            on_progress(f"could not read {range_name}'s configurator ({error}) — continuing")
+            continue
+
+        layouts = parse_configurator_models(payload, configurator_slug)
+        if not layouts:
+            on_progress(f"{range_name}: configurator series {series_id} listed no layouts")
+            continue
+        for layout in layouts:
+            found[layout.label] = layout
+        with_beds = sum(1 for layout in layouts if layout.bed_types)
+        with_plan = sum(1 for layout in layouts if layout.floorplan_url)
+        on_progress(
+            f"{range_name}: configurator series {series_id} gives {len(layouts)} layout(s), "
+            f"{with_beds} with bed types and {with_plan} with a drawing"
+        )
+    return found
+
+
 def collect(
     http: Fetcher,
     browser: object = None,  # noqa: ARG001 - server-rendered; `http` snapshots every fetch
@@ -960,6 +1234,7 @@ def collect(
         on_progress(f"price list is the {model_year.group(1)} model year")
 
     site = _site_layouts(http, wanted, on_progress)
+    configurator = _configurator_layouts(http, wanted, on_progress)
 
     spec_pages = [
         (number, page.text)
@@ -1006,6 +1281,28 @@ def collect(
                         f"publishes the same {agreed} figures ({site_url})"
                     )
 
+            layout = configurator.get(product.label)
+            if layout is not None:
+                # A third independent publication of the two masses and the berth count.
+                # Reported, never resolved here, for the same reason the range page is:
+                # the price list is the source of record and a disagreement is a question
+                # for a human, not something to average away.
+                differences = [
+                    f"{name} price list {mine} vs configurator {theirs}"
+                    for name, mine, theirs in (
+                        ("berths", product.berths, layout.berths),
+                        ("MTPLM", product.mtplm_kilograms, layout.mtplm_kilograms),
+                        ("MRO", product.mro_kilograms, layout.mro_kilograms),
+                    )
+                    if mine is not None and theirs is not None and mine != theirs
+                ]
+                if differences:
+                    on_progress(
+                        f"{product.label}: the configurator DISAGREES with the price list "
+                        f"on {len(differences)} field(s) — {'; '.join(differences)}. "
+                        f"Emitting the price list's figures; this needs a human"
+                    )
+
             extracted.append(
                 build_extracted(
                     product,
@@ -1013,6 +1310,7 @@ def collect(
                     payload_basis=reason,
                     corroboration=corroboration,
                     floorplan_url=floorplan,
+                    configurator=layout,
                 )
             )
 

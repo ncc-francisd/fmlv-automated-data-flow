@@ -1,0 +1,338 @@
+[
+ {
+  "id": 4125730,
+  "marketingName": "Touring 310",
+  "layoutImageVertical": {
+   "overlayImageSource": "/hymer/produktbilder/2023_01/caravans/touring-facelift/hoch/image-thumb__31330__fancybox-big/2022-eriba-touring-310_a.jpg"
+  },
+  "technicalData": {
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "3",
+    "unit": null,
+    "unitLong": null
+   },
+   "technicalDataBed": {
+    "key": "technicalDataBed",
+    "value": {
+     "items": [
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "140",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "188",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": 0,
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "double-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": 0,
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "73",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "188",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "53",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "seating-group-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "front",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": 0,
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "73",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "188",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "yes",
+        "bedType": "seating-group-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "front",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      }
+     ]
+    },
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "1000",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "weightRoadworthy": {
+    "key": "weightRoadworthy",
+    "value": "820",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   }
+  }
+ },
+ {
+  "id": 4127746,
+  "marketingName": "Touring 420",
+  "layoutImageVertical": {
+   "overlayImageSource": "/hymer/produktbilder/2023_01/caravans/touring-facelift/hoch/image-thumb__31332__fancybox-big/2022-eriba-touring-420_a.jpg"
+  },
+  "technicalData": {
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "2",
+    "unit": null,
+    "unitLong": null
+   },
+   "technicalDataBed": {
+    "key": "technicalDataBed",
+    "value": {
+     "items": [
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "188",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "190",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": 0,
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": 0,
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "seating-group-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": 0,
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      }
+     ]
+    },
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "1100",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "weightRoadworthy": {
+    "key": "weightRoadworthy",
+    "value": "940",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   }
+  }
+ },
+ {
+  "id": 4125121,
+  "marketingName": "Touring 620",
+  "layoutImageVertical": {
+   "overlayImageSource": "/eriba/grundrisse/my25/touring/hochkant/image-thumb__82476__fancybox-big/2024-eriba-touring-620_b.jpg"
+  },
+  "technicalData": {
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "2",
+    "unit": null,
+    "unitLong": null
+   },
+   "technicalDataBed": {
+    "key": "technicalDataBed",
+    "value": {
+     "items": [
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "205",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "210",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "200",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "twin-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "138",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "200",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "yes",
+        "bedType": "double-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "pop-top",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      }
+     ]
+    },
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "1500",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "weightRoadworthy": {
+    "key": "weightRoadworthy",
+    "value": "1290",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   }
+  }
+ }
+]

@@ -201,6 +201,34 @@ agreed, none differed. Without that the attribution would have been plausible ra
 established, and a silently transposed column is the failure this whole warning exists
 about.
 
+### A configurator is a data source, not a dead end
+
+A "needs JavaScript" page is not the same as unreachable data. Eriba's configurator renders
+nothing server-side, so searching its HTML for a layout or a drawing finds neither, and the
+survey concluded that Touring had no floorplan anywhere on the site and that the
+configurator offered no per-layout link. Both were wrong, and the requester disproved them
+by clicking through it.
+
+Two steps got the whole of it without a browser:
+
+* **The mount point's own config.** Eriba's `<div id="configurator" data-config='…'>` holds
+  base64 JSON with the `seriesId` the API is keyed on. Configurators are built this way as
+  a rule — the page hands its JavaScript the parameters, and those parameters are in the
+  served HTML even when nothing else is.
+* **The endpoint table in the bundle.** Grepping the configurator JS for `"/…api…"` turned
+  up `fetchModels: "/configurator-api/series/{seriesId}/models"` verbatim. Public,
+  unauthenticated, plain JSON.
+
+What it yielded is the point: a per-layout URL and drawing for every layout, `bed_types`
+and `sleeping_area` as *structured* records (`bedType`, `installedIn`, `isOptional`) rather
+than prose to be parsed, and an independent republication of the berth count and both
+masses. That last one matters most — it corroborated the adapter's positional reading of a
+columnar price list, which is the fragile thing it does.
+
+So before recording a field as unobtainable, or a pointer as the best available compromise,
+check whether the interactive part of the site is fed by an API. And when a reviewer says a
+page does something your notes say it cannot, believe the reviewer: they are looking at it.
+
 ### A one-layout range's leaflet is a spec sheet, not marketing
 
 The reason brochure tables are hard is that they put layouts side by side. A range with
