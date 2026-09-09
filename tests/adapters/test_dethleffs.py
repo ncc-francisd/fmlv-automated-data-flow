@@ -5,7 +5,7 @@ things the adapter reads: the technical-data modal, the main-facts card and the 
 tag. **All five tables sharing the modal's class are kept**, including the four equipment
 lists, because picking the specification out of them is what the parse gets right or wrong.
 
-Nine of the 48 layouts were kept, each for a reason:
+Nine of the 54 layouts were kept, each for a reason:
 
 * `just_van_t1` — the requester's warning made concrete: a "Van" the site tags `Low
   Profile`. Also the `<sup>` footnote sitting inside the height cell.
@@ -60,8 +60,13 @@ CAPTURED: tuple[tuple[str, str], ...] = (
 #: What Dethleffs publicly list on the GB site, and what the sitemap must therefore yield:
 #: 36 motorhomes and 12 campervans. Reconciled against all 11 range pages on 2 September
 #: 2026 with nothing missing in either direction.
-EXPECTED_LAYOUT_COUNT = 48
-EXPECTED_MOTORHOME_COUNT = 36
+#: What the GB sitemap lists, refreshed 9 September 2026. It was 48 at the 2 September
+#: survey; `Trend Active Plus` launched in between and added six, which the adapter
+#: collected by nothing at all until its path was configured. `collect` now reconciles the
+#: sitemap against the configured ranges out loud on every run so the next one is noticed.
+EXPECTED_LAYOUT_COUNT = 54
+#: 36 at the survey, plus the six `Trend Active Plus` layouts that launched after it.
+EXPECTED_MOTORHOME_COUNT = 42
 EXPECTED_CAMPERVAN_COUNT = 12
 
 
@@ -452,7 +457,12 @@ def model_urls() -> list[str]:
 
 
 def test_the_sitemap_yields_the_whole_published_roster(model_urls: list[str]) -> None:
-    """Dethleffs list 36 motorhomes and 12 campervans on the GB site."""
+    """Dethleffs list 42 motorhomes and 12 campervans on the GB site.
+
+    Refreshed 9 September 2026, when `Trend Active Plus` added six motorhomes to what had
+    been a 48-layout roster. Those six were in the sitemap and in no configured range, so
+    nothing collected them — which is why `collect` now reconciles the two out loud.
+    """
     assert len(model_urls) == EXPECTED_LAYOUT_COUNT
     assert sum("/motorhomes/" in url for url in model_urls) == EXPECTED_MOTORHOME_COUNT
     assert sum("/camper-van/" in url for url in model_urls) == EXPECTED_CAMPERVAN_COUNT

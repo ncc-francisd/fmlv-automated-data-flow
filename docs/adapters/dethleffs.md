@@ -305,22 +305,42 @@ Genuinely gone from the site (so genuine deactivations, not parse failures): **E
 **Just Van** range (3), **Globebus Performance** (2) and **4x4** (2), `Trend Active A class
 I 7027`, `Just Camp Active T 6762`, and three Globetrail layouts.
 
-## Resolved: Trend Active Plus is not on the UK site
+## Trend Active Plus launched a week after the survey - and a stated roster went stale
 
-Checked again after the requester reported the pages working. The page they opened,
-`/motorhomes/trend-active/t-7057-eb`, has a modal headed **"Trend Active Low profile /
-T 7057 EB"** at **£85,090.00** — that is the *plain* Trend Active, and it is already one of
-the 48. Every plausible Plus URL 404s (`/motorhomes/trend-active-plus`,
-`…/trend-active-plus/t-7057-eb`, `…/i-7057-eb`, `/motorhomes/trend-plus`, and both
-configurator paths), the `/motorhomes/trend-active` range page links only to its 11 layouts
-and to the two non-Plus configurator entries, and the string "Trend Active Plus" appears
-nowhere on the site. It exists only in the MY2027 GB technical PDF.
+On 2 September 2026 this range was **out of scope and correctly so**: every plausible URL
+404'd, the range page linked only to the plain Trend Active's layouts, and the string
+appeared nowhere on the site. It existed only in the MY2027 GB technical PDF, and the
+website-overrules-the-PDF rule put it out.
 
-Per the website-overrules-the-PDF rule, **Trend Active Plus is out of scope** — and there
-is no price for it anywhere, so it could not be published in full even if included. Worth a
-question to the brand, since the PDF suggests it is a real MY2027 product. If it is ever
-added, `T 7057 EB` and `I 7057 EB` **collide on model name** with existing Trend Active
-layouts and are separated only by the range.
+By **9 September** it was live: `/motorhomes/trend-active-plus` with six layouts, in the
+sitemap, priced. And the adapter collected **none of them**, silently, because
+`DEFAULT_RANGES` is a stated roster and nothing reconciled it against the sitemap. 54
+layout pages published, 48 collected, no warning anywhere. It was found by counting the
+sitemap by hand.
+
+**So `collect` now reconciles the two out loud on every run**: any layout page under no
+configured range is named in an `on_progress` warning. A stated roster still beats a
+heuristic - that rule is not in doubt - but a stated roster has to be told when it is
+wrong, and the sitemap is the thing that can tell it.
+
+### The collision the old note predicted
+
+That section closed by warning that if the range were ever added, `T 7057 EB` and
+`I 7057 EB` would **collide on model name** with existing Trend Active layouts and be
+separated only by the range. It was right, and the first mapping walked into it:
+`trend-active` and `trend-active-plus` both publish `7057 DBL`, `7057 EB` and `7057 EBL`,
+the Plus about GBP1,500 dearer. Filing the Plus under FMLV's existing `Trend Active T` -
+which looked right, because FMLV holds `Trend Active T` / `7057 DBL` - produced **12
+products carrying 6 identities**, which is two upload rows per vehicle.
+
+They are therefore their own ranges, `Trend Active Plus T` and `Trend Active Plus I`, which
+also agrees with the requester's Carado ruling that an equipment tier belongs in the range
+name. FMLV's `Trend Active T` / `7057 DBL` is the plain one, already collected from
+`trend-active`.
+
+**And `collect` now checks for duplicate identities**, because that is what caught this: two
+products sharing a range and model would upload as two rows for one vehicle, and the matcher
+would pair both against the same baseline row.
 
 ## The first real run — #8, 2 September 2026
 
@@ -584,11 +604,41 @@ beds have a length of 195 cm" about the I 4 and "roomy, separate shower" about t
 is the only prose read. **The twelve campervan pages publish theirs in German** — *"großes
 Querbett"* — so they yield no beds and no washroom, and nothing is invented for them.
 
-Still open: the **campervans' fridge**, which is in the GB camper-van PDF (84 l with a 6.1 l
-freezer) and not on their pages, so those 12 findings are silent where the manual pack above
-has an answer. And the sitemap now lists **54** model pages against the 48 this survey
-recorded — the difference is worth reading carefully on the first run rather than assuming,
-per the roster rule in [`README.md`](README.md).
+### The campervans' fridge - closed 9 September 2026
+
+The requester spotted this on his first run of the findings panel: *"on some of them, you
+don't mention fridges at all. Is that because there was literally no mention of fridges on
+the whole site?"* It was not. The 42 motorhome pages carry a `Refrigerator volume (thereof
+freezer)` row; the 12 Globetrail campervan pages carry no such row **and** no kitchen
+equipment category, so their fridge was the one habitation field the adapter reported
+nothing for.
+
+It is in the **camper-van technical-data PDF**, and only there - one line per range in the
+standard-equipment list:
+
+| PDF footer | site range heading | the line |
+| --- | --- | --- |
+| `Globetrail (Fiat)` | `Globetrail Fiat` | Compressor refrigerator 84 l incl. freezer compartment 6.1 l |
+| `Globetrail Active Plus` | `Globetrail Active Plus Fiat` | Compressor refrigerator 84 l incl. freezer compartment 6.1 l |
+| `Globetrail Performance (VW)` | `Globetrail VW Performance` | Compressor refrigerator with drawers 90 l incl. freezer compartment (7 l) |
+
+Which matches the manual layout pack above, figure for figure. Three things about how it is
+read:
+
+* **Per range, not per layout** - that is all the document supports, the same as
+  `eriba.heating_from_spec_page`. The finding's snippet says so, so nobody mistakes it for
+  a per-layout reading.
+* **The page always wins.** A range-wide figure may only fill what the layout page left
+  unsaid; it can never override something read off the layout itself.
+* **Rediscovered, not hardcoded.** The PDF's path carries the model year twice
+  (`/mj27/technische-daten_camper-vans-02-2027_gb_englisch.pdf`), so it is found from the
+  campervan index page each run. A missing or unreadable document costs the one field and
+  nothing else - it never raises.
+
+That is a third vocabulary for the same three ranges: the site says `Globetrail Fiat`, the
+PDF says `Globetrail (Fiat)`, and FMLV says `Globetrail Classic`. See `PDF_RANGE_HEADINGS`.
+
+**All 54 products now carry a fridge finding and a heating finding.**
 
 ### Two things the layout data revealed that the adapter's own diff would not
 

@@ -46,6 +46,7 @@ from html import unescape
 from pathlib import Path
 
 from ..fetch.http import Fetcher
+from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
 from . import habitation
@@ -80,6 +81,10 @@ DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("motorhomes/globebus-performance-4x4", "Globebus Performance 4x4"),
     ("motorhomes/just-camp-active", "Just Camp Active"),
     ("motorhomes/trend-active", "Trend Active"),
+    # Launched on the GB site after the 2 September 2026 survey, which had recorded it as
+    # not sold here. Six layouts, and the adapter collected none of them until
+    # 9 September — see the roster warning in `collect`.
+    ("motorhomes/trend-active-plus", "Trend Active Plus"),
     ("motorhomes/xl-a", "XL A"),
     ("motorhomes/xl-i", "XL I"),
     ("motorhomes/alpa", "Alpa"),
@@ -113,6 +118,17 @@ RANGE_MAP: dict[str, tuple[str, bool]] = {
     "Alpa Coachbuilt": ("Alpa A", True),
     "Trend Active A class": ("Trend Active I", True),
     "Trend Active Low profile": ("Trend Active T", True),
+    # **A range of its own, and the model codes are why.** `trend-active` and
+    # `trend-active-plus` both publish `7057 DBL`, `7057 EB` and `7057 EBL` — different
+    # vehicles, the Plus about £1,500 dearer — so filing the Plus under `Trend Active T`
+    # gave six duplicate identities and would have put two rows for one product into an
+    # upload. The first build of this mapping did exactly that, and the duplicate-identity
+    # check in `collect` is what caught it.
+    #
+    # It also agrees with the requester's Carado ruling of 9 September 2026, that an
+    # equipment tier belongs in the range name rather than the model.
+    "Trend Active Plus A Class": ("Trend Active Plus I", True),
+    "Trend Active Plus Low Profile": ("Trend Active Plus T", True),
     "XL Family I": ("XL Family I", True),
     "XL Family A": ("XL", False),
     "Just Camp Active Low Profile": ("Just Camp Active", False),
@@ -146,6 +162,7 @@ RANGE_PATH_TO_FMLV_RANGES: dict[str, frozenset[str]] = {
     ),
     "Just Camp Active": frozenset({"Just Camp Active"}),
     "Trend Active": frozenset({"Trend Active T", "Trend Active I"}),
+    "Trend Active Plus": frozenset({"Trend Active Plus T", "Trend Active Plus I"}),
     "XL A": frozenset({"XL"}),
     "XL I": frozenset({"XL Family I"}),
     "Alpa": frozenset({"Alpa A", "Alpa I"}),
@@ -214,6 +231,11 @@ _BODY_TYPES: dict[str, BodyType] = {
 #: The tag Dethleffs give every campervan. It does not distinguish the four campervan body
 #: types FMLV needs, so those are resolved from the roof — see `DethleffsLayout.body_type`.
 CAMPERVAN_TAG = "Camper Van"
+
+#: The campervan section of the site, and the prefix of every campervan range path.
+#: **Singular** — `/campervans` 404s. Also the page the camper-van technical-data PDF is
+#: linked from, which is the only place those twelve layouts' fridge is published.
+CAMPER_VAN_SECTION = "camper-van"
 
 #: Marks a value as available only as a cost option, e.g. `265 / 278 (○)`, `4 - 5 (○)`.
 OPTIONAL_MARK = "○"
@@ -874,7 +896,93 @@ def _feature_value(features: dict[str, habitation.Feature], name: str) -> object
     return found.value if found is not None else None
 
 
-def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
+#: The MY2027 GB camper-van technical-data PDF, discovered from the campervan index page
+#: rather than hardcoded: its path carries the model year twice
+#: (`/mj27/technische-daten_camper-vans-02-2027_gb_englisch.pdf`), so a hardcoded URL is a
+#: URL that expires. The rule in `docs/adapters/README.md` on rediscovering documents.
+_CAMPER_VAN_PDF = re.compile(
+    r"[\w/.-]*technische-daten[\w/.-]*camper-vans[\w/.-]*\.pdf", re.I
+)
+
+#: The page footer, which names the range every page of the PDF belongs to. It prints in
+#: two orders — `15 - 02/2027 | GB | Globetrail (Fiat)` on a section's first page and
+#: `16 - Globetrail (Fiat) | 02/2027 | GB` on the rest — so both are matched.
+_PDF_FOOTER = re.compile(
+    r"(?:^|\n)\s*\d+\s*-\s*(?:(?P<before>[^|\n]+?)\s*\|\s*)?02/\d{4}\s*\|\s*GB"
+    r"(?:\s*\|\s*(?P<after>[^\n]+))?"
+)
+
+#: PDF footer label -> the site's own range heading, which is what a layout carries.
+#: A third vocabulary for the same three ranges: the site says `Globetrail Fiat`, the PDF
+#: says `Globetrail (Fiat)`, and FMLV says `Globetrail Classic`.
+PDF_RANGE_HEADINGS: dict[str, str] = {
+    "Globetrail (Fiat)": "Globetrail Fiat",
+    "Globetrail Active Plus": "Globetrail Active Plus Fiat",
+    "Globetrail Performance (VW)": "Globetrail VW Performance",
+}
+
+
+def find_camper_van_pdf_url(index_html: str) -> str | None:
+    """The camper-van technical-data PDF's URL, from the campervan index page."""
+    match = _CAMPER_VAN_PDF.search(index_html)
+    if match is None:
+        return None
+    path = unescape(match.group(0))
+    return path if path.startswith("http") else BASE_URL + path
+
+
+def parse_camper_van_refrigeration(pages: list[str]) -> dict[str, habitation.Feature]:
+    """`{site range heading: Feature}` for the fridge each campervan range publishes.
+
+    **Why this exists.** The 36 motorhome pages carry a `Refrigerator volume (thereof
+    freezer)` row; the 12 Globetrail campervan pages carry no such row and no kitchen
+    equipment category either, so their fridge was the one habitation field the adapter
+    reported nothing for. The requester noticed exactly that gap on his first run of the
+    findings panel, 9 September 2026: *"on some of them, you don't mention fridges at all.
+    Is that because there was literally no mention of fridges on the whole site?"* It was
+    not — it is in this PDF, and only here.
+
+    Read **per range rather than per layout**, which is all the document supports: each
+    range's standard-equipment list states one fridge for every layout in it. The same
+    treatment `eriba.heating_from_spec_page` gives a figure published once per page.
+    """
+    found: dict[str, habitation.Feature] = {}
+    for text in pages:
+        footer = _PDF_FOOTER.search(text)
+        if footer is None:
+            continue
+        label = (footer.group("before") or footer.group("after") or "").strip()
+        heading = PDF_RANGE_HEADINGS.get(label)
+        if heading is None or heading in found:
+            continue
+        feature = habitation.refrigeration_from(text.splitlines())
+        if feature is not None:
+            found[heading] = feature
+    return found
+
+
+def _build_extracted_motorhome(
+    layout: DethleffsLayout,
+    *,
+    range_refrigeration: habitation.Feature | None = None,
+    range_source_url: str | None = None,
+) -> ExtractedMotorhome:
+    """One product from its layout page, plus anything only a range document settles.
+
+    `range_refrigeration` fills a field the *page* does not publish: the 12 Globetrail
+    campervans' fridge, which is in the camper-van technical-data PDF and nowhere else.
+    See `parse_camper_van_refrigeration`.
+
+    **The page always wins.** A range document states one value for every layout in it, so
+    it is the weaker source and may only fill what the page left unsaid — it can never
+    override something read off the layout itself.
+    """
+    features = dict(layout.features)
+    from_range: set[str] = set()
+    if range_refrigeration is not None and "refrigeration" not in features:
+        features["refrigeration"] = range_refrigeration
+        from_range.add("refrigeration")
+
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -894,10 +1002,10 @@ def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
         # Habitation, from the page's own wording — reported as findings rather than
         # proposed, so these values are never written to FMLV by the pipeline. See
         # `spec_lines` and `product_model.findings`.
-        heating=_feature_value(layout.features, "heating"),
-        refrigeration=_feature_value(layout.features, "refrigeration"),
-        shower_toilet_separated=_feature_value(layout.features, "shower_toilet_separated"),
-        bed_types=_feature_value(layout.features, "bed_types") or [],
+        heating=_feature_value(features, "heating"),
+        refrigeration=_feature_value(features, "refrigeration"),
+        shower_toilet_separated=_feature_value(features, "shower_toilet_separated"),
+        bed_types=_feature_value(features, "bed_types") or [],
         microwave=False if layout.microwave_absence else None,
         # A proposed value, not a finding: the site answers it either way. See
         # `DethleffsLayout.rear_garage`.
@@ -906,8 +1014,10 @@ def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
 
     provenance: dict[str, Provenance] = {}
 
-    def record(field: str, snippet: str) -> None:
-        provenance[field] = Provenance(source_url=layout.url, snippet=f"{layout.label} — {snippet}")
+    def record(field: str, snippet: str, *, url: str | None = None) -> None:
+        provenance[field] = Provenance(
+            source_url=url or layout.url, snippet=f"{layout.label} — {snippet}"
+        )
 
     # Both halves of the identity, always together: they are one name split across two
     # columns, and accepting a range rename without the matching model rename corrupts it.
@@ -993,7 +1103,18 @@ def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
             "hatch — under-bed space loaded through the rear doors is not a rear garage",
         )
 
-    for name, feature in layout.features.items():
+    for name, feature in features.items():
+        if name in from_range:
+            # Not on the layout's page at all, so the link has to open the document that
+            # does state it, and the note has to say it is a range-wide figure.
+            record(
+                name,
+                f"stated once for the whole {layout.range_heading} range in the "
+                f"camper-van technical data, the layout pages publishing no fridge row: "
+                f"{feature.snippet}",
+                url=range_source_url,
+            )
+            continue
         note = feature.note or _FEATURE_NOTES.get(name, "read from the page")
         record(name, f"{note}: {feature.snippet}")
     if layout.microwave_absence:
@@ -1006,6 +1127,59 @@ def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
             floorplan_provenance(motorhome, BASE_URL + layout.floorplan_path, layout.label)
         )
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
+
+
+def _camper_van_refrigeration(
+    http: Fetcher,
+    ranges: tuple[tuple[str, str], ...],
+    *,
+    on_progress: Callable[[str], None],
+) -> tuple[dict[str, habitation.Feature], str | None]:
+    """The campervans' fridge, from the one document that states it.
+
+    Two extra fetches, and only when a campervan range is in scope: the campervan index
+    page to discover the PDF (its path carries the model year twice, so it is rediscovered
+    rather than hardcoded), then the PDF itself.
+
+    Never raises. A missing or unreadable document leaves the twelve campervans' fridge
+    unstated, which is where they were before — so this can cost nothing but the fetch.
+    """
+    wanted = [path for path, _label in ranges if path.startswith(CAMPER_VAN_SECTION)]
+    if not wanted:
+        return {}, None
+
+    index_url = f"{BASE_URL}/{CAMPER_VAN_SECTION}"
+    index = http.fetch(index_url)
+    if index.status_code != 200:
+        on_progress(f"no campervan fridge: {index_url} returned {index.status_code}")
+        return {}, None
+    pdf_url = find_camper_van_pdf_url(
+        index.file_path.read_text(encoding="utf-8", errors="replace")
+    )
+    if pdf_url is None:
+        on_progress(f"no campervan fridge: no technical-data PDF linked from {index_url}")
+        return {}, None
+
+    on_progress(f"fetching the camper-van technical data {pdf_url} ...")
+    document = http.fetch(pdf_url)
+    if document.status_code != 200:
+        on_progress(f"no campervan fridge: {pdf_url} returned {document.status_code}")
+        return {}, None
+    try:
+        pages = [page.text for page in extract_text(document.file_path).pages]
+    except Exception as error:  # noqa: BLE001 — a bad PDF costs one field, not the run
+        on_progress(f"no campervan fridge: could not read {pdf_url} ({error})")
+        return {}, None
+
+    found = parse_camper_van_refrigeration(pages)
+    if found:
+        on_progress(
+            f"camper-van technical data gives the fridge for "
+            f"{', '.join(sorted(found))}"
+        )
+    else:
+        on_progress(f"no campervan fridge found in {pdf_url}")
+    return found, pdf_url
 
 
 def collect(
@@ -1045,6 +1219,24 @@ def collect(
 
     wanted_paths = [path for path, _label in ranges]
     on_progress(f"{len(model_urls)} model page(s) in the sitemap, across {len(wanted_paths)} range path(s)")
+
+    # A stated roster beats a heuristic, but a stated roster goes stale — and silently.
+    # `Trend Active Plus` launched on the GB site a week after the survey recorded it as
+    # not sold here, and six real layouts were collected by nothing at all until someone
+    # counted the sitemap by hand. So the two are reconciled out loud on every run.
+    prefixes = tuple(f"{BASE_URL}/{path}/" for path, _label in ranges)
+    unclaimed = [url for url in model_urls if not url.startswith(prefixes)]
+    if unclaimed and ranges == DEFAULT_RANGES:
+        paths = sorted({url.rsplit("/", 1)[0].replace(f"{BASE_URL}/", "") for url in unclaimed})
+        on_progress(
+            f"WARNING: {len(unclaimed)} layout page(s) in the sitemap are under no "
+            f"configured range and were NOT collected — {', '.join(paths)}. Add the path "
+            f"to DEFAULT_RANGES and its heading to RANGE_MAP."
+        )
+
+    camper_van_fridges, camper_van_pdf_url = _camper_van_refrigeration(
+        http, ranges, on_progress=on_progress
+    )
 
     results: list[ExtractedMotorhome] = []
     for path, range_label in ranges:
@@ -1106,7 +1298,29 @@ def collect(
             ):
                 if value is None:
                     on_progress(f"[{layout.label}] WARNING: no {field} published, left blank")
-            results.append(_build_extracted_motorhome(layout))
+            results.append(
+                _build_extracted_motorhome(
+                    layout,
+                    range_refrigeration=camper_van_fridges.get(layout.range_heading),
+                    range_source_url=camper_van_pdf_url,
+                )
+            )
+
+    # Two products with one identity is two rows for one vehicle in the upload, and the
+    # matcher pairs both against the same baseline row. Cheap to check, and it caught the
+    # `Trend Active Plus` mapping the moment that range was added.
+    seen_identities: dict[tuple[str | None, str | None], int] = {}
+    for extracted in results:
+        key = (extracted.motorhome.manufacturer_range, extracted.motorhome.model)
+        seen_identities[key] = seen_identities.get(key, 0) + 1
+    for (range_name, model), count in sorted(
+        (item for item in seen_identities.items() if item[1] > 1),
+        key=lambda item: str(item[0]),
+    ):
+        on_progress(
+            f"WARNING: {count} products share the identity '{range_name}' / '{model}' — "
+            f"they would upload as duplicate rows. Check RANGE_MAP."
+        )
 
     on_progress(f"{len(results)} product(s) collected")
     return results
