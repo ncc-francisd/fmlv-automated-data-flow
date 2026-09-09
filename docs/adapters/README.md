@@ -550,11 +550,31 @@ includes, not about what every vehicle has.
 until September 2026 **no adapter populated any of them** beyond body type. They are not
 one problem, and the requester drew the line on 6 September 2026:
 
-| | fields | source | who decides |
-|---|---|---|---|
-| **Factual** | refrigeration, heating, microwave, rear garage, separated shower/toilet | stated *in words* in the specification list | the adapter, quoting the line |
-| **Subjective** | lounge location, sleeping area, kitchen location, bathroom rear-vs-side | need the floorplan drawing | a reviewer, given a link to it |
-| **Both** | bed types | named in the copy by some brands, not others | the adapter where the copy names them, else a reviewer |
+| | fields | source |
+|---|---|---|
+| **Factual** | refrigeration, heating, microwave, rear garage, separated shower/toilet | stated *in words* in the specification list |
+| **Subjective** | lounge location, sleeping area, kitchen location, bathroom rear-vs-side | need the floorplan drawing |
+| **Both** | bed types | named in the copy by some brands, not others |
+
+**None of them is a proposal any more, except rear garage.** They are **findings**: the
+adapter states what it read and quotes the line, and a person enters the value into FMLV
+by hand. `src/product_model/findings.py` carries the ruling and the reasoning, and the
+short version is that the group cost two reviewers their answers inside a week — an Eriba
+Touring 430 lost its washroom location and a Dethleffs Alpa A 6820-2 its bed types, both to
+an Accept on an empty list that read as a confirmation. The requester, 9 September 2026:
+*"an additional line, not to accept or reject, but simply to state a finding […] we could
+leave it to humans to add those elements to the CSV."*
+
+What this changes for an adapter: **nothing.** Read the features, set them on the product,
+record provenance quoting the line — exactly as before. The pipeline decides what becomes
+a finding and what becomes a proposal, in one place, and a new adapter gets the behaviour
+for free. What it changes downstream is that a new product's habitation columns reach the
+CSV **blank** rather than `No`, so the person is filling a gap they can see.
+
+`rear_garage` and a caravan's `twin_axle` stayed proposals, at the requester's direction:
+both are stated plainly in a specification, both are single booleans with no list to go
+empty, and there is no drawing to read. So is `body_type`, which is derived from a
+published height and segment.
 
 `adapters/habitation.py` does the factual half. An adapter passes in its specification
 lines and gets back `{field name: Feature}`, where a `Feature` carries the value **and the
@@ -576,16 +596,11 @@ Two rules run through it, both learned on Rimor's 34 products:
   this reason — they were plain booleans defaulting to `False` until 6 September 2026,
   which meant every adapter silently wrote "No" for a microwave it had never looked for.
 
-  An adapter that checked and found nothing should **record provenance with no value**.
-  `diff.compare` renders that as confirm-or-replace: the reviewer is shown what FMLV
-  holds, told why the adapter could not check it, and keeps or changes it. The requester,
-  6 September 2026: *"you couldn't find or validate the microwave value, so you can either
-  keep what we've got, or change it"*. `rimor.UNCONFIRMED_FEATURES` is the worked example.
-  Saying nothing at all is worse — the reviewer then cannot tell "checked, and the
-  manufacturer is silent" from "never looked".
-
-  On a **new** product there is no baseline to keep, so `None` still writes `No` — FMLV's
-  column has no third state. That is a first upload a reviewer reads in full anyway.
+  An adapter that checked and found nothing should still **record provenance with no
+  value**. That becomes a finding reading "not stated", with the adapter's own explanation
+  beneath it — so a reader can tell "checked, and the manufacturer is silent" from "never
+  looked", which is the distinction saying nothing at all destroys.
+  `rimor.UNCONFIRMED_FEATURES` is the worked example.
 * **Never read a paid option as standard.** "Rear Adjustable Bed Option: £1,500" is a bed
   the buyer may not have, and the price is what gives it away.
 
@@ -608,10 +623,20 @@ Three conditions before doing this on another brand, all of which matter:
   than flipping it to `True`. Absence is the only thing read. (A *priced* mention is
   already dropped by `habitation.usable_lines`, so it correctly falls through to absence:
   the vehicle as standard has none.)
-* **It is a recommendation, never a silent write.** The reviewer gets a proposal with the
-  reasoning beside it, and on a product FMLV holds `Yes` for they see `Yes → No` and can
-  refuse it. That visibility is the whole difference from the failure the rule guards
-  against — every adapter writing "No" for a microwave it never looked for.
+* **It is a recommendation, never a silent write.** It reaches the reviewer as a finding
+  with the reasoning beneath it and writes nothing at all, and a product FMLV already
+  holds `Yes` for keeps its `Yes` untouched. That visibility is the whole difference from
+  the failure the rule guards against — every adapter writing "No" for a microwave it
+  never looked for.
+
+**The vocabulary is where the work is, and two words were missing until Dethleffs.** `hot
+air` is the Erwin Hymer Group's phrase for warm air, and without it Dethleffs answered the
+heating on **none** of its 54 layouts; `hot water heating` is the industry's name for a wet
+system, used that way by Adria, Knaus, Bürstner and Dethleffs alike, and it sits one word
+from a `hot water boiler` that heats the taps and means nothing about the space heating.
+When a brand yields no reading for a field its specification plainly states, suspect the
+vocabulary before the parser — `habitation.heating_is_unclear` exists to narrate exactly
+that case.
 
 ### One bed takes one description, the most specific that fits
 
