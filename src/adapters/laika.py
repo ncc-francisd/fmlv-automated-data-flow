@@ -43,10 +43,11 @@ from `Ecovip Titanio I`, the `I` marking the integrated (A-class) build. That is
 type, and FMLV already records it as one — so both file under `Ecovip Titanio`, exactly as
 Adria's 60Y editions file under `Matrix` rather than `Matrix 60Y`.
 
-**One floorplan is another manufacturer's vehicle.** Coachbuilt Kreos `L 5009 MB` has a
-Carado campervan photograph in its floorplan slot and no correct drawing anywhere in it —
-a Laika site bug. `parse_floorplans` therefore requires the file to name its own layout,
-and that product gets no pointer rather than a misleading one.
+**A drawing's filename says nothing about its content.** `L 5009 MB`'s plan is served as
+`carado-imagebank-data_VE_Camper-Van_CV540_…png` — an Erwin Hymer Group image-bank name
+Laika's WordPress kept from upload. The image itself is the correct Laika low-profile
+drawing. So `parse_floorplans` trusts the slider's structure, which ties each drawing to
+its own `data-name`, and never the filename.
 """
 
 from __future__ import annotations
@@ -324,36 +325,35 @@ def parse_layouts(index_html: str) -> list[LaikaLayout]:
     return layouts
 
 
-def _identifies(filename: str, model: str) -> bool:
-    """Whether a drawing's filename names this layout.
-
-    Required because one of them does not name any Laika layout at all: coachbuilt Kreos
-    `L 5009 MB` has a **Carado campervan photograph** in its floorplan slot and no correct
-    drawing anywhere in it. Taking the first image in the slider would hand a reviewer
-    another manufacturer's van to read a kitchen position off.
-    """
-    squashed = re.sub(r"[^a-z0-9]", "", filename.lower())
-    wanted = re.sub(r"[^a-z0-9]", "", model.lower())
-    return bool(wanted) and wanted in squashed
-
-
 def parse_floorplans(range_html: str) -> dict[str, str]:
     """`{layout name: drawing URL}` from one range page's floorplan slider.
 
-    Only drawings whose filename names their own layout — see `_identifies`.
+    **The structure is the guarantee, not the filename.** Each slide carries its layout in
+    `data-name` and its own drawing inside it, so the search is bounded to the span between
+    one `data-name` and the next — a slide with no image of its own yields nothing rather
+    than borrowing its neighbour's.
+
+    A filename check was tried here first and was **wrong**: Laika's WordPress keeps the
+    name a file was uploaded under, and the Erwin Hymer Group brands share an image bank,
+    so `L 5009 MB`'s perfectly correct low-profile drawing is served as
+    `carado-imagebank-data_VE_Camper-Van_CV540_…png`. Requiring the filename to name the
+    layout threw that plan away. The lesson is the general one: an asset's name is not
+    evidence about its content, and on a shared image bank it is not even evidence about
+    its brand.
     """
     section = range_html[range_html.find("section__floorplan-slider") :]
     if not section:
         return {}
+    slides = list(_SLIDE.finditer(section))
     plans: dict[str, str] = {}
-    for match in _SLIDE.finditer(section):
+    for index, match in enumerate(slides):
         name = " ".join(match.group(1).split())
         if not name or name in plans:
             continue
-        image = _SLIDE_IMAGE.search(section, match.end())
-        if image is None:
-            continue
-        if _identifies(image.group(0).rsplit("/", 1)[-1], name):
+        # Bounded to this slide, so a missing drawing cannot pick up the next layout's.
+        end = slides[index + 1].start() if index + 1 < len(slides) else len(section)
+        image = _SLIDE_IMAGE.search(section, match.end(), end)
+        if image is not None:
             plans[name] = image.group(0)
     return plans
 

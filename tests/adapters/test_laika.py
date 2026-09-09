@@ -7,8 +7,8 @@ Fixtures were saved from the live site on 9 September 2026.
   shapes: `ProductGroup`s for the multi-layout ranges and bare `Vehicle`s for the two Kreos
   ranges, which is the distinction a parser has to get right or lose a fifth of the roster.
 * **`laika_floorplans_coachbuilt_ecovip.html`** — a well-behaved slider, five layouts.
-* **`laika_floorplans_coachbuilt_kreos.html`** — *the trap.* Laika's own site puts a Carado
-  campervan photograph in this layout's floorplan slot.
+* **`laika_floorplans_coachbuilt_kreos.html`** — the layout whose correct drawing is served
+  under a Carado image-bank filename, which is why nothing here judges an asset by its name.
 """
 
 from __future__ import annotations
@@ -183,33 +183,36 @@ def test_a_well_behaved_slider_yields_one_drawing_per_layout() -> None:
     assert "L-2009" in plans["L 2009"]
 
 
-def test_another_manufacturers_photograph_is_refused() -> None:
-    """Laika's own site puts a **Carado campervan** in this layout's floorplan slot.
+def test_a_misleading_filename_does_not_lose_a_good_drawing() -> None:
+    """`L 5009 MB`'s plan is served under a **Carado image-bank name**, and is correct.
 
-    Every image in the section is `carado-imagebank-data_VE_Camper-Van_CV540…png`, and
-    there is no correct drawing anywhere in it. Taking the first image would hand a
-    reviewer another manufacturer's van to read a kitchen position off — worse than
-    offering nothing, because it would be read as fact and recorded.
+    The Erwin Hymer Group brands share an image bank and Laika's WordPress keeps the name
+    a file was uploaded under, so this layout's low-profile drawing arrives as
+    `carado-imagebank-data_VE_Camper-Van_CV540…png`. A filename check was tried here first
+    and threw the plan away; the requester spotted it by opening the page. An asset's name
+    is not evidence about its content, and on a shared image bank not even about its brand.
     """
     section = _read(SLIDER_KREOS)
 
-    assert "carado" in section.lower()  # the trap really is in the page
-    assert laika.parse_floorplans(section) == {}
+    plans = laika.parse_floorplans(section)
+
+    assert set(plans) == {"L 5009 MB"}
+    assert "carado-imagebank-data" in plans["L 5009 MB"]
 
 
-@pytest.mark.parametrize(
-    ("filename", "model", "expected"),
-    [
-        ("25-Laika-Ecovip-Titanio-L-2009_b-1920x983.png", "L 2009", True),
-        ("26-Laika-Kreos-H-5109-MB_c-1920x983.png", "H 5109 MB", True),
-        ("carado-imagebank-data_VE_Camper-Van_CV540_CU_2025.png", "L 5009 MB", False),
-        ("25-Laika-Ecovip-Titanio-L-3019_a.png", "L 2009", False),
-    ],
-)
-def test_a_drawing_must_name_its_own_layout(
-    filename: str, model: str, expected: bool
-) -> None:
-    assert laika._identifies(filename, model) is expected
+def test_each_slide_keeps_to_its_own_drawing() -> None:
+    """The structure is the guarantee, so a slide with no image must not borrow one."""
+    section = (
+        '<div class="section__floorplan-slider">'
+        '<div data-name="L 2009"></div>'
+        '<div data-name="L 3019">'
+        '<img src="https://www.laika.it/wp-content/uploads/2026/07/L-3019.png">'
+        "</div></div>"
+    )
+
+    plans = laika.parse_floorplans(section)
+
+    assert set(plans) == {"L 3019"}
 
 
 def test_a_page_with_no_slider_yields_nothing() -> None:
@@ -283,7 +286,7 @@ def test_the_floorplan_becomes_a_pointer_on_every_positional_field(
 
 
 def test_no_drawing_means_no_pointers(layouts: dict[str, laika.LaikaLayout]) -> None:
-    """`L 5009 MB` is in exactly this position until Laika fix its floorplan slot."""
+    """A layout whose slider is ever emptied must not leave a dead link behind."""
     extracted = laika._build_extracted_motorhome(layouts["L 5009 MB"])
 
     assert not [e for e in extracted.provenance.values() if e.reviewer_reference]

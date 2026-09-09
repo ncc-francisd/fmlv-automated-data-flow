@@ -99,23 +99,38 @@ Secondary and weaker: the gated table prints mass in running order with its ±5%
 misread digit but not a slipped column, and it is behind the gate. The slider cross-check
 is the better one.
 
-## Floorplans: 9 of 10, and one is somebody else's vehicle
+## Floorplans: 10 of 10
 
-Each range page has a `section__floorplan-slider` whose slides carry `data-name` and a
-drawing named after the layout — `25-Laika-Ecovip-Titanio-L-2009_b-1920x983.png`. So the
-join is trivial: the slide names its own layout.
+Each range page has a `section__floorplan-slider` whose slides carry the layout in
+`data-name` and its own drawing inside the slide. **That structure is the join** — the
+search is bounded to the span between one `data-name` and the next, so a slide without a
+drawing yields nothing rather than borrowing its neighbour's.
 
-**Except Coachbuilt Kreos.** Every image in `L 5009 MB`'s floorplan section is
+### A filename is not evidence about its content
+
+Worth recording, because the first version of this adapter got it wrong. `L 5009 MB`'s
+drawing is served as
 
 ```
 carado-imagebank-data_VE_Camper-Van_CV540_CU_2025_…_WEB-2-1920x762.png
 ```
 
-— a **Carado campervan photograph**, not a Laika floorplan, and there is no correct drawing
-anywhere in that section. A Laika site bug, and exactly the case where a wrong drawing is
-worse than none: a reviewer would read a layout off a different manufacturer's van. So the
-floorplan pointer must be **name-checked against the layout** rather than taken as the
-first image in the slider, and `L 5009 MB` gets none until Laika fix it.
+and it was read as a **Carado campervan photograph misfiled by Laika** — a site bug — so
+the adapter required a drawing's filename to name its own layout and dropped this one. The
+requester opened the page and said it looked like a low-profile motorhome. **He was right:
+downloading the image shows Laika's own correct Kreos L 5009 MB drawing**, twin rear
+singles, side washroom, front lounge.
+
+The Erwin Hymer Group brands share an image bank, and Laika's WordPress keeps whatever
+name a file was uploaded under. So a `carado-…` filename on a Laika page says nothing
+about the picture — not even which brand it belongs to.
+
+The general lesson, which is why this is in the notes rather than just the git history:
+**a filename is metadata about an upload, not about an image.** Where the markup already
+ties an asset to a record — a slide to its `data-name` — trust the markup. Dethleffs is the
+opposite case and shows when a filename check *is* worth having: there the page shows
+sixteen plans in one flat list with nothing structural to tell them apart, so the name is
+the only signal available. Structure first; names only when there is no structure.
 
 ## Settled by the requester, 9 September 2026
 
@@ -134,8 +149,8 @@ first image in the slider, and `L 5009 MB` gets none until Laika fix it.
 
 9 September 2026. **10 products across 2 ranges, none dropped, 155 fields with
 provenance**, and no blank among price, both masses, payload, all three dimensions, seats,
-berths, chassis or body type. Four A-class, six low profile. **9 of 10 carry a floorplan
-pointer** — `L 5009 MB` is the Carado-photograph bug above, and the run says so by name.
+berths, chassis or body type. Four A-class, six low profile, and **all ten carry a
+floorplan pointer**.
 
 ## Still unverified
 
@@ -145,5 +160,4 @@ pointer** — `L 5009 MB` is the Carado-photograph bug above, and the run says s
 * **When the model year turns over.** Not established for Laika; per
   [`README.md`](README.md) the sector rolls July to early September, so re-check at the end
   of September with the rest.
-* **Whether the Carado floorplan is ever corrected.** If it is, `L 5009 MB` picks up its
-  pointer with no code change — the filename check is what gates it.
+* **Nothing about the floorplans.** All ten resolve, and the one that looked wrong was not.
