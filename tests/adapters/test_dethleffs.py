@@ -33,7 +33,7 @@ import pytest
 
 from src.adapters import dethleffs
 from src.adapters.dethleffs import DethleffsLayout
-from src.product_model.enums import BodyType
+from src.product_model.enums import BedType, BodyType, Heating, Refrigeration
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -684,3 +684,120 @@ def test_no_floorplan_means_no_pointers() -> None:
     provenance = dethleffs._build_extracted_motorhome(layout).provenance
 
     assert not [entry for entry in provenance.values() if entry.reviewer_reference]
+
+
+# --------------------------------------------------------------------------- #
+# Habitation: what the page's own wording settles, reported as findings
+# --------------------------------------------------------------------------- #
+
+
+def test_the_heater_fitted_as_standard_is_read_and_the_optional_one_is_not(
+    layouts: dict[str, DethleffsLayout],
+) -> None:
+    """The whole reason `parse_standard_equipment` tracks the sub-heading.
+
+    Globetrail's standard heater is a 4 kW hot-air unit and its options include a `Diesel
+    heater Combi 6D`. `Combi` is settled warm-air vocabulary, so an undivided read of the
+    table would quote the option — a heater the buyer may not have — as the evidence.
+    """
+    layout = layouts["globetrail_540_dr"]
+
+    assert layout.features["heating"].value is Heating.BLOWN_AIR
+    assert "Hot air heating 4 kW" in layout.features["heating"].snippet
+    assert "Combi" not in layout.features["heating"].snippet
+    assert not any("Combi" in line for line in dethleffs.parse_standard_equipment(
+        _read("globetrail_540_dr")
+    ))
+
+
+def test_hot_air_and_hot_water_heating_are_told_apart(
+    layouts: dict[str, DethleffsLayout],
+) -> None:
+    """One word decides it, and Dethleffs use both phrases on neighbouring ranges.
+
+    Globebus: "Gas hot air heating 6kW … and hot water boiler" — a hot-air heater whose
+    boiler serves the taps. Alpa: "Hot-water heating with boiler, automatic drain valve
+    and shut-off valve for the sleeping area", and XL A adds "Heat exchanger for hot-water
+    heating" — a water-borne system, zoned and drainable.
+    """
+    assert layouts["globebus_active_i1"].features["heating"].value is Heating.BLOWN_AIR
+    assert layouts["alpa_a_6820_2"].features["heating"].value is Heating.WET_CENTRAL
+    assert layouts["xl_a_7872_2_family"].features["heating"].value is Heating.WET_CENTRAL
+
+
+def test_every_captured_layout_answers_its_heating(
+    layouts: dict[str, DethleffsLayout],
+) -> None:
+    """54 of 54 on the live site, 9 September 2026 — the field was blank on all of them
+    until `hot air` was added to the shared warm-air vocabulary."""
+    unanswered = [name for name, layout in layouts.items() if "heating" not in layout.features]
+
+    assert unanswered == []
+
+
+def test_the_refrigerator_row_is_what_makes_a_fridge_freezer(
+    layouts: dict[str, DethleffsLayout],
+) -> None:
+    """The requester found this one: Globebus Active I 1 went out asserting no fridge.
+
+    Dethleffs never write the word "fridge" in an equipment list. The only mention is a
+    specification row, `Refrigerator volume (thereof freezer), approx. 137 (15)`, and the
+    parenthesis is the freezer's 15 litres — which is what makes it a fridge freezer
+    rather than a fridge.
+    """
+    layout = layouts["globebus_active_i1"]
+
+    assert layout.features["refrigeration"].value is Refrigeration.FRIDGE_FREEZER
+    assert "thereof freezer" in layout.features["refrigeration"].snippet
+    # The campervans publish no such row, and nothing is invented for them.
+    assert "refrigeration" not in layouts["globetrail_540_dr"].features
+
+
+def test_the_beds_come_from_the_summary_not_the_range_prose(
+    layouts: dict[str, DethleffsLayout],
+) -> None:
+    """The page describes every layout in the range; only `og:description` is this one's.
+
+    Globebus Active I 1's summary says "a transverse double bed". Further down, the same
+    page says "The practical single beds have a length of 195 cm" and labels it `(I 4)`.
+    Reading the prose would give this layout its neighbour's beds.
+    """
+    layout = layouts["globebus_active_i1"]
+
+    assert layout.features["bed_types"].value == [BedType.TRANSVERSE]
+    assert "transverse double bed" in layout.features["bed_types"].snippet
+
+
+def test_a_microwave_nobody_mentions_is_reported_as_absent(
+    layouts: dict[str, DethleffsLayout],
+) -> None:
+    """The requester's ruling for this one field, against the usual rule on silence.
+
+    `microwave` appears on none of the 54 layout pages and nowhere in the 160-page MY2027
+    GB technical-data PDF, which does itemise an oven where one is fitted.
+    """
+    for name, layout in layouts.items():
+        assert layout.microwave_absence is not None, name
+
+    product = dethleffs._build_extracted_motorhome(layouts["just_van_t1"]).motorhome
+    assert product.microwave is False
+
+
+def test_a_stated_microwave_stops_the_absence_being_asserted() -> None:
+    """A mention anywhere is enough, an options list included: reporting No against a
+    microwave the page names would be a false statement rather than a silence."""
+    assert dethleffs.microwave_absence_note(["Kitchen: Microwave oven"]) is None
+    assert dethleffs.microwave_absence_note(["Kitchen: Oven in the floor units"]) is not None
+
+
+def test_each_habitation_reading_quotes_the_line_that_settled_it(
+    layouts: dict[str, DethleffsLayout],
+) -> None:
+    """A finding is only useful with its evidence — see `product_model.findings`."""
+    extracted = dethleffs._build_extracted_motorhome(layouts["alpa_a_6820_2"])
+
+    for field in ("heating", "refrigeration", "microwave"):
+        entry = extracted.provenance[field]
+        assert entry.source_url == layouts["alpa_a_6820_2"].url
+        assert entry.snippet.startswith(layouts["alpa_a_6820_2"].label)
+        assert not entry.reviewer_reference  # a statement, not a pointer at a drawing

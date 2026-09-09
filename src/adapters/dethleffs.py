@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from html import unescape
 from pathlib import Path
@@ -48,6 +48,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import (
     ExtractedMotorhome,
     Provenance,
@@ -335,6 +336,13 @@ class DethleffsLayout:
     base_vehicle_manufacturer: str | None = None
     poptop_published: str | None = None
     card: dict[str, str] | None = None
+    #: Habitation features the page's own wording settles, keyed by product field name —
+    #: see `spec_lines`. These reach the reviewer as **findings** rather than proposals:
+    #: stated with the line that said so, for a person to enter by hand. See
+    #: `product_model.findings`.
+    features: dict[str, habitation.Feature] = field(default_factory=dict)
+    #: Why the microwave is reported as absent, or `None` to say nothing about it.
+    microwave_absence: str | None = None
 
     @property
     def label(self) -> str:
@@ -586,6 +594,120 @@ def parse_spec_table(page_html: str) -> tuple[str | None, str | None, dict[str, 
     return None, None, {}
 
 
+#: The `<tr>` that names a sub-list rather than an item — `Standard equipment` or
+#: `Optional equipment`. The four equipment tables interleave both under one header, and
+#: `_ROW` deliberately skips these rows, so a parser using it reads a priced option as
+#: standard equipment. `parse_standard_equipment` tracks them instead.
+_SUB_HEADING_CLASS = "m-table__sub-hl"
+
+#: Any row, sub-headings included, because which sub-list a row belongs to is only
+#: knowable from the last sub-heading above it.
+_ANY_ROW = re.compile(r"<tr(?P<attrs>[^>]*)>(?P<row>.*?)</tr>", re.S)
+
+#: The one-sentence summary of the layout, in the page's own metadata. Written per layout
+#: by Dethleffs and the only place the site says what a *particular* layout has: the
+#: marketing prose further down the page describes every layout in the range at once,
+#: labelling each paragraph `(I 4)` or `(I 1 and I 4)`, so reading it would attribute a
+#: neighbour's beds to this vehicle.
+#:
+#: A real one, from `globebus-active/i-1`: *"Motorhome royalty in a compact format! This
+#: motorhome features a high-quality seating lounge, a transverse double bed and a bathroom
+#: with a swivelling rear wall."*
+#:
+#: **The twelve campervan pages publish this in German** — *"großes Querbett"* — which is
+#: why they yield no beds and no washroom. Left as it is rather than translated: the
+#: patterns in `habitation` are English phrases, so German prose simply matches nothing.
+_OG_DESCRIPTION = re.compile(r'property="og:description" content="(?P<text>[^"]*)"')
+
+#: The label that opens the fitted-as-standard sub-list.
+STANDARD_EQUIPMENT = "Standard equipment"
+
+
+def parse_standard_equipment(page_html: str) -> list[str]:
+    """Every equipment line a layout has **as standard**, one per line, category prefixed.
+
+    The four equipment tables (`Electrical installation`, `Heating`, `Water supply`, `Gas
+    supply`) each interleave a `Standard equipment` sub-list with an `Optional equipment`
+    one, so the sub-heading decides what a row means. Reading them undivided would take
+    Globetrail's optional `Diesel heater Combi 6D` as evidence of a Truma Combi on a
+    vehicle whose standard heater is a 4 kW hot-air unit, and the Alpa's optional `Winter
+    Comfort Package ALDE` as a wet central system on a blown-air vehicle — the
+    `habitation` module's standing rule that a paid option is not standard equipment.
+
+    The category is prefixed so a reviewer reading the quote can see where it came from:
+    `Heating: Gas hot air heating 6kW with …`.
+    """
+    lines: list[str] = []
+    for match in _TABLE.finditer(page_html):
+        table = match.group("body")
+        headers = [_clean(cell) for cell in _TH.findall(table)]
+        if len(headers) != 1:
+            continue  # the two-header table is the specification, not an equipment list
+        standard = False
+        for row in _ANY_ROW.finditer(table):
+            cells = [_clean(cell) for cell in _CELL.findall(row.group("row"))]
+            if not cells or not cells[0]:
+                continue
+            if _SUB_HEADING_CLASS in row.group("row"):
+                standard = cells[0].casefold().startswith(STANDARD_EQUIPMENT.casefold())
+                continue
+            if standard:
+                lines.append(f"{headers[0]}: {cells[0]}")
+    return lines
+
+
+def spec_lines(page_html: str) -> list[str]:
+    """Everything on a layout's page that says what is fitted, for `habitation.features_from`.
+
+    Three sources, and each answers something the others do not:
+
+    * the **page summary**, for the beds and sometimes the washroom;
+    * the **specification rows**, whose `Refrigerator volume (thereof freezer), approx. 137
+      (15)` is the only place a fridge is mentioned at all — and the parenthesis is the
+      freezer, which is what makes it a fridge freezer;
+    * the **standard equipment**, for the heating.
+
+    Verified across all 54 layouts on 9 September 2026: heating on 54, refrigeration on 42
+    (the twelve campervans publish no refrigerator row), beds on 6, a separated washroom on
+    4, and **not one mention of a microwave anywhere**.
+    """
+    summary = _OG_DESCRIPTION.search(page_html)
+    _range, _model, specs = parse_spec_table(page_html)
+    return [
+        *([_clean(summary.group("text"))] if summary else []),
+        *(f"{label} {value}" for label, value in specs.items()),
+        *parse_standard_equipment(page_html),
+    ]
+
+
+#: Why a microwave is reported as **absent** rather than left unsaid. The standing rule is
+#: that silence is not a negative — but the requester ruled otherwise for this one field,
+#: 9 September 2026: *"it should probably just recommend no, and say we couldn't find any
+#: evidence or mention of a microwave, and I would just default to accepting a no."*
+#:
+#: Safe here in a way it would not be as a proposal: a finding writes nothing into FMLV,
+#: and this wording says exactly what the recommendation rests on. The evidence is real —
+#: `microwave` appears nowhere on any of the 54 layout pages, nor anywhere in the 160-page
+#: MY2027 GB technical-data PDF, which does itemise an oven where one is fitted.
+MICROWAVE_ABSENCE_NOTE = (
+    "no mention of a microwave anywhere on the layout's page — not in the specification, "
+    "not in the standard equipment, not in the summary. Dethleffs do itemise an oven where "
+    "one is fitted, so the vocabulary is there and unused"
+)
+
+
+def microwave_absence_note(lines: list[str]) -> str | None:
+    """The reason to report `microwave = No`, or `None` where the page mentions one.
+
+    A mention **anywhere** stops the assertion, including in an options list: a microwave
+    the buyer may not have is still a microwave the page named, and reporting No against it
+    would be a false statement rather than a silence.
+    """
+    if habitation.microwave_from(lines) is not None:
+        return None
+    return MICROWAVE_ABSENCE_NOTE
+
+
 def parse_main_facts(page_html: str) -> dict[str, str]:
     """The main-facts card as `{label: value}` — the page's second rendering of six specs."""
     return {
@@ -608,6 +730,7 @@ def parse_layout(url: str, page_html: str) -> DethleffsLayout | None:
     range_heading, model, specs = parse_spec_table(page_html)
     if not range_heading or not model or not specs:
         return None
+    lines = spec_lines(page_html)
     mro_raw = specs.get(LABEL_MRO, "")
     chassis = specs.get(LABEL_CHASSIS, "")
     return DethleffsLayout(
@@ -634,6 +757,8 @@ def parse_layout(url: str, page_html: str) -> DethleffsLayout | None:
         poptop_published=specs.get(LABEL_BED_POPTOP) or None,
         card=parse_main_facts(page_html),
         floorplan_path=parse_floorplan(page_html),
+        features=habitation.features_from(lines),
+        microwave_absence=microwave_absence_note(lines),
     )
 
 
@@ -681,6 +806,28 @@ def parse_floorplan(html: str) -> str | None:
     return None
 
 
+#: How each habitation feature's quote is introduced, where `habitation` does not supply
+#: its own wording. Says which of the three sources in `spec_lines` the line came from,
+#: because "the page says so" is not much help when the page says it in three places.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heater fitted as standard",
+    "refrigeration": "the specification's refrigerator row",
+    # Not named more precisely than this, because either source can settle them: the
+    # summary describes the beds on most layouts, but `Globetrail Active Plus 600 KS`'s
+    # bunks are evidenced by an electrical line — "Light strip on the underside of the
+    # upper bunk bed, on both sides". Every quote carries its own category prefix, so the
+    # snippet says where it came from without this having to guess.
+    "shower_toilet_separated": "read from the page's own wording",
+    "bed_types": "read from the page's own wording",
+}
+
+
+def _feature_value(features: dict[str, habitation.Feature], name: str) -> object | None:
+    """One feature's value, or `None` where the page did not settle it."""
+    found = features.get(name)
+    return found.value if found is not None else None
+
+
 def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -698,6 +845,14 @@ def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
         mh_width_mm=layout.mh_width_mm,
         mh_height_mm=layout.mh_height_mm,
         body_type=layout.body_type,
+        # Habitation, from the page's own wording — reported as findings rather than
+        # proposed, so these values are never written to FMLV by the pipeline. See
+        # `spec_lines` and `product_model.findings`.
+        heating=_feature_value(layout.features, "heating"),
+        refrigeration=_feature_value(layout.features, "refrigeration"),
+        shower_toilet_separated=_feature_value(layout.features, "shower_toilet_separated"),
+        bed_types=_feature_value(layout.features, "bed_types") or [],
+        microwave=False if layout.microwave_absence else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -778,6 +933,12 @@ def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
                 f"{HIGH_TOP_ABOVE_MM}mm) and the elevating roof being {roof}"
             )
         record("body_type", f"from {detail}, not from the model name or the base vehicle")
+
+    for name, feature in layout.features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "read from the page")
+        record(name, f"{note}: {feature.snippet}")
+    if layout.microwave_absence:
+        record("microwave", layout.microwave_absence)
 
     # The positional fields no specification table settles. One pointer per field, all at
     # the same drawing, so the link sits beside the field being decided.

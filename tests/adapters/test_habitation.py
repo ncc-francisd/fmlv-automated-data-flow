@@ -162,10 +162,33 @@ def test_a_wet_room_is_a_bathroom_not_a_heating_system() -> None:
     assert found[0] is Heating.BLOWN_AIR
 
 
-def test_hot_water_alone_is_not_wet_central_heating() -> None:
-    """"heating and hot water" describes a water tank, not water-borne space heating."""
-    found = habitation.heating_from(["Whale hot water heating"])
-    assert found is None or found[0] is not Heating.WET_CENTRAL
+def test_a_boiler_for_the_taps_is_not_wet_central_heating() -> None:
+    """"heating and hot water" describes a water tank, not water-borne space heating.
+
+    The distinction is one word: a **hot water boiler** heats the taps, and Dethleffs'
+    Globebus pairs one with a hot-air heater on every layout. **Hot water heating** is the
+    industry's name for the water-borne system itself, and four manufacturers in this
+    project's fixtures use it that way — Adria's "Hot-water heating system Alde Compact
+    3030", Knaus's "ALDE hot water heating incl. booster", Bürstner's "Hot water heating
+    (Diesel) with integrated 10-litre boiler", and Dethleffs' Alpa, whose own lines give
+    it away twice over: "Heat exchanger for hot-water heating" and a "shut-off valve for
+    the sleeping area".
+    """
+    combi = habitation.heating_from(["Combi C4 heating and hot water system"])
+    assert combi is not None and combi[0] is Heating.BLOWN_AIR
+
+    boiler = habitation.heating_from(
+        ["Gas hot air heating 6kW with 1.8kW electric heating element and hot water boiler"]
+    )
+    assert boiler is not None and boiler[0] is Heating.BLOWN_AIR
+
+
+def test_hot_water_heating_is_a_wet_system() -> None:
+    """See above: the phrase names the water-borne system, radiators and all."""
+    found = habitation.heating_from(
+        ["Hot-water heating with boiler, automatic drain valve and shut-off valve"]
+    )
+    assert found is not None and found[0] is Heating.WET_CENTRAL
 
 
 def test_heating_of_an_unnamed_kind_is_reported_not_guessed() -> None:

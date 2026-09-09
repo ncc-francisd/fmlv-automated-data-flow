@@ -167,8 +167,16 @@ def refrigeration_from(lines: Iterable[str]) -> Feature | None:
 #: which the requester confirmed in the same ruling. They are the phrasings Rimor
 #: actually uses — 33 of its 34 products say "Combi C4/C6 heating and hot water system"
 #: or "Truma Combi C6", and one says "Webasto AirTop".
+#:
+#: **`hot air` is the Erwin Hymer Group's word for the same thing**, and its absence here
+#: was why Dethleffs produced no heating reading at all: every one of its 48 layouts
+#: publishes either "Gas hot air heating 6kW with 1.8kW electric heating element and hot
+#: water boiler" or the diesel equivalent, and not one says "blown" or "warm". The hot
+#: water boiler in those lines heats domestic water rather than radiators — the same
+#: arrangement as the Truma Combi ruled on above.
 _WARM_AIR = re.compile(
-    r"\bblown[- ]air\b|\bwarm[- ]air\b|\bforced[- ]air\b|\bcombi\b|\bairtop\b|\bair top\b",
+    r"\bblown[- ]air\b|\bwarm[- ]air\b|\bhot[- ]air\b|\bforced[- ]air\b"
+    r"|\bcombi\b|\bairtop\b|\bair top\b",
     re.I,
 )
 
@@ -176,8 +184,15 @@ _WARM_AIR = re.compile(
 #: room Shower and cassette toilet" appears on seven Rimor products and is a bathroom,
 #: not a heating system. Matching `wet` alone would have called every one of them wet
 #: central heating.
+#:
+#: **`hot water heating` is a wet system and `hot water boiler` is not**, which is why the
+#: phrase has to carry the word "heating" itself. Dethleffs' Alpa publishes "Hot-water
+#: heating with boiler, automatic drain valve and shut-off valve" — radiators, drained for
+#: winter — while its Globebus publishes "Gas hot air heating […] and hot water boiler",
+#: where the boiler heats the taps. Matching a bare "hot water" would call both wet.
 _WET_CENTRAL = re.compile(
     r"\bwet[- ]central\b|\bwet[- ]system\b|\bwet[- ]heating\b|\balde\b"
+    r"|\bhot[- ]water heating\b"
     r"|\bwater[- ]based\b|\bradiator|\bunderfloor heating\b",
     re.I,
 )

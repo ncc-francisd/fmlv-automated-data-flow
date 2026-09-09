@@ -541,6 +541,49 @@ and accessory price lists, which *do* list "Oven in the kitchen floor units", "C
 and oven with 4 hobs" and "Fridge (137 l) with integrated oven". Dethleffs neither fits nor
 offers a microwave on any of the 48.
 
+### The adapter now reads three of these itself — 9 September 2026
+
+Since the habitation fields became **findings** (`src/product_model/findings.py`) the
+adapter reads what the page settles and *states* it for a person to enter by hand, rather
+than proposing it. Three sources, and each answers something the others do not:
+
+| Source | Answers | Coverage |
+| --- | --- | --- |
+| `og:description`, the page's own one-line summary | beds, sometimes a separated washroom | 6 and 4 of 54 |
+| the specification rows | `Refrigerator volume (thereof freezer), approx. 137 (15)` | 42 of 54 |
+| the **standard** equipment list | the heater | 54 of 54 |
+
+**The standard/optional split is not optional.** Each of the four equipment tables
+interleaves a `Standard equipment` sub-list with an `Optional equipment` one under a single
+header, and `_ROW` skips the sub-heading rows — so an undivided read quotes Globetrail's
+optional `Diesel heater Combi 6D` (settled warm-air vocabulary) as the evidence for a
+vehicle whose standard heater is a 4 kW hot-air unit, and the Alpa's optional `Winter
+Comfort Package ALDE` as a wet system on a blown-air vehicle. `parse_standard_equipment`
+tracks the sub-heading; the category is prefixed to each line so the quote says where it
+came from.
+
+**`hot air` had to be added to the shared warm-air vocabulary**, and until it was, Dethleffs
+produced no heating reading at all: every layout publishes "Gas hot air heating 6kW with
+1.8kW electric heating element and hot water boiler" or the diesel equivalent, and not one
+says "blown" or "warm". **`hot water heating` had to be added to the wet one**, which is one
+word away from it — the Globebus boiler heats the taps, while the Alpa's "Hot-water heating
+with boiler, automatic drain valve and shut-off valve for the sleeping area" and the XL A's
+"Heat exchanger for hot-water heating" are a zoned, drainable water-borne system. That gives
+46 blown air and 8 wet central, which matches the ranges: Alpa, XL A and Trend Active I.
+
+**Never the marketing prose.** A layout page describes *every* layout in its range, labelling
+each paragraph `(I 4)` or `(I 1 and I 4)`. `globebus-active/i-1` says "The practical single
+beds have a length of 195 cm" about the I 4 and "roomy, separate shower" about the I 6.
+`og:description` is the only wording on the page that is about this layout, which is why it
+is the only prose read. **The twelve campervan pages publish theirs in German** — *"großes
+Querbett"* — so they yield no beds and no washroom, and nothing is invented for them.
+
+Still open: the **campervans' fridge**, which is in the GB camper-van PDF (84 l with a 6.1 l
+freezer) and not on their pages, so those 12 findings are silent where the manual pack above
+has an answer. And the sitemap now lists **54** model pages against the 48 this survey
+recorded — the difference is worth reading carefully on the first run rather than assuming,
+per the roster rule in [`README.md`](README.md).
+
 ### Two things the layout data revealed that the adapter's own diff would not
 
 `Just Camp Active T 6762` is the **only one of the 48 with no rear bed** — its rear third
