@@ -197,6 +197,18 @@
     .value-diff .new { font-weight: 600; }
     .provenance { font-size: 0.85em; color: var(--muted); margin-top: 0.2rem; }
     .provenance blockquote { margin: 0.2rem 0 0; padding-left: 0.6rem; border-left: 2px solid var(--border); }
+    /* Findings: what the site said about the habitation fields, for a person to type
+       into FMLV. Deliberately unlike a change row — no buttons, no grid, indented under
+       the floorplan link — so it never reads as something waiting on a decision. */
+    .findings { margin: 0.3rem 0 0.8rem; padding: 0.4rem 0.6rem; border-left: 3px solid var(--border); background: #fafafa; }
+    .findings-heading { margin: 0 0 0.3rem; font-size: 0.9em; font-weight: 600; }
+    .findings-heading .muted { font-weight: 400; }
+    .findings ul { margin: 0; padding-left: 1.1rem; }
+    .findings li { margin-bottom: 0.35rem; font-size: 0.9em; }
+    .findings .finding-field { font-weight: 600; }
+    .findings .finding-field::after { content: ":"; }
+    .findings .finding-value { margin-right: 0.4rem; }
+    .findings blockquote { margin: 0.15rem 0 0; padding-left: 0.6rem; border-left: 2px solid var(--border); color: var(--muted); font-size: 0.95em; }
     .decision-form { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
     .decision-form input[type="text"] { width: 8rem; }
     .decision { font-size: 0.9em; }

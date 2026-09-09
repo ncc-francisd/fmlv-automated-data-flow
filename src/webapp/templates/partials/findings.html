@@ -1,0 +1,42 @@
+{#
+  What a deep read of the manufacturer's site found for the habitation fields — stated,
+  not proposed. Nothing here accepts, rejects or reaches the upload CSV: a person reads
+  it and types the value into FMLV themselves. See `product_model.findings`.
+
+  Expects `product_findings`, a list of `store.ProposedChange` rows with `is_finding`.
+  The floorplan is lifted out of the list and rendered as the link above it, because it
+  is a pointer to a drawing rather than a statement about a column.
+#}
+{% set product_findings = (findings or {}).get(product.id) or [] %}
+{% set floorplan = (product_findings | selectattr('field', 'equalto', FLOORPLAN_FIELD) | list | first) %}
+{% set stated = product_findings | rejectattr('field', 'equalto', FLOORPLAN_FIELD) | list %}
+{% if floorplan and floorplan.source_url %}
+  <p class="product-floorplan">
+    <a href="{{ floorplan.source_url }}" target="_blank" rel="noopener">Floorplan</a>
+    <span class="muted">— for the layout fields no wording settles</span>
+  </p>
+{% endif %}
+{% if stated %}
+  <div class="findings">
+    <p class="findings-heading">
+      What we found on the site
+      <span class="muted">— for you to add to the CSV by hand. Nothing here is applied.</span>
+    </p>
+    <ul>
+      {% for finding in stated %}
+        <li>
+          <span class="finding-field">{{ finding_label(finding.field) }}</span>
+          <span class="finding-value">
+            {% if finding.new_value %}{{ choice_label(finding.new_value) }}{% else %}<span class="muted">not stated</span>{% endif %}
+          </span>
+          {% if finding.source_url %}
+            <a href="{{ finding.source_url }}" target="_blank" rel="noopener">source</a>
+          {% endif %}
+          {% if finding.source_snippet %}
+            <blockquote>{{ finding.source_snippet }}</blockquote>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}

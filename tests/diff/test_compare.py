@@ -174,17 +174,16 @@ def test_an_attempted_but_unfilled_field_never_proposes_blanking_the_baseline() 
     assert entry.provenance.snippet == "choose one"
 
 
-def test_a_floorplan_pointer_with_nothing_on_either_side_is_asked_about() -> None:
-    """"Checked and unchanged" is a false claim when nothing was checked.
+def test_a_floorplan_pointer_is_neither_confirmed_nor_asked_about() -> None:
+    """The washroom left the comparison entirely on 9 September 2026.
 
-    The requester, 9 September 2026, on an Eriba Touring 310 whose washroom neither source
-    describes: *"I'm not sure why […] there isn't an option to confirm the bathroom
-    equipment."* There was not one — the field was blank in FMLV, blank from the adapter,
-    compared equal, and so reported as verified. It would have uploaded blank again.
+    It had been a confirm-or-replace row: the requester, on an Eriba Touring 310 whose
+    washroom neither source describes, *"I'm not sure why […] there isn't an option to
+    confirm the bathroom equipment."* That row is gone, along with the rest of the
+    habitation group — the drawing reaches the reviewer as a finding instead, and a
+    matched product keeps whatever FMLV holds. `product_model.findings` records why.
 
-    `old_value=None` is the marker: with nothing to keep, the row has no "keep it" answer
-    and `store.changes` gives it the same needs-a-choice wording a new product's empty
-    column gets.
+    So: not a change, not a confirmation, and not a gap. Nothing at all.
     """
     baseline = BASELINE.model_copy(update={"bathroom_layout": []})
     extracted = ExtractedMotorhome(
@@ -198,13 +197,11 @@ def test_a_floorplan_pointer_with_nothing_on_either_side_is_asked_about() -> Non
         },
     )
 
-    _changes, confirmed, missing = compare_fields(baseline, extracted)
+    changes, confirmed, missing = compare_fields(baseline, extracted)
 
     assert "bathroom_layout" not in confirmed
-    gap = next(m for m in missing if m.field == "bathroom_layout")
-    assert gap.old_value is None
-    assert gap.provenance is not None
-    assert gap.provenance.source_url.endswith("floorplan.jpg")
+    assert all(change.field != "bathroom_layout" for change in changes)
+    assert all(gap.field != "bathroom_layout" for gap in missing)
 
 
 def test_an_attempted_unfilled_field_is_ignored_when_the_baseline_is_empty_too() -> None:
@@ -230,19 +227,25 @@ def test_an_attempted_unfilled_field_is_ignored_when_the_baseline_is_empty_too()
     assert all(m.field != "body_type" for m in missing)
 
 
-def test_an_empty_list_is_not_a_proposal_to_delete() -> None:
+def test_an_empty_list_can_no_longer_reach_a_matched_products_value() -> None:
     """The Eriba Touring 430 bug, 9 September 2026 — and it reached a real upload.
 
-    `bathroom_layout` became a list that morning. An adapter that finds nothing then hands
-    over `[]` rather than `None`, and this branch tested `is None`, so the empty list fell
+    `bathroom_layout` became a list that morning. An adapter that finds nothing hands over
+    `[]` rather than `None`, the blank check tested `is None`, so the empty list fell
     through to the change branch and was proposed as `side_shower_toilet` -> nothing. The
     reviewer accepted what read as a confirmation and the CSV came out with no washroom
-    location at all.
+    location at all. A Dethleffs Alpa A 6820-2 lost its `fixed_separate_beds` the same way;
+    `bed_types` had been exposed to it since it was written.
 
-    `bed_types` had been exposed to the same thing since it was written; nothing had
-    happened to expose it.
+    Two things now stand between that and a reviewer, and this asserts both. `_is_blank`
+    treats `[]` as nothing found, so the change branch is unreachable for an empty list;
+    and the two list fields are **findings**, so nothing about them is proposed at all and
+    a matched product's values cannot be touched however the adapter reads the copy.
     """
+    from src.diff.compare import _is_blank
     from src.product_model.enums import BathroomLayout, BedType
+
+    assert _is_blank([]) and _is_blank(None) and not _is_blank([BedType.FIXED])
 
     baseline = BASELINE.model_copy(
         update={
@@ -265,13 +268,9 @@ def test_an_empty_list_is_not_a_proposal_to_delete() -> None:
         },
     )
 
-    changes, _confirmed, missing = compare_fields(baseline, extracted)
+    changes, confirmed, missing = compare_fields(baseline, extracted)
 
-    # Neither proposed as a change — a deletion is not what "found nothing" means.
-    assert "bathroom_layout" not in {c.field for c in changes}
-    assert "bed_types" not in {c.field for c in changes}
-    # Both offered as confirm-or-replace, carrying the value they would otherwise lose.
-    by_field = {m.field: m for m in missing}
-    assert {"bathroom_layout", "bed_types"} <= set(by_field)
-    assert by_field["bathroom_layout"].old_value == [BathroomLayout.SIDE_SHOWER_TOILET]
-    assert by_field["bed_types"].old_value == [BedType.FIXED, BedType.MAKE_UP]
+    for field in ("bathroom_layout", "bed_types"):
+        assert field not in {change.field for change in changes}
+        assert field not in {gap.field for gap in missing}
+        assert field not in confirmed

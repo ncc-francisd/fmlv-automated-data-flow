@@ -58,6 +58,29 @@ _LABELS: dict[str, str] = {
     "type_rigid": "Rigid",
     "type_folding": "Folding",
     "type_pop_up": "Pop up",
+    # The washroom, and the heating and refrigeration a specification settles. Added
+    # 9 September 2026 for the findings list, which is read as prose rather than picked
+    # from a dropdown, so a bare `side_shower_toilet` there reads as jargon.
+    "rear_shower_toilet": "Rear washroom",
+    "side_shower_toilet": "Side washroom",
+    "no_toilet": "No toilet",
+    "no_shower": "No shower",
+    "toilet_only": "Toilet only",
+    "shower_only": "Shower only",
+    "blown_air_heating": "Blown air",
+    "wet_central_heating": "Wet central heating",
+    "no_heating": "No heating",
+    "fridge": "Fridge",
+    "fridge_freezer": "Fridge/freezer",
+    "sleeping_area_front": "Front",
+    "sleeping_area_rear": "Rear",
+    "sleeping_area_both": "Front and rear",
+    "rear_kitchen": "Rear kitchen",
+    "side_kitchen": "Side kitchen",
+    "corner_kitchen": "Corner kitchen",
+    "front_lounge": "Front lounge",
+    "rear_lounge": "Rear lounge",
+    "twin_lounge": "Twin lounge",
     # The yes/no fields. `apply_field` parses these back with `raw_value == "True"`, so
     # the stored value has to be Python's own `str(bool)` and the label is what softens it.
     "True": "Yes",

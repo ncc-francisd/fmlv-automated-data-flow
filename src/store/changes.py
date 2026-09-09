@@ -51,6 +51,12 @@ from ..diff.compare import MissingField, field_value, profile_for
 from ..diff.year_rollover import bump_year, can_bump_year
 from ..product_model import caravan_schema, schema
 from ..product_model.caravan import Caravan
+from ..product_model.findings import (
+    FINDING_FIELDS,
+    FLOORPLAN_FIELD,
+    FLOORPLAN_SNIPPET,
+    SILENCE_MEANS,
+)
 from ..product_model.validation import (
     CARAVAN_LAYOUT_GROUP_FIELDS,
     LAYOUT_GROUP_FIELDS,
@@ -119,25 +125,18 @@ def fields_needing_a_choice(product: Product) -> tuple[str, ...]:
     * **Required columns** the adapter could not fill. `Kilig 55 Plus` went out with no
       MRO, MTPLM or payload, and the only sign was `required field 'mro_kilograms' is
       missing` in the issues file after the upload was generated.
-    * **Single-select layout groups.** The `Rimor Van 238` has no factory page at all, so
-      the adapter recorded nothing for sleeping area, kitchen, lounge or washroom — not
-      even a floorplan to point at — and there was no row to flag.
-
-    * **Fields the copy routinely leaves open.** `bed_types` and
-      `shower_toilet_separated` are neither required columns nor single-select groups, so
-      neither list above reaches them — and FMLV has no third state for either, so a new
-      product wrote `No` across all seven bed-type columns whether or not anyone had
-      looked. Eriba is the case that surfaced it: its price list publishes bed
-      *dimensions* and never describes the washroom, so all 18 caravans would have gone
-      out asserting no beds. The requester, 9 September 2026: *"if bed types or indeed
-      separated shower and toilet are not available in the copy, they should be available
-      for a reviewer like myself to either leave the default as blank or input a value. I
-      can sometimes see from the picture of the inside whether or not, or what, the bed
-      types are, and also sometimes whether the shower and toilet are separated."*
+    * **The body type**, where the adapter could not derive one. It is a choice across
+      eight mutually exclusive columns, so a blank leaves the product uncategorised in
+      every FMLV filter — the `Rimor Van 238` has no factory page at all and went out
+      with nothing in any of them.
 
     The identity strings are excluded: `manufacturer`, `model` and their kin are always
     set on a product that exists at all, and a reviewer cannot usefully be asked to
-    choose one.
+    choose one. So are the habitation fields — bed types, the washroom, the kitchen and
+    lounge locations, heating: those are **findings**, reported for a person to type in
+    rather than asked about here. `product_model.findings` records why. `body_type`
+    survives that exclusion and is the only member of either layout group left, because
+    it is derived from a published height and segment rather than read off a drawing.
     """
     layout = (
         CARAVAN_LAYOUT_GROUP_FIELDS
@@ -147,16 +146,8 @@ def fields_needing_a_choice(product: Product) -> tuple[str, ...]:
     required = caravan_schema.REQUIRED if isinstance(product, Caravan) else schema.REQUIRED
     return (
         *(f for f in sorted(required) if f not in _IDENTITY_FIELDS),
-        *layout,
-        *OPEN_HABITATION_FIELDS,
+        *(f for f in layout if f not in FINDING_FIELDS),
     )
-
-
-#: Held on both products, settled by neither list above, and silently written `No` when
-#: nobody answers — so a new product is asked about them explicitly. Ordered after the
-#: layout groups because that is the order a reviewer works a product in: what it is and
-#: where things are, then how the beds and washroom are built.
-OPEN_HABITATION_FIELDS: tuple[str, ...] = ("bed_types", "shower_toilet_separated")
 
 
 #: Never asked about: a product with no manufacturer or model does not exist, and these
@@ -327,6 +318,11 @@ class ProposedChange:
     #: True when this row exists to hand the reviewer a source — the floorplan for a
     #: field no wording settles — rather than to propose a value.
     reviewer_reference: bool = False
+    #: True when this row **states what the adapter found** for a person to type into
+    #: FMLV by hand, rather than proposing anything. Findings are kept out of
+    #: `list_change_queue` entirely, so nothing can decide one and nothing can carry one
+    #: into an upload — see `product_model.findings`.
+    is_finding: bool = False
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> ProposedChange:
@@ -342,6 +338,7 @@ class ProposedChange:
             confidence=row["confidence"],
             created_at=row["created_at"],
             reviewer_reference=bool(row["reviewer_reference"]),
+            is_finding=bool(row["is_finding"]),
         )
 
 
@@ -402,6 +399,10 @@ class PersistResult:
     archive_proposed: int = 0
     missing_field_proposed: int = 0
     disappeared_noted: int = 0
+    #: Read-only statements of what the adapter found, for a person to type into FMLV by
+    #: hand. Counted separately from `proposed` because nothing decides one, so they are
+    #: not work waiting on a reviewer — see `product_model.findings`.
+    findings_recorded: int = 0
 
 
 def _now() -> str:
@@ -466,16 +467,17 @@ def record_proposed_change(
     source_snippet: str | None = None,
     confidence: float | None = None,
     reviewer_reference: bool = False,
+    is_finding: bool = False,
 ) -> ProposedChange:
     cursor = connection.execute(
         """
         INSERT INTO proposed_change
             (run_id, product_id, field, old_value, new_value, source_url, source_snippet,
-             confidence, created_at, reviewer_reference)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             confidence, created_at, reviewer_reference, is_finding)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (run_id, product_id, field, old_value, new_value, source_url, source_snippet,
-         confidence, _now(), int(reviewer_reference)),
+         confidence, _now(), int(reviewer_reference), int(is_finding)),
     )
     connection.commit()
     assert cursor.lastrowid is not None
@@ -576,6 +578,83 @@ def run_review_summary(connection: sqlite3.Connection, run_id: int) -> RunReview
     )
 
 
+def _record_findings(
+    connection: sqlite3.Connection,
+    *,
+    run_id: int,
+    product_id: int,
+    extracted: Any,
+    is_new: bool,
+) -> int:
+    """Store what the adapter *found* about the habitation fields, for a person to type in.
+
+    Not proposals — `list_change_queue` never returns these, so nothing can decide one
+    and nothing can carry one into an upload CSV. `product_model.findings` records the
+    ruling behind that and which fields it covers.
+
+    Two kinds of row, with different scopes:
+
+    * **The floorplan**, for every product. One row per product rather than one per
+      positional field: a reviewer opens the drawing once and reads the whole layout off
+      it, and five rows pointing at the same image were five clicks for one glance.
+    * **Everything the copy settles** — the fridge, the heating, the microwave, the beds,
+      the washroom — for a **new** product only. A model FMLV already holds carries its
+      own values across untouched, so there would be nothing to type.
+    """
+    recorded = 0
+    floorplan_url = next(
+        (
+            provenance.source_url
+            for name, provenance in extracted.provenance.items()
+            if name in FINDING_FIELDS and provenance.reviewer_reference and provenance.source_url
+        ),
+        None,
+    )
+    if floorplan_url is not None:
+        record_proposed_change(
+            connection,
+            run_id=run_id,
+            product_id=product_id,
+            field=FLOORPLAN_FIELD,
+            old_value=None,
+            new_value=None,
+            source_url=floorplan_url,
+            source_snippet=FLOORPLAN_SNIPPET,
+            is_finding=True,
+        )
+        recorded += 1
+
+    if not is_new:
+        return recorded
+
+    for name in FINDING_FIELDS:
+        provenance = extracted.provenance.get(name)
+        if provenance is None or provenance.reviewer_reference:
+            # Nothing was read for this field, or all the adapter offered was the drawing
+            # — which the one row above already hands over.
+            continue
+        value = _serialize(field_value(extracted.product, name))
+        snippet = provenance.snippet
+        if value is None and name in SILENCE_MEANS:
+            # The adapter read the copy and the copy did not say. For the microwave that
+            # is itself the answer; see `findings.SILENCE_MEANS`.
+            value, note = SILENCE_MEANS[name]
+            snippet = f"{snippet} {note}"
+        record_proposed_change(
+            connection,
+            run_id=run_id,
+            product_id=product_id,
+            field=name,
+            old_value=None,
+            new_value=value,
+            source_url=provenance.source_url,
+            source_snippet=snippet,
+            is_finding=True,
+        )
+        recorded += 1
+    return recorded
+
+
 def persist_diff(
     connection: sqlite3.Connection,
     *,
@@ -611,6 +690,7 @@ def persist_diff(
     archive_proposed = 0
     missing_field_proposed = 0
     disappeared_noted = 0
+    findings_recorded = 0
 
     for diff in diffs:
         if diff.kind == ChangeKind.DISAPPEARED:
@@ -641,9 +721,19 @@ def persist_diff(
             vehicle_class=vehicle_class,
         )
 
+        findings_recorded += _record_findings(
+            connection,
+            run_id=run_id,
+            product_id=product.id,
+            extracted=diff.extracted,
+            is_new=diff.kind == ChangeKind.NEW_PRODUCT,
+        )
+
         if diff.kind == ChangeKind.NEW_PRODUCT:
             profile = profile_for(diff.extracted.product)
             for field_name, provenance in diff.extracted.provenance.items():
+                if field_name in FINDING_FIELDS:
+                    continue  # reported above, never proposed
                 value = field_value(diff.extracted.product, field_name)
                 if (
                     value is None
@@ -825,6 +915,7 @@ def persist_diff(
         archive_proposed=archive_proposed,
         missing_field_proposed=missing_field_proposed,
         disappeared_noted=disappeared_noted,
+        findings_recorded=findings_recorded,
     )
 
 
@@ -837,6 +928,12 @@ def list_change_queue(connection: sqlite3.Connection, run_id: int) -> list[Chang
     A change whose latest decision is "undo" comes back with `decision=None` — the
     undo row itself stays in the database for the audit trail, but as far as this
     queue is concerned the change is pending again.
+
+    **Findings are excluded**, and this one `WHERE` clause is what makes them safe: a row
+    that never reaches the queue can never be decided (`webapp` renders its forms from
+    it) and can never reach an upload (`output.build.build_upload_products` reads it for
+    every field it writes). See `product_model.findings`, and `findings_by_product` for
+    reading them back.
     """
     rows = connection.execute(
         """
@@ -861,7 +958,7 @@ def list_change_queue(connection: sqlite3.Connection, run_id: int) -> list[Chang
             ORDER BY latest.decided_at DESC, latest.id DESC
             LIMIT 1
         )
-        WHERE proposed_change.run_id = ?
+        WHERE proposed_change.run_id = ? AND proposed_change.is_finding = 0
         ORDER BY product.manufacturer_range, product.model, proposed_change.field
         """,
         (run_id,),
@@ -891,6 +988,30 @@ def list_change_queue(connection: sqlite3.Connection, run_id: int) -> list[Chang
             )
         entries.append(ChangeQueueEntry(change=change, product=product, decision=decision))
     return entries
+
+
+def findings_by_product(
+    connection: sqlite3.Connection, run_id: int
+) -> dict[int, list[ProposedChange]]:
+    """One run's findings, keyed by product id and ordered as the review shows them.
+
+    Read-only by construction: findings carry no decision to join against, the same way
+    a disappearance notice does not. The order is `FINDING_FIELDS`' own — the floorplan
+    first, then the beds and washroom, then the equipment — rather than alphabetical,
+    because it is a list a person reads down while typing a row into FMLV.
+    """
+    order = {field: index for index, field in enumerate((FLOORPLAN_FIELD, *FINDING_FIELDS))}
+    rows = connection.execute(
+        "SELECT * FROM proposed_change WHERE run_id = ? AND is_finding = 1",
+        (run_id,),
+    ).fetchall()
+
+    by_product: dict[int, list[ProposedChange]] = {}
+    for row in rows:
+        by_product.setdefault(row["product_id"], []).append(ProposedChange.from_row(row))
+    for findings in by_product.values():
+        findings.sort(key=lambda finding: (order.get(finding.field, len(order)), finding.field))
+    return by_product
 
 
 def list_disappearance_notices(

@@ -137,8 +137,7 @@ def test_new_product_persists_every_extracted_field_with_no_old_value(
 
     # The extracted field, plus one row per field the product would reach FMLV blank on —
     # a new product needs a choice from each, and without a row the reviewer never sees
-    # it. `bed_types` counts via `[]` rather than `None`, being the schema's one list.
-    # See `LAYOUT_GROUP_UNSET_SNIPPET` and `fields_needing_a_choice`.
+    # it. See `NEEDS_A_CHOICE_SNIPPET` and `fields_needing_a_choice`.
     unset_count = sum(
         1
         for f in store.changes.fields_needing_a_choice(extracted.product)
@@ -154,11 +153,10 @@ def test_new_product_persists_every_extracted_field_with_no_old_value(
 
     unset = {e.change.field for e in queue if e.change.reviewer_reference}
     assert "mro_kilograms" in unset
-    assert "sleeping_area" in unset
-    # Neither a required column nor a layout group, and both silently written `No` on a
-    # new product until 9 September 2026 — see `OPEN_HABITATION_FIELDS`.
-    assert "bed_types" in unset
-    assert "shower_toilet_separated" in unset
+    assert "body_type" in unset
+    # The habitation fields are **not** here. They are findings, reported for a person to
+    # type in rather than asked about — see `product_model.findings`.
+    assert not {"sleeping_area", "bed_types", "shower_toilet_separated"} & unset
     assert all(
         e.change.new_value is None for e in queue if e.change.reviewer_reference
     )
@@ -623,10 +621,14 @@ def test_a_new_product_is_asked_about_every_column_it_has_nothing_for(
         assert rows[field_name].new_value is None
         assert rows[field_name].reviewer_reference is True
 
-    # And the positional groups, which no wording could ever settle.
-    for field_name in ("sleeping_area", "kitchen_location", "lounge_location"):
-        assert field_name in rows, field_name
-        assert rows[field_name].new_value is None
+    # And the body type, a choice across eight exclusive columns with nothing to keep.
+    assert "body_type" in rows
+    assert rows["body_type"].new_value is None
+
+    # The positional groups are **not** asked about. Since 9 September 2026 they are
+    # findings — read off the drawing and typed in by hand — so a reviewer is offered no
+    # dropdown for them. See `product_model.findings`.
+    assert not {"sleeping_area", "kitchen_location", "lounge_location"} & set(rows)
 
     # What it did find is a normal proposal, not one of these.
     assert rows["rrp_pounds"].new_value == "56995"

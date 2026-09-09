@@ -597,3 +597,48 @@ def test_the_readable_copy_keeps_the_run_prefix_the_download_route_checks(
     )
     assert readable_path.name.startswith("run86_")
     assert readable_path.name.endswith("-readable.csv")
+
+
+def test_a_finding_cannot_be_carried_into_the_upload(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """The fridge the site states is a note for a person, not a column this writes.
+
+    Deciding one is refused at the review endpoint, so this covers the layer beneath: a
+    decision recorded against a finding by any other route still writes nothing, because
+    `build_upload_products` only ever sees `list_change_queue`, and findings are not in it.
+    See `product_model.findings`.
+    """
+    from src.product_model.enums import Refrigeration
+
+    extracted = make_extracted(rrp_pounds=93920, refrigeration=Refrigeration.FRIDGE_FREEZER)
+    extracted.provenance["refrigeration"] = Provenance(
+        source_url="https://www.adria.co.uk/matrix", snippet="141L fridge with freezer"
+    )
+    store.persist_diff(
+        connection, run_id=run_id, manufacturer_id=3, diffs=diff_products([extracted], [])
+    )
+
+    finding = next(
+        row
+        for rows in store.findings_by_product(connection, run_id).values()
+        for row in rows
+        if row.field == "refrigeration"
+    )
+    store.record_decision(
+        connection, proposed_change_id=finding.id, action="accept", decided_by="ben"
+    )
+    queue = store.list_change_queue(connection, run_id)
+    store.record_decision(
+        connection,
+        proposed_change_id=next(e.change.id for e in queue if e.change.field == "rrp_pounds"),
+        action="accept",
+        decided_by="ben",
+    )
+
+    [motorhome] = build_upload_motorhomes(
+        connection, run_id=run_id, manufacturer=make_manufacturer(), baseline=[]
+    )
+
+    assert motorhome.rrp_pounds == 93920
+    assert motorhome.refrigeration is None

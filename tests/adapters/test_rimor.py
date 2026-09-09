@@ -815,13 +815,19 @@ def test_an_unconfirmed_microwave_is_reported_not_denied(
     assert "no microwave stated" in extracted.provenance["microwave"].snippet
 
 
-def test_an_unconfirmed_feature_becomes_confirm_or_replace(
+def test_an_existing_products_microwave_is_left_entirely_alone(
     mnc_kilig_66: str, factory_kilig_66_plus: str
 ) -> None:
     """The end-to-end shape: FMLV holds a microwave, the adapter cannot check it.
 
-    It must reach the reviewer as a missing field carrying the reason — never as a
-    proposed change to No, which would quietly delete a fact nobody disproved.
+    Until 9 September 2026 this reached the reviewer as a confirm-or-replace row. It no
+    longer reaches them at all: the requester ruled that a model FMLV already holds keeps
+    its habitation values, so there is nothing to confirm — *"We will keep and retain the
+    existing values for existing models."* The adapter's reading goes to a **new**
+    product's findings instead. `product_model.findings` records it.
+
+    What must never happen either way is a proposed change to No, which would quietly
+    delete a fact nobody disproved.
     """
     from src.diff.compare import compare_fields
     from src.product_model.model import Motorhome
@@ -833,12 +839,11 @@ def test_an_unconfirmed_feature_becomes_confirm_or_replace(
     extracted = rimor._build_extracted_motorhome(listing, model)
     baseline = Motorhome(manufacturer="Rimor", model="66 Plus", product_id=1, microwave=True)
 
-    changes, _confirmed, missing = compare_fields(baseline, extracted)
+    changes, confirmed, missing = compare_fields(baseline, extracted)
 
     assert "microwave" not in {change.field for change in changes}
-    unconfirmed = next(m for m in missing if m.field == "microwave")
-    assert unconfirmed.old_value is True
-    assert unconfirmed.provenance is not None
+    assert "microwave" not in {gap.field for gap in missing}
+    assert "microwave" not in confirmed
 
 
 def test_rear_garage_is_answered_rather_than_left_unconfirmed(

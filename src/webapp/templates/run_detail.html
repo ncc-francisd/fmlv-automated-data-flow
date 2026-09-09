@@ -65,8 +65,13 @@
   {% if decided %}
     <h2>Decided ({{ decided|length }})</h2>
     {% for product_id, group in decided|groupby('product.id') %}
+      {% set product = group[0].product %}
       <div class="product-group">
-        <h3>{{ group[0].product.manufacturer_range }} — {{ group[0].product.model }}</h3>
+        <h3>{{ product.manufacturer_range }} — {{ product.model }}</h3>
+        {# Repeated here as well as in the pending group: a product with every row
+           decided drops out of Pending, and the findings are what a person types into
+           FMLV *after* deciding, so they have to still be on the page. #}
+        {% include "partials/findings.html" %}
         {% for entry in group %}
           {% include "partials/change_row.html" %}
         {% endfor %}

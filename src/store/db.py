@@ -34,6 +34,12 @@ _ADDED_COLUMNS = [
     # floorplan handed over for a field only a drawing can answer. The review page
     # lifts the first one to the product header.
     ("proposed_change", "reviewer_reference", "INTEGER NOT NULL DEFAULT 0"),
+    # Marks a row that states what the adapter **found**, for a person to act on by hand
+    # — never a proposal, never decided, never written to the upload. The habitation
+    # fields a specification only hints at moved to these on 9 September 2026, after the
+    # decision flow lost two reviewers' answers by treating "no value" as "delete the
+    # value". See `store.changes.record_finding`.
+    ("proposed_change", "is_finding", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

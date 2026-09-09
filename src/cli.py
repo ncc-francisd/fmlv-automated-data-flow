@@ -551,6 +551,11 @@ def format_summary(summary: RunSummary) -> str:
             "in-scope fields not found this run"
         )
     lines.append(f"  verified    {persisted.verified} fields checked and unchanged")
+    if persisted.findings_recorded:
+        lines.append(
+            f"  findings    {persisted.findings_recorded} habitation readings stated for "
+            "a person to enter by hand — nothing to decide"
+        )
     if persisted.suppressed_rejections:
         lines.append(
             f"  suppressed  {persisted.suppressed_rejections} previously-rejected changes"

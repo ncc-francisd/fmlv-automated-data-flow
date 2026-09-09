@@ -65,6 +65,7 @@ from ..cli import (
 )
 from ..diff.compare import LAYOUT_FIELDS
 from ..output import generate_upload
+from ..product_model.findings import FLOORPLAN_FIELD, finding_label
 from ..registry import Manufacturer, loader
 from ..store.decisions import Action
 from ..store.changes import LIST_SEPARATOR
@@ -109,6 +110,11 @@ _templates.env.globals["can_be_blanked"] = choices.can_be_blanked
 #: Whether FMLV expects the column filled — shown on the "Leave blank" button so the
 #: reviewer knows the upload will report a gap, rather than meeting it at upload time.
 _templates.env.globals["is_required_field"] = choices.is_required_field
+
+#: A finding's heading, as a person reads it rather than as FMLV names the column.
+_templates.env.globals["finding_label"] = finding_label
+#: The one finding that is a link rather than a statement — lifted to the product header.
+_templates.env.globals["FLOORPLAN_FIELD"] = FLOORPLAN_FIELD
 
 
 #: Everything is stored in UTC (`datetime.now(UTC)` throughout `store/`); this is
@@ -676,6 +682,10 @@ def create_app(
                 # So a field with no row is not ambiguous: it either matched, or the
                 # adapter never reached it. See `store.verified_fields_by_product`.
                 "verified_fields": store.verified_fields_by_product(connection, run_id),
+                # What a deep read of the site found for the habitation fields, stated
+                # rather than proposed, for a person to type into FMLV by hand. See
+                # `product_model.findings`.
+                "findings": store.findings_by_product(connection, run_id),
                 "reviewers": app.state.reviewers,
             },
         )
@@ -799,6 +809,15 @@ def create_app(
             raise HTTPException(
                 status_code=404, detail=f"no proposed change with id {change_id}"
             ) from None
+        if change.is_finding:
+            # A finding is a statement, not a proposal — nothing to accept or reject, and
+            # a decision on one would be honoured by `build_upload_products` and write a
+            # habitation field the pipeline deliberately no longer writes. The review
+            # renders no form for these, so this is only reachable by a hand-rolled POST.
+            raise HTTPException(
+                status_code=400,
+                detail=f"{change.field} is a finding for a person to act on, not a proposal",
+            )
 
         corrected_value = corrected_value.strip()
         reviewer_name = reviewer_name.strip()
@@ -937,6 +956,7 @@ def create_app(
                 "entries": entries,
                 "error": error,
                 "verified_fields": store.verified_fields_by_product(connection, run_id),
+                "findings": store.findings_by_product(connection, run_id),
                 "reviewers": app.state.reviewers,
             },
         )

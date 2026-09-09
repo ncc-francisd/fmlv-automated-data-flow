@@ -20,7 +20,7 @@ from src import paths, store
 from src.adapters.base import ExtractedMotorhome, Provenance
 from src.diff.classify import diff_products
 from src.product_model import io
-from src.product_model.enums import BedType, BodyType
+from src.product_model.enums import BedType, BodyType, Refrigeration
 from src.product_model.model import Motorhome
 from src.vehicle_class import VehicleClass
 from src.webapp import create_app
@@ -1437,30 +1437,38 @@ def test_a_product_with_no_floorplan_gets_no_header_link(
 
 
 def _run_with_a_bed_types_change(db_path: Path) -> tuple[int, int]:
-    """A pending `bed_types` proposal on a matched product, for the multi-select tests."""
+    """A pending `bed_types` proposal on a matched product, for the multi-select tests.
+
+    Recorded directly rather than through `persist_diff`, because since 9 September 2026
+    the pipeline no longer *proposes* `bed_types` — it reports it as a finding, and
+    `product_model.findings` says why. The multi-select review path still has to work:
+    the deployed run store holds hundreds of `bed_types` and `bathroom_layout` proposals
+    from earlier runs, and a reviewer opening one of those runs must still be able to
+    tick the boxes and decide it. That is exactly what this fixture now stands for.
+    """
     connection = store.connect(db_path)
     run = store.start_run(
         connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
     )
-    baseline = Motorhome(
-        manufacturer="Adria Mobil",
+    product = store.upsert_seen(
+        connection,
+        manufacturer_id=3,
+        fmlv_product_id=1,
         manufacturer_range="Matrix",
         model="Supreme 670 DC",
-        product_id=1,
-        bed_types=[BedType.ISLAND],
+        run_id=run.id,
     )
-    extracted = make_extracted(rrp_pounds=45000, bed_types=[BedType.DROP_DOWN])
-    extracted.provenance["bed_types"] = Provenance(
-        source_url="https://example.test/p", snippet="Front electric drop-down double bed"
+    change = store.record_proposed_change(
+        connection,
+        run_id=run.id,
+        product_id=product.id,
+        field="bed_types",
+        old_value="island_bed",
+        new_value="drop_down_bed",
+        source_url="https://example.test/p",
+        source_snippet="Front electric drop-down double bed",
     )
-    diffs = diff_products([extracted], [baseline])
-    store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
     store.finish_run(connection, run.id)
-    change = next(
-        entry.change
-        for entry in store.list_change_queue(connection, run_id=run.id)
-        if entry.change.field == "bed_types"
-    )
     connection.close()
     return run.id, change.id
 
@@ -1554,24 +1562,26 @@ def test_an_unrecognised_bed_type_is_refused_at_review_not_at_upload(
 
 
 def _run_with_an_unset_field(db_path: Path) -> tuple[int, int]:
-    """A new product carrying a floorplan pointer: no value either side, so no answer yet."""
+    """A new product whose body type the adapter could not derive: no value either side.
+
+    `body_type` rather than a positional field, because since 9 September 2026 the
+    positional fields are findings and no longer ask the reviewer anything — see
+    `product_model.findings`. The body type is the case left: eight mutually exclusive
+    columns, nothing in the baseline to keep, and a blank leaves the product out of every
+    FMLV filter.
+    """
     connection = store.connect(db_path)
     run = store.start_run(
         connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
     )
-    extracted = make_extracted(rrp_pounds=45000)
-    extracted.provenance["sleeping_area"] = Provenance(
-        source_url="https://example.test/floorplan.jpg",
-        snippet="read which end the beds are at off the floorplan",
-        reviewer_reference=True,
-    )
+    extracted = make_extracted(rrp_pounds=45000, body_type=None)
     diffs = diff_products([extracted], [])
     store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
     store.finish_run(connection, run.id)
     product_id = next(
         entry.product.id
         for entry in store.list_change_queue(connection, run_id=run.id)
-        if entry.change.field == "sleeping_area"
+        if entry.change.field == "body_type"
     )
     connection.close()
     return run.id, product_id
@@ -1604,7 +1614,7 @@ def test_accept_all_leaves_a_field_that_needs_a_choice_pending(
 
     assert response.status_code == 200
     assert "still need a choice" in response.text
-    assert "sleeping_area" in response.text
+    assert "body_type" in response.text
 
     connection = store.connect(db_path)
     pending = [
@@ -1613,10 +1623,10 @@ def test_accept_all_leaves_a_field_that_needs_a_choice_pending(
         if entry.decision is None
     ]
     connection.close()
-    # The pointer is still pending, along with every other column this new product has
-    # nothing for — see `store.changes.fields_needing_a_choice`. Everything with a real
-    # value was accepted.
-    assert "sleeping_area" in [entry.change.field for entry in pending]
+    # The unanswerable field is still pending, along with every other column this new
+    # product has nothing for — see `store.changes.fields_needing_a_choice`. Everything
+    # with a real value was accepted.
+    assert "body_type" in [entry.change.field for entry in pending]
     assert "rrp_pounds" not in [entry.change.field for entry in pending]
 
 
@@ -1731,9 +1741,6 @@ def test_accept_all_does_accept_a_new_products_weights(
         ("mh_payload_kilograms", "3500 kg MTPLM - 3051 kg MRO"),
     ):
         extracted.provenance[name] = Provenance("https://www.rimor.it/x", snippet)
-    extracted.provenance["sleeping_area"] = Provenance(
-        "https://www.rimor.it/plan.jpg", "read it off the floorplan", reviewer_reference=True
-    )
     store.persist_diff(
         connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [])
     )
@@ -1763,9 +1770,9 @@ def test_accept_all_does_accept_a_new_products_weights(
     assert decided.get("mro_kilograms") == "accept"
     assert decided.get("mh_payload_kilograms") == "accept"
     assert decided.get("mtplm_kilograms") == "accept"
-    # Held back: the floorplan pointer, and the other columns this new product has no
-    # value for at all. Nothing with a real figure is.
-    assert "sleeping_area" in pending
+    # Held back: the columns this new product has no value for at all. Nothing with a
+    # real figure is.
+    assert "body_type" in pending
     assert not {"mro_kilograms", "mtplm_kilograms", "mh_payload_kilograms"} & set(pending)
 
 
@@ -1897,32 +1904,33 @@ def test_reordered_bed_types_are_not_treated_as_an_edit(
     client: TestClient, db_path: Path
 ) -> None:
     """The boxes submit in enum order; the adapter proposes in the order the copy named
-    them. Same set, so pressing Accept must stay an accept rather than a correction."""
+    them. Same set, so pressing Accept must stay an accept rather than a correction.
+
+    A stored proposal rather than a fresh diff — `bed_types` is a finding now, and this
+    guards the path a run from before that still takes. See `_run_with_a_bed_types_change`.
+    """
     connection = store.connect(db_path)
     run = store.start_run(
         connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
     )
-    baseline = Motorhome(
-        manufacturer="Rimor", manufacturer_range="Sarus", model="66 Plus", product_id=7927,
-        bed_types=[BedType.MAKE_UP],
-    )
-    extracted = make_extracted(
-        rrp_pounds=64995,
+    product = store.upsert_seen(
+        connection,
+        manufacturer_id=75,
+        fmlv_product_id=7927,
         manufacturer_range="Sarus",
         model="66 Plus",
-        bed_types=[BedType.ISLAND, BedType.DROP_DOWN],
+        run_id=run.id,
     )
-    extracted.provenance["bed_types"] = Provenance(
-        "https://mnc.test/x", "Rear double island bed / Electric drop-down double bed"
-    )
-    store.persist_diff(
-        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [baseline])
-    )
-    change_id = next(
-        e.change.id
-        for e in store.list_change_queue(connection, run_id=run.id)
-        if e.change.field == "bed_types"
-    )
+    change_id = store.record_proposed_change(
+        connection,
+        run_id=run.id,
+        product_id=product.id,
+        field="bed_types",
+        old_value="make_up_beds",
+        new_value="island_bed, drop_down_bed",
+        source_url="https://mnc.test/x",
+        source_snippet="Rear double island bed / Electric drop-down double bed",
+    ).id
     connection.close()
 
     client.post(
@@ -1993,6 +2001,10 @@ def test_a_field_checked_and_unchanged_is_shown_so_a_missing_row_is_not_ambiguou
     The requester, 8 September 2026: *"I noticed that there's no proposal on bed types. Is
     this because there is no change in the bed types?"* A field with no row may have
     matched, or never been looked at, and those mean opposite things.
+
+    Shown here on the MTPLM rather than on `bed_types` itself, which is a finding now and
+    so is neither proposed nor confirmed — see `product_model.findings`. The ambiguity the
+    line answers is the same for every field that *is* still compared.
     """
     connection = store.connect(db_path)
     run = store.start_run(
@@ -2004,17 +2016,17 @@ def test_a_field_checked_and_unchanged_is_shown_so_a_missing_row_is_not_ambiguou
         model="77 Plus",
         product_id=7940,
         rrp_pounds=59995,
-        bed_types=[BedType.DROP_DOWN],
+        mtplm_kilograms=3500,
     )
-    # Same beds, a changed price: the beds are checked and match, the price does not.
+    # The same MTPLM, a changed price: the mass is checked and matches, the price does not.
     extracted = make_extracted(
         rrp_pounds=61995,
         manufacturer_range="Kilig",
         model="77 Plus",
-        bed_types=[BedType.DROP_DOWN],
+        mtplm_kilograms=3500,
     )
-    extracted.provenance["bed_types"] = Provenance(
-        "https://mnc.test/x", "Front electric drop-down double bed"
+    extracted.provenance["mtplm_kilograms"] = Provenance(
+        "https://mnc.test/x", "Maximum overall weight: 3500 kg"
     )
     store.persist_diff(
         connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [baseline])
@@ -2026,7 +2038,7 @@ def test_a_field_checked_and_unchanged_is_shown_so_a_missing_row_is_not_ambiguou
 
     assert response.status_code == 200
     assert "checked and unchanged" in response.text
-    assert "bed_types" in response.text
+    assert "mtplm_kilograms" in response.text
     # And the price, which did change, is still a row to decide.
     assert "61995" in response.text
 
@@ -2052,3 +2064,88 @@ def test_a_product_with_nothing_verified_shows_no_such_line(
 
     assert response.status_code == 200
     assert "checked and unchanged" not in response.text
+
+
+# --------------------------------------------------------------------------- #
+# Findings: stated for a person to act on, never decided
+# --------------------------------------------------------------------------- #
+
+
+def _run_with_findings(db_path: Path) -> tuple[int, int, int]:
+    """A new product whose copy settles the fridge: `(run, product, finding change id)`."""
+    connection = store.connect(db_path)
+    run = store.start_run(
+        connection, manufacturer_id=75, fmlv_manufacturer="Rimor", trigger="manual"
+    )
+    extracted = make_extracted(
+        rrp_pounds=61995,
+        manufacturer_range="Kilig",
+        model="66 Plus",
+        refrigeration=Refrigeration.FRIDGE_FREEZER,
+    )
+    extracted.provenance["refrigeration"] = Provenance(
+        "https://mnc.test/kilig-66", "141L fridge with freezer compartment"
+    )
+    extracted.provenance["bathroom_layout"] = Provenance(
+        "https://www.rimor.it/plan.png", "read the washroom off the floorplan", True
+    )
+    store.persist_diff(
+        connection, run_id=run.id, manufacturer_id=75, diffs=diff_products([extracted], [])
+    )
+    store.finish_run(connection, run.id)
+    findings = store.findings_by_product(connection, run.id)
+    product_id, rows = next(iter(findings.items()))
+    finding_id = next(row.id for row in rows if row.field == "refrigeration")
+    connection.close()
+    return run.id, product_id, finding_id
+
+
+def test_a_finding_is_shown_with_its_source_and_no_buttons(
+    client: TestClient, db_path: Path
+) -> None:
+    """The requester, 9 September 2026: *"not to accept or reject, but simply to state a
+    finding […] you could put the source, and it could take you to that copy."*
+    """
+    run_id, _product_id, finding_id = _run_with_findings(db_path)
+
+    response = client.get(f"/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert "What we found on the site" in response.text
+    assert "Refrigeration" in response.text
+    assert "Fridge/freezer" in response.text
+    assert "141L fridge with freezer compartment" in response.text
+    # And no decision form for it, which is what keeps it out of the CSV.
+    assert f"/changes/{finding_id}/decide" not in response.text
+
+
+def test_the_floorplan_finding_is_the_products_header_link(
+    client: TestClient, db_path: Path
+) -> None:
+    """One link per product rather than one per positional field — the drawing answers
+    them all at once, and a reviewer opens it once."""
+    run_id, _product_id, _finding_id = _run_with_findings(db_path)
+
+    response = client.get(f"/runs/{run_id}")
+
+    assert 'class="product-floorplan"' in response.text
+    assert 'href="https://www.rimor.it/plan.png"' in response.text
+    # Not repeated as a statement in the list below it.
+    assert response.text.count("https://www.rimor.it/plan.png") == 1
+
+
+def test_deciding_a_finding_is_refused(client: TestClient, db_path: Path) -> None:
+    """Only reachable by a hand-rolled POST — the page renders no form for one — but a
+    decision would be honoured by `build_upload_products` and write the very column the
+    pipeline no longer writes."""
+    run_id, _product_id, finding_id = _run_with_findings(db_path)
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{finding_id}/decide",
+        data={"action": "accept", "reviewer_name": "ben"},
+    )
+
+    assert response.status_code == 400
+    connection = store.connect(db_path)
+    assert store.latest_decision(connection, finding_id) is None
+    connection.close()
