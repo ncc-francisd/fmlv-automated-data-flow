@@ -168,9 +168,12 @@ fields.
 | 6 | `rrp_pounds` | the year's rise |
 | 6 | `mh_passenger_seats_inc_driver` | 4 → 2, or 3 → 2 on the Flair 920 |
 
-The seat correction is the one to look at before accepting. It is right by both settled
-rules — count three-point belts only, and record the base vehicle rather than the optioned
-variant — but 4 is what FMLV has shown customers until now.
+**The seat correction is settled.** It is right by both standing rules — count three-point
+belts only, and record the base vehicle rather than the optioned variant — and the
+requester confirmed it on 9 September 2026 after reading the row himself: *"it clearly
+states two seats are fitted with a three-point safety belt and option to have three, four
+and five. So within our normal parameters, we would call that two. So that's a change from
+the four that we have on FMLV."* Accept it on all six.
 
 ### Berths are derived, and the derivation is corroborated
 
