@@ -109,20 +109,50 @@ _EXCLUSIVE_BATHROOM_LOCATIONS: frozenset[BathroomLayout] = frozenset(
 )
 
 
+#: `no_toilet` and `no_shower` together mean there is no washroom, so nothing else in the
+#: group can be true of it and neither can `separate_shower_toilet`. Reported because FMLV
+#: holds rows like this and the pipeline round-trips them faithfully: an Eriba Touring 310
+#: came back from a run on 9 September 2026 with `no_toilet`, `no_shower` **and**
+#: `separate_shower_toilet` all set, which the reviewer spotted in the CSV. Nothing had
+#: proposed it — the combination was already in the baseline and was preserved, which is
+#: correct behaviour and still worth saying out loud.
+_NO_WASHROOM = frozenset({BathroomLayout.NO_TOILET, BathroomLayout.NO_SHOWER})
+
+
 def _contradictory_washroom(product: object, key: str) -> list[Issue]:
-    """One issue when a product claims its washroom is both rear and side."""
+    """Issues where a product's washroom columns cannot all be true at once."""
     chosen = set(getattr(product, "bathroom_layout", []) or [])
-    if not _EXCLUSIVE_BATHROOM_LOCATIONS <= chosen:
-        return []
-    return [
-        Issue(
-            severity="warning",
-            code="ambiguous_layout_group",
-            message="a washroom cannot be both rear and side",
-            product_key=key,
-            field="bathroom_layout",
+    separated = bool(getattr(product, "shower_toilet_separated", False))
+    issues: list[Issue] = []
+
+    if _EXCLUSIVE_BATHROOM_LOCATIONS <= chosen:
+        issues.append(
+            Issue(
+                severity="warning",
+                code="ambiguous_layout_group",
+                message="a washroom cannot be both rear and side",
+                product_key=key,
+                field="bathroom_layout",
+            )
         )
-    ]
+
+    if _NO_WASHROOM <= chosen and (separated or chosen - _NO_WASHROOM):
+        also = sorted(member.value for member in chosen - _NO_WASHROOM)
+        if separated:
+            also.append("separate_shower_toilet")
+        issues.append(
+            Issue(
+                severity="warning",
+                code="ambiguous_layout_group",
+                message=(
+                    f"no toilet and no shower, yet also {', '.join(also)} — a vehicle with "
+                    f"no washroom cannot have one arranged"
+                ),
+                product_key=key,
+                field="bathroom_layout",
+            )
+        )
+    return issues
 
 
 def _validate_payload(motorhome: Motorhome, key: str) -> list[Issue]:

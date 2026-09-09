@@ -228,3 +228,50 @@ def test_an_attempted_unfilled_field_is_ignored_when_the_baseline_is_empty_too()
     assert all(change.field != "body_type" for change in changes)
     assert "body_type" in confirmed  # both None, so it compares equal
     assert all(m.field != "body_type" for m in missing)
+
+
+def test_an_empty_list_is_not_a_proposal_to_delete() -> None:
+    """The Eriba Touring 430 bug, 9 September 2026 — and it reached a real upload.
+
+    `bathroom_layout` became a list that morning. An adapter that finds nothing then hands
+    over `[]` rather than `None`, and this branch tested `is None`, so the empty list fell
+    through to the change branch and was proposed as `side_shower_toilet` -> nothing. The
+    reviewer accepted what read as a confirmation and the CSV came out with no washroom
+    location at all.
+
+    `bed_types` had been exposed to the same thing since it was written; nothing had
+    happened to expose it.
+    """
+    from src.product_model.enums import BathroomLayout, BedType
+
+    baseline = BASELINE.model_copy(
+        update={
+            "bathroom_layout": [BathroomLayout.SIDE_SHOWER_TOILET],
+            "bed_types": [BedType.FIXED, BedType.MAKE_UP],
+        }
+    )
+    extracted = ExtractedMotorhome(
+        motorhome=Motorhome(bathroom_layout=[], bed_types=[]),
+        provenance={
+            "bathroom_layout": Provenance(
+                source_url="https://example.invalid/plan.png",
+                snippet="open the floorplan",
+                reviewer_reference=True,
+            ),
+            "bed_types": Provenance(
+                source_url="https://example.invalid/spec",
+                snippet="the copy named no beds",
+            ),
+        },
+    )
+
+    changes, _confirmed, missing = compare_fields(baseline, extracted)
+
+    # Neither proposed as a change — a deletion is not what "found nothing" means.
+    assert "bathroom_layout" not in {c.field for c in changes}
+    assert "bed_types" not in {c.field for c in changes}
+    # Both offered as confirm-or-replace, carrying the value they would otherwise lose.
+    by_field = {m.field: m for m in missing}
+    assert {"bathroom_layout", "bed_types"} <= set(by_field)
+    assert by_field["bathroom_layout"].old_value == [BathroomLayout.SIDE_SHOWER_TOILET]
+    assert by_field["bed_types"].old_value == [BedType.FIXED, BedType.MAKE_UP]

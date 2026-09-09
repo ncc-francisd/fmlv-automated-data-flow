@@ -288,14 +288,23 @@ def compare_fields(
         if old_value == new_value:
             confirmed.append(field_path)
             continue
-        if new_value is None and old_value is not None:
+        if _is_blank(new_value) and not _is_blank(old_value):
             # The adapter looked and came back empty-handed — it recorded provenance
-            # saying so. Proposing `None` over a good baseline value would offer a
+            # saying so. Proposing nothing over a good baseline value would offer a
             # reviewer an "accept" that silently blanks the field, so this takes the
             # same confirm-or-replace route as an unfound in-scope field instead.
             # Reached when an adapter can identify a field's *family* but not its value
             # (`swift._body_type_basis`); before 2026-08-29 no adapter recorded
             # provenance for an empty field, so this branch was unreachable.
+            #
+            # **`_is_blank`, not `is None`.** A list field's empty state is `[]`, and
+            # while this read `is None` an empty list fell through to the change branch
+            # below and was proposed as a *deletion* — `side_shower_toilet` -> nothing,
+            # with an Accept that wiped it. That reached a real upload on 9 September
+            # 2026, on Eriba's Touring 430: the reviewer accepted what looked like a
+            # confirmation and the CSV came out with no washroom location at all.
+            # `bathroom_layout` became a list that morning, which is what exposed it;
+            # `bed_types` had been exposed to the same thing since it was written.
             missing.append(
                 MissingField(
                     field=field_path,
