@@ -801,3 +801,34 @@ def test_each_habitation_reading_quotes_the_line_that_settled_it(
         assert entry.source_url == layouts["alpa_a_6820_2"].url
         assert entry.snippet.startswith(layouts["alpa_a_6820_2"].label)
         assert not entry.reviewer_reference  # a statement, not a pointer at a drawing
+
+
+def test_a_published_storage_opening_is_what_makes_a_rear_garage(
+    layouts: dict[str, DethleffsLayout],
+) -> None:
+    """The requester's ruling, 2 September 2026: under-bed storage is not a rear garage.
+
+    All 36 motorhomes publish `Measurement storage opening right/left (W x H)` — the
+    external hatch. The 12 Globetrail campervans publish neither: their under-bed space is
+    loaded through the rear doors. The site's *prose* calls that a rear garage and its
+    equipment list calls it "rear storage space with 4 integrated lashing eyes"; the
+    specification row is the specific source and it wins.
+    """
+    assert layouts["globebus_active_i1"].rear_garage is True
+    assert layouts["just_van_t1"].rear_garage is True
+    assert layouts["alpa_a_6820_2"].rear_garage is True
+    assert layouts["globetrail_540_dr"].rear_garage is False
+    assert layouts["globetrail_performance_600_dr_classic"].rear_garage is False
+
+
+def test_the_rear_garage_quotes_the_opening_or_says_there_is_none(
+    layouts: dict[str, DethleffsLayout],
+) -> None:
+    """It is a proposed value, so the reviewer decides it — with the measurement in hand."""
+    with_garage = dethleffs._build_extracted_motorhome(layouts["globebus_active_i1"])
+    without = dethleffs._build_extracted_motorhome(layouts["globetrail_540_dr"])
+
+    assert with_garage.motorhome.rear_garage is True
+    assert "75 x 100" in with_garage.provenance["rear_garage"].snippet
+    assert without.motorhome.rear_garage is False
+    assert "no storage-opening row" in without.provenance["rear_garage"].snippet

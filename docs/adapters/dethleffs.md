@@ -527,6 +527,12 @@ copy, which was wrong. **Any manufacturer whose panel vans are described as havi
 "garage" needs the same test**: is there an external hatch and a published opening, or is
 it just the space under the bed?
 
+**The adapter reads this itself since 9 September 2026**, as a proposed value rather than a
+finding: the presence of a `Measurement storage opening` row *is* the answer, so an absent
+row is a No rather than a silence. It stayed in the spec at the requester's direction —
+*"rear garage […] for motor homes, I assume you would still include that as part of the
+spec"* — and every proposal quotes the measurement, or says there is no opening row.
+
 **Fridge — all 48 are fridge/freezer, none is a plain fridge.** The 36 motorhomes publish
 `Refrigerator volume (thereof freezer), approx.` on their own page, 83 l to 177 l, always
 with a non-zero freezer figure; some print two, the second being an upgrade option. The 12

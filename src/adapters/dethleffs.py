@@ -178,6 +178,25 @@ LABEL_HEIGHT_POPTOP_OPEN = "Overall height (open pop-top roof)"
 #: standard or a cost option decides the body type — see `DethleffsLayout.body_type`.
 LABEL_BED_POPTOP = "Bed dimension: pop-up roof, L x W, approx."
 
+#: The rear garage's own external hatch, published as a width and a height per side. Its
+#: **presence is the whole test**, per the requester's ruling of 2 September 2026: all 36
+#: motorhomes publish one and are a rear garage; the 12 Globetrail campervans publish
+#: neither and are not, because *"under-bed storage is not a rear garage"* — theirs is
+#: loaded through the rear doors with no side hatch.
+#:
+#: The two sources on the site disagree and the **marketing copy is the one to ignore**:
+#: the model pages' prose calls a campervan's under-bed space a rear garage while the
+#: equipment list calls it "rear storage space with 4 integrated lashing eyes". The
+#: specification row is the specific source and it wins. See `docs/adapters/dethleffs.md`,
+#: where a first build of the layout pack recorded all 48 as `yes` off that prose.
+#:
+#: Deliberately **not** `Clear dimensions of rear garage door/flap`, which only the two
+#: Alpa Coachbuilts publish and which is an *optional* extra flap.
+LABEL_GARAGE_OPENINGS: tuple[str, ...] = (
+    "Measurement storage opening right (W x H)",
+    "Measurement storage opening left (W x H)",
+)
+
 #: `Manufacturer-specified mass for optional equipment` sits **between** the two masses,
 #: exactly where payload would go, and is not payload — it caps factory-fitted extras
 #: (555 kg on the Just Van T 1 against a real payload of 888 kg). Named here so the mistake
@@ -343,6 +362,9 @@ class DethleffsLayout:
     features: dict[str, habitation.Feature] = field(default_factory=dict)
     #: Why the microwave is reported as absent, or `None` to say nothing about it.
     microwave_absence: str | None = None
+    #: The rear-garage opening rows, kept whole so the evidence can be quoted — see
+    #: `LABEL_GARAGE_OPENINGS`.
+    openings: dict[str, str] = field(default_factory=dict)
 
     @property
     def label(self) -> str:
@@ -395,6 +417,27 @@ class DethleffsLayout:
         if self.mtplm_kilograms is None or self.mro_kilograms is None:
             return None
         return self.mtplm_kilograms - self.mro_kilograms
+
+    @property
+    def rear_garage(self) -> bool:
+        """Whether the layout has a rear garage, from whether it publishes an opening.
+
+        Never `None`: an absent row is an answer here rather than a silence, because
+        Dethleffs publish the opening for every layout that has one — see
+        `LABEL_GARAGE_OPENINGS`. That makes this a proposed value like any other spec, not
+        a finding: the requester, 9 September 2026, *"rear garage […] for motor homes, I
+        assume you would still include that as part of the spec"*.
+        """
+        return any(self.garage_openings.values())
+
+    @property
+    def garage_openings(self) -> dict[str, str]:
+        """The published opening per side, for quoting as the evidence."""
+        return {
+            label: value
+            for label, value in (self.openings or {}).items()
+            if label in LABEL_GARAGE_OPENINGS and value
+        }
 
     @property
     def has_standard_elevating_roof(self) -> bool:
@@ -759,6 +802,9 @@ def parse_layout(url: str, page_html: str) -> DethleffsLayout | None:
         floorplan_path=parse_floorplan(page_html),
         features=habitation.features_from(lines),
         microwave_absence=microwave_absence_note(lines),
+        openings={
+            label: specs[label] for label in LABEL_GARAGE_OPENINGS if specs.get(label)
+        },
     )
 
 
@@ -853,6 +899,9 @@ def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
         shower_toilet_separated=_feature_value(layout.features, "shower_toilet_separated"),
         bed_types=_feature_value(layout.features, "bed_types") or [],
         microwave=False if layout.microwave_absence else None,
+        # A proposed value, not a finding: the site answers it either way. See
+        # `DethleffsLayout.rear_garage`.
+        rear_garage=layout.rear_garage,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -933,6 +982,16 @@ def _build_extracted_motorhome(layout: DethleffsLayout) -> ExtractedMotorhome:
                 f"{HIGH_TOP_ABOVE_MM}mm) and the elevating roof being {roof}"
             )
         record("body_type", f"from {detail}, not from the model name or the base vehicle")
+
+    if layout.rear_garage:
+        openings = "; ".join(f"{label} {value}" for label, value in layout.garage_openings.items())
+        record("rear_garage", f"the specification publishes a garage opening — {openings}")
+    else:
+        record(
+            "rear_garage",
+            "the specification publishes no storage-opening row, so there is no external "
+            "hatch — under-bed space loaded through the rear doors is not a rear garage",
+        )
 
     for name, feature in layout.features.items():
         note = feature.note or _FEATURE_NOTES.get(name, "read from the page")
