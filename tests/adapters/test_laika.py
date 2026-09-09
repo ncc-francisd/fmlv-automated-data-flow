@@ -22,11 +22,17 @@ from src.product_model.enums import BodyType
 
 FIXTURES = Path(__file__).parent / "fixtures"
 INDEX = "laika_models_index_jsonld.html"
+VAN_INDEX = "laika_campervan_index_jsonld.html"
+SLIDER_VAN = "laika_floorplans_campervan_performance.html"
 SLIDER_ECOVIP = "laika_floorplans_coachbuilt_ecovip.html"
 SLIDER_KREOS = "laika_floorplans_coachbuilt_kreos.html"
 
-#: What Laika's UK site publishes: Ecovip Titanio 5 low-profile + 3 A-class, Kreos 1 + 1.
-EXPECTED_LAYOUTS = 10
+#: Ecovip Titanio 5 low-profile + 3 A-class, Kreos 1 + 1 — the motorhome index's ten.
+EXPECTED_MOTORHOMES = 10
+
+#: Ecovip Evoluzione 540/600 and Ecovip Performance 540/600/645 — five layouts, published
+#: as twenty records because each comes in four paint colours.
+EXPECTED_VANS = 5
 
 
 def _read(name: str) -> str:
@@ -43,9 +49,76 @@ def layouts() -> dict[str, laika.LaikaLayout]:
 # --------------------------------------------------------------------------- #
 
 
-def test_the_index_yields_the_whole_uk_range(layouts: dict[str, laika.LaikaLayout]) -> None:
-    """One fetch, ten layouts — the count Laika's own sitemap and range pages agree on."""
-    assert len(layouts) == EXPECTED_LAYOUTS
+def test_the_motorhome_index_yields_its_ten(layouts: dict[str, laika.LaikaLayout]) -> None:
+    assert len(layouts) == EXPECTED_MOTORHOMES
+
+
+def test_the_vans_are_a_second_index_and_are_not_optional() -> None:
+    """The gap that shipped: `/en-gb/motorhomes/` says nothing about the vans.
+
+    They live under their own top-level path, so a first version of this adapter read one
+    index and produced 10 products where the UK range is 15. The reviewer caught it against
+    FMLV's own count — which is exactly what a target count is for.
+    """
+    vans = laika.parse_layouts(_read(VAN_INDEX))
+
+    assert len(vans) == EXPECTED_VANS
+    assert {v.range_label for v in vans} == {"Ecovip Evoluzione", "Ecovip Performance"}
+    assert laika.INDEX_PATHS == ("/en-gb/motorhomes/", "/en-gb/camper-van/")
+
+
+def test_a_paint_colour_is_not_a_layout() -> None:
+    """The vans publish one structured record per colour, at identical prices and weights.
+
+    Twenty records, five vehicles. Keeping them apart would quadruple the van range and put
+    four `540`s into FMLV.
+    """
+    vans = laika.parse_layouts(_read(VAN_INDEX))
+
+    assert [v.model for v in vans if v.range_label == "Ecovip Performance"] == [
+        "540",
+        "600",
+        "645",
+    ]
+    assert all(" - " not in v.model for v in vans)
+
+
+@pytest.mark.parametrize(
+    ("published", "expected"),
+    [
+        ("Ecovip Performance 540 - Grigio Torino", "Ecovip Performance 540"),
+        ("540 - Azzurro Portofino", "540"),
+        ("L 2009", "L 2009"),
+        ("H 5109 MB", "H 5109 MB"),
+    ],
+)
+def test_the_colour_comes_off_but_the_layout_does_not(
+    published: str, expected: str
+) -> None:
+    """`L 4009 DS` and `H 5109 MB` must survive: the suffix pattern needs a space-dash-space."""
+    assert laika.strip_colour(published) == expected
+
+
+def test_a_van_is_a_high_top_by_the_height_rule() -> None:
+    """Every Laika van is 2650 mm, so all five clear the settled 2300 mm threshold.
+
+    The segment alone would not settle it — FMLV splits panel-van conversions four ways and
+    the roof is what separates them, so the height decides and a missing one yields nothing.
+    """
+    vans = laika.parse_layouts(_read(VAN_INDEX))
+
+    assert {v.body_type for v in vans} == {BodyType.CAMPERVAN_HIGH_TOP}
+    van_url = "https://www.laika.it/en-gb/camper-van/ecovip-performance/"
+    assert laika.body_type_for(van_url, 2650) is BodyType.CAMPERVAN_HIGH_TOP
+    assert laika.body_type_for(van_url, 2200) is BodyType.CAMPERVAN
+    assert laika.body_type_for(van_url, None) is None
+
+
+def test_the_van_slider_collapses_its_colours_too() -> None:
+    """Twelve slides, three layouts — the drawings differ only in upholstery."""
+    plans = laika.parse_floorplans(_read(SLIDER_VAN))
+
+    assert set(plans) == {"540", "600", "645"}
 
 
 def test_a_one_layout_range_is_not_dropped(layouts: dict[str, laika.LaikaLayout]) -> None:

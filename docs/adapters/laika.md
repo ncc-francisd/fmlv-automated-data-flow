@@ -51,19 +51,49 @@ publishes interior width, headroom, insulation thicknesses and the optional-equi
 225 / 299 / 2971 / 3500 / wheelbase 3450 on `L 2009`, checked value by value. So the gate
 never has to be passed.
 
-## The roster: 10 layouts, and two of them nearly invisible
+## The roster: 15 layouts across **two** indexes
 
-Four range pages, from the sitemap (which agrees with the index page's own links):
-
-| Range page | Layouts |
+| Index / range page | Layouts |
 | --- | --- |
 | `/en-gb/motorhomes/a-class/ecovip-titanio/` | 3 — H 2109, H 3119, H 4109 DS |
 | `/en-gb/motorhomes/a-class/kreos/` | 1 — H 5109 MB |
 | `/en-gb/motorhomes/coachbuilt/ecovip-titanio/` | 5 — L 2009, L 3019, L 4009, L 4009 DS, L 4012 DS |
 | `/en-gb/motorhomes/coachbuilt/kreos/` | 1 — L 5009 MB |
+| `/en-gb/camper-van/ecovip-evoluzione/` | 2 — 540, 600 |
+| `/en-gb/camper-van/ecovip-performance/` | 3 — 540, 600, 645 |
 
-**10 in total**, and the index page's JSON-LD lists all ten, so the roster needs one fetch
-rather than four.
+**15 in total, and it takes two fetches, not one.** `/en-gb/motorhomes/` lists the ten
+coachbuilts and A-classes and says **nothing at all** about the vans, which sit under their
+own top-level `/en-gb/camper-van/` path. Both indexes are read, and `INDEX_PATHS` is where
+a third body style would be added.
+
+### How this went wrong, and what would have caught it
+
+The first version of this adapter shipped **10 products**. It missed the vans twice over:
+the sitemap sweep filtered on `/motorhomes/` in the path, and the requester's own remark —
+*"there are some camper vans as well"* — was misread as saying there were none.
+
+**What would have caught it in minutes is a target count.** FMLV holds 38 Laika products;
+the requester said so on sight and the discrepancy was obvious. Stage 1.5 of
+`.claude/skills/add-manufacturer` asks for the manufacturer's public claim precisely so
+there is a number to fail against, and no number was obtained here — the four range pages
+found by the sitemap were taken as the roster, which made the roster self-confirming.
+
+The residual gap, **15 published against 38 in FMLV**, is not a parsing gap: the UK site
+publishes one model year, and FMLV accumulates. The first run against a real export is what
+resolves it, as disappearances rather than silence.
+
+### A paint colour is not a layout
+
+The vans publish **one structured record per colour** — `Ecovip Performance 540 - Grigio
+Torino`, `… - Azzurro Portofino`, `… - Bianco Cortina`, `… - Grigio Napoli` — at identical
+prices, weights and dimensions, and the floorplan slider does the same. Twenty records,
+five vehicles. `strip_colour` collapses them, keyed on `(range, model)` so the first wins.
+
+The requester's rule, 9 September 2026: *"we wouldn't count different colours as a
+different model. We would count a different model if it has a different model code or
+name."* The suffix pattern needs a space-dash-space, so `L 4009 DS` and `H 5109 MB` survive
+it untouched.
 
 ### The trap: a one-layout range is a different JSON-LD shape
 
@@ -147,16 +177,20 @@ the only signal available. Structure first; names only when there is no structur
 
 ## First run
 
-9 September 2026. **10 products across 2 ranges, none dropped, 155 fields with
+9 September 2026. **15 products across 4 ranges, none dropped, 240 fields with
 provenance**, and no blank among price, both masses, payload, all three dimensions, seats,
-berths, chassis or body type. Four A-class, six low profile, and **all ten carry a
-floorplan pointer**.
+berths, chassis or body type. Four A-class, six low profile, five campervan high tops — all
+five vans are 2650 mm, clearing the settled 2300 mm threshold. **All fifteen carry a
+floorplan pointer.**
 
 ## Still unverified
 
-* **The FMLV baseline join.** `fmlv_manufacturer` is `Laika` from
-  `resources/manufacturers-full-list.csv` (id 52) but has not been checked against a real
-  FMLV export, so the first run will classify all ten as new until it is.
+* **Why FMLV holds 38 and the site publishes 15.** The requester confirmed FMLV spells the
+  manufacturer `Laika`, matching the supplier list, so the join key is right and the
+  baseline will match. The gap is therefore products FMLV has accumulated that the current
+  UK site no longer lists — older model years and withdrawn layouts — which the first run
+  against a real export will report as disappearances. Worth reading that first run
+  carefully rather than assuming.
 * **When the model year turns over.** Not established for Laika; per
   [`README.md`](README.md) the sector rolls July to early September, so re-check at the end
   of September with the rest.

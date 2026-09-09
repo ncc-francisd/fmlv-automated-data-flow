@@ -84,8 +84,13 @@ BASE_URL = "https://www.laika.it"
 MANUFACTURER = "Laika"
 MANUFACTURER_DISPLAY_NAME = "Laika"
 
-#: The UK models index — one fetch for the whole roster. Sterling, and server-rendered.
-MODELS_INDEX_PATH = "/en-gb/motorhomes/"
+#: The two UK body-style indexes, each publishing its own half of the roster as JSON-LD.
+#:
+#: **Both, not just the first.** `/en-gb/motorhomes/` lists the coachbuilts and A-classes
+#: and says nothing about the vans, which live under their own top-level path — a first
+#: version of this adapter read only the motorhome index and shipped 10 products where the
+#: UK range is 15. The reviewer caught it against FMLV's own count.
+INDEX_PATHS: tuple[str, ...] = ("/en-gb/motorhomes/", "/en-gb/camper-van/")
 
 #: `(low-profile page, A-class page, FMLV range label)`. Used only by `--range` and to
 #: fetch the drawings: the roster itself comes from the index in one request.
@@ -105,6 +110,8 @@ DEFAULT_RANGES: tuple[tuple[str, str, str], ...] = (
         "/en-gb/motorhomes/a-class/kreos/",
         "Kreos",
     ),
+    ("/en-gb/camper-van/ecovip-evoluzione/", "Ecovip Evoluzione"),
+    ("/en-gb/camper-van/ecovip-performance/", "Ecovip Performance"),
 )
 
 #: Laika's own description of what it builds, from the index page's meta description:
@@ -116,6 +123,16 @@ BODY_TYPES: dict[str, BodyType] = {
     "a-class": BodyType.A_CLASS,
 }
 
+#: A campervan taller than this is a high top. The settled cross-manufacturer rule, set by
+#: the NCC side on 16 August 2026 — see `docs/adapters/README.md`. Every Laika van is
+#: 2650 mm, so all five are high tops, but the height decides it rather than the segment.
+HIGH_TOP_ABOVE_MM = 2300
+
+#: The URL segment Laika files its vans under. Kept apart from `BODY_TYPES` because the
+#: segment alone does not settle the type: FMLV splits panel-van conversions four ways and
+#: the roof is what separates them.
+CAMPERVAN_SEGMENT = "camper-van"
+
 #: Every `application/ld+json` block on a page.
 _JSON_LD = re.compile(
     r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', re.S
@@ -124,6 +141,13 @@ _JSON_LD = re.compile(
 #: The trailing `I` Laika appends for the integrated build — `Ecovip Titanio I`. Dropped,
 #: because it names a body type FMLV already records in its own column.
 _INTEGRATED_SUFFIX = re.compile(r"\s+I$")
+
+#: The paint colour Laika appends to a van's name — `Ecovip Evoluzione 540 - Verde
+#: Mugello`. **The vans publish one structured record per colour**, so without stripping
+#: this the five van layouts arrive as twenty products: four Verde/Arancio/Azzurro/Grigio
+#: copies of each, at identical prices, weights and dimensions. A colour is a trim option,
+#: not a layout.
+_COLOUR_SUFFIX = re.compile(r"\s+-\s+\S.*$")
 
 #: A floorplan slide. `data-name` is the layout, and the drawing follows within the slide.
 _SLIDE = re.compile(r'data-name="([^"]+)"')
@@ -207,6 +231,16 @@ def _lower_berth(published: str | None) -> int | None:
     return int(numbers[0]) if numbers else None
 
 
+def strip_colour(name: str) -> str:
+    """`Ecovip Performance 540 - Grigio Torino` -> `Ecovip Performance 540`.
+
+    The vans publish one record *per paint colour*, in the structured data and again in the
+    floorplan slider, so without this the five van layouts arrive as twenty products at
+    identical prices, weights and dimensions. A colour is a trim option, not a layout.
+    """
+    return _COLOUR_SUFFIX.sub("", " ".join(name.split())).strip()
+
+
 def fmlv_range(vehicle_configuration: str | None) -> str | None:
     """The FMLV range for a `vehicleConfiguration`, with the integrated `I` dropped."""
     if not vehicle_configuration:
@@ -214,14 +248,30 @@ def fmlv_range(vehicle_configuration: str | None) -> str | None:
     return _INTEGRATED_SUFFIX.sub("", " ".join(vehicle_configuration.split())) or None
 
 
-def body_type_for(url: str | None) -> BodyType | None:
-    """The body type a layout's own URL names, or `None` for a path neither covers."""
+def body_type_for(url: str | None, height_mm: int | None = None) -> BodyType | None:
+    """The body type a layout's own URL names, or `None` where it cannot be settled.
+
+    `/coachbuilt/` and `/a-class/` settle it outright — Laika describe their range as
+    "Low-profile and A-class", and the requester confirmed no over-cab bed anywhere in it.
+
+    `/camper-van/` does not: it says the vehicle is a panel-van conversion, and FMLV splits
+    those four ways with the roof deciding. So the height decides, on the same 2300 mm
+    threshold every other adapter uses. **A missing height yields `None`, not a guess** —
+    the four campervan columns are mutually exclusive and picking the wrong one is worse
+    than leaving it for a reviewer.
+    """
     if not url:
         return None
     for segment, body_type in BODY_TYPES.items():
         if f"/{segment}/" in url:
             return body_type
-    return None
+    if f"/{CAMPERVAN_SEGMENT}/" not in url or height_mm is None:
+        return None
+    return (
+        BodyType.CAMPERVAN_HIGH_TOP
+        if height_mm > HIGH_TOP_ABOVE_MM
+        else BodyType.CAMPERVAN
+    )
 
 
 def _model_name(variant: dict[str, Any], range_label: str | None) -> str | None:
@@ -233,6 +283,7 @@ def _model_name(variant: dict[str, Any], range_label: str | None) -> str | None:
     name = " ".join(str(variant.get("name") or variant.get("model") or "").split())
     if not name:
         return None
+    name = strip_colour(name)
     if range_label and name.lower().startswith(f"{range_label.lower()} "):
         name = name[len(range_label) + 1 :].strip()
     return name or None
@@ -269,7 +320,9 @@ def parse_layouts(index_html: str) -> list[LaikaLayout]:
     become a product.
     """
     layouts: list[LaikaLayout] = []
-    seen: set[str] = set()
+    # Keyed on the vehicle, not the URL: the vans put four colours of one layout on one
+    # page, so a URL key keeps one of twenty and a colour-blind identity keeps five.
+    seen: set[tuple[str, str]] = set()
     for raw in _JSON_LD.findall(index_html):
         try:
             block = json.loads(raw)
@@ -277,13 +330,13 @@ def parse_layouts(index_html: str) -> list[LaikaLayout]:
             continue
         for variant in _variants(block):
             url = str(variant.get("url") or variant.get("@id") or "")
-            if not url or url in seen:
+            if not url:
                 continue
             range_label = fmlv_range(variant.get("vehicleConfiguration"))
             model = _model_name(variant, range_label)
-            if not range_label or not model:
+            if not range_label or not model or (range_label, model) in seen:
                 continue
-            seen.add(url)
+            seen.add((range_label, model))
 
             properties = _properties(variant)
             offers = variant.get("offers")
@@ -300,7 +353,7 @@ def parse_layouts(index_html: str) -> list[LaikaLayout]:
                 LaikaLayout(
                     range_label=range_label,
                     model=model,
-                    body_type=body_type_for(url),
+                    body_type=body_type_for(url, _centimetres_to_mm(variant.get("height"))),
                     rrp_pounds=price,
                     mro_kilograms=_quantity(variant.get("weight")),
                     mtplm_kilograms=_quantity(variant.get("weightTotal")),
@@ -347,7 +400,9 @@ def parse_floorplans(range_html: str) -> dict[str, str]:
     slides = list(_SLIDE.finditer(section))
     plans: dict[str, str] = {}
     for index, match in enumerate(slides):
-        name = " ".join(match.group(1).split())
+        # Colour-blind, and first wins: the drawings differ only in upholstery, so any
+        # one of a layout's four is the layout. See `strip_colour`.
+        name = strip_colour(match.group(1))
         if not name or name in plans:
             continue
         # Bounded to this slide, so a missing drawing cannot pick up the next layout's.
@@ -401,7 +456,7 @@ def _build_extracted_motorhome(
         mh_height_mm=layout.mh_height_mm,
     )
 
-    source = layout.source_url or f"{BASE_URL}{MODELS_INDEX_PATH}"
+    source = layout.source_url or f"{BASE_URL}{INDEX_PATHS[0]}"
     provenance: dict[str, Provenance] = {}
 
     def record(field: str, snippet: str) -> None:
@@ -466,18 +521,26 @@ def collect(
     and collecting nothing silently would look like a manufacturer that had withdrawn its
     whole range. Anything narrower is narrated and skipped.
     """
-    index_url = f"{BASE_URL}{MODELS_INDEX_PATH}"
-    on_progress(f"fetching the models index {index_url} ...")
-    index = http.fetch(index_url)
-    if index.status_code != 200:
-        msg = f"models index {index_url} returned {index.status_code}"
-        raise RuntimeError(msg)
-
-    layouts = parse_layouts(index.file_path.read_text(encoding="utf-8", errors="replace"))
+    layouts: list[LaikaLayout] = []
+    seen: set[tuple[str, str]] = set()
+    for path in INDEX_PATHS:
+        index_url = f"{BASE_URL}{path}"
+        on_progress(f"fetching the index {index_url} ...")
+        index = http.fetch(index_url)
+        if index.status_code != 200:
+            msg = f"index {index_url} returned {index.status_code}"
+            raise RuntimeError(msg)
+        found = parse_layouts(index.file_path.read_text(encoding="utf-8", errors="replace"))
+        on_progress(f"  {path} publishes {len(found)} layout(s)")
+        for layout in found:
+            key = (layout.range_label, layout.model)
+            if key not in seen:
+                seen.add(key)
+                layouts.append(layout)
     if not layouts:
-        msg = f"no structured vehicle data on {index_url}"
+        msg = f"no structured vehicle data on any of {INDEX_PATHS}"
         raise RuntimeError(msg)
-    on_progress(f"the index publishes {len(layouts)} layout(s)")
+    on_progress(f"{len(layouts)} layout(s) across the UK range")
 
     wanted = {entry[-1] for entry in ranges}
 
