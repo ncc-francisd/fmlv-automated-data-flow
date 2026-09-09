@@ -40,8 +40,11 @@ from ..product_model.enums import (
     SleepingArea,
 )
 from ..product_model.caravan import Caravan
+from ..product_model.caravan_io import columns_for_field as caravan_columns_for_field
 from ..product_model.caravan_io import write_csv as write_caravan_csv
 from ..product_model.enums import CaravanBodyType, CaravanSleepingArea
+from ..product_model.findings import FINDING_FIELDS
+from ..product_model.io import columns_for_field as motorhome_columns_for_field
 from ..product_model.io import write_csv as write_fmlv_csv
 from ..product_model.model import AutomaticVariant, Motorhome
 from ..product_model.product import Product
@@ -310,6 +313,38 @@ def _approved_value(entry: ChangeQueueEntry) -> str | None:
     return entry.change.new_value
 
 
+def _unanswered_habitation_columns(product: Product) -> list[str]:
+    """The habitation columns a **new** product should reach FMLV blank on, not `No`.
+
+    A single-select group writes `No` to every member it does not hold, so an unanswered
+    `refrigeration` asserts *no fridge*. The requester found exactly that on a Dethleffs
+    Globebus Active I1, whose own downloadable price list publishes a fridge freezer:
+    *"the output […] states no for fridge or fridge/freezer. This is more worrying in some
+    ways."*
+
+    Since the habitation fields became findings, nothing in the review answers them and
+    nobody accepts anything, so that `No` is the default outcome rather than a decision.
+    Blanking the columns makes the row say what is true — nobody has answered yet — and
+    turns the person's job into filling a gap they can see, which is what was asked for:
+    *"we could leave it to humans to add those elements to the CSV."*
+
+    A field a decision *did* answer keeps its answer. That is not reachable from a finding,
+    but a run stored before the change carries real `bed_types` proposals a reviewer can
+    still decide, and this must not blank one of those out from under them.
+    """
+    columns_for_field = (
+        caravan_columns_for_field
+        if isinstance(product, Caravan)
+        else motorhome_columns_for_field
+    )
+    unanswered: list[str] = []
+    for field_name in FINDING_FIELDS:
+        if getattr(product, field_name, None) not in (None, []):
+            continue
+        unanswered.extend(columns_for_field(field_name))
+    return unanswered
+
+
 def build_upload_products(
     connection: sqlite3.Connection,
     *,
@@ -365,6 +400,12 @@ def build_upload_products(
 
         for entry in approved:
             product = apply_field(product, entry.change.field, _approved_value(entry))
+
+        if baseline_product is None:
+            # Only a new product. A matched one is a copy of its baseline row, so every
+            # habitation column already holds whatever FMLV holds and blanking one would
+            # clear a `No` the NCC set deliberately.
+            product.unanswered_columns = _unanswered_habitation_columns(product)
 
         results.append(_mirror_guide_price(product))
 

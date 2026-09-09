@@ -642,3 +642,78 @@ def test_a_finding_cannot_be_carried_into_the_upload(
 
     assert motorhome.rrp_pounds == 93920
     assert motorhome.refrigeration is None
+
+
+def test_a_new_products_unanswered_habitation_columns_are_blank_not_no(
+    connection: sqlite3.Connection, run_id: int, tmp_path: Path
+) -> None:
+    """The Dethleffs Globebus Active I1, whose price list publishes a fridge freezer.
+
+    The requester, 9 September 2026: *"the output contains no values for bed types or
+    bathroom layout, and also states no for fridge or fridge/freezer […] the site has a
+    spec/price list download showing that a fridge/freezer. This is more worrying in some
+    ways."* It is: a group nobody answered wrote `No` to every member, which reads as a
+    decision that the vehicle has no fridge.
+
+    Since the habitation fields became findings nothing in the review answers them, so
+    they reach the CSV empty for a person to fill in — see `product_model.findings`.
+    """
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93920)], []),
+    )
+    for entry in store.list_change_queue(connection, run_id):
+        if entry.change.new_value is not None:
+            store.record_decision(
+                connection, proposed_change_id=entry.change.id, action="accept", decided_by="ben"
+            )
+
+    motorhomes = build_upload_motorhomes(
+        connection, run_id=run_id, manufacturer=make_manufacturer(), baseline=[]
+    )
+    destination = tmp_path / "upload.csv"
+    write_csv(motorhomes, destination)
+    with destination.open(encoding="utf-8-sig", newline="") as handle:
+        [row] = list(csv.DictReader(handle))
+
+    for column in ("fridge", "fridge_freezer", "fixed_bed", "drop_down_bed",
+                   "side_shower_toilet", "no_toilet", "blown_air_heating",
+                   "separate_shower_toilet", "microwave", "rear_kitchen"):
+        assert row[column] == "", column
+    # And a column outside the habitation group still asserts its answer.
+    assert row["rear_garage"] == "No"
+    assert row["rrp_pounds"] == "93920"
+
+
+def test_an_existing_products_habitation_columns_are_never_blanked(
+    connection: sqlite3.Connection, run_id: int, tmp_path: Path
+) -> None:
+    """A matched row is a copy of FMLV's own, so a `No` there is the NCC's, not a gap."""
+    from src.product_model.enums import Refrigeration
+
+    baseline = make_baseline(refrigeration=Refrigeration.FRIDGE_FREEZER)
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([make_extracted(rrp_pounds=93920)], [baseline]),
+    )
+    entry = next(
+        e for e in store.list_change_queue(connection, run_id) if e.change.field == "rrp_pounds"
+    )
+    store.record_decision(
+        connection, proposed_change_id=entry.change.id, action="accept", decided_by="ben"
+    )
+
+    motorhomes = build_upload_motorhomes(
+        connection, run_id=run_id, manufacturer=make_manufacturer(), baseline=[baseline]
+    )
+    destination = tmp_path / "upload.csv"
+    write_csv(motorhomes, destination)
+    with destination.open(encoding="utf-8-sig", newline="") as handle:
+        [row] = list(csv.DictReader(handle))
+
+    assert row["fridge_freezer"] == "Yes"
+    assert row["fridge"] == "No"

@@ -83,20 +83,57 @@ def validate(motorhome: Motorhome) -> list[Issue]:
     issues.extend(_validate_length(motorhome, key))
     issues.extend(_validate_automatic(motorhome, key))
 
-    for field_name in LAYOUT_GROUP_FIELDS:
-        # `bathroom_layout` is a list, so "nothing chosen" is `[]` rather than `None`.
-        if getattr(motorhome, field_name) in (None, []):
-            issues.append(
-                Issue(
-                    severity="warning",
-                    code="layout_group_unset",
-                    message=f"no option selected for '{field_name}'",
-                    product_key=key,
-                    field=field_name,
-                )
-            )
+    # `bathroom_layout` is a list, so "nothing chosen" is `[]` rather than `None`.
+    issues.extend(_unset_layout_groups(motorhome, LAYOUT_GROUP_FIELDS, key))
 
     return issues
+
+
+def _unset_layout_groups(product: object, fields: tuple[str, ...], key: str) -> list[Issue]:
+    """One warning per product for the layout groups nobody has answered, not one each.
+
+    It stays a warning because it is a real checklist: the row is going to FMLV with
+    those columns empty and a person has to fill them. It became **one** line on
+    9 September 2026, when the habitation fields turned into findings and every new
+    product started arriving with the whole group unanswered — five warnings apiece over
+    forty-eight Dethleffs layouts is 240 lines of the same fact, which buries the errors
+    the file exists to show. The review page carries the values and their sources; see
+    `product_model.findings`.
+
+    `body_type` keeps a line of its own. It is still a proposal a reviewer answers, so an
+    unset one means something different: nobody chose, rather than nobody was asked.
+    """
+    unset = [name for name in fields if getattr(product, name, None) in (None, [])]
+    if not unset:
+        return []
+    issues: list[Issue] = []
+    if "body_type" in unset:
+        issues.append(
+            Issue(
+                severity="warning",
+                code="layout_group_unset",
+                message="no option selected for 'body_type'",
+                product_key=key,
+                field="body_type",
+            )
+        )
+        unset.remove("body_type")
+    if unset:
+        issues.append(
+            Issue(
+                severity="warning",
+                code="layout_group_unset",
+                message=(
+                    "no option selected for " + ", ".join(f"'{name}'" for name in unset)
+                    + " — read them off the floorplan and enter them by hand, "
+                    "or see the findings on the review page"
+                ),
+                product_key=key,
+                field=unset[0],
+            )
+        )
+    return issues
+
 
 
 #: A washroom cannot be both rear and side. `bathroom_layout` became multi-select on
@@ -324,17 +361,7 @@ def validate_caravan(caravan: Caravan) -> list[Issue]:
     issues.extend(_validate_caravan_payload(caravan, key))
     issues.extend(_validate_caravan_lengths(caravan, key))
 
-    for field_name in CARAVAN_LAYOUT_GROUP_FIELDS:
-        if getattr(caravan, field_name) in (None, []):
-            issues.append(
-                Issue(
-                    severity="warning",
-                    code="layout_group_unset",
-                    message=f"no option selected for '{field_name}'",
-                    product_key=key,
-                    field=field_name,
-                )
-            )
+    issues.extend(_unset_layout_groups(caravan, CARAVAN_LAYOUT_GROUP_FIELDS, key))
 
     return issues
 

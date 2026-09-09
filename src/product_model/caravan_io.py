@@ -55,6 +55,35 @@ _MULTI_SELECT_FIELDS: tuple[tuple[str, type[ColumnEnum]], ...] = (
 )
 
 
+#: The FMLV columns a canonical field that is **not** an enum group writes to, where the
+#: two are not spelled the same. Only the habitation booleans need an entry, and only
+#: `separate_shower_toilet` actually differs — the column is named for the partition, the
+#: field for the question asked about it.
+_COLUMNS_BY_FIELD: dict[str, tuple[str, ...]] = {
+    "shower_toilet_separated": ("separate_shower_toilet",),
+    "microwave": ("microwave",),
+    "rear_garage": ("rear_garage",),
+}
+
+
+def columns_for_field(field_name: str) -> tuple[str, ...]:
+    """Every FMLV column one canonical field writes to, group members included.
+
+    A single-select group writes `Yes` to the member it holds and `No` to the rest, so
+    "which columns does this field own" is not answerable from the column names — it is
+    answerable from the enum. `output.build` needs it to leave a habitation column
+    genuinely blank on a new product instead of asserting `No` across a group nobody has
+    answered; see `product_model.findings`.
+
+    Returns `()` for a field with no column of its own, rather than raising: the caller
+    is looping over field names from elsewhere and a plain integer column needs nothing
+    doing to it.
+    """
+    for name, enum_cls in (*_SINGLE_SELECT_FIELDS, *_MULTI_SELECT_FIELDS):
+        if name == field_name:
+            return tuple(member.value for member in enum_cls)
+    return _COLUMNS_BY_FIELD.get(field_name, ())
+
 @dataclass
 class CaravanReadResult:
     """The outcome of reading a caravan export: parsed rows plus anything that went wrong."""
@@ -213,6 +242,12 @@ def caravan_to_row(caravan: Caravan) -> dict[str, str]:
         schema.IMAGE_SEPARATOR.join(caravan.images) if caravan.images else None,
     )
     set_yes_no("archived", caravan.archived)
+
+    # Last, so it wins over every `No` written above: the columns nobody has answered
+    # yet, left genuinely empty for a person to fill in. See `unanswered_columns`.
+    for column in caravan.unanswered_columns:
+        if column in row:
+            row[column] = ""
 
     return row
 

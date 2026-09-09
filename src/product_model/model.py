@@ -78,6 +78,21 @@ class Motorhome(BaseModel):
     #: empty for everything except a product read back from an export.
     extra_column_flags: list[str] = Field(default_factory=list)
 
+    #: Columns to leave **blank** rather than `No`: nobody has answered them yet.
+    #:
+    #: The mirror image of `extra_column_flags`. A single-select group writes `No` to every
+    #: member it does not hold, so an unanswered `refrigeration` asserts *no fridge* — and
+    #: on a Dethleffs Globebus Active I1 it did, on a product whose own price list
+    #: publishes a fridge freezer. That is fine while the pipeline proposes the value and a
+    #: reviewer answers it; it is wrong now that the habitation fields are **findings** a
+    #: person types in by hand, because the person is then correcting a false `No` rather
+    #: than filling a gap they can see. See `product_model.findings`.
+    #:
+    #: Populated in one place only — `output.build.build_upload_products`, for a genuinely
+    #: new product — so a row read back from an export is unaffected and a `No` FMLV
+    #: already holds is never disturbed.
+    unanswered_columns: list[str] = Field(default_factory=list)
+
     # --- Identity -------------------------------------------------------------
     manufacturer: str | None = None
     base_vehicle_manufacturer: str | None = None
