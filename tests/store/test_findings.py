@@ -283,3 +283,47 @@ def test_a_matched_products_habitation_values_are_never_touched(
         "refrigeration" not in fields and "bed_types" not in fields
         for fields in verified.values()
     )
+
+
+def test_a_finding_is_not_counted_as_work_waiting_on_a_reviewer(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """The runs list said 18 changes on a run with nothing left to accept.
+
+    The requester, on Eriba's run 98, 9 September 2026: *"it seems to suggest eighteen
+    changes I haven't addressed, but there are no accept changes anywhere that I can see."*
+    Eighteen caravans, one floorplan finding each, and the pending count did not exclude
+    them — so the number could never reach zero however carefully the run was reviewed.
+    """
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=75,
+        diffs=diff_products([a_scan_that_found_things()], []),
+    )
+    findings = store.findings_by_product(connection, run_id)
+    assert findings, "the fixture must produce findings for this to test anything"
+
+    summary = store.run_review_summary(connection, run_id)
+    queue = [entry for entry in store.list_change_queue(connection, run_id)]
+
+    assert summary.pending_count == len(queue)
+    assert summary.pending_count > 0  # the real proposals are still counted
+
+
+def test_deciding_every_proposal_takes_the_pending_count_to_zero(
+    connection: sqlite3.Connection, run_id: int
+) -> None:
+    """The other half of it: a fully reviewed run must read as finished."""
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=75,
+        diffs=diff_products([a_scan_that_found_things()], []),
+    )
+    for entry in store.list_change_queue(connection, run_id):
+        store.record_decision(
+            connection, proposed_change_id=entry.change.id, action="accept", decided_by="ben"
+        )
+
+    assert store.run_review_summary(connection, run_id).pending_count == 0

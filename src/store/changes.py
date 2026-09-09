@@ -538,6 +538,10 @@ def run_review_summary(connection: sqlite3.Connection, run_id: int) -> RunReview
     this run (ties broken alphabetically) — a simple "who's mainly been through this"
     signal for the runs overview page, not a permissions concept. `None` if nothing on
     the run has been decided yet.
+
+    **`pending_count` is work a reviewer can actually do**, so findings are excluded: they
+    carry no decision and never will, and a count that included them would never reach
+    zero however carefully a run was reviewed.
     """
     pending_row = connection.execute(
         """
@@ -549,7 +553,14 @@ def run_review_summary(connection: sqlite3.Connection, run_id: int) -> RunReview
             ORDER BY latest.decided_at DESC, latest.id DESC
             LIMIT 1
         )
-        WHERE proposed_change.run_id = ? AND decision.id IS NULL
+        WHERE proposed_change.run_id = ?
+          AND decision.id IS NULL
+          -- Findings are never decided, so counting them here left every run showing
+          -- work that could not be done. The requester on Eriba's run 98, 9 September
+          -- 2026: *"it seems to suggest eighteen changes I haven't addressed, but there
+          -- are no accept changes anywhere that I can see."* Eighteen caravans, one
+          -- floorplan finding each. See `product_model.findings`.
+          AND proposed_change.is_finding = 0
         """,
         (run_id,),
     ).fetchone()
