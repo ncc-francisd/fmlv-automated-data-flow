@@ -141,15 +141,63 @@ Worth knowing before it is run, because two of these are systematic:
   and 4 is what FMLV has shown customers until now.
 * **`Arto 88` arrives as a new product.**
 
+## The build, and the first diff — 9 September 2026
+
+**7 of 7 collected, no blank field on any of them, 133 fields with provenance, all seven
+carrying a floorplan.** Diffed against the live export, scoped the way a run scopes it:
+
+| | |
+| --- | --- |
+| collected | 7 |
+| baseline | 6 |
+| matched | 6 |
+| new | 1 — `Arto 88` |
+| **disappeared** | **0** |
+
+No identity renames: the ranges and models the adapter emits match FMLV's strings exactly,
+`6.9E` and `7.3F` included. No dimension or maximum-laden-mass change either — the API and
+FMLV already agree on every one, which is the strongest evidence the parse reads the right
+fields.
+
+24 field changes across the six, and half of them fill a blank:
+
+| n | field | |
+| --- | --- | --- |
+| 6 | `mro_kilograms` | **FMLV held none** |
+| 6 | `mh_payload_kilograms` | **FMLV held none** |
+| 6 | `rrp_pounds` | the year's rise |
+| 6 | `mh_passenger_seats_inc_driver` | 4 → 2, or 3 → 2 on the Flair 920 |
+
+The seat correction is the one to look at before accepting. It is right by both settled
+rules — count three-point belts only, and record the base vehicle rather than the optioned
+variant — but 4 is what FMLV has shown customers until now.
+
+### Berths are derived, and the derivation is corroborated
+
+The API states bed dimensions and never a berth count. Each dimension pair is one bed and
+its width decides whether it sleeps one or two, at a 1,200 mm threshold that sits in a
+545 mm gap — every Niesmann single is 730 or 735 mm and every double 1,280 or wider.
+
+That gives **4 on all seven layouts, matching FMLV's 4 on all six existing products**,
+including the iSmove 6.9 E whose rear is twin singles where the others have a double. The
+requester approved the approach: *"the fact that there are two double beds is our best
+guidance on the berths, so that would be four."* The provenance quotes the bed sizes, so a
+reviewer can see the working.
+
+### Two things the survey had not seen
+
+**`thumbFilename` is not per-layout.** Flair 880 and 920 share `cart_flair_2022.png` and
+both iSmoves share `cart_ismove.png`, so joining a drawing on it would give two products the
+same floorplan. `imgGalleryFilename` is the per-layout one — `a78.png`, `flair_2023_880.png`
+— and resolves under `/assets/02-grundrisse/`.
+
+**The backend wraps its JSON in PHP output when it feels like it** — a notice ahead of the
+document when a parameter is missing, and trailing output after it — so a plain
+`json.loads` fails on a response that is otherwise perfectly good. The captured fixtures
+happen to be clean, which is why the tests construct both cases rather than relying on them.
+
 ## Still unverified
 
-* **Berths.** The API gives bed *dimensions* — an overhead front bed and rear bed(s) — but
-  no berth count, and FMLV holds 4 for all six. Reading 4 from two double beds is
-  inference, not a published figure, so confirm before relying on it.
-* **The floorplan assets.** `imgGalleryFilename` and `thumbFilename` are bare filenames
-  (`a78.png`, `cart_arto78.png`) and the bundle references `/assets/02-grundrisse/`; the
-  full URL has not been resolved. Note `imageKey` is **not** per-layout — Flair 880 and 920
-  share `F920`, and both iSmoves share `iS69` — so the key cannot be the join.
 * **Model year changeover.** Not established for this brand.
 * **Whether `lang=en` alone gives the UK market**, or whether a market parameter exists that
   the bundle sets separately. The prices reconcile with FMLV, which is good evidence, but
