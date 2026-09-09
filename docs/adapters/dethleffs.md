@@ -342,6 +342,54 @@ name. FMLV's `Trend Active T` / `7057 DBL` is the plain one, already collected f
 products sharing a range and model would upload as two rows for one vehicle, and the matcher
 would pair both against the same baseline row.
 
+## The MY2027 changeover, checked 9 September 2026
+
+The requester asked the right question of his rerun: *"eighteen new models out of fifty
+eight — that is a high proportion. Either we were very out of date, or are some of these
+just name changes or duplicates?"* Per the roster rule in [`README.md`](README.md) that has
+to be answered against the disappearances, not asserted, so it was — against the live
+export, scoped the way a real run scopes it (one manufacturer, not archived, current model
+year, deduplicated).
+
+| | |
+| --- | --- |
+| collected from the site | 54 |
+| baseline in scope | 49 |
+| matched | 35 |
+| **new** | **19** |
+| disappeared | 14 |
+
+**None of the 19 is a rename.** Every new product was compared against every vanished one
+on overall length and mass in running order; not one pair agrees within 20 mm and 40 kg. So
+they are different vehicles, and the count is a real model-year refresh rather than name
+drift. The 19 break down as:
+
+| n | why |
+| --- | --- |
+| 6 | `Trend Active Plus` — the range that launched after the survey and that nothing collected until 9 September |
+| 3 | `Just Van` — genuinely new for MY2027, and known to be at survey time |
+| 3 | `Globebus Performance` and `Globebus Performance 4x4 T 16` — a range with no FMLV counterpart |
+| 2 | `XL A 6822-2`, `A 7822-2` |
+| 2 | `Globetrail Active 540 DS`, `600 ES` |
+| 2 | `Just Camp Active T 6752 DBL`, `T 6762` |
+| 1 | `Trend Active I 7027` |
+
+Against 14 withdrawals: all four `Esprit I 7150-2`, all four `Globebus T Camp` and `T Camp
+Active`, three `Globetrail Classic 640`s, both `Globetrotter XL I 7850-2`, and `6617 EB`
+from both Trend Actives. Net +5.
+
+### The matcher does not revive an archived row, and that was worth proving
+
+Diffing against the **raw** export — 186 rows, 73 of them archived — the six Trend Active
+Plus layouts match archived 2023 `Trend T` and `Trend I` rows at 0.67, because the plain
+Trend Active takes the live row first and `7057 DBL` still matches exactly. Accepting that
+would rename a retired 2023 product into a 2027 one and never create the real vehicle.
+
+It cannot happen in a run: `cli.execute_run` excludes archived rows from the baseline
+before diffing, so with the real scope **zero** products match an archived row.
+`matching._tie_break` prefers live over archived on equal scores, which is the second
+guard. Recorded because the raw-export diff looks alarming and is not the diff that runs.
+
 ## The first real run — #8, 2 September 2026
 
 **48 of 48 collected. Nothing dropped, nothing skipped, no field left blank.** 50 plain
