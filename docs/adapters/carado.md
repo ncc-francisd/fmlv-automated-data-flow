@@ -55,7 +55,7 @@ match in the project so far.
 
 23 pages under `/gb/en/motorhomes/{body-style}/{slug}`, carrying everything FMLV needs in
 plain tables — price, chassis, all three dimensions, both masses, seats, berths, plus a
-per-layout floorplan. A real block, from `T447`:
+per-layout floorplan on all but one of them. A real block, from `T447`:
 
 ```
 Basic price incl. VAT                                  £66,290
@@ -234,6 +234,65 @@ What the copy settles outright:
 
 These reach the reviewer as **findings**, not proposals — see
 `src/product_model/findings.py`.
+
+## What the build found — 9 September 2026
+
+**29 of 29 products, none dropped, no blank spec field on any of them, 606 fields with
+provenance.** Ranges as FMLV will hold them: `Alcoves PRO` 3, `Campervan` 4, `Campervan
+PRO` 6, `Campervan PRO+` 3, `Integrated` 2, `Semi-integrated` 8, `Van` 3. Body types: 13
+campervan high top, 11 low profile, 3 over-cab bed, 2 A class. Habitation findings:
+refrigeration on 29, microwave on 29, heating on 26, a separated washroom on 5.
+
+Three things the survey had not seen, each of which would have shipped a wrong product:
+
+### The site has two specification templates
+
+`cv601-pro` publishes its whole specification as a **definition list** — `<dd
+class="m-facts__label">` / `<dt class="m-facts__info">` pairs — where the other 22 use
+tables. Its 19 tables are the equipment lists only. A parser that knew about tables alone
+lost that vehicle silently, and 28 of 29 looks like success.
+
+The other 22 pages carry a **six-item** facts card *beside* their tables, so the fallback
+must only fire when the tables gave nothing — otherwise a six-row summary would replace a
+25-row specification.
+
+### A floorplan is told from a photograph by its preset, not its name
+
+Every image on the page is served through the same `/image-thumb__<id>__<preset>/` resizer,
+so the preset is the only signal. Carado's drawings all use `wls-carado-floorplan-large`.
+Without requiring that token the parser matched the **photography** as well, and reported a
+floorplan for all 29 — some of which would have been pictures of a lounge behind a link
+labelled "Floorplan".
+
+With it: **28 of 29**. `CV601 PRO` publishes no drawing at all — its only presets are
+`wls-carado-stage` and `wls-ambient-*` — and the run narrates that rather than pointing at
+a photograph.
+
+This is the [`laika.md`](laika.md) lesson with the opposite conclusion, and the distinction
+is worth keeping: a *filename* is metadata about an upload and says nothing, but a
+*preset* is the site's own statement of what the image is for. Markup, not naming.
+
+### A dimension row's label is not a statement about the vehicle
+
+`Lying area Alcove / pull-down bed / Clever-lift bed (cm) | 195 x 140 - 110 OPT` is a
+measurement heading listing three things a Carado might have. Fed to `habitation` it gave
+**14 of the 29 products a bed type read off it** — and every one was wrong. `Bed dimension
+middle` and `Bed dimension rear` are the same shape.
+
+So only the two specification rows that state a feature are passed
+(`HABITATION_SPEC_LABELS`): the refrigerator volume and the heating type. The equipment
+lists go in wholesale, because every line there really is a statement about this vehicle.
+Carado now yields no bed types at all, which is correct — the copy never names a bed, and
+the floorplan pointer is what answers it.
+
+The same class of mistake as Rimor's `Tags` metadata line and Laika's misfiled filename:
+text that looks like content and is not.
+
+### And one honest gap
+
+**The three Alcoves yield no heating.** Their pages have no equipment accordions and no
+`Heating type` row, so there is nothing on them to read — which is a fourth sign those
+pages are stale, alongside the price, the missing equipment lists and the Citroën chassis.
 
 ## Still unverified
 
