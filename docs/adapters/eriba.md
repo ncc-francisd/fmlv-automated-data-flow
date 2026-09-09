@@ -774,3 +774,94 @@ Three things worth promoting to [`README.md`](README.md) if a second brand shows
   website covers 9 of 18 and is not needed as a source at all, but running it every run and
   comparing gives a live check on the columnar parse of the other 9, which nothing else can
   check. Cheap, and it is the only reason the Touring figures can be trusted.
+
+
+---
+
+# ERIBA Car — the campervans
+
+Surveyed and built 9 September 2026, as a **second adapter** (`adapters/eriba.py`). Eriba
+builds both areas, so it has two modules and not one with a flag: this one is keyed
+`("Eriba", motorhome)` and the caravan one above `("Eriba", caravan)`. Same manufacturer id
+196, same supplier name. The Bailey pair is the same arrangement.
+
+## One page, and it carries everything
+
+`/gb/en/models/camper-vans/eriba-car` publishes both layouts in full — price, chassis, all
+three dimensions, both masses, seats, berths, roof type, heating and the fridge — in the
+same `has-columns--1+` tables Dethleffs and Carado use. No PDF, no login, no JavaScript.
+One real block, from the 600:
+
+```
+Price                                                    £74,510.00
+Standard chassis                                         VW Crafter 35
+Length / Width / Height (cm)                             599 / 207 / 270
+Mass in running order (-/+ 5%) (kg)*                     2880 (2736 - 3024)*
+Manufacturer-specified mass for optional equipment (kg)* 275
+Technically permissible maximum laden mass (kg)*         3500
+Permitted number of seats (including driver) *           4
+Roof type                                                Fix roof
+Standard heating                                         Warm air, 4 kW
+Berths                                                   2 - 4 (○)
+Refrigerator volume incl. freezer (l)                    90 (7)
+```
+
+## Three things about the page
+
+**Every layout's specification is rendered twice, byte for byte** — four blocks, two
+vehicles. A parser that counted blocks would invent two products. `parse_spec_blocks`
+collapses an exact repeat and keeps a differing one, so the duplication is also a free
+check on the parse.
+
+**The roof type is published**, so the body type is *derived* and not assumed: `Fix roof`
+at 2,700 mm is a campervan high top, which is what the requester expected and what FMLV
+already holds. A standard pop-top would classify itself; an optional one would not change
+what the vehicle is.
+
+**The two layouts share a price and every dimension** and differ everywhere else — the 600
+has 4 permitted seats, a 4 kW gas heater, a 90-litre fridge and a central bed; the 602 has
+**2 seats**, a 6 kW diesel heater and a 70-litre fridge. Easy to mistake for one vehicle
+rendered twice, which is why the tests assert the differences.
+
+## The configurator lists a layout the UK does not sell
+
+`/gb/en/configurator/eriba-car` returns **600, 601 and 602**, but `ERIBA Car 601` appears
+nowhere on the UK model page and the requester confirmed his GB configurator offers only
+two. So the **page is the roster** and the API is used for one thing: the floorplans, which
+the page does not carry. A layout in the API and not on the page is narrated, never
+collected.
+
+## `ERIBA CAR` is how FMLV spells the range
+
+The export holds `Eriba` / `ERIBA CAR` / `600`, so a product reads back as "Eriba ERIBA CAR
+600" — capitals, and the brand twice. **Emitted as FMLV has it rather than tidied**: the
+export decides these strings, and a rename risks two rows for one vehicle. Worth raising as
+a data-quality tidy-up; not worth an unasked-for rename.
+
+## The first diff — 9 September 2026
+
+Both matched, nothing new, nothing disappeared. Four changes each:
+
+| | 600 | 602 |
+| --- | --- | --- |
+| `rrp_pounds` | 70,800 → **74,510** | 70,800 → **74,510** |
+| `mh_height_mm` | 2,670 → **2,700** | 2,670 → **2,700** |
+| `mro_kilograms` | 2,819 → **2,880** | 2,819 → **2,826** |
+| `mh_payload_kilograms` | 681 → **620** | 681 → **674** |
+| `mh_passenger_seats_inc_driver` | — | 4 → **2** |
+
+The 602's seat count is the one to look at: the page says two permitted seats where FMLV
+holds four, and the 600 really does have four, so this is a per-layout difference rather
+than a systematic correction.
+
+## The self-check
+
+The printed ±5% band against the stated running order — weak, because the band is a
+function of the mass, and the same limitation as the caravans'. The stronger check is
+structural: the page states each layout twice and the two must agree.
+
+## Still unverified
+
+* **Whether `ERIBA CAR` should be tidied** to something that does not repeat the brand.
+* **The 601.** It is real — the configurator carries a 2025 drawing for it — but not sold
+  here. Worth re-checking at the model-year rollover in case it arrives.

@@ -69,13 +69,25 @@ def layouts(name: str) -> dict[str, eriba_caravan.EribaCaravan]:
 # --------------------------------------------------------------------------- #
 
 
-def test_the_adapter_is_registered_for_caravans_and_not_for_motorhomes() -> None:
+def test_this_adapter_is_registered_for_caravans_and_the_other_for_motorhomes() -> None:
     """Miss a wiring edit and `adapter_for` returns `None`, which reads as "nobody has
-    written one yet" — Eriba would simply never appear in the trigger dropdown."""
+    written one yet" — Eriba would simply never appear in the trigger dropdown.
+
+    Eriba builds both areas, so there are **two modules and not one with a flag**: this
+    one for the 18 caravans and `eriba` for the two ERIBA Car campervans, added
+    9 September 2026. They share a manufacturer id and a `MANUFACTURER` string and are
+    keyed apart by `VehicleClass`, the same arrangement as the Bailey pair.
+    """
+    from src.adapters import eriba
+
     assert adapter_for("Eriba", VehicleClass.CARAVAN) is eriba_caravan
-    assert adapter_for("Eriba") is None
-    assert adapters_for("Eriba") == {VehicleClass.CARAVAN: eriba_caravan}
+    assert adapter_for("Eriba", VehicleClass.MOTORHOME) is eriba
+    assert adapters_for("Eriba") == {
+        VehicleClass.CARAVAN: eriba_caravan,
+        VehicleClass.MOTORHOME: eriba,
+    }
     assert ADAPTERS[("Eriba", VehicleClass.CARAVAN)] is eriba_caravan
+    assert eriba.MANUFACTURER == eriba_caravan.MANUFACTURER
 
 
 def test_the_range_labels_are_the_fmlv_range_names() -> None:
