@@ -571,6 +571,13 @@ a finding and what becomes a proposal, in one place, and a new adapter gets the 
 for free. What it changes downstream is that a new product's habitation columns reach the
 CSV **blank** rather than `No`, so the person is filling a gap they can see.
 
+**That blank is a gate.** FMLV rejects a row with an empty cell in one of these columns, so
+the upload fails until a person has filled them — which is the requester's own reason for
+preferring it, 9 September 2026: *"although it won't upload to FMLV with empty cells, it
+highlights that we need to fill them in and we can see them."* A `No` would upload cleanly
+and be wrong. Confine it to the habitation columns for the same reason: a blank anywhere
+the pipeline is genuinely responsible for would block an upload nobody needs to touch.
+
 `rear_garage` and a caravan's `twin_axle` stayed proposals, at the requester's direction:
 both are stated plainly in a specification, both are single booleans with no list to go
 empty, and there is no drawing to read. So is `body_type`, which is derived from a

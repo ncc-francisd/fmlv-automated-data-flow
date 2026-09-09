@@ -328,6 +328,18 @@ def _unanswered_habitation_columns(product: Product) -> list[str]:
     turns the person's job into filling a gap they can see, which is what was asked for:
     *"we could leave it to humans to add those elements to the CSV."*
 
+    **The blank is a gate, and that is the point — do not "fix" it back to `No`.** FMLV
+    will not accept a row with an empty cell in one of these columns, so the upload fails
+    until a person has filled them in. The requester, 9 September 2026, told which way that
+    cuts: *"I don't mind empty cells on this CSV actually because, although it won't upload
+    to FMLV with empty cells, it highlights that we need to fill them in and we can see
+    them. So I think it's actually better to be blank."* A `No` would upload cleanly and be
+    wrong; a blank cannot go out unnoticed.
+
+    That is also why this is confined to the habitation columns. A blank anywhere the
+    pipeline is genuinely responsible for would stop an upload nobody needs to intervene
+    in, which is a different and unwelcome thing.
+
     A field a decision *did* answer keeps its answer. That is not reachable from a finding,
     but a run stored before the change carries real `bed_types` proposals a reviewer can
     still decide, and this must not blank one of those out from under them.
