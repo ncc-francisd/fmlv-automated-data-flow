@@ -61,6 +61,7 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.murvi.co.uk"
@@ -246,6 +247,37 @@ def _metres_to_mm(text: str) -> int:
 def _flatten(text: str) -> str:
     """One page's text as a single line, for prose matching. See the Patterns note."""
     return " ".join(text.split())
+
+
+#: The headings Murvi divide a specification page into. They sit on their own line with
+#: no punctuation, so a sentence-splitter runs straight through them and welds the end of
+#: one section onto the start of the next — which is how a wardrobe and a fridge ended up
+#: in the same quoted "sentence".
+_SECTION_HEADING = re.compile(
+    r"^\s*(?:In the [a-z ]+|General equipment|Dimensions|Standard equipment)\s*$",
+    re.I | re.M,
+)
+
+#: A word broken across a line by the PDF's own wrapping — "12v 85L com-\npressor
+#: fridge". Left in, the phrase this module wants to read is split in half.
+_WRAPPED_WORD = re.compile(r"-\s*\n\s*")
+
+
+def spec_sentences(text: str) -> list[str]:
+    """One page's prose as whole sentences, for `habitation`.
+
+    Murvi publish paragraphs rather than bullets, hard-wrapped by the PDF at whatever
+    column the text ran out at, so neither the raw lines nor the whole flattened page is
+    readable: a line is half a phrase and the page is one enormous quote. Rejoining the
+    wraps and splitting on sentence ends gives something a reviewer can be shown.
+    """
+    joined = _WRAPPED_WORD.sub("", text)
+    return [
+        sentence
+        for block in _SECTION_HEADING.split(joined)
+        for raw in re.split(r"(?<=[.!?])\s+", " ".join(block.split()))
+        if (sentence := raw.strip())
+    ]
 
 
 @dataclass(frozen=True)
@@ -500,10 +532,59 @@ def _reconciles(spec: MurviSpec, siblings: list[MurviSpec]) -> str | None:
     return None
 
 
+def option_lines(pages: list[str], spec: MurviSpec) -> list[str]:
+    """The lines of `spec`'s options page, as printed.
+
+    Found by the same running header as `other_page_prices`, for the same reasons — and
+    read as **lines** rather than sentences, because an options page is a priced table
+    with no punctuation in it at all: "230V microwave oven with grill at high level
+    250.00". `spec_sentences` would return the whole page as one.
+    """
+    header = re.compile(
+        rf"F?\s*{spec.make}\s+Murvi\s+{re.escape(spec.family)}(?!\s*XL)",
+        re.IGNORECASE,
+    )
+    found: list[str] = []
+    for index, text in enumerate(pages, start=1):
+        if index == spec.page_number:
+            continue
+        flat = _flatten(text)
+        if not header.search(flat) or _IDENTITY.search(flat) is not None:
+            continue
+        found.extend(line.strip() for line in _WRAPPED_WORD.sub("", text).splitlines())
+    return [line for line in found if line]
+
+
+#: How each habitation reading is introduced.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heater in the specification page's General equipment section",
+    "refrigeration": "the fridge named in the specification page",
+    "shower_toilet_separated": "the washroom as the specification page describes it",
+    "bed_types": "the beds as the specification page describes them",
+}
+
+#: Why the fridge is usually not reported. Murvi build to order and the kitchen is a
+#: menu — "Option of 12v 115L Isotherm compressor fridge, 12v 85L compressor fridge or
+#: Dometic RM10.5T - 3-way, 93L AES fridge" — so there is no standard fridge to state.
+FRIDGE_IS_A_CHOICE_NOTE = (
+    "Murvi offer a choice of fridges rather than fitting one as standard — the "
+    "specification page lists them as alternatives — so no single value is right for "
+    "this column without knowing what the vehicle was ordered with"
+)
+
+#: Said when a microwave is offered but not fitted, which is every Murvi.
+MICROWAVE_OPTIONAL_NOTE = (
+    "no microwave in the standard specification; one is priced on the options page "
+    "rather than fitted, so the answer for a standard vehicle is No"
+)
+
+
 def _build(
     spec: MurviSpec,
     price_inc_vat: int,
     document_url: str,
+    equipment: tuple[str, ...] = (),
+    offered: tuple[str, ...] = (),
 ) -> ExtractedMotorhome:
     """One `ExtractedMotorhome`, with provenance on every field it sets.
 
@@ -511,7 +592,12 @@ def _build(
     parsed cell. Bürstner 27 August 2026 is why: a value set on the model but absent from the
     provenance dict is never compared against the baseline *and* lands blank on a genuinely
     new product, and it is silent in both directions.
+
+    `equipment` is the specification page's prose, as sentences, and `offered` its
+    options page's lines. What they settle about the habitation reaches the reviewer as
+    **findings** rather than proposals; see `product_model.findings`.
     """
+    features = habitation.features_from(equipment)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -528,6 +614,23 @@ def _build(
         mh_length_mm=spec.mh_length_mm,
         mh_width_mm=spec.mh_width_mm,
         mh_height_mm=spec.mh_height_mm,
+        # Habitation, from the specification page's own prose — reported as findings
+        # rather than proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        bed_types=features["bed_types"].value if "bed_types" in features else [],
+        microwave=(
+            features["microwave"].value
+            if "microwave" in features
+            else (False if habitation.microwave_offered(offered) else None)
+        ),
     )
 
     page = f"the February price list, p{spec.page_number}"
@@ -609,6 +712,20 @@ def _build(
         f"{page}: \"Overall height {spec.mh_height_mm / 1000:.3f}M\" ({spec.make} "
         f"{spec.body_code} donor van)",
     )
+
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "read from the specification page")
+        record(name, f"{page}: {note}: {feature.snippet}")
+    if equipment and "refrigeration" not in features:
+        record("refrigeration", f"{page}: {FRIDGE_IS_A_CHOICE_NOTE}")
+    if equipment and "microwave" not in features:
+        if offered_line := habitation.microwave_offered(offered):
+            record("microwave", f"{MICROWAVE_OPTIONAL_NOTE}: {offered_line}")
+        else:
+            record("microwave", f"{page}: no microwave anywhere in the price list")
+    if unclear := habitation.heating_is_unclear(equipment):
+        if "heating" not in features:
+            record("heating", f"{page}: a heater is listed but its kind is not named: {unclear}")
 
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
@@ -708,7 +825,15 @@ def collect(
             on_progress(f"SKIPPED {spec.label} (p{spec.page_number}): {failure}")
             continue
         price = _price_from_pages(spec, pages, on_progress)
-        results.append(_build(spec, price, document_url))
+        results.append(
+            _build(
+                spec,
+                price,
+                document_url,
+                equipment=tuple(spec_sentences(pages[spec.page_number - 1])),
+                offered=tuple(option_lines(pages, spec)),
+            )
+        )
 
     on_progress(
         f"collected {len(results)} product(s) for "

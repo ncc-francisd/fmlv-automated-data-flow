@@ -627,6 +627,57 @@ trigger dropdown as the sixteenth manufacturer despite `status=paused` — that 
 filtered on `adapter_for()` alone, so pausing keeps it manually runnable exactly as intended.
 Full suite 1122 passed, 2 skipped.
 
+## The habitation findings — 10 September 2026
+
+Murvi's specification page is **prose, not bullets** — paragraphs under "In the kitchen",
+"In the bathroom" and "General equipment" — and the PDF hard-wraps it at whatever column
+the text ran out at, mid-word:
+
+```
+Truma Combi D 4 (E), 4kW diesel heater with  900/1800 W mains
+integrated space and water heating.
+…
+Option of 12v 115L Isotherm compressor fridge, 12v 85L com-
+pressor fridge or Dometic RM10.5T - 3-way, 93L AES fridge
+```
+
+Neither the raw lines nor the flattened page is readable: a line is half a phrase, and
+the page is one enormous quote. `spec_sentences` rejoins the hyphen wraps, splits on the
+section headings — which carry no punctuation, so a sentence splitter runs straight
+through them and welds a wardrobe onto a fridge — and then splits on sentence ends.
+
+What comes out:
+
+| | |
+| --- | --- |
+| `heating` | **blown air**, on all ten. "Truma Combi D 4 (E), 4kW diesel heater", corroborated by "Hot air outlet" in the bathroom and "Two heater outlets in the lounge area and one in the kitchen" |
+| `bed_types` | **make-up**. "Extremely versatile rear seating that quickly converts to a generous size double bed" |
+| `microwave` | **No**, with the reason: one is priced at £250 on the options page, so it is offered rather than absent |
+| `refrigeration` | **not reported** — see below |
+| the washroom | not reported; Murvi describe one room with a shower curtain and never use the word "separate" |
+
+### The fridge is a menu, and saying otherwise would be wrong
+
+"Option of 12v 115L Isotherm compressor fridge, 12v 85L compressor fridge or Dometic
+RM10.5T - 3-way, 93L AES fridge" — three fridges, none of them standard, and a fourth
+("65L compressor fridge") tied to the optional rear storage area. Murvi build to order.
+So the finding **states that** rather than picking one, and the shared vocabulary gained
+two phrases to make it happen: `option of` and `only available with`, both of which
+describe a condition rather than a fitting.
+
+This is the first brand where the honest answer to a habitation field is "the buyer
+chooses". Worth remembering for the other converters.
+
+### The options page is read as lines, the specification page as sentences
+
+An options page is a priced table with no punctuation anywhere in it — "230V microwave
+oven with grill at high level 250.00" — so `spec_sentences` returns the whole page as one
+sentence. `option_lines` reads it line by line instead, and finds the page by the same
+running header `other_page_prices` uses, for the same reasons.
+
+Its prices are bare numbers with no `£`, so `habitation._OPTION`'s price test does not
+fire on them — which is exactly why the split has to be by *page* rather than by line.
+
 ## What is unverified
 
 - **`fmlv_manufacturer` is confirmed** as `Murvi` from the export's own `manufacturer`

@@ -71,8 +71,16 @@ class Feature:
 #: for the microwave: a brand that offers one has not said there is none, so an adapter
 #: should check the unfiltered lines before reporting an absence. `niesmann_bischoff` and
 #: `bailey` both word their note that way.
+#:
+#: **`option of` is a choice, not a fitting**, and Murvi write their whole kitchen that
+#: way: "Option of 12v 115L Isotherm compressor fridge, 12v 85L compressor fridge or
+#: Dometic RM10.5T - 3-way, 93L AES fridge". Three fridges, none of them standard, and
+#: recording any one of them would tell a reviewer the buyer has no say. `only available
+#: with` is the same claim from the other end — Murvi's rear storage area is "only
+#: available with a 65L compressor fridge", which states a condition, not a fitting.
 _OPTION = re.compile(
     r"£\s*[\d,]|\b(?:option|optional|extra)s?\b\s*[:\-]|\bcost option\b"
+    r"|\boption of\b|\bonly available with\b"
     r"|\((?:retailer|dealer)[- ]fit(?:ted)?\)",
     re.I,
 )
@@ -327,6 +335,11 @@ def heating_is_unclear(lines: Iterable[str]) -> str | None:
 #: says "microwave" somewhere in its name, which the first alternative already catches.
 _MICROWAVE = re.compile(r"\bmicrowave\b", re.I)
 
+#: A line that mentions a microwave only to exclude it — Murvi's "Additional 60W solar
+#: panel (not with microwave oven)". It still proves one is offered, so it is not
+#: discarded; it is just the worse quote of the two. See `microwave_offered`.
+_MICROWAVE_RULED_OUT = re.compile(r"\bnot with\b|\bwithout\b|\bexcept\b|\bno\b\s+microwave", re.I)
+
 
 def microwave_from(lines: Iterable[str]) -> tuple[bool, str] | None:
     """`(True, the line that said so)` when a microwave is stated, else `None`.
@@ -349,8 +362,15 @@ def microwave_offered(lines: Iterable[str]) -> str | None:
     second is the commoner. Bailey list "Fitted microwave oven (Retailer fit)" and
     Niesmann sell an 800-watt one as a priced extra; on both, an absence note that said
     "no mention anywhere" would be untrue.
+
+    A line that mentions a microwave only to rule it out is the last resort rather than
+    the first: Murvi's options page offers one at £250 and, twenty lines earlier, an
+    "Additional 60W solar panel (not with microwave oven)". Both are evidence that one is
+    offered; only the first is worth quoting.
     """
-    return _first_match(lines, _MICROWAVE)
+    lines = list(lines)
+    offering = [line for line in lines if not _MICROWAVE_RULED_OUT.search(line)]
+    return _first_match(offering, _MICROWAVE) or _first_match(lines, _MICROWAVE)
 
 
 # --- Bathroom ------------------------------------------------------------------------

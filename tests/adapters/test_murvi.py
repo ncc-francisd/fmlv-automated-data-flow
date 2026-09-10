@@ -31,7 +31,7 @@ import pytest
 
 from src.adapters import murvi
 from src.adapters.murvi import HIGH_TOP_ABOVE_MM, MurviSpec
-from src.product_model.enums import BodyType
+from src.product_model.enums import BodyType, Heating
 from src.product_model.model import Motorhome
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -618,3 +618,84 @@ def test_a_superseded_price_list_is_not_preferred_over_the_linked_one() -> None:
     assert murvi.find_price_list_url(html) == (
         "https://www.murvi.co.uk/wp-content/uploads/2025/10/Murvi-price-list-October-2025.pdf"
     ), "the page's single link is taken as-is; ordering is not a defence and must not be relied on"
+
+
+# --------------------------------------------------------------------------------------
+# The specification prose, and the habitation findings read from it
+# --------------------------------------------------------------------------------------
+
+PIMENTO_SPEC = "murvi_ford_pimento_spec.txt"
+PIMENTO_OPTIONS = "murvi_ford_pimento_options.txt"
+MOROCCO_SPEC = "murvi_fiat_morocco_xl_spec.txt"
+
+
+def _pimento_findings():
+    spec_text, options_text = _text(PIMENTO_SPEC), _text(PIMENTO_OPTIONS)
+    spec = murvi.parse_specification_page(spec_text, 1)
+    assert spec is not None
+    return murvi._build(
+        spec,
+        spec.price_inc_vat,
+        "https://example.test/price-list.pdf",
+        equipment=tuple(murvi.spec_sentences(spec_text)),
+        offered=tuple(murvi.option_lines([spec_text, options_text], spec)),
+    )
+
+
+def test_a_word_broken_across_a_line_is_rejoined() -> None:
+    """The PDF wraps mid-word — "12v 85L com-\\npressor fridge" — which splits the phrase."""
+    sentences = murvi.spec_sentences(_text(PIMENTO_SPEC))
+
+    assert not [line for line in sentences if "com- pressor" in line]
+    assert [line for line in sentences if "compressor fridge" in line]
+
+
+def test_a_section_heading_does_not_weld_two_paragraphs_together() -> None:
+    """Murvi's headings carry no punctuation, so a sentence splitter runs through them."""
+    sentences = murvi.spec_sentences(_text(MOROCCO_SPEC))
+
+    assert not [line for line in sentences if "In the kitchen Option of" in line]
+
+
+def test_the_heater_is_read_as_blown_air() -> None:
+    extracted = _pimento_findings()
+
+    assert extracted.motorhome.heating is Heating.BLOWN_AIR
+    assert "Truma Combi D 4" in extracted.provenance["heating"].snippet
+
+
+def test_the_fridge_is_reported_as_a_choice_rather_than_stated() -> None:
+    """Murvi build to order: "Option of 12v 115L Isotherm compressor fridge, … or …"."""
+    extracted = _pimento_findings()
+
+    assert extracted.motorhome.refrigeration is None
+    assert "choice of fridges" in extracted.provenance["refrigeration"].snippet
+
+
+def test_a_microwave_priced_on_the_options_page_is_reported_as_offered() -> None:
+    extracted = _pimento_findings()
+
+    assert extracted.motorhome.microwave is False
+    snippet = extracted.provenance["microwave"].snippet
+    assert "priced on the options page" in snippet
+    assert "230V microwave oven with grill at high level" in snippet
+
+
+def test_the_options_page_is_read_as_lines_not_sentences() -> None:
+    """It is a priced table with no punctuation, so a sentence split returns one blob."""
+    spec = murvi.parse_specification_page(_text(PIMENTO_SPEC), 1)
+    assert spec is not None
+    lines = murvi.option_lines([_text(PIMENTO_SPEC), _text(PIMENTO_OPTIONS)], spec)
+
+    assert "230V microwave oven with grill at high level 250.00" in lines
+    assert len(lines) > 50
+
+
+def test_habitation_is_left_alone_when_no_prose_is_supplied() -> None:
+    spec = murvi.parse_specification_page(_text(PIMENTO_SPEC), 1)
+    assert spec is not None
+    extracted = murvi._build(spec, spec.price_inc_vat, "https://example.test/x.pdf")
+
+    assert extracted.motorhome.heating is None
+    assert extracted.motorhome.microwave is None
+    assert "refrigeration" not in extracted.provenance
