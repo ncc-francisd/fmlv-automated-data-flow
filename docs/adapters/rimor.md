@@ -614,7 +614,11 @@ The catalogue's Horus range is four layouts — 38, 45, 54 and 95 — against th
 holds. This is the requester's own expectation, from 10 September: *"I think we might
 find a few more models being stood down."*
 
-**It is not proof, and must not be actioned from this document.** The roster is MNC's,
+**Horus 12 is confirmed dead.** The requester heard from MNC on 10 September that it is
+no longer in their range — so at least one of the four is a genuine withdrawal and not a
+rename. The other three still have to be checked.
+
+**The rest is not proof, and must not be actioned from this document.** The roster is MNC's,
 not the factory's, and MNC's site is what a run reads. Two things have to be true before
 these are archived: MNC has to have dropped them too, and they must not be **renames** —
 Horus 12 and 54 share a 5413mm length, and 38, 40 and 66 all share 5998mm, so the old
