@@ -33,8 +33,10 @@ from src.adapters.joa import (
     _text,
     find_model_urls,
     floorplan_for,
+    length_from_the_strip,
     parse_equipment,
     parse_model_page,
+    strip_lengths_mm,
     width_disagreement,
 )
 from src.product_model.enums import BedType, BodyType, Heating, Refrigeration
@@ -227,6 +229,56 @@ def test_a_missing_length_has_nothing_to_contradict() -> None:
     )
 
     assert reconciles is True
+
+
+@pytest.mark.parametrize("name", sorted(PAGES))
+def test_every_page_carries_the_model_strip(name: str) -> None:
+    """Nine of the ten, on all ten pages. The 54G is the one the strip omits."""
+    lengths = strip_lengths_mm(_page(name))
+
+    assert len(lengths) == 9
+    assert "54G" not in lengths
+    assert lengths["63T"] == 6360
+
+
+def test_the_63t_page_states_its_length_twice_and_the_strip_is_right() -> None:
+    """The summary says `5.99 m long`; the same page's strip says `L6,36m`.
+
+    6360 is what Pilote's Technical Book and FMLV both carry, so the page had the
+    right figure on it all along — the adapter was reading only the wrong one.
+    """
+    product = _parse("joa_panel_van_63t.html")
+
+    assert product.mh_length_mm == 5990
+    assert product.strip_length_mm == 6360
+    assert length_from_the_strip(product) == 6360
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [("joa_motorhome_75tb.html", 7450), ("joa_motorhome_60f.html", 5990)],
+)
+def test_the_strip_agrees_with_a_summary_that_is_already_right(
+    name: str, expected: int
+) -> None:
+    product = _parse(name)
+
+    assert product.strip_length_mm == product.mh_length_mm == expected
+
+
+def test_the_54g_has_no_strip_length_to_fall_back_on() -> None:
+    """Its own summary is right, so nothing is lost — but the fallback must not guess."""
+    product = _parse("joa_panel_van_54g.html")
+
+    assert product.strip_length_mm is None
+    assert length_from_the_strip(product) is None
+
+
+def test_a_strip_length_that_also_fails_the_code_check_is_refused() -> None:
+    """A second wrong figure is not an improvement on the first. Blank beats wrong."""
+    product = replace(_parse("joa_panel_van_63t.html"), strip_length_mm=5990)
+
+    assert length_from_the_strip(product) is None
 
 
 def test_a_failed_length_check_does_not_cost_the_other_fields() -> None:

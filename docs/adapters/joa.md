@@ -109,9 +109,32 @@ The number in the code is the length in decimetres, and it holds on all ten:
 | 5.41 m | 5.99 m | 6.36 m | 6.99 m | 7.39 m | 7.45 m |
 
 Worst miss 0.11 m (the 75Qs), so a ±0.15 m band passes all ten — and it **catches a real
-error**: the 63T's summary strip says `5,99 m long`, which is the 60G's length, and is
+error**: the 63T's summary strip says `5.99 m long`, which is the 60G's length, and is
 off its expected 6.3 m by 0.31 m. The Technical Book says 6.36 m and FMLV holds 6360.
 This is Le Voyageur's check, and the same failure it was built for.
+
+### The page states the length twice, and the second one is right
+
+Found 10 September 2026, after the first run, when the requester pointed at the
+campervans index: **every page carries a model strip naming nine of the ten vehicles
+with their lengths** — `Panel van 63T L6,36m`, `Motorhome 70Q L6,99m`. On the 63T's own
+page that strip says **6,36 m**, six inches from the summary strip's wrong 5.99 m, and it
+is the figure the Technical Book and FMLV both carry.
+
+So the check can now **repair** rather than only reject: where the summary strip fails
+the model-code test, `length_from_the_strip` supplies the strip's figure instead — but
+only if that figure passes the same test, so a page whose strip is also wrong still ends
+with a blank length rather than a different wrong one. **The 54G is the one model the
+strip omits**, which is why this is a fallback and not the primary source; its own
+summary is correct anyway.
+
+The requester's own index screenshot shows the same 6,36 m on the `/en/our-campervans/`
+card. Both second sources agree, and no extra fetch is needed for either — the strip was
+already in the page the adapter had.
+
+Two decimal separators are in play and both must be read: the summary strip prints
+`5.99 m long` with a full stop on the van pages, the model strip prints `L6,36m` with a
+comma. A pattern that assumes one of them silently finds nothing.
 
 The usual `payload = MTPLM − MRO` is **not** available: no MRO is published anywhere, so
 it has to be derived from the other two and the identity becomes true by construction —
@@ -200,6 +223,17 @@ The self-check fired once, on the page it was built for:
 [Van 63T] LENGTH DISCARDED and left for FMLV's own figure: the page states 5990mm but
 the model code implies about 6300mm, a 310mm gap against a 150mm tolerance
 ```
+
+**Superseded on 10 September**, by the model strip described above. The next run reads
+the 63T's length as 6360 and narrates the repair instead:
+
+```
+[Van 63T] LENGTH TAKEN FROM THE MODEL STRIP (6360mm) because the page states 5990mm
+but the model code implies about 6300mm ...
+```
+
+That agrees with what FMLV already holds, so the in-scope-field-not-found on the 63T
+disappears and no length is proposed on any of the ten.
 
 Three products were hand-checked against both the page and Pilote's documents — 75TB,
 54G and 60F — on length, width, height, payload, derived MRO, price, seats and berths.

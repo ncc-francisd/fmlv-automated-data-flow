@@ -125,6 +125,17 @@ HIGH_TOP_ABOVE_MM = 2300
 #: How far the length may sit from the one its model code implies. See `_reconciles`.
 LENGTH_TOLERANCE_MM = 150
 
+#: The model strip every page carries, which names nine of the ten vehicles with their
+#: lengths — `Motorhome 70Q L6,99m`, `Panel van 63T L6,36m`. It is a **second length for
+#: the same vehicle on the same page**, and where the two disagree the strip has been
+#: right: the 63T's summary strip says `5.99 m long` while its own strip entry says
+#: `L6,36m`, which is the figure the Technical Book and FMLV both carry. See
+#: `strip_lengths_mm`. The 54G is absent from the strip, so this is a fallback and never
+#: the primary source.
+_STRIP_LENGTH = re.compile(
+    r"(?:Motorhome|Panel van)\s+(?P<code>[0-9]{2}[A-Z]{1,2})\s+L(?P<m>\d+),(?P<cm>\d+)m"
+)
+
 # --- Reading one page ----------------------------------------------------------------
 
 #: A canonical vehicle page in the sitemap. The bare `/en/vehicle/` index is excluded by
@@ -247,6 +258,10 @@ class JoaProduct:
     #: The width the summary strip states, where it states one. Read only as a check on
     #: the technical panel's own figure — see `_reconciles`.
     width_strip_mm: int | None = None
+    #: This model's length as the page's own model strip states it — a second reading of
+    #: the same figure, used to repair a summary strip that fails the code check. `None`
+    #: for the 54G, which the strip omits. See `strip_lengths_mm`.
+    strip_length_mm: int | None = None
 
     @property
     def label(self) -> str:
@@ -326,6 +341,7 @@ def parse_model_page(page: str, slug: str) -> JoaProduct | None:
         mh_width_mm=int(width_height.group(1)) * 10 if width_height else None,
         mh_height_mm=int(width_height.group(2)) * 10 if width_height else None,
         width_strip_mm=_metres_to_mm(first(_WIDTH_STRIP)),
+        strip_length_mm=strip_lengths_mm(page).get(model),
         mh_passenger_seats_inc_driver=_int(first(_SEATS)),
         berths=_int(first(_BERTHS)),
         mh_payload_kilograms=_int(first(_PAYLOAD)),
@@ -334,6 +350,20 @@ def parse_model_page(page: str, slug: str) -> JoaProduct | None:
         heating_published=first(_HEATING),
         refrigerator_published=first(_REFRIGERATOR),
     )
+
+
+def strip_lengths_mm(page: str) -> dict[str, int]:
+    """Every length the page's model strip states, keyed by model code.
+
+    The strip is navigation rather than specification, and it is on all ten pages, so
+    each page states nine lengths besides the one in its own summary. That redundancy is
+    what lets a bad summary be repaired instead of merely rejected — see `_reconciles`.
+    """
+    return {
+        match.group("code").upper(): int(match.group("m")) * 1000
+        + int(match.group("cm")) * 10
+        for match in _STRIP_LENGTH.finditer(_text(page))
+    }
 
 
 def floorplan_for(page: str, model: str) -> str | None:
@@ -380,6 +410,21 @@ def _reconciles(product: JoaProduct) -> tuple[bool, str]:
         f"{product.implied_length_mm}mm, a {gap}mm gap against a {LENGTH_TOLERANCE_MM}mm "
         f"tolerance — the length has probably been copied from a neighbouring model"
     )
+
+
+def length_from_the_strip(product: JoaProduct) -> int | None:
+    """The strip's length for this model, but only when it passes the same code check.
+
+    The strip is the second reading of a figure the summary strip got wrong, so it earns
+    its place only by satisfying the check the summary failed. Requiring that means a
+    page whose strip is *also* wrong still ends with a blank length rather than with a
+    different wrong one.
+    """
+    if product.strip_length_mm is None:
+        return None
+    if abs(product.strip_length_mm - product.implied_length_mm) > LENGTH_TOLERANCE_MM:
+        return None
+    return product.strip_length_mm
 
 
 def width_disagreement(product: JoaProduct) -> str | None:
@@ -629,13 +674,22 @@ def collect(
 
         reconciles, why_not = _reconciles(product)
         if not reconciles:
-            # The length alone is discarded — see `_reconciles`. Everything else on the
-            # page stands, so the product is still worth proposing.
-            on_progress(
-                f"[{product.label}] LENGTH DISCARDED and left for FMLV's own figure: "
-                f"{why_not}"
-            )
-            product = replace(product, mh_length_mm=None)
+            # The page states the length twice. Where the summary strip fails the code
+            # check, the model strip's own figure is tried before the length is given
+            # up — see `length_from_the_strip`. Everything else on the page stands
+            # either way, so the product is still worth proposing.
+            if (repaired := length_from_the_strip(product)) is not None:
+                on_progress(
+                    f"[{product.label}] LENGTH TAKEN FROM THE MODEL STRIP "
+                    f"({repaired}mm) because {why_not}"
+                )
+                product = replace(product, mh_length_mm=repaired)
+            else:
+                on_progress(
+                    f"[{product.label}] LENGTH DISCARDED and left for FMLV's own "
+                    f"figure: {why_not}"
+                )
+                product = replace(product, mh_length_mm=None)
         elif product.mh_length_mm is None:
             on_progress(
                 f"[{product.label}] WARNING: no length in the summary strip, so it could "
