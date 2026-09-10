@@ -271,43 +271,36 @@ _AIR_DUCTING = re.compile(
 )
 
 
-def _first_match_about_heating(
-    lines: Iterable[str], pattern: re.Pattern[str]
-) -> str | None:
-    """`_first_match`, preferring a line that is actually about the heating.
-
-    The value is the same either way — both passes use the same pattern — but the quote
-    is not, and a reviewer reads the quote. Swift's Conqueror list names a radiator on
-    "Towel rail above radiator (model specific)" long before "Alde radiator central
-    heating and water heating with daily programming with LCD touchscreen control". Both
-    settle it as wet; only the second is worth showing.
-    """
-    lines = list(lines)
-    about_heating = [line for line in lines if _ANY_HEATING.search(line)]
-    return _first_match(about_heating, pattern) or _first_match(lines, pattern)
-
-
 def heating_from(lines: Iterable[str]) -> tuple[Heating, str] | None:
     """`(Heating, the line that said so)`, or `None` when the type is not settled.
 
-    Wet central is tested first: a vehicle with radiators may well also have a blown-air
-    booster, and the water system is the answer to the question FMLV asks. `None` covers
-    both "no heating mentioned" and "heating mentioned but neither kind named", which are
-    different situations — see `heating_is_unclear`.
+    Wet central is tested before blown air **within a tier**: a vehicle with radiators
+    may well also have a blown-air booster, and the water system is the answer to the
+    question FMLV asks. `None` covers both "no heating mentioned" and "heating mentioned
+    but neither kind named", which are different situations — see `heating_is_unclear`.
+
+    **A line that is about the heating outranks one that merely contains a heating
+    word**, whichever system it points at, and that is why the tiers are ordered the way
+    they are rather than wet-then-air twice over. A washroom towel radiator is not a
+    heating system: Swift's Conqueror lists "Towel rail above radiator", Auto-Trail's
+    Frontier "Washroom area radiator". Where such a page also says "Blown air heating
+    outlets", the blown air is the answer and the towel rail is a fitting.
     """
     usable = usable_lines(lines)
-    if wet_line := _first_match_about_heating(usable, _WET_CENTRAL):
-        return Heating.WET_CENTRAL, wet_line
-    if warm_line := _first_match_about_heating(usable, _WARM_AIR):
-        return Heating.BLOWN_AIR, warm_line
+    about_heating = [line for line in usable if _ANY_HEATING.search(line)]
+
+    for scope in (about_heating, usable):
+        if wet_line := _first_match(scope, _WET_CENTRAL):
+            return Heating.WET_CENTRAL, wet_line
+        if warm_line := _first_match(scope, _WARM_AIR):
+            return Heating.BLOWN_AIR, warm_line
 
     # The weak tier, and only on a line that is talking about heating — see
     # `_WET_PLUMBING`. Wet still wins over air where a page carries both, for the same
     # reason as above: a wet system with a blown-air booster is a wet system.
-    heating_lines = [line for line in usable if _ANY_HEATING.search(line)]
-    if plumbing := _first_match(heating_lines, _WET_PLUMBING):
+    if plumbing := _first_match(about_heating, _WET_PLUMBING):
         return Heating.WET_CENTRAL, plumbing
-    if ducting := _first_match(heating_lines, _AIR_DUCTING):
+    if ducting := _first_match(about_heating, _AIR_DUCTING):
         return Heating.BLOWN_AIR, ducting
     return None
 

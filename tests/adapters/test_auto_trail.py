@@ -11,11 +11,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dataclasses import replace
+
 import pytest
 
 from src.adapters import auto_trail
 from src.adapters.auto_trail import AutoTrailProduct
-from src.product_model.enums import BodyType
+from src.product_model.enums import BedType, BodyType, Heating, Refrigeration
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -730,3 +732,65 @@ def test_no_drawing_means_no_pointers() -> None:
     )
 
     assert not [e for e in extracted.provenance.values() if e.reviewer_reference]
+
+
+# --------------------------------------------------------------------------- #
+# The habitation findings, from the same specification block
+# --------------------------------------------------------------------------- #
+
+
+def _built(product: AutoTrailProduct):
+    return auto_trail._build_extracted_motorhome(
+        product, "https://example.test/spec.pdf", "https://example.test/range/"
+    )
+
+
+def test_the_block_is_kept_line_by_line_for_the_habitation(f_line) -> None:
+    lines = f_line["F60"].spec_lines
+
+    assert "150Ltr fridge with integrated freezer compartment Included" in lines
+    assert "Fully fitted microwave Included" in lines
+
+
+def test_the_f_line_habitation_is_read_from_its_own_rows(f_line) -> None:
+    extracted = _built(f_line["F60"])
+    motorhome = extracted.motorhome
+
+    assert motorhome.heating is Heating.BLOWN_AIR
+    assert motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert motorhome.microwave is True
+    assert motorhome.bed_types == [BedType.DROP_DOWN]
+    assert "Blown air heating outlets" in extracted.provenance["heating"].snippet
+
+
+def test_a_washroom_radiator_reads_as_wet_where_nothing_else_is_said(frontier) -> None:
+    """The Delaware's only heating row is "Washroom area radiator Included"."""
+    extracted = _built(frontier["Delaware"])
+
+    assert extracted.motorhome.heating is Heating.WET_CENTRAL
+    assert "radiator" in extracted.provenance["heating"].snippet
+
+
+def test_a_blown_air_row_outranks_a_washroom_radiator(frontier) -> None:
+    """The Scout publishes both shapes of row; the one about heating wins."""
+    extracted = _built(frontier["Scout"])
+
+    assert extracted.motorhome.heating is Heating.BLOWN_AIR
+
+
+def test_a_cost_option_row_is_never_read_as_fitted(expedition_coachbuilt) -> None:
+    """Every row ends "Included" or "Cost option" — `habitation._OPTION` knows the second."""
+    product = expedition_coachbuilt["C63"]
+    assert [line for line in product.spec_lines if line.endswith("Cost option")]
+
+    extracted = _built(product)
+    assert extracted.motorhome.microwave is None
+    assert "no microwave in the specification table" in extracted.provenance["microwave"].snippet
+
+
+def test_habitation_is_left_alone_when_the_block_was_not_kept(f_line) -> None:
+    extracted = _built(replace(f_line["F60"], spec_lines=()))
+
+    assert extracted.motorhome.heating is None
+    assert extracted.motorhome.microwave is None
+    assert "refrigeration" not in extracted.provenance

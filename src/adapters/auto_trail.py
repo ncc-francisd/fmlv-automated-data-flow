@@ -53,6 +53,7 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, floorplan_provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.auto-trail.co.uk"
@@ -369,6 +370,13 @@ class AutoTrailProduct:
     stated_max_berths: int | None = None
     #: Rows that exist in the document but could not be read, for `collect` to narrate.
     parse_warnings: tuple[str, ...] = ()
+    #: This model's own block of the specification document, line by line. Auto-Trail
+    #: state the fridge, the heating, the microwave and the beds in ordinary rows of the
+    #: same table the figures come from — "150Ltr fridge with integrated freezer
+    #: compartment Included" — so the habitation findings need no second source. Each
+    #: row ends `Included` or `Cost option`, and `habitation._OPTION` already knows the
+    #: second, which is where the phrase came from.
+    spec_lines: tuple[str, ...] = ()
 
     @property
     def label(self) -> str:
@@ -752,6 +760,9 @@ def parse_models(text: str, range_label: str) -> list[AutoTrailProduct]:
                 base_vehicle_manufacturer=fmlv_base_vehicle(chassis.group(1)) if chassis else None,
                 stated_max_berths=_count(block, r"Max\. No\. of berths", take=_trailing_int),
                 parse_warnings=warnings,
+                spec_lines=tuple(
+                    stripped for line in block.splitlines() if (stripped := line.strip())
+                ),
             )
         )
 
@@ -763,12 +774,30 @@ def parse_models(text: str, range_label: str) -> list[AutoTrailProduct]:
 # --------------------------------------------------------------------------- #
 
 
+#: How each habitation reading is introduced. Auto-Trail's rows are already sentences,
+#: so the note only has to say which part of the table they came from.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heating row of the specification table",
+    "refrigeration": "the kitchen features",
+    "microwave": "the kitchen features",
+    "shower_toilet_separated": "the washroom features",
+    "bed_types": "the maximum bed measurements",
+}
+
+
 def _build_extracted_motorhome(
     product: AutoTrailProduct,
     spec_url: str,
     range_url: str,
     floorplan_url: str | None = None,
 ) -> ExtractedMotorhome:
+    """One model as a `Motorhome`, plus the provenance a reviewer sees beside each field.
+
+    The habitation fields come from `product.spec_lines` — the same block the figures
+    were read from — and reach the reviewer as **findings** rather than proposals; see
+    `product_model.findings`.
+    """
+    features = habitation.features_from(product.spec_lines)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -785,6 +814,19 @@ def _build_extracted_motorhome(
         mh_width_mm=product.mh_width_mm,
         mh_height_mm=product.mh_height_mm,
         body_type=product.body_type,
+        # Habitation, from the same specification block — reported as findings rather
+        # than proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        bed_types=features["bed_types"].value if "bed_types" in features else [],
+        microwave=features["microwave"].value if "microwave" in features else None,
     )
 
     # `berths` records the standard figure, so the snippet carries Auto-Trail's own
@@ -841,6 +883,28 @@ def _build_extracted_motorhome(
                 f"= {product.mh_payload_kilograms}kg (Auto-Trail publishes no payload)"
             ),
         )
+
+    def record(field: str, snippet: str) -> None:
+        provenance[field] = Provenance(
+            source_url=spec_url, snippet=f"{product.label} — {snippet}"
+        )
+
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "the specification table")
+        record(name, f"{note}: {feature.snippet}")
+    if product.spec_lines and "microwave" not in features:
+        # Left unset, so `findings.SILENCE_MEANS` supplies the recommendation and its own
+        # wording. Auto-Trail's table is exhaustive — every row it lists ends "Included"
+        # or "Cost option", so a feature that is neither is genuinely not offered.
+        record(
+            "microwave",
+            "no microwave in the specification table. Every feature Auto-Trail offer is "
+            "a row in it ending 'Included' or 'Cost option', so its silence is a full "
+            "answer rather than an omission",
+        )
+    if unclear := habitation.heating_is_unclear(product.spec_lines):
+        if "heating" not in features:
+            record("heating", f"heating is listed but its kind is not named: {unclear}")
 
     # The positional fields no specification table settles. Auto-Trail publish nothing
     # about them, so every one is a reviewer's to read off the drawing.

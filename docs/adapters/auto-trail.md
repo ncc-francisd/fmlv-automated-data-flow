@@ -393,6 +393,44 @@ classified as new`, which is the unconfirmed join key below doing exactly what i
   extra fetches per run. It is the obvious next defence if a parse ever looks wrong.
 
 
+## The habitation findings — 10 September 2026
+
+Auto-Trail need no second source for these: the fridge, the heating, the microwave and
+the beds are ordinary rows of the **same specification block** the figures come from, so
+`AutoTrailProduct` simply keeps the block line by line and `habitation` reads it.
+
+```
+KITCHEN FEATURES
+150Ltr fridge with integrated freezer compartment      Included
+Fully fitted microwave                                 Included
+WASHROOM FEATURES
+Blown air heating outlets to washroom area             Included
+MAX. BED MEASUREMENTS
+Electric drop down bed (imperial) 1.23m x 1.93m
+```
+
+**Every row ends `Included` or `Cost option`**, and `habitation._OPTION` already knew the
+second phrase — it was added for this brand, for `_campervan_body_type`. So a priced
+extra is filtered before anything reads it, and there is no options section to split off.
+
+That also makes the microwave absence unusually strong here. The Expedition Coachbuilts
+name no microwave, and because every feature Auto-Trail offer is a row ending in one of
+those two words, the table's silence is a full answer rather than an omission. The note
+says exactly that.
+
+### Where a washroom radiator is the only evidence
+
+The Frontier Delaware and Comanche publish "Washroom area radiator Included" and no
+blown-air row; the Scout in the same document publishes "Blown air heating outlets to
+washroom area Included" and no radiator. So the contrast is deliberate and the radiator
+is read as wet central — with the row quoted, so a reviewer can disagree.
+
+It did expose an ordering bug in the shared vocabulary, though, and that is fixed:
+`heating_from` used to test wet against **every** line before testing air against the
+lines that mention heating, so a page saying "Blown air heating throughout" and, in
+passing, "Towel rail above radiator" came back wet. A line that is *about* the heating
+now outranks one that merely contains a heating word, whichever system it points at.
+
 ## Floorplans: 37 of 37, and no ambiguity
 
 Every model page carries one drawing, under an `<h3>620S Internal Layout</h3>` heading:
