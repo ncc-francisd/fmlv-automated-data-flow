@@ -555,3 +555,102 @@ every axis — 3500 kg not 4500, a 60-litre diesel tank not 90, a 90 L fridge no
 combined shower not a separate one, a sliding WC, no cooker hood, no separate reading
 lights, a 190 x 200 permanent bed. An adapter that treats the Eterna range as homogeneous
 will get this one wrong in a dozen places.
+
+## The adapter — built 10 September 2026
+
+`src/adapters/le_voyageur.py`, 49 tests, first real run **#76**: **18 collected, 14
+matched, 4 new, 1 disappeared**, 72 proposals, 122 fields verified unchanged, 22
+findings. Five things the survey could not know, all found by building it.
+
+### FMLV spells the range `Hertiage`, and the adapter reproduces it
+
+The export, fetched once the supplier name arrived, holds **`Hertiage`** — the `i` and
+`a` transposed — on all four Héritage rows. It also settles the range/model question the
+survey left open: the range letters live in the **model**, and the two ranges use two
+spacings, `LV7.8CF` closed up against `LVXH7.9 CF` with one space.
+
+**The misspelling cannot be corrected from the adapter**, and this is worth understanding
+before anyone "fixes" it. The identity tokeniser splits on the decimal point, so:
+
+| pair | score |
+| --- | --- |
+| `Heritage LVXH7.9 CF` against FMLV's `Hertiage LVXH7.9 CF` — the same vehicle | **0.600** |
+| `Hertiage LVXH7.6 CF` against `Hertiage LVXH7.9 CF` — *different vehicles* | **0.600** |
+
+Identical scores, so no threshold tells "renamed" from "a different layout". Emitting the
+correct spelling would let a genuinely new layout claim an existing row on tie-break order
+alone. **Fix it by hand in FMLV**, then change `DEFAULT_RANGES` and the next run matches
+at 1.000.
+
+That same arithmetic is why the module declares **`MATCH_THRESHOLD = 0.75`**: with the
+range reproduced exactly, true pairs score 1.000 and every false pair is 0.600 or below,
+so the margin is real rather than lucky.
+
+### The model string is normalised, never taken from the heading
+
+The `<h1>` prints `LV7.0 GJF`; FMLV holds `LV7.0GJF`. Those score **0.25** against each
+other — `{lv7, 0, gjf}` against `{lv7, 0gjf}` — so emitting the heading verbatim would
+propose the product as new and archive the real row. `_fmlv_model` rebuilds the string to
+each range's convention, and it matches all 13 rows the export holds.
+
+### Prices exist in FMLV after all, and they are a year behind
+
+The survey said `rrp_pounds` would stay unset because no page carries a price. The pages
+still don't — but **FMLV holds a price for every live row**, from a previous list, and the
+2027 figures are uniformly higher: +£4,350 or so across Eterna, +£2,600 across Héritage.
+So the price is a manually sourced constant, banded by size, and the first run proposes 14
+increases and 4 new prices.
+
+### The payload question dissolved once the website was the source
+
+The Héritage payload anomaly recorded above is a property of **the handbook's** figures.
+The website publishes payload and MTPLM directly, and `MTPLM - payload` reproduces FMLV's
+stored MRO **exactly on all 15 rows** — so the site is where FMLV's own weights came from,
+the derivation is sound, and the run proposes no weight change on any matched product. The
+requester's ruling still stands as the rule; it simply does not bite here.
+
+### Three bugs the build found, all in reading a labelled row
+
+Worth recording because each would have shipped silently:
+
+* **`Exterior  height` never matched.** The survey said to match its double space
+  literally — but `plain_text` collapses whitespace first, so the literal never matched
+  and the height came back empty **on all 18**. It reached run #72 as eighteen missing
+  fields. Labels now match any run of whitespace.
+* **`Chassis : Fiat AL-KO` read as `Fiat AL-`.** Stopping at "the next thing that looks
+  like a label" breaks on values containing capitals, because `KO Side compartement
+  volume :` is itself label-shaped. Values are now sliced to the start of the next
+  **known** label, from an explicit vocabulary.
+* **The detailed block has no colons.** The summary writes `Label : value`; the detailed
+  block writes `Label value`, so the hold cross-check read nothing until the colon was
+  made optional.
+
+### Floorplans: ten of eighteen
+
+`Implantations-<LV|LVXH>-<size><suffix>-<width>x<height>.png`, largest rendering taken.
+**Eight have no drawing in the rendered markup** and are narrated every run: LV6.8LF,
+LV7.5CF, LV7.5GJF, LV8.5CF, LVXH6.9 LF, both LVXH7.6s and LVXH7.9 GJL. The LV6.8LF's file
+exists as `Implantations-LV-6.8.png` with its `LF` dropped, but a bare-size match is not
+attempted because `7.5` alone is ambiguous between the CF and the GJF.
+
+### What the first run proposes, and the two things to look at
+
+* **1 disappearance — `Eterna LV8.5GJL`.** It is not on the site, it is not in the 2027
+  handbook, and its stored dimensions are the LV7.8GJL's (7850 mm, 4500 kg) rather than an
+  8.5's. It looks like a row created in error rather than a withdrawn model.
+* **4 new** — LVXH6.9 LF, both LVXH7.6s and LVXH7.9 GJL, all Héritage.
+* **`mh_height_mm` 3090 → 3000 on three Héritage rows.** The site says `3 m` on seven of
+  the eight and the handbook says 300 cm on all eight, so 3090 looks like a figure copied
+  from the LVXH7.9 GJF, which is the one page still printing 3.09 m.
+* **`mh_length_mm` 8750 → 8730 on the LVXH8.7 CF**, a 20 mm correction off the page.
+
+### Two open questions for the requester
+
+* **The LV6.8LF's seat count.** The site says `Seated places : 2` and FMLV holds 2, so
+  nothing is proposed — but the handbook's table says **4 seats with safety belts** for
+  that layout, and every other Eterna says 4. One of the two documents is wrong about a
+  travel-seat count, which is a safety-adjacent field.
+* **Héritage width.** The site says 2.25 m and FMLV holds 2250, so again nothing is
+  proposed. The handbook calls 225 cm the **interior** width and gives a **body** width of
+  232 cm — and the settled rule wants the body width excluding mirrors. If the handbook is
+  right, all four Héritage rows are 70 mm narrow.
