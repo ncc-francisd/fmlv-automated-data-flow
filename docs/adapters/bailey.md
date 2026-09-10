@@ -348,12 +348,69 @@ Three deliberate omissions:
   here, and dropped from `caravan_schema.REQUIRED` — FMLV itself holds it blank on 5 of
   Bailey's 27 live products, so requiring it would raise an error against FMLV's own data
   on every run. Whatever FMLV holds is left untouched.
-* **Every layout flag.** The pages describe layouts in marketing prose — "parallel seat
-  front lounge and rear island king size bed" — and a bed-sizes block naming Front
-  Double, Front N/S Single and Rear Fixed Double. Enough to guess from, not enough to be
-  right. `bailey.py` takes the same line.
+* **The positional layout fields.** Where the kitchen, the lounge, the beds and the
+  washroom sit is only ever in a drawing, and Bailey publish none — see *The habitation
+  findings* below, which is what changed here on 10 September 2026 and what did not.
 * **`optional_equipment_payload_kilograms`.** Out of scope, and blank on all 92 real
   caravan products FMLV holds.
+
+## The habitation findings — 10 September 2026
+
+Bailey publish no floorplan on any page, motorhome or caravan, so the layout pointer
+every other adapter offers has nothing to point at. What they publish instead is
+**prose**, and a lot of it: a "Key Features" summary near the top and then a dozen
+collapsible sections — CAB, LIVING ROOM, KITCHEN FEATURES, BATHROOM, HEATING & PLUMBING —
+running to well over a hundred bulleted lines per page. `bailey.parse_equipment` reads
+them all, and both halves of the brand use it: the caravan pages carry byte-identical
+markup down to the section headings, so one parser serves both.
+
+That is enough to settle four of the finding fields outright:
+
+| | read from |
+| --- | --- |
+| `refrigeration` | "Thetford 150 litre compressor tower refrigerator with 17 litre freezer compartment" |
+| `heating` | "Alu-Tech insulation and Truma Combi 6E heating" → blown air; "Alde radiator heating" → wet |
+| `shower_toilet_separated` | "Spacious end washroom with separate shower and wardrobe" |
+| `bed_types` | "a front lounge and a drop-down king-sized bed above" |
+
+**The washroom's line is only ever in "Key Features"**, above the first section heading,
+which is why the head of the page is read and not just the accordion.
+
+### Splitting the options off has to be structural
+
+`habitation.usable_lines` already discards a line that marks itself as an extra, and
+Bailey's `_OPTION` marker — `(Retailer fit)` — was added for this brand. On the Adamo
+every upgrade does carry it. **On the Endeavour none of them do**: its OPTIONAL UPGRADES
+list offers a "Pop-top roof to create additional high level double bed complete with
+mattress, reading lights and opening rooflight" with no marker at all. Read as standard,
+a campervan with no over-cab bed gains one — and the same list offers an engine, a towbar
+and a solar panel on the same terms.
+
+So `parse_equipment` splits on the **heading** (`OPTIONAL UPGRADES` on the motorhomes and
+campervans, `OPTIONAL EXTRAS` on the caravans) and returns the two lists separately. The
+line-level filter still runs on top of it and costs nothing.
+
+### The microwave: three different answers, not two
+
+* **Autograph and three of the four caravans** list "Branded flatbed microwave oven with
+  digital controls" as standard → `True`.
+* **Adamo and Alora** list "Fitted microwave oven (Retailer fit)" under OPTIONAL
+  UPGRADES. Recorded `False` **with its own note** — "one is offered as an upgrade rather
+  than fitted" — rather than left unset, because unset would let the generic
+  `findings.SILENCE_MEANS` wording ("no mention was found anywhere") stand over the top
+  of a page that plainly does mention one.
+* **Endeavour and the Discovery** name none anywhere. Left unset, so `SILENCE_MEANS`
+  supplies both the recommendation and the wording. Bailey's lists are exhaustive enough
+  for silence to be real evidence here.
+
+### One thing the shared vocabulary had wrong
+
+The Discovery's only oven is "Thetford triplex combination oven, grill with electronic
+ignition and flame failure device" and the Endeavour's is a "combination oven/grill".
+`habitation._MICROWAVE` matched `combination oven`, so both — and every other Bailey with
+that line — would have been reported as having a microwave. A flame failure device is
+proof it burns gas. The phrase came out of the vocabulary; see the traps list in
+[`README.md`](README.md).
 
 ## Range names: the spec table abbreviates
 

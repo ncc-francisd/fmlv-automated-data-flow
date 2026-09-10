@@ -63,11 +63,13 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from html import unescape
 from pathlib import Path
 
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.baileyofbristol.co.uk"
@@ -178,6 +180,72 @@ _HERO_PRICE = re.compile(r'<small class="t3 mr-2">OTR</small>\s*£\s*([\d,]+)')
 def _hero_price(html: str) -> int | None:
     match = _HERO_PRICE.search(html)
     return int(match.group(1).replace(",", "")) if match else None
+
+
+# --- Equipment, for the habitation findings ------------------------------------------
+
+#: Bailey publish what a vehicle is fitted with as bulleted lists, and there are two
+#: kinds on a page: the "Key Features" summary near the top, whose `<ul>` carries the
+#: class itself, and one collapsible section per area of the vehicle further down, each
+#: wrapping its `<ul>` in a `<div>` that carries it. The backreference takes whichever
+#: opened the block; neither ever nests another of the same tag.
+_BULLETS = re.compile(
+    r'<(div|ul)\b[^>]*class="[^"]*\bbullet-points\b[^"]*"[^>]*>(.*?)</\1>', re.S
+)
+_LIST_ITEM = re.compile(r"<li\b[^>]*>(.*?)</li>", re.S)
+
+#: One collapsible section of the specification, from its heading to the next one. The
+#: `b3b` class is what tells these headings apart from the page's other `<h4>`s (the
+#: price, the share links, the model's own name).
+_SECTION = re.compile(
+    r'<h4\b[^>]*class="b3b[^"]*"[^>]*>(.*?)</h4>(.*?)(?=<h4\b[^>]*class="b3b|\Z)', re.S
+)
+
+#: `OPTIONAL UPGRADES` on the motorhomes and campervans, `OPTIONAL EXTRAS` on the
+#: caravans. Everything in one is an upgrade, whether or not the individual line says so.
+_OPTIONAL_SECTION = re.compile(r"\s*optional\b", re.I)
+
+
+def _text(fragment: str) -> str:
+    """One list item or heading as a person reads it: no markup, no entities, one line."""
+    return " ".join(unescape(re.sub(r"<[^>]+>", " ", fragment)).split())
+
+
+def _bullet_lines(fragment: str) -> list[str]:
+    return [text for _tag, body in _BULLETS.findall(fragment) for item in _LIST_ITEM.findall(body) if (text := _text(item))]
+
+
+@dataclass(frozen=True)
+class BaileyEquipment:
+    """A page's bulleted equipment, split by whether the vehicle actually has it.
+
+    The split is **structural — by which section a line sits in — and it has to be.**
+    `habitation.usable_lines` already drops a line that marks itself as an option, and on
+    the Adamo every upgrade does say "(Retailer fit)". The Endeavour does not: its
+    optional list offers a "Pop-top roof to create additional high level double bed" with
+    no marker at all, so a campervan with no over-cab bed would have gained one. Reading
+    the heading costs nothing and does not depend on Bailey's copywriting staying tidy.
+    """
+
+    standard: tuple[str, ...] = ()
+    optional: tuple[str, ...] = ()
+
+
+def parse_equipment(page: str) -> BaileyEquipment:
+    """Everything the page's bulleted lists say, split into fitted and offered.
+
+    Anything above the first section heading — in practice the "Key Features" summary —
+    counts as standard, which is where the washroom's shape is stated: "Spacious end
+    washroom with separate shower and wardrobe" appears there and nowhere else.
+    """
+    sections = list(_SECTION.finditer(page))
+    head = page[: sections[0].start()] if sections else page
+    standard = _bullet_lines(head)
+    optional: list[str] = []
+    for section in sections:
+        target = optional if _OPTIONAL_SECTION.match(_text(section.group(1))) else standard
+        target.extend(_bullet_lines(section.group(2)))
+    return BaileyEquipment(tuple(dict.fromkeys(standard)), tuple(dict.fromkeys(optional)))
 
 
 def find_model_urls(range_html: str, path: str) -> list[str]:
@@ -306,7 +374,39 @@ def parse_model_page(html: str, *, is_campervan: bool) -> BaileyProduct | None:
     )
 
 
-def _build_extracted_motorhome(product: BaileyProduct, source_url: str) -> ExtractedMotorhome:
+#: How each habitation reading is introduced where `habitation` supplies no wording of
+#: its own. Bailey state all of this in prose rather than in a specification row, so the
+#: quote is a sentence and the note says which list it came from.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heating, from the page's own equipment lists",
+    "refrigeration": "the fridge, from the page's own equipment lists",
+    "microwave": "a microwave listed as standard equipment",
+    "shower_toilet_separated": "the washroom as the page describes it",
+    "bed_types": "the beds as the page describes them",
+}
+
+#: Said when a microwave is offered but not fitted. Bailey list one under OPTIONAL
+#: UPGRADES on the Adamo and the Alora, so "no mention anywhere" would be untrue — the
+#: factory does not install it, but a buyer can have it.
+MICROWAVE_OPTIONAL_NOTE = (
+    "no microwave in the standard equipment; one is offered as an upgrade rather than "
+    "fitted, so the answer for a factory-standard vehicle is No"
+)
+
+
+def _build_extracted_motorhome(
+    product: BaileyProduct,
+    source_url: str,
+    equipment: BaileyEquipment | None = None,
+) -> ExtractedMotorhome:
+    """One model as a `Motorhome`, plus the provenance a reviewer sees beside each field.
+
+    `equipment` is the page's bulleted lists, split by `parse_equipment`. What it settles
+    about the habitation — the fridge, the heating, the washroom, the beds, the microwave
+    — reaches the reviewer as **findings** rather than proposals; see
+    `product_model.findings`.
+    """
+    features = habitation.features_from(equipment.standard if equipment else ())
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -323,6 +423,25 @@ def _build_extracted_motorhome(product: BaileyProduct, source_url: str) -> Extra
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
         body_type=product.body_type,
+        # Habitation, from the page's equipment lists — reported as findings rather than
+        # proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        bed_types=features["bed_types"].value if "bed_types" in features else [],
+        # `False` rather than unset when Bailey offer one as an upgrade: leaving it unset
+        # would let the generic "no mention anywhere" note stand, and there is a mention.
+        microwave=(
+            features["microwave"].value
+            if "microwave" in features
+            else (False if equipment and habitation.microwave_offered(equipment.optional) else None)
+        ),
     )
 
     provenance: dict[str, Provenance] = {}
@@ -393,6 +512,23 @@ def _build_extracted_motorhome(product: BaileyProduct, source_url: str) -> Extra
         f"names this vehicle",
     )
 
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "read from the page")
+        record(name, f"{note}: {feature.snippet}")
+    if "microwave" not in features and equipment:
+        if offered := habitation.microwave_offered(equipment.optional):
+            record("microwave", f"{MICROWAVE_OPTIONAL_NOTE}: {offered}")
+        else:
+            # Left unset, so `findings.SILENCE_MEANS` supplies the recommendation and its
+            # own wording. Bailey's lists run to well over a hundred items across a dozen
+            # headed sections, so silence in them is real evidence rather than an omission.
+            record("microwave", "no microwave anywhere in the page's equipment lists")
+    if unclear := habitation.heating_is_unclear(equipment.standard if equipment else ()):
+        if "heating" not in features:
+            # Narrated rather than guessed: the shared vocabulary needs a phrase adding,
+            # which is a different thing from Bailey having said nothing.
+            record("heating", f"heating is listed but its kind is not named: {unclear}")
+
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
@@ -460,7 +596,9 @@ def collect(
                     f"resolve to a mapped value), left blank rather than guessed"
                 )
 
-            results.append(_build_extracted_motorhome(product, model_url))
+            results.append(
+                _build_extracted_motorhome(product, model_url, parse_equipment(html))
+            )
 
     on_progress(f"{len(results)} product(s) collected")
     return results

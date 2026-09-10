@@ -75,7 +75,17 @@ from ..fetch.http import Fetcher
 from ..product_model.caravan import Caravan
 from ..product_model.enums import CaravanBodyType
 from ..vehicle_class import VehicleClass
-from .bailey import _field, _kilograms, _leading_int, _metres_to_mm
+from . import habitation
+from .bailey import (
+    MICROWAVE_OPTIONAL_NOTE,
+    BaileyEquipment,
+    _field,
+    _FEATURE_NOTES,
+    _kilograms,
+    _leading_int,
+    _metres_to_mm,
+    parse_equipment,
+)
 from .base import ExtractedCaravan, Provenance
 
 BASE_URL = "https://www.baileyofbristol.co.uk"
@@ -233,8 +243,19 @@ def parse_model_page(html: str) -> BaileyCaravan:
     )
 
 
-def build_extracted(product: BaileyCaravan, source_url: str) -> ExtractedCaravan:
-    """One parsed page as a `Caravan` plus the provenance a reviewer sees beside it."""
+def build_extracted(
+    product: BaileyCaravan,
+    source_url: str,
+    equipment: BaileyEquipment | None = None,
+) -> ExtractedCaravan:
+    """One parsed page as a `Caravan` plus the provenance a reviewer sees beside it.
+
+    `equipment` is the page's bulleted lists, split by `bailey.parse_equipment` — the
+    caravan pages carry the identical markup, down to the section headings, so the same
+    parser reads both halves of the brand. What it settles about the habitation reaches
+    the reviewer as **findings** rather than proposals; see `product_model.findings`.
+    """
+    features = habitation.features_from(equipment.standard if equipment else ())
     caravan = Caravan(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -253,6 +274,27 @@ def build_extracted(product: BaileyCaravan, source_url: str) -> ExtractedCaravan
         awning_length_mm=product.awning_length_mm,
         twin_axle=product.twin_axle,
         body_type=CaravanBodyType.RIGID,
+        # Habitation, from the page's equipment lists — reported as findings rather than
+        # proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        bed_types=features["bed_types"].value if "bed_types" in features else [],
+        microwave=(
+            features["microwave"].value
+            if "microwave" in features
+            else (
+                False
+                if equipment and habitation.microwave_offered(equipment.optional)
+                else None
+            )
+        ),
     )
 
     provenance: dict[str, Provenance] = {}
@@ -298,6 +340,18 @@ def build_extracted(product: BaileyCaravan, source_url: str) -> ExtractedCaravan
         "not change the type, even where a manufacturer calls it a pop-up (NCC rule, "
         "7 September 2026). Bailey market no micro, and nothing here folds.",
     )
+
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "read from the page")
+        record(name, f"{note}: {feature.snippet}")
+    if "microwave" not in features and equipment:
+        if offered := habitation.microwave_offered(equipment.optional):
+            record("microwave", f"{MICROWAVE_OPTIONAL_NOTE}: {offered}")
+        else:
+            record("microwave", "no microwave anywhere in the page's equipment lists")
+    if unclear := habitation.heating_is_unclear(equipment.standard if equipment else ()):
+        if "heating" not in features:
+            record("heating", f"heating is listed but its kind is not named: {unclear}")
 
     return ExtractedCaravan(caravan=caravan, provenance=provenance)
 
@@ -349,7 +403,7 @@ def collect(
                 f"({product.mtplm_kilograms} - {product.mro_kilograms}) — recording anyway"
             )
 
-        extracted.append(build_extracted(product, url))
+        extracted.append(build_extracted(product, url, parse_equipment(html)))
         on_progress(f"read {product.label}")
 
     return extracted

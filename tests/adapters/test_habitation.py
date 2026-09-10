@@ -222,6 +222,39 @@ def test_no_microwave_mentioned_never_asserts_there_is_none() -> None:
     assert habitation.microwave_from(["Oven"]) is None
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Combination oven (oven, grill, hob combined)",
+        "Thetford triplex combination oven, grill with electronic ignition and flame failure device",
+        "Fully equipped kitchen with a 3-burner gas hob and combination oven/grill",
+    ],
+)
+def test_a_combination_oven_is_a_gas_oven_not_a_microwave(line: str) -> None:
+    """In the British trade the phrase means oven-and-grill-in-one, and it burns gas.
+
+    Bailey's own parenthesis spells it out, and a flame failure device settles it. The
+    phrase was in the vocabulary until 10 September 2026 and was inventing a microwave
+    on every Bailey caravan and on the Endeavour campervan.
+    """
+    assert habitation.microwave_from([line]) is None
+
+
+def test_a_microwave_combi_still_reads_as_a_microwave() -> None:
+    """The case removing "combination oven" had to keep working: it says the word."""
+    found = habitation.microwave_from(["Microwave combination oven with grill"])
+    assert found is not None and found[0] is True
+
+
+def test_microwave_offered_sees_past_the_option_filter() -> None:
+    """"Nobody mentions one" and "one is offered but not fitted" are different answers."""
+    lines = ["Fitted microwave oven (Retailer fit)"]
+
+    assert habitation.microwave_from(lines) is None
+    assert habitation.microwave_offered(lines) == "Fitted microwave oven (Retailer fit)"
+    assert habitation.microwave_offered(["3 burner hob"]) is None
+
+
 # --------------------------------------------------------------------------- #
 # Bathroom
 # --------------------------------------------------------------------------- #

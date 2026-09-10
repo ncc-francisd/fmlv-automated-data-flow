@@ -713,13 +713,28 @@ Where nothing settles it, say so rather than guess — `habitation.heating_is_un
 exists for exactly that, and Laika's "6 kW diesel heater, remotely controllable" is what it
 is for.
 
-Three traps worth knowing before writing the next one:
+Five traps worth knowing before writing the next one:
 
 * **A bare "wet" is not wet central heating.** "Wet room Shower and cassette toilet"
   appears on seven Rimor products, all of them blown air. Match `wet central`, `Alde`,
   `radiator` — never `wet`.
 * **An oven is not a microwave.** Rimor lists "Oven" on 24 products. Conflating them
   invents 24 microwaves.
+* **Nor is a "combination oven".** In the British trade the phrase means an oven and a
+  grill in one housing, burning gas — Bailey publish "Combination oven (oven, grill, hob
+  combined)" and "Thetford triplex combination oven, grill with electronic ignition and
+  flame failure device". It was in the vocabulary until 10 September 2026 and gave every
+  Bailey caravan and the Endeavour campervan a microwave they do not have. A real
+  microwave-combi says the word "microwave" in its own name, so nothing is lost.
+* **An option is not an absence, and the option filter is not enough on its own.**
+  `habitation.usable_lines` drops a line that marks itself as an extra, and
+  `microwave_offered` deliberately does not, so an adapter can say "offered but not
+  fitted" instead of "never mentioned" — Bailey's "Fitted microwave oven (Retailer fit)"
+  and Niesmann's priced 800-watt one both need that wording. But where a source publishes
+  its options under a **heading**, split on the heading rather than trusting every line to
+  mark itself: Bailey's Endeavour lists "Pop-top roof to create additional high level
+  double bed" under OPTIONAL UPGRADES with no marker of any kind, and read as standard it
+  gives a campervan with no over-cab bed one.
 * **The summary and the specification disagree, and the specification is right.** Rimor's
   Sarus 66 Plus summary says "141 L fridge" where its spec list says "141L fridge with
   freezer compartment". Read *every* line for a freezer, and put the itemised list ahead

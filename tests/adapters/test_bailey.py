@@ -1,8 +1,9 @@
 """Tests for the Bailey adapter's pure parsing functions, against real captured pages.
 
 The fixtures are (trimmed) real pages fetched 20 August 2026 — see
-`docs/adapters/bailey.md`. Trimming keeps only the hero price banner and the "Technical
-specification" section, which is everything `parse_model_page` reads; verified to parse
+`docs/adapters/bailey.md`. Trimming keeps the hero price banner, the "Key Features" list,
+the collapsible equipment sections and the "Technical specification" section, which is
+everything `parse_model_page` and `parse_equipment` read between them; verified to parse
 identically to the untrimmed page before being saved. No network here.
 """
 
@@ -23,9 +24,10 @@ from src.adapters.bailey import (
     _metres_to_mm,
     _reconciles,
     find_model_urls,
+    parse_equipment,
     parse_model_page,
 )
-from src.product_model.enums import BodyType
+from src.product_model.enums import BedType, BodyType, Heating, Refrigeration
 from src.product_model.schema import IN_SCOPE
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -319,3 +321,136 @@ def test_a_missing_mass_is_not_treated_as_contradictory() -> None:
 def test_payload_falls_back_to_derivation_when_not_published() -> None:
     product = _product(mtplm_kilograms=3500, mro_kilograms=2827, mh_payload_kilograms_published=None)
     assert product.mh_payload_kilograms == 673
+
+
+# --------------------------------------------------------------------------- #
+# Equipment lists, and the habitation findings read from them
+# --------------------------------------------------------------------------- #
+
+
+def test_key_features_and_the_specification_sections_are_both_read() -> None:
+    """The washroom's shape is only ever stated in "Key Features", above the sections."""
+    equipment = parse_equipment(_page("adamo_60_2"))
+
+    assert (
+        "Spacious end washroom with separate shower and wardrobe" in equipment.standard
+    )
+    assert (
+        "Truma Combi 6E heating and hot water system" in equipment.standard
+    )
+
+
+def test_an_optional_upgrade_is_kept_out_of_the_standard_equipment() -> None:
+    equipment = parse_equipment(_page("adamo_60_2"))
+
+    assert "Fitted microwave oven (Retailer fit)" in equipment.optional
+    assert "Fitted microwave oven (Retailer fit)" not in equipment.standard
+
+
+def test_an_unmarked_optional_upgrade_is_still_kept_out() -> None:
+    """The reason the split is structural rather than left to `habitation._OPTION`.
+
+    The Endeavour's optional list offers a pop-top roof "to create additional high level
+    double bed" and says nothing about it being an extra beyond the heading it sits
+    under. Read as standard it would give a campervan with no over-cab bed one.
+    """
+    equipment = parse_equipment(_page("endeavour_b62"))
+
+    pop_top = [line for line in equipment.optional if line.startswith("Pop-top roof")]
+    assert pop_top, "the pop-top line should be in the optional list"
+    assert not [line for line in equipment.standard if line.startswith("Pop-top roof")]
+
+    extracted = _build_extracted_motorhome(
+        parse_model_page(_page("endeavour_b62"), is_campervan=True),
+        "https://example.test",
+        equipment,
+    )
+    assert BedType.DROP_DOWN not in extracted.motorhome.bed_types
+
+
+def test_the_adamo_habitation_is_read_from_its_equipment_lists() -> None:
+    page = _page("adamo_60_2")
+    extracted = _build_extracted_motorhome(
+        parse_model_page(page, is_campervan=False), "https://example.test", parse_equipment(page)
+    )
+    motorhome = extracted.motorhome
+
+    assert motorhome.heating is Heating.BLOWN_AIR
+    assert motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert motorhome.shower_toilet_separated is True
+    assert "17 litre freezer compartment" in extracted.provenance["refrigeration"].snippet
+
+
+def test_alde_makes_the_autograph_wet_central() -> None:
+    page = _page("autograph_79_4f")
+    extracted = _build_extracted_motorhome(
+        parse_model_page(page, is_campervan=False), "https://example.test", parse_equipment(page)
+    )
+
+    assert extracted.motorhome.heating is Heating.WET_CENTRAL
+    assert "Alde" in extracted.provenance["heating"].snippet
+
+
+def test_a_microwave_offered_as_an_upgrade_is_reported_as_offered_not_absent() -> None:
+    """"No mention anywhere" would be untrue: Bailey sell one, the factory just won't fit it."""
+    page = _page("adamo_60_2")
+    extracted = _build_extracted_motorhome(
+        parse_model_page(page, is_campervan=False), "https://example.test", parse_equipment(page)
+    )
+
+    # `False`, not unset — unset would let `findings.SILENCE_MEANS` append its generic
+    # "no mention was found anywhere" note over the top of this one.
+    assert extracted.motorhome.microwave is False
+    snippet = extracted.provenance["microwave"].snippet
+    assert "offered as an upgrade" in snippet
+    assert "Fitted microwave oven (Retailer fit)" in snippet
+
+
+def test_a_microwave_fitted_as_standard_is_recorded() -> None:
+    page = _page("autograph_79_4f")
+    extracted = _build_extracted_motorhome(
+        parse_model_page(page, is_campervan=False), "https://example.test", parse_equipment(page)
+    )
+
+    assert extracted.motorhome.microwave is True
+    assert "flatbed microwave oven" in extracted.provenance["microwave"].snippet
+
+
+def test_a_page_naming_no_microwave_at_all_is_left_for_the_silence_rule() -> None:
+    page = _page("endeavour_b62")
+    extracted = _build_extracted_motorhome(
+        parse_model_page(page, is_campervan=True), "https://example.test", parse_equipment(page)
+    )
+
+    assert extracted.motorhome.microwave is None
+    assert "no microwave anywhere" in extracted.provenance["microwave"].snippet
+
+
+def test_no_positional_habitation_field_is_guessed_from_the_prose() -> None:
+    """The findings stop at what the copy states; the drawing's fields stay unset.
+
+    Bailey publish no floorplan at all, so there is not even a pointer to give.
+    """
+    page = _page("adamo_60_2")
+    extracted = _build_extracted_motorhome(
+        parse_model_page(page, is_campervan=False), "https://example.test", parse_equipment(page)
+    )
+    motorhome = extracted.motorhome
+
+    assert motorhome.sleeping_area is None
+    assert motorhome.kitchen_location is None
+    assert motorhome.lounge_location is None
+    assert motorhome.bathroom_layout == []
+
+
+def test_habitation_is_left_alone_when_no_equipment_is_supplied() -> None:
+    extracted = _build_extracted_motorhome(
+        parse_model_page(_page("adamo_60_2"), is_campervan=False), "https://example.test"
+    )
+    motorhome = extracted.motorhome
+
+    assert motorhome.heating is None
+    assert motorhome.refrigeration is None
+    assert motorhome.microwave is None
+    assert motorhome.bed_types == []
+    assert "microwave" not in extracted.provenance

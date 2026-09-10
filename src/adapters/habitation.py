@@ -60,7 +60,21 @@ class Feature:
 #: A spec line describing a priced extra rather than standard equipment. The price is the
 #: giveaway — Rimor's "Rear Adjustable Bed Option: £1,500" and "Alloy wheel option:
 #: £1,350" both carry one — and so is an explicit "option"/"extra" with a colon.
-_OPTION = re.compile(r"£\s*[\d,]|\b(?:option|optional|extra)s?\b\s*[:\-]|\bcost option\b", re.I)
+#:
+#: **`retailer fit` and `dealer fit` mean the same thing** and are Bailey's words for it:
+#: "Fitted microwave oven (Retailer fit)" sits in the same bulleted list as the standard
+#: equipment and describes a microwave the factory does not install. Reading it as fitted
+#: would assert a microwave on every Bailey that merely *can* have one.
+#:
+#: An **optional** item is not the same as an absent one, and the difference matters most
+#: for the microwave: a brand that offers one has not said there is none, so an adapter
+#: should check the unfiltered lines before reporting an absence. `niesmann_bischoff` and
+#: `bailey` both word their note that way.
+_OPTION = re.compile(
+    r"£\s*[\d,]|\b(?:option|optional|extra)s?\b\s*[:\-]|\bcost option\b"
+    r"|\((?:retailer|dealer)[- ]fit(?:ted)?\)",
+    re.I,
+)
 
 #: The `Tags` and `Categories` metadata lines. They repeat feature words out of context
 #: ("Tags 687TC, rimor, transverse bed"), so they are never read as specification.
@@ -277,7 +291,16 @@ def heating_is_unclear(lines: Iterable[str]) -> str | None:
 
 #: A microwave, and specifically not an oven or a grill — Rimor lists "Oven" on 24
 #: products and a microwave on none, so conflating them would invent 24 microwaves.
-_MICROWAVE = re.compile(r"\bmicrowave\b|\bcombination oven\b|\bcombi oven\b", re.I)
+#:
+#: **`combination oven` used to be here and had to come out** (10 September 2026). In the
+#: British caravan trade the phrase means a gas oven and grill in one housing, not a
+#: microwave-combi: Bailey publish "Combination oven (oven, grill, hob combined)" and
+#: "Thetford triplex combination oven, grill with electronic ignition and flame failure
+#: device" — a flame failure device being conclusive proof it burns gas. Every occurrence
+#: across every fixture in this project is that appliance, so the phrase was inventing a
+#: microwave on Bailey's caravans and on the Endeavour campervan. A real microwave-combi
+#: says "microwave" somewhere in its name, which the first alternative already catches.
+_MICROWAVE = re.compile(r"\bmicrowave\b", re.I)
 
 
 def microwave_from(lines: Iterable[str]) -> tuple[bool, str] | None:
@@ -290,6 +313,19 @@ def microwave_from(lines: Iterable[str]) -> tuple[bool, str] | None:
     if line := _first_match(usable_lines(lines), _MICROWAVE):
         return True, line
     return None
+
+
+def microwave_offered(lines: Iterable[str]) -> str | None:
+    """The line naming a microwave **even as an option**, or `None` if there is no mention.
+
+    The difference from `microwave_from` is the option filter, which this deliberately
+    skips. It exists so an adapter can tell *"nobody mentions a microwave"* from *"one is
+    offered but not fitted"* — two facts a reviewer would act on differently, and the
+    second is the commoner. Bailey list "Fitted microwave oven (Retailer fit)" and
+    Niesmann sell an 800-watt one as a priced extra; on both, an absence note that said
+    "no mention anywhere" would be untrue.
+    """
+    return _first_match(lines, _MICROWAVE)
 
 
 # --- Bathroom ------------------------------------------------------------------------

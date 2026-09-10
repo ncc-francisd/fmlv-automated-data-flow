@@ -17,7 +17,7 @@ import pytest
 
 from src.adapters import ADAPTERS, adapter_for, bailey, bailey_caravan
 from src.product_model.caravan import Caravan
-from src.product_model.enums import CaravanBodyType
+from src.product_model.enums import CaravanBodyType, Heating, Refrigeration
 from src.vehicle_class import VehicleClass
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -286,25 +286,73 @@ def test_a_field_the_page_omits_gets_no_provenance() -> None:
     assert extracted.caravan.awning_length_mm is None
 
 
-def test_no_layout_flag_is_guessed_from_the_marketing_copy() -> None:
-    """The pages describe layouts in prose — enough to guess from, not enough to be right.
-
-    `bailey.py` takes the same line, setting only what Bailey state outright.
-    """
+def test_nothing_habitational_is_read_without_the_equipment_lists() -> None:
+    """`build_extracted` on its own reads the specification table and nothing else."""
     extracted = bailey_caravan.build_extracted(parsed(MESSINA), "https://example.test")
     caravan = extracted.caravan
 
-    assert caravan.sleeping_area is None
     assert caravan.bed_types == []
-    assert caravan.kitchen_location is None
-    assert caravan.bathroom_layout == []
-    assert caravan.lounge_location is None
     assert caravan.heating is None
     assert caravan.refrigeration is None
     # `None`, not `False`: the copy not mentioning a microwave is not the copy saying
-    # there is none. `False` here would have proposed an unevidenced No over whatever
-    # FMLV holds; `None` sends it to the reviewer as confirm-or-replace instead.
+    # there is none. `False` here would assert an unevidenced No.
     assert caravan.microwave is None
+
+
+def test_the_positional_layout_fields_are_never_guessed_from_the_prose() -> None:
+    """The pages describe layouts in prose — enough to guess from, not enough to be right.
+
+    What the copy *states* is now read and handed over as findings (the fridge, the
+    heating, the washroom, the beds), but where the kitchen, the lounge, the beds and the
+    washroom sit is only in a drawing, and Bailey publish none. `bailey.py` takes the
+    same line.
+    """
+    extracted = bailey_caravan.build_extracted(
+        parsed(MESSINA), "https://example.test", bailey.parse_equipment(fixture(MESSINA))
+    )
+    caravan = extracted.caravan
+
+    assert caravan.sleeping_area is None
+    assert caravan.kitchen_location is None
+    assert caravan.bathroom_layout == []
+    assert caravan.lounge_location is None
+
+
+def test_the_caravan_habitation_is_read_from_the_same_equipment_lists() -> None:
+    """Identical markup to the motorhome pages, down to the section headings."""
+    extracted = bailey_caravan.build_extracted(
+        parsed(MESSINA), "https://example.test", bailey.parse_equipment(fixture(MESSINA))
+    )
+    caravan = extracted.caravan
+
+    assert caravan.heating is Heating.BLOWN_AIR
+    assert caravan.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert caravan.shower_toilet_separated is True
+    assert caravan.microwave is True
+
+
+def test_alde_makes_the_unicorn_wet_central() -> None:
+    extracted = bailey_caravan.build_extracted(
+        parsed(CABRERA), "https://example.test", bailey.parse_equipment(fixture(CABRERA))
+    )
+
+    assert extracted.caravan.heating is Heating.WET_CENTRAL
+    assert "Alde" in extracted.provenance["heating"].snippet
+
+
+def test_a_gas_combination_oven_does_not_become_a_microwave() -> None:
+    """The Discovery's only oven is Thetford's gas triplex — hob, oven and grill in one.
+
+    Its own line gives it away: "with electronic ignition and flame failure device".
+    """
+    extracted = bailey_caravan.build_extracted(
+        parsed(DISCOVERY_D4_2),
+        "https://example.test",
+        bailey.parse_equipment(fixture(DISCOVERY_D4_2)),
+    )
+
+    assert extracted.caravan.microwave is None
+    assert "no microwave anywhere" in extracted.provenance["microwave"].snippet
 
 
 def test_no_caravan_carries_an_optional_equipment_payload() -> None:
