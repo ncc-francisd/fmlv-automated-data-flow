@@ -182,11 +182,43 @@ it as a roster:
 Where an estimate and the pages disagree, the pages were read directly and win — the same
 rule as website-over-PDF.
 
+## The price lists — corroboration, and one file not to use
+
+The requester pointed at a downloadable price list on 10 September 2026. It is worth
+knowing about and worth **not** wiring in, for reasons that matter in both directions.
+
+There are three of them under `/hymer/drucksachen/preislisten/`:
+
+| file | pages | currency | covers |
+| --- | --- | --- | --- |
+| `motorhomes/gb_en_hymer_motorhomes_preisliste.pdf` | 73 | **£**, no € | the motorhome ranges |
+| `motorhomes/int_de_en_hymer_motorhomes_preisliste.pdf` | 73 | **€**, no £ | the same, internationally |
+| `campervans/int_de_en_hymer_campervans_preisliste.pdf` | 37 | **€** | Yellowstone, Redwood |
+
+**Do not reach for the `int_de_en` one.** It is the file that turns up first and it is
+priced in euros — the mistake that makes Morelo's data the worst in this project. The GB
+edition exists at the same path with `gb_en_` in place of `int_de_en`, and there is **no GB
+campervan edition at all**, so the GB site remains the only sterling source for Yellowstone
+and Redwood.
+
+### What the GB price list is good for
+
+**It corroborates the site's prices exactly.** `PRICES AND TECHNICAL DATA HYMER EXSIS-T /
+Exsis-t 474 / Price a) £ 96,290.-` — the same figure the adapter reads off the range page.
+Two independent renderings agreeing is stronger evidence than this site's own ±5% band, and
+it is why the adapter does not need the PDF.
+
+**It is the evidence behind the microwave finding.** The word appears **nowhere** in 73
+pages of exhaustively itemised and priced equipment, nor in the 37-page campervan list.
+That is a document saying there is none rather than a document that forgot — the
+itemised-table exception in [`README.md`](README.md), on the firmest footing it has had.
+
+It also covers `B-MC I 580` and `GT-S 600`, the two motorhome layouts whose pages publish
+no drawing, so it is where to look if those ever need one by hand.
+
 ## Still unverified
 
 * **Whether the 23 disappearances are all real withdrawals.** Blackline, T-Class, Exsis-I
   and the Xperience and CrossTrail editions have no GB page, but three of them do have
   drawings on the Yellowstone page, so "no page" is not quite "not sold".
-* **The configurator's standard-equipment tab**, which was not needed but may carry a
-  microwave mention the model pages lack.
 * **Model year changeover.** Not established for this brand.
