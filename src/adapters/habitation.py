@@ -190,16 +190,50 @@ _WARM_AIR = re.compile(
 #: heating with boiler, automatic drain valve and shut-off valve" — radiators, drained for
 #: winter — while its Globebus publishes "Gas hot air heating […] and hot water boiler",
 #: where the boiler heats the taps. Matching a bare "hot water" would call both wet.
+#: **`warm water heating` is the same system under another adjective** — Dethleffs write
+#: "Hot-water heating", Niesmann + Bischoff "Warm water heating with thermostat control,
+#: heating cartridge and touch screen panel". Both require the word "heating" for the
+#: reason above, so a warm-water *boiler* still reads as domestic hot water.
+#:
+#: A `heating circuit` is plumbing by definition, and Niesmann's own line gives it away:
+#: "(independent heating circuit in the rear bedroom)". Nothing blown-air is zoned that way.
 _WET_CENTRAL = re.compile(
     r"\bwet[- ]central\b|\bwet[- ]system\b|\bwet[- ]heating\b|\balde\b"
-    r"|\bhot[- ]water heating\b"
+    r"|\b(?:hot|warm)[- ]water heating\b|\bheating circuit\b"
     r"|\bwater[- ]based\b|\bradiator|\bunderfloor heating\b",
     re.I,
 )
 
 #: A heating system of unspecified kind, used only to tell "no heating mentioned" from
 #: "heating mentioned but the type is unclear" — the second is narrated, not proposed.
-_ANY_HEATING = re.compile(r"\bheating\b|\bheater\b", re.I)
+_ANY_HEATING = re.compile(r"\bheating\b|\bheater\b|\bheat exchanger\b", re.I)
+
+#: **How the plumbing gives a system away**, from the requester on 10 September 2026:
+#: *"If the spec sheet mentions fluid capacity (litres), a circulation pump, or glycol, it
+#: is a wet system. If it lists airflow (m³/h), ducting diameter (e.g. 60mm/90mm), or
+#: outlet vents, it is a blown air system."*
+#:
+#: These are the **weak tier**, and what separates them from the patterns above is that
+#: they are trusted only on a line that also mentions heating. Every one of them appears
+#: innocently elsewhere: a fresh water tank has a capacity in litres, an air conditioner
+#: quotes m³/h, and a washroom has an extractor vent. A brand fitting an aircon beside a
+#: wet heater would otherwise be read as blown air off the aircon's airflow figure.
+#:
+#: `circulation` is required alongside the pump for the same reason — Eriba and Laika both
+#: list a "submersible pump", which is the fresh water one.
+_WET_PLUMBING = re.compile(
+    r"\bglycol\b|\bcirculation pump\b|\bfluid capacity\b|\bheating fluid\b"
+    r"|\bsystem fluid\b|\bexpansion (?:tank|vessel)\b",
+    re.I,
+)
+
+#: The other half of the same ruling. `duct` covers the diameter case — a spec quoting
+#: "60 mm ducting" is describing where the warm air goes.
+_AIR_DUCTING = re.compile(
+    r"\bm³/h\b|\bm3/h\b|\bcubic met(?:re|er)s? per hour\b"
+    r"|\bduct(?:ing|ed|s)?\b|\boutlet vents?\b|\bwarm[- ]air outlets?\b",
+    re.I,
+)
 
 
 def heating_from(lines: Iterable[str]) -> tuple[Heating, str] | None:
@@ -215,6 +249,15 @@ def heating_from(lines: Iterable[str]) -> tuple[Heating, str] | None:
         return Heating.WET_CENTRAL, wet_line
     if warm_line := _first_match(usable, _WARM_AIR):
         return Heating.BLOWN_AIR, warm_line
+
+    # The weak tier, and only on a line that is talking about heating — see
+    # `_WET_PLUMBING`. Wet still wins over air where a page carries both, for the same
+    # reason as above: a wet system with a blown-air booster is a wet system.
+    heating_lines = [line for line in usable if _ANY_HEATING.search(line)]
+    if plumbing := _first_match(heating_lines, _WET_PLUMBING):
+        return Heating.WET_CENTRAL, plumbing
+    if ducting := _first_match(heating_lines, _AIR_DUCTING):
+        return Heating.BLOWN_AIR, ducting
     return None
 
 

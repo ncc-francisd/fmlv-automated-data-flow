@@ -23,7 +23,7 @@ import pytest
 
 from src.adapters import niesmann_bischoff as nb
 from src.adapters.niesmann_bischoff import NbLayout
-from src.product_model.enums import BodyType
+from src.product_model.enums import BodyType, Heating
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -396,3 +396,72 @@ def test_manufacturer_matches_the_registry() -> None:
 def test_every_default_range_is_one_the_body_type_map_knows() -> None:
     """A new range added to `DEFAULT_RANGES` without a body type would ship blank."""
     assert {label for _name, label in nb.DEFAULT_RANGES} <= set(nb.BODY_TYPES)
+
+
+# --------------------------------------------------------------------------- #
+# Standard equipment, and the flag that keeps an option out of it
+# --------------------------------------------------------------------------- #
+
+
+def test_only_the_standard_equipment_is_read() -> None:
+    """The configurator is an options catalogue, so `serie` is what makes it usable.
+
+    Arto 78 marks 7 of its 34 technology items `serie: True` at price 0; the other 27 are
+    priced upgrades.
+    """
+    lines = nb.parse_standard_equipment(_read("arto_78_technik.json"))
+
+    assert len(lines) == 7
+    assert any("Warm water heating" in line for line in lines)
+    assert not any("Roof air conditioner" in line for line in lines)
+
+
+def test_the_category_stays_on_the_line() -> None:
+    """So the quote a reviewer reads says where on the page it came from."""
+    lines = nb.parse_standard_equipment(_read("arto_78_technik.json"))
+
+    assert any(line.startswith("Heating, Air Conditioning System: ") for line in lines)
+
+
+def test_a_range_that_publishes_no_standard_equipment_yields_none() -> None:
+    """**The reading that would have been wrong.** Every one of iSmove 6.9 E's 44
+    technology items is `serie: False` — including `Warm water heating with thermostat
+    control (Alde 3030+)` at £3,186. Without the flag the adapter would report iSmove as
+    wet central heating when the wet system is an upgrade, and its standard heating is
+    something the endpoint does not publish at all.
+    """
+    body = _read("ismove_69e_technik.json")
+
+    assert "Alde 3030+" in body, "the fixture must still contain the tempting option"
+    assert nb.parse_standard_equipment(body) == []
+
+
+def test_the_arto_heating_is_read_as_wet() -> None:
+    """`Warm water heating with thermostat. control, heating cartridge …(independent
+    heating circuit in the rear bedroom)` — and `warm water heating` had to be added to the
+    shared vocabulary beside Dethleffs' `hot-water heating` to see it."""
+    from src.adapters import habitation
+
+    lines = nb.parse_standard_equipment(_read("arto_78_technik.json"))
+    found = habitation.heating_from(lines)
+
+    assert found is not None
+    assert found[0] is Heating.WET_CENTRAL
+
+
+def test_an_optional_microwave_is_not_reported_as_fitted() -> None:
+    """Niesmann sell a microwave as a priced extra in `/data/interieur`, which has **no**
+    standard items at all. Only the standard list reaches `habitation`, so the option
+    neither asserts a microwave nor suppresses the note — and the note says which."""
+    lines = nb.parse_standard_equipment(_read("arto_78_technik.json"))
+    extracted = nb.build_extracted(
+        NbLayout("Arto", "Arto 78", {"title": "Arto 78"}), lines
+    )
+
+    assert extracted.motorhome.microwave is False
+    assert "priced option" in extracted.provenance["microwave"].snippet
+
+
+@pytest.mark.parametrize("payload", ["", "not json", "{}", '{"items": "not a list"}'])
+def test_an_unusable_equipment_response_yields_nothing(payload: str) -> None:
+    assert nb.parse_standard_equipment(payload) == []

@@ -30,12 +30,14 @@ import ast
 import json
 import re
 from collections.abc import Callable, Iterable
+from urllib.parse import quote
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import (
     ExtractedMotorhome,
     Provenance,
@@ -86,6 +88,19 @@ _BACKEND_BASE = re.compile(r'"(?P<base>https://[a-z0-9.-]*niesmann-bischoff\.com
 #: `auflastung`) takes `&grundriss=<layout>` as well, and none of them is needed: the
 #: layout record already carries the specification.
 LAYOUTS_PATH = "/data/grundriss"
+
+#: The equipment endpoint, `?modell=<range>&grundriss=<layout>&lang=en`. Its
+#: `[Heating, Air Conditioning System]` group is the only place Niesmann say what heating
+#: a layout has — the layout record itself carries the numbers and nothing habitational.
+EQUIPMENT_PATH = "/data/technik"
+
+#: **The flag that separates standard equipment from a paid extra.** Every item carries
+#: `serie: True` or `serie: False`, and the configurator is an options catalogue, so
+#: without this the adapter would report the fridge and microwave a buyer *may* add as
+#: though they were fitted. `/data/interieur` has **zero** `serie: True` items — its
+#: kitchen fridge and its 800-watt microwave are both upgrades — which is exactly the
+#: reading that would have been wrong.
+STANDARD_FLAG = "serie"
 
 #: The market. Under `lang=en` the prices come back in sterling — established by comparing
 #: all six against FMLV's own figures, which they exceed by 1.7 to 4.4 per cent. A euro
@@ -223,6 +238,36 @@ def berths_from(pairs: Iterable[tuple[str, str]]) -> int | None:
             found = True
             berths += 2 if measured >= DOUBLE_BED_FROM_MM else 1
     return berths if found else None
+
+
+def parse_standard_equipment(payload: str) -> list[str]:
+    """Every item a layout has **as standard**, category prefixed, from `/data/technik`.
+
+    Options are dropped on the `serie` flag — see `STANDARD_FLAG`. The category is kept on
+    the line so a reviewer reading the quote can see where it came from:
+    `Heating, Air Conditioning System: Warm water heating with thermostat…`.
+    """
+    data = _decode(payload)
+    if not isinstance(data, dict):
+        return []
+    lines: list[str] = []
+    for group in data.get("items") or []:
+        if not isinstance(group, dict):
+            continue
+        category = _text(str(group.get("title", "")))
+        inner = group.get("items")
+        if isinstance(inner, str):
+            try:
+                inner = ast.literal_eval(inner)
+            except (ValueError, SyntaxError):
+                inner = []
+        for item in inner or []:
+            if not isinstance(item, dict) or item.get(STANDARD_FLAG) is not True:
+                continue
+            title = _text(str(item.get("title", "")))
+            if title:
+                lines.append(f"{category}: {title}" if category else title)
+    return lines
 
 
 @dataclass(frozen=True)
@@ -379,8 +424,33 @@ def _reconciles(layout: NbLayout) -> list[str]:
 # --------------------------------------------------------------------------- #
 
 
-def build_extracted(layout: NbLayout) -> ExtractedMotorhome:
-    """One product, from one layout record."""
+#: How each habitation reading is introduced where `habitation` supplies no wording.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heating fitted as standard",
+    "refrigeration": "the refrigeration fitted as standard",
+    "shower_toilet_separated": "the washroom fitted as standard",
+}
+
+#: Why a microwave is reported absent — and note how narrow the claim is. Niesmann **do**
+#: offer one, as a priced option (`Microwave (230V, 800 watts, mounted behind cupboard
+#: door)`), so this says only that none is fitted as standard. The check is given the
+#: standard list alone, so the option neither triggers nor suppresses it; the wording
+#: carries the nuance instead.
+MICROWAVE_ABSENCE_NOTE = (
+    "no microwave in the standard equipment. Niesmann do offer one as a priced option, so "
+    "this says it is not fitted as standard rather than that it cannot be had"
+)
+
+
+def build_extracted(
+    layout: NbLayout, equipment: list[str] | None = None
+) -> ExtractedMotorhome:
+    """One product, from one layout record and its standard-equipment list."""
+    features = habitation.features_from(equipment or [])
+    # `False` rather than left unset, so `findings.SILENCE_MEANS` does not append its
+    # generic "no mention anywhere" reasoning — which would be wrong here. Niesmann
+    # publish a microwave; it is simply not standard. See `MICROWAVE_ABSENCE_NOTE`.
+    no_microwave = bool(equipment) and habitation.microwave_from(equipment) is None
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -398,6 +468,18 @@ def build_extracted(layout: NbLayout) -> ExtractedMotorhome:
         mh_width_mm=layout.mh_width_mm,
         mh_height_mm=layout.mh_height_mm,
         rear_garage=layout.rear_garage,
+        # Habitation, from the standard equipment only — reported as findings rather than
+        # proposed. See `parse_standard_equipment` for why the `serie` flag matters.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        microwave=False if no_microwave else None,
     )
 
     label = layout.title
@@ -482,6 +564,16 @@ def build_extracted(layout: NbLayout) -> ExtractedMotorhome:
         ),
     )
 
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "listed as standard equipment")
+        record(name, f"{note}: {feature.snippet}")
+    if equipment:
+        unclear = habitation.heating_is_unclear(equipment)
+        if unclear and "heating" not in features:
+            record("heating", f"a heater is listed but its kind is not named: {unclear}")
+        if no_microwave:
+            record("microwave", MICROWAVE_ABSENCE_NOTE)
+
     if layout.floorplan_path:
         provenance.update(
             floorplan_provenance(motorhome, BASE_URL + layout.floorplan_path, label)
@@ -565,7 +657,21 @@ def collect(
                     on_progress(f"[{layout.title}] WARNING: no {name} published, left blank")
             if layout.floorplan_path is None:
                 on_progress(f"[{layout.title}] no floorplan published")
-            results.append(build_extracted(layout))
+            # One extra call a layout, for the only habitation the brand publishes.
+            # Never fatal: a failure costs the findings and nothing else.
+            equipment: list[str] = []
+            kit_url = (
+                f"{backend}{EQUIPMENT_PATH}?modell={range_name}"
+                f"&grundriss={quote(layout.title)}&lang={LANGUAGE}"
+            )
+            kit = http.fetch(kit_url)
+            if kit.status_code == 200:
+                equipment = parse_standard_equipment(
+                    kit.file_path.read_text(encoding="utf-8", errors="replace")
+                )
+            if not equipment:
+                on_progress(f"[{layout.title}] no standard equipment read, so no findings")
+            results.append(build_extracted(layout, equipment))
 
     on_progress(f"{len(results)} product(s) collected")
     return results

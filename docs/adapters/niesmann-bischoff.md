@@ -199,6 +199,45 @@ document when a parameter is missing, and trailing output after it — so a plai
 `json.loads` fails on a response that is otherwise perfectly good. The captured fixtures
 happen to be clean, which is why the tests construct both cases rather than relying on them.
 
+## Habitation — added 10 September 2026, and the flag that makes it honest
+
+The requester noticed a new product arriving with no findings panel. The layout record
+carries the numbers and nothing habitational, so the findings come from
+`/data/technik?modell=…&grundriss=…&lang=en`.
+
+**The configurator is an options catalogue, so `serie` is what makes it usable.** Every
+item carries `serie: true` or `serie: false`, and reading the endpoint without that filter
+would have been actively wrong rather than merely noisy:
+
+| range | items | standard | what an unfiltered read would have said |
+| --- | --- | --- | --- |
+| Arto 78 | 34 | **7** | correct |
+| Flair 880 | 37 | **0** | wet central, off a £2,308 floor-heating upgrade |
+| iSmove 6.9 E | 44 | **0** | wet central, off a **£3,186 Alde 3030+** |
+
+iSmove is the case worth remembering: its warm-water heating is an upgrade, so its
+standard heating is something the endpoint does not publish at all. Reporting the option
+would have put a wet system against a vehicle that very likely has blown air.
+
+So **the three Artos get a heating finding and the other four get none** — honest, and the
+alternative was worse. `/data/interieur` is the same story with nothing standard in it at
+all: its drawer fridge and its 800-watt microwave are both priced extras.
+
+### What the Arto's heating says
+
+`Warm water heating with thermostat. control, heating cartridge and touch screen panel
+(independent heating circuit in the rear bedroom)`, alongside `Engine heat exchanger` and
+`Floor heating` — all three standard. That reads as **wet central**, and seeing it needed
+two additions to the shared vocabulary: `warm water heating` beside Dethleffs'
+`hot-water heating`, and `heating circuit`, which is plumbing by definition.
+
+### The microwave note is narrower than the others'
+
+Niesmann **do** sell one — `Microwave (230V, 800 watts, mounted behind cupboard door)` — so
+the finding says it is not fitted as standard rather than that it cannot be had. The field
+is set to `False` explicitly so `findings.SILENCE_MEANS` does not append its generic "no
+mention anywhere" reasoning, which would be untrue here.
+
 ## Still unverified
 
 * **Model year changeover.** Not established for this brand.
