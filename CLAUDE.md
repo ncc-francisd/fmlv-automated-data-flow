@@ -119,6 +119,13 @@ for the person typing a row in, so wording such as "select one" is advice to the
 than a constraint the data obeys — query the export to find out how a group of columns is
 actually used.
 
+### Habitation findings belong in the adapter as it is written
+
+A new adapter reports the habitation findings from the start — see
+`docs/adapters/README.md`. Going back into a finished adapter to add them costs far
+more than writing them while the source is already understood, so the seven adapters
+that still lack them are done when they are next touched rather than in a sweep.
+
 ### Reporting what a run found
 
 Sanity-check pipeline output before presenting it. An implausible number of new products

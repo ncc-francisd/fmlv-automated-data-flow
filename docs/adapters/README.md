@@ -721,6 +721,26 @@ Where nothing settles it, say so rather than guess — `habitation.heating_is_un
 exists for exactly that, and Laika's "6 kW diesel heater, remotely controllable" is what it
 is for.
 
+### Which adapters report findings, and what is left
+
+Rolled out 10 September 2026, **19 of 26 adapters**: Adria, Auto-Trail, Bailey (both
+halves), Bürstner, Carado, Dethleffs, Elddis, Eriba (both halves), Hymer, Knaus, Laika,
+Moto-Trek, Murvi, Niesmann + Bischoff, Rimor and Swift (both halves).
+
+**The retrofit is parked here deliberately**, at the requester's direction on 10
+September 2026: it costs far more to go back into an adapter than to write the findings
+while the source is already understood. So the remaining seven are done **when that
+adapter is next touched**, and every new adapter includes them from the start.
+
+| left to do | what the source looks like, from the fixture survey |
+| --- | --- |
+| `chausson` | model pages, 18 signals across 7 fixtures — the smallest real source of the seven |
+| `etrusco` | catalogue pages, 22 signals; EHG family, so `sectioned_equipment` should fit |
+| `sunlight` | 8 signals, all in run JSON rather than a spec source |
+| `wingamm` | 7 signals in the catalogue text |
+| `weinsberg` | 6 signals in the price-list page JSON |
+| `coachman`, `morelo` | **none at all.** Neither source names a fridge, a heater or a microwave anywhere in the captured fixtures, so there may be nothing to read |
+
 Five traps worth knowing before writing the next one:
 
 * **A bare "wet" is not wet central heating.** "Wet room Shower and cassette toilet"
