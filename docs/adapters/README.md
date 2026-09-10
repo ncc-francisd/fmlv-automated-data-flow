@@ -595,6 +595,14 @@ brand's**. "141L fridge with freezer compartment", "Combi C4 heating", "separate
 cubicle and cassette toilet", "electric drop-down double bed" recur across manufacturers,
 so the second adapter to want these should be one call and a loop.
 
+**So is the shape of the page.** `habitation.sectioned_equipment` reads an accordion of
+headed sections into an `Equipment(standard, optional)` — the layout almost every British
+manufacturer uses, differing only in which tag carries the heading. Bailey, Swift and
+Swift's caravans all go through it. Give it the heading pattern, the pattern for headings
+that mean "upgrade" rather than "equipment", and optionally `inside` (a container, where
+the region also holds navigation), `include_head` (a summary above the first heading) and
+`until` (where the accordion stops, so the last section does not swallow the footer).
+
 Two rules run through it, both learned on Rimor's 34 products:
 
 * **Only ever assert a feature from positive evidence.** A page that never mentions a

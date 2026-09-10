@@ -72,7 +72,7 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -80,6 +80,7 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.swiftgroup.co.uk"
@@ -706,9 +707,141 @@ def _body_type_basis(product: SwiftProduct) -> str:
     )
 
 
+# --- Equipment, for the habitation findings ------------------------------------------
+
+#: One collapsible equipment section's heading. Swift use the same accordion for these as
+#: for their FAQs, hence the class name.
+SECTION_HEADING = re.compile(r'<h3 class="faqs-question">(.*?)</h3>', re.S)
+
+#: Sections that are not standard equipment. `Options` is the important one — the Sprite
+#: offers a "Lux Pack (microwave, carpet set, and TV aerial)" in it with no marker of any
+#: kind on the line. `Notes` is the small print about how the masses were measured.
+NOT_STANDARD_SECTION = re.compile(r"\s*(?:options?|notes)\b", re.I)
+
+#: Where the equipment accordion stops. Without it the last section runs to the end of
+#: the document and picks up the site footer — "Newsletter", "Terms and Conditions",
+#: "Privacy", "Site map" all arrived as equipment.
+END_OF_EQUIPMENT = re.compile(r"<footer\b", re.I)
+
+#: A line Swift qualify but do not say how — "Towel rail above radiator (model specific)",
+#: "Weight plate upgrade (model dependent)". True of some layouts on the page and not
+#: others, and the page never says which, so it cannot be attributed to one and is read
+#: for none.
+_UNATTRIBUTABLE = re.compile(r"\(model[- ](?:specific|dependent)\)", re.I)
+
+#: A parenthetical, for testing whether it names layouts.
+_PARENTHETICAL = re.compile(r"\(([^)]*)\)")
+
+#: How a parenthetical lists layouts: "850 & 860", "Alpine 4 and Major 4 EB",
+#: "except kitchen, washroom and bunk bed windows" (which names none, and so is not one).
+_LIST_SEPARATOR = re.compile(r",|&|\band\b", re.I)
+
+#: A line about the sleeping arrangement, which is the one habitation fact that varies
+#: layout to layout within a Swift range — see `equipment_for`.
+_ABOUT_A_BED = re.compile(r"\bbeds?\b|\bbunks?\b", re.I)
+
+
+def equipment_for(
+    model: str,
+    equipment: habitation.Equipment,
+    *,
+    models_on_the_page: Iterable[str] = (),
+) -> tuple[str, ...]:
+    """`equipment.standard`, narrowed to the lines that are true of the layout named `model`.
+
+    Swift publish **one equipment list per range page**, shared by every layout on it,
+    and qualify the lines that are not universal in brackets. Three kinds:
+
+    * `(model specific)` — dropped for everyone. The page does not say which models.
+    * `(850 & 860)` — kept only for those layouts.
+    * `(except 845)` — dropped for that layout, kept for the rest.
+
+    A parenthetical naming no layout on the page is not a qualifier at all — "(except
+    kitchen, washroom and bunk bed windows)" is about windows — and the line is kept.
+
+    **Beds are the exception to that last rule**, because they are the one habitation
+    fact that varies within a range: one fridge, one heater and one microwave serve every
+    layout on the page, but the beds are what makes a layout a layout. Swift qualify some
+    bed lines by naming models ("aluminium front bed frame on L shape lounge models (560L
+    & 650L)") and others by describing a class of them ("Wide double bed (fixed beds)").
+    The second names no layout, so it cannot be attributed to one, and reading it as
+    universal would give the Sprite Alpine 4 — a bunk-bed caravan — a fixed bed. So a
+    bed line carrying **any** qualifier this cannot resolve is dropped; an unqualified
+    one ("Easy Accuride bed make up system on front beds") is true of the whole range and
+    is kept.
+    """
+    others = {name.casefold() for name in models_on_the_page} - {model.casefold()}
+    kept: list[str] = []
+    for line in equipment.standard:
+        if _UNATTRIBUTABLE.search(line):
+            continue
+        qualifiers = _PARENTHETICAL.findall(line)
+        if not all(_applies_to(inner, model, others) for inner in qualifiers):
+            continue
+        if qualifiers and _ABOUT_A_BED.search(line) and not any(
+            _names_a_layout(inner, model, others) for inner in qualifiers
+        ):
+            continue
+        kept.append(line)
+    return tuple(kept)
+
+
+def _names_a_layout(parenthetical: str, model: str, others: set[str]) -> bool:
+    """Whether a bracketed qualifier is about layouts at all."""
+    named = {
+        part.strip().removeprefix("except").strip().casefold()
+        for part in _LIST_SEPARATOR.split(parenthetical)
+    }
+    return bool(named & (others | {model.casefold()}))
+
+
+def _applies_to(parenthetical: str, model: str, others: set[str]) -> bool:
+    """Whether a bracketed qualifier leaves the line true of `model`."""
+    if not _names_a_layout(parenthetical, model, others):
+        return True  # not a layout qualifier — "(fixed beds)", "(6 berth)"
+    excluding = parenthetical.strip().lower().startswith("except")
+    named = {
+        part.strip().removeprefix("except").strip().casefold()
+        for part in _LIST_SEPARATOR.split(parenthetical)
+    }
+    return (model.casefold() in named) is not excluding
+
+
+#: How each habitation reading is introduced. The wording says *range* rather than
+#: *layout* deliberately: these lists are published once per range page.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heating listed as standard for the range",
+    "refrigeration": "the fridge listed as standard for the range",
+    "microwave": "a microwave listed as standard for the range",
+    "shower_toilet_separated": "the washroom as the range page describes it",
+}
+
+#: Said when a microwave is offered but not fitted, as the Sprite's "Lux Pack" does.
+MICROWAVE_OPTIONAL_NOTE = (
+    "no microwave in the standard equipment; one is offered as an upgrade rather than "
+    "fitted, so the answer for a factory-standard vehicle is No"
+)
+
+
 def _build_extracted_motorhome(
-    product: SwiftProduct, source_url: str, *, payload_basis: str
+    product: SwiftProduct,
+    source_url: str,
+    *,
+    payload_basis: str,
+    equipment: tuple[str, ...] = (),
+    offered: tuple[str, ...] = (),
 ) -> ExtractedMotorhome:
+    """One layout as a `Motorhome`, plus the provenance a reviewer sees beside each field.
+
+    `equipment` is the range page's standard-equipment list narrowed to this layout by
+    `equipment_for`, and `offered` is its Options section. What they settle about the
+    habitation reaches the reviewer as **findings** rather than proposals; see
+    `product_model.findings`.
+    """
+    features = habitation.features_from(equipment)
+    # Dropped for the reason set out in `swift_caravan.build_extracted`: Swift's lists
+    # describe the range's furniture rather than a layout's sleeping arrangement.
+    features.pop("bed_types", None)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -725,6 +858,22 @@ def _build_extracted_motorhome(
         rrp_pounds=product.rrp_pounds,
         base_vehicle_manufacturer=product.base_vehicle_manufacturer,
         body_type=product.body_type,
+        # Habitation, from the range page's equipment lists — reported as findings
+        # rather than proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        microwave=(
+            features["microwave"].value
+            if "microwave" in features
+            else (False if habitation.microwave_offered(offered) else None)
+        ),
     )
 
     snippets = {
@@ -781,6 +930,23 @@ def _build_extracted_motorhome(
         if value is not None or name in always_record
     }
 
+    def record(field: str, snippet: str) -> None:
+        provenance[field] = Provenance(
+            source_url=source_url, snippet=f"{product.label} — {snippet}"
+        )
+
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "read from the range page")
+        record(name, f"{note}: {feature.snippet}")
+    if equipment and "microwave" not in features:
+        if offered_line := habitation.microwave_offered(offered):
+            record("microwave", f"{MICROWAVE_OPTIONAL_NOTE}: {offered_line}")
+        else:
+            record("microwave", "no microwave anywhere in the range's equipment list")
+    if unclear := habitation.heating_is_unclear(equipment):
+        if "heating" not in features:
+            record("heating", f"heating is listed but its kind is not named: {unclear}")
+
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
@@ -829,11 +995,8 @@ def collect(
                 )
                 continue
             slug = range_path.rstrip("/").rsplit("/", 1)[-1]
-            products = parse_range_page(
-                page.file_path.read_text(encoding="utf-8", errors="replace"),
-                slug=slug,
-                index_path=index_path,
-            )
+            page_html = page.file_path.read_text(encoding="utf-8", errors="replace")
+            products = parse_range_page(page_html, slug=slug, index_path=index_path)
             if not products:
                 # Swift leaves empty placeholder nodes live — three `merlin` paths were
                 # linked on 2026-08-28 and only one carried layouts.
@@ -845,6 +1008,19 @@ def collect(
                 + (f", built on {base_vehicle}" if base_vehicle else ", BASE VEHICLE NOT FOUND")
             )
             _narrate_heights(products, category=category, on_progress=on_progress)
+
+            equipment = habitation.sectioned_equipment(
+                page_html,
+                heading=SECTION_HEADING,
+                optional_heading=NOT_STANDARD_SECTION,
+                until=END_OF_EQUIPMENT,
+            )
+            if not equipment.standard:
+                on_progress(
+                    f"[{category}] {products[0].range_label}: no standard-equipment "
+                    f"sections on the page, so no habitation findings"
+                )
+            models_on_the_page = [item.model for item in products]
 
             for product in products:
                 ok, basis = _reconciles(product, guide)
@@ -863,7 +1039,13 @@ def collect(
                     )
                 results.append(
                     _build_extracted_motorhome(
-                        product, f"{BASE_URL}{range_path}", payload_basis=basis
+                        product,
+                        f"{BASE_URL}{range_path}",
+                        payload_basis=basis,
+                        equipment=equipment_for(
+                            product.model, equipment, models_on_the_page=models_on_the_page
+                        ),
+                        offered=equipment.optional,
                     )
                 )
 

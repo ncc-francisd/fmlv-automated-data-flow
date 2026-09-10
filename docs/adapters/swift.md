@@ -786,6 +786,76 @@ So Swift's caravans take the same line as Bailey's: no layout flags, and
 habitation-layout-pack job, not the adapter's. Recorded here so the bed-size table is not
 re-proposed as a shortcut to it.
 
+## The habitation findings — 10 September 2026
+
+Both halves of Swift use one mechanism, because both publish the same thing: a page per
+**range**, carrying an accordion of headed equipment sections — Exterior & Construction,
+Living, Relaxing & Sleeping, Cooking & Eating, Washing, Storage, Heating & Utilities,
+Safety & Security, and **Options**. A hundred to a hundred and eighty lines per page, and
+the four factual habitation fields fall straight out of them:
+
+| | Kon-Tiki reads | Sprite reads |
+| --- | --- | --- |
+| `refrigeration` | Dometic Series 10 133 litre fridge with freezer | Dometic 98 litre fridge with freezer compartment |
+| `heating` | "Alde dual fuel radiator central heating" → wet | "Dual fuel heating with Truma Combi Boiler" → blown air |
+| `microwave` | "Dometic built-in flatbed microwave" → yes | offered in the Lux Pack only → no |
+| `shower_toilet_separated` | "toilet and separate shower" → yes | not stated |
+
+### One list, many layouts — so the qualifiers have to be read
+
+This is what makes Swift different from Bailey, where one URL is one vehicle. A Swift
+list is published once for the whole range and qualifies the lines that are not universal
+in brackets. `swift.equipment_for` resolves them per layout:
+
+| the page says | what happens |
+| --- | --- |
+| `(model specific)`, `(model dependent)` | dropped for **everyone** — the page does not say which |
+| `(794 & 894)`, `(560L & 650L)` | kept for those layouts only |
+| `(except 845)` | dropped for that layout, kept for the rest |
+| `(except kitchen, washroom and bunk bed windows)` | names no layout, so it is not a qualifier at all — kept |
+
+Without it the Kon-Tiki 740 would be reported with the 794's electric rise-and-fall
+island bed.
+
+### The Options section is split off structurally
+
+The Sprite's options list offers a **"Lux Pack (microwave, carpet set, and TV aerial)"**
+with no marker on the line, so `habitation.usable_lines` alone would read it as fitted.
+Splitting on the section heading instead is what makes the Sprite's microwave finding
+read *"one is offered as an upgrade rather than fitted"* rather than either a wrong Yes
+or an untrue "no mention anywhere".
+
+The last section runs to the end of the document unless bounded, which is why
+`END_OF_EQUIPMENT` exists: without it the site footer's "Newsletter", "Terms and
+Conditions", "Privacy" and "Site map" arrive as equipment. Harmless as long as Options
+stays last on every page, and not something to leave resting on that.
+
+### Two things the shared vocabulary had wrong, both found here
+
+* **"Towel rail above radiator (model specific)" was being quoted as the evidence for
+  wet central heating**, eleven lines before "Alde radiator central heating and water
+  heating with daily programming". Same answer, useless quote. `heating_from` now prefers
+  a line that mentions heating.
+* **"Washroom and shower tray with foldaway washbasin and black separate vanity unit"
+  read as a separated washroom.** The word "separate" there belongs to the vanity unit
+  and the shower is a clause away; the pattern allowed 40 characters between them and now
+  allows 15 and no comma. The Trekker campervan was the product affected.
+
+### `bed_types` is deliberately not reported, on either half
+
+Swift's lists describe the range's **furniture**, not a layout's sleeping arrangement:
+"Full height headboards to fixed beds", "Aluminium bed frames to maximise strength and
+storage space (fixed beds)", "Wide double bed (fixed beds)". Each names a *class* of
+models rather than a layout, so `equipment_for` cannot narrow it, and reading them as
+universal gave every Conqueror Grande a fixed bed off a headboard and the Sprite Alpine 4
+— a bunk-bed caravan — one as well.
+
+The motorhome pages do qualify some bed lines properly, and the layout JSON carries a
+per-layout `beds` array on top of that. Neither is enough: the array names positions
+("Front Double", "Rear Nearside Single") without saying whether a bed is built in or made
+up from the seating, which is exactly the distinction `BedType` exists for — the same
+conclusion the bed-size table reached above, from a different document.
+
 ## Re-verify after the NEC show
 
 Same caveat as the motorhomes: the guide is stamped "Issued September 2026" and carries

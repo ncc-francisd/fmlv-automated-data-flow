@@ -147,16 +147,21 @@ from ..fetch.pdf import extract_text
 from ..product_model.caravan import Caravan
 from ..product_model.enums import CaravanBodyType
 from ..vehicle_class import VehicleClass
+from . import habitation
 from .base import ExtractedCaravan, Provenance
 from .swift import (
     BASE_URL,
     MANUFACTURER,
     MANUFACTURER_DISPLAY_NAME,
+    END_OF_EQUIPMENT,
+    NOT_STANDARD_SECTION,
+    SECTION_HEADING,
     _kilograms,
     _leading_int,
     _metres_to_mm,
     _price,
     find_quick_guide_url,
+    equipment_for,
     parse_layouts_json,
     range_and_model,
 )
@@ -429,8 +434,29 @@ def unsplittable_titles(page_html: str, *, slug: str) -> list[str]:
     ]
 
 
+#: How each habitation reading is introduced. The wording says *range* rather than
+#: *layout* deliberately: these lists are published once per range page.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heating listed as standard for the range",
+    "refrigeration": "the fridge listed as standard for the range",
+    "microwave": "a microwave listed as standard for the range",
+    "shower_toilet_separated": "the washroom as the range page describes it",
+}
+
+#: Said when a microwave is offered but not fitted — the Sprite's "Lux Pack".
+MICROWAVE_OPTIONAL_NOTE = (
+    "no microwave in the standard equipment; one is offered as an upgrade rather than "
+    "fitted, so the answer for a factory-standard caravan is No"
+)
+
+
 def build_extracted(
-    product: SwiftCaravan, source_url: str, *, payload_basis: str | None = None
+    product: SwiftCaravan,
+    source_url: str,
+    *,
+    payload_basis: str | None = None,
+    equipment: tuple[str, ...] = (),
+    offered: tuple[str, ...] = (),
 ) -> ExtractedCaravan:
     """One parsed layout as a `Caravan` plus the provenance a reviewer sees beside it.
 
@@ -438,7 +464,23 @@ def build_extracted(
     `GuideSpecs.check`, so the payload's provenance can cite a published figure rather
     than only the subtraction that produced it. `None` means the guide was unavailable —
     the payload is still emitted, and its provenance says the arithmetic stands alone.
+
+    `equipment` is the range page's standard-equipment list narrowed to this layout by
+    `equipment_for`, and `offered` is its Options section. What they settle about the
+    habitation reaches the reviewer as **findings** rather than proposals; see
+    `product_model.findings`.
     """
+    features = habitation.features_from(equipment)
+    # `bed_types` is deliberately dropped, on both halves of the brand. Swift's lists are
+    # published once per range and describe furniture rather than layouts — "Full height
+    # headboards to fixed beds", "Aluminium bed frames to maximise strength and storage
+    # space (fixed beds)" — so they name a class of models rather than a layout, and
+    # reading them as universal gave every Conqueror Grande a fixed bed off a headboard.
+    # The layout JSON does carry a per-layout `beds` array, but it names positions
+    # ("Front Double", "Rear Nearside Single") without saying whether a bed is built in
+    # or made up from the seating, which is exactly what `BedType` has to distinguish.
+    # So the beds are left to the reviewer and the drawing.
+    features.pop("bed_types", None)
     caravan = Caravan(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -454,6 +496,22 @@ def build_extracted(
         headroom_mm=product.headroom_mm,
         twin_axle=product.twin_axle,
         body_type=CaravanBodyType.RIGID,
+        # Habitation, from the range page's equipment lists — reported as findings
+        # rather than proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        microwave=(
+            features["microwave"].value
+            if "microwave" in features
+            else (False if habitation.microwave_offered(offered) else None)
+        ),
     )
 
     provenance: dict[str, Provenance] = {}
@@ -528,6 +586,18 @@ def build_extracted(
         "not change the type, even where a manufacturer calls it a pop-up (NCC rule, "
         "7 September 2026). Swift market no micro, and nothing here folds.",
     )
+
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "read from the range page")
+        record(name, f"{note}: {feature.snippet}")
+    if equipment and "microwave" not in features:
+        if offered_line := habitation.microwave_offered(offered):
+            record("microwave", f"{MICROWAVE_OPTIONAL_NOTE}: {offered_line}")
+        else:
+            record("microwave", "no microwave anywhere in the range's equipment list")
+    if unclear := habitation.heating_is_unclear(equipment):
+        if "heating" not in features:
+            record("heating", f"heating is listed but its kind is not named: {unclear}")
 
     return ExtractedCaravan(caravan=caravan, provenance=provenance)
 
@@ -612,6 +682,16 @@ def collect(
         if products[0].headroom_mm is None:
             on_progress(f"{slug}: no headroom stated on {url} — leaving FMLV's own figure")
 
+        equipment = habitation.sectioned_equipment(
+            page_html,
+            heading=SECTION_HEADING,
+            optional_heading=NOT_STANDARD_SECTION,
+            until=END_OF_EQUIPMENT,
+        )
+        if not equipment.standard:
+            on_progress(f"{slug}: no standard-equipment sections on {url} - no habitation findings")
+        models_on_the_page = [item.model for item in products]
+
         for product in products:
             reconciles, reason = guide.check(product)
             if not reconciles:
@@ -621,7 +701,17 @@ def collect(
                 on_progress(f"{product.label}: {reason}")
             # The guide's own words travel with the payload, so a reviewer sees a
             # published figure beside the subtraction rather than arithmetic alone.
-            extracted.append(build_extracted(product, url, payload_basis=reason))
+            extracted.append(
+                build_extracted(
+                    product,
+                    url,
+                    payload_basis=reason,
+                    equipment=equipment_for(
+                        product.model, equipment, models_on_the_page=models_on_the_page
+                    ),
+                    offered=equipment.optional,
+                )
+            )
             on_progress(f"read {product.label}")
 
     for mtplm in guide.unmatched():

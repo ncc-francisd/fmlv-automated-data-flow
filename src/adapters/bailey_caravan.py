@@ -78,7 +78,6 @@ from ..vehicle_class import VehicleClass
 from . import habitation
 from .bailey import (
     MICROWAVE_OPTIONAL_NOTE,
-    BaileyEquipment,
     _field,
     _FEATURE_NOTES,
     _kilograms,
@@ -246,7 +245,7 @@ def parse_model_page(html: str) -> BaileyCaravan:
 def build_extracted(
     product: BaileyCaravan,
     source_url: str,
-    equipment: BaileyEquipment | None = None,
+    equipment: habitation.Equipment | None = None,
 ) -> ExtractedCaravan:
     """One parsed page as a `Caravan` plus the provenance a reviewer sees beside it.
 

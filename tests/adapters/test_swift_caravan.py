@@ -23,9 +23,17 @@ from pathlib import Path
 
 import pytest
 
-from src.adapters import ADAPTERS, adapter_for, adapters_for, swift, swift_caravan
+from src.adapters import (
+    ADAPTERS,
+    adapter_for,
+    adapters_for,
+    habitation,
+    swift,
+    swift_caravan,
+)
+from src.adapters.base import ExtractedCaravan
 from src.product_model.caravan import Caravan
-from src.product_model.enums import CaravanBodyType
+from src.product_model.enums import CaravanBodyType, Heating, Refrigeration
 from src.vehicle_class import VehicleClass
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -616,3 +624,80 @@ def test_a_baseline_holding_a_split_produces_a_clearable_row() -> None:
     assert [c.new_value for c in changes if c.field == "personal_effects_payload_kilograms"] == [
         201
     ]
+
+
+# --------------------------------------------------------------------------- #
+# The equipment lists, and the habitation findings read from them
+# --------------------------------------------------------------------------- #
+
+
+def equipment_lists(name: str) -> habitation.Equipment:
+    return habitation.sectioned_equipment(
+        fixture(name),
+        heading=swift.SECTION_HEADING,
+        optional_heading=swift.NOT_STANDARD_SECTION,
+        until=swift.END_OF_EQUIPMENT,
+    )
+
+
+def built_with_equipment(name: str, model: str) -> ExtractedCaravan:
+    lists = equipment_lists(name)
+    products = parsed(name)
+    return swift_caravan.build_extracted(
+        by_model(name, model),
+        "https://example.test",
+        equipment=swift.equipment_for(
+            model, lists, models_on_the_page=[item.model for item in products]
+        ),
+        offered=lists.optional,
+    )
+
+
+def test_the_elegance_habitation_is_read_from_its_range_page() -> None:
+    extracted = built_with_equipment(ELEGANCE_GRANDE, "860")
+    caravan = extracted.caravan
+
+    assert caravan.heating is Heating.WET_CENTRAL
+    assert caravan.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert caravan.microwave is True
+    assert "Alde" in extracted.provenance["heating"].snippet
+
+
+def test_a_microwave_in_the_options_pack_is_reported_as_offered_not_absent() -> None:
+    """The Sprite's "Lux Pack (microwave, carpet set, and TV aerial)" carries no marker."""
+    extracted = built_with_equipment(SPRITE, "Alpine 4")
+
+    assert extracted.caravan.microwave is False
+    snippet = extracted.provenance["microwave"].snippet
+    assert "offered as an upgrade" in snippet
+    assert "Lux Pack" in snippet
+
+
+def test_the_beds_are_left_to_the_reviewer() -> None:
+    """"Wide double bed (fixed beds)" names a class of models, not a layout."""
+    extracted = built_with_equipment(ELEGANCE_GRANDE, "860")
+
+    assert extracted.caravan.bed_types == []
+    assert "bed_types" not in extracted.provenance
+
+
+def test_a_line_qualified_for_other_layouts_is_not_read_for_this_one() -> None:
+    lists = equipment_lists(ELEGANCE_GRANDE)
+    models = [item.model for item in parsed(ELEGANCE_GRANDE)]
+
+    for_845 = swift.equipment_for("845", lists, models_on_the_page=models)
+    for_850 = swift.equipment_for("850", lists, models_on_the_page=models)
+
+    assert not [line for line in for_845 if "Midi Heki in washroom" in line]
+    assert [line for line in for_850 if "Midi Heki in washroom" in line]
+
+
+def test_habitation_is_left_alone_when_no_equipment_is_supplied() -> None:
+    extracted = swift_caravan.build_extracted(
+        by_model(ELEGANCE_GRANDE, "860"), "https://example.test"
+    )
+
+    assert extracted.caravan.heating is None
+    assert extracted.caravan.refrigeration is None
+    assert extracted.caravan.microwave is None
+    assert "microwave" not in extracted.provenance

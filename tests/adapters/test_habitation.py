@@ -8,6 +8,8 @@ central heating, "Oven" read as a microwave, a priced bed option read as standar
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from src.adapters import habitation
@@ -552,3 +554,138 @@ def test_a_bed_that_lifts_or_folds_is_made_up(line: str) -> None:
     beds, _quotes = habitation.bed_types_from([line])
     assert BedType.MAKE_UP in beds
     assert BedType.FIXED not in beds
+
+
+def test_the_separating_word_has_to_be_next_to_the_shower_or_the_toilet() -> None:
+    """Swift's Trekker: the word "separate" there belongs to the vanity unit."""
+    line = (
+        "Washroom and shower tray with foldaway washbasin and black separate vanity unit"
+    )
+
+    assert habitation.shower_toilet_separated_from([line]) is None
+
+
+def test_a_separating_word_a_few_words_away_still_counts() -> None:
+    found = habitation.shower_toilet_separated_from(
+        ["Washroom design with vanity unit, door mirror, sink, toilet and separate shower"]
+    )
+
+    assert found is not None and found.value is True
+
+
+def test_the_heating_quote_prefers_a_line_that_is_about_the_heating() -> None:
+    """Both lines settle it as wet; only the second is worth showing a reviewer."""
+    found = habitation.heating_from(
+        [
+            "Towel rail above radiator",
+            "Alde radiator central heating and water heating with daily programming",
+        ]
+    )
+
+    assert found is not None
+    assert found[0] is Heating.WET_CENTRAL
+    assert found[1].startswith("Alde radiator central heating")
+
+
+def test_a_radiator_still_settles_it_when_no_line_says_heating() -> None:
+    found = habitation.heating_from(["Towel rail above radiator"])
+
+    assert found is not None and found[0] is Heating.WET_CENTRAL
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "External service doors - access under nearside front bed and larger access door under fixed beds",
+        "Curtains to all windows (except kitchen, washroom and bunk bed windows)",
+        "Blinds and flyscreens to all windows including the bunk beds",
+    ],
+)
+def test_a_door_or_a_window_that_mentions_a_bed_is_not_a_bed(line: str) -> None:
+    """Swift's lists are long enough that beds turn up in them as landmarks."""
+    found, _quoted = habitation.bed_types_from([line])
+
+    assert found == []
+
+
+def test_a_light_that_mentions_a_bunk_still_evidences_the_bunk() -> None:
+    """Dethleffs' Globetrail 600 KS has no other line saying its bunks exist."""
+    found, _quoted = habitation.bed_types_from(
+        ["Light strip on the underside of the upper bunk bed, on both sides"]
+    )
+
+    assert found == [BedType.FIXED_BUNKS]
+
+
+# --------------------------------------------------------------------------- #
+# Reading the lists off a page
+# --------------------------------------------------------------------------- #
+
+_ACCORDION = """
+<h3 class="section">Cooking &amp; Eating</h3>
+<ul><li>Dometic 133 litre fridge with freezer compartment</li>
+<li>Flatbed microwave oven</li></ul>
+<h3 class="section">Options</h3>
+<ul><li>Lux Pack (microwave, carpet set, and TV aerial)</li></ul>
+"""
+
+_HEADING = re.compile(r'<h3 class="section">(.*?)</h3>', re.S)
+_OPTIONAL = re.compile(r"\s*options?\b", re.I)
+
+
+def test_sectioned_equipment_splits_the_options_off() -> None:
+    equipment = habitation.sectioned_equipment(
+        _ACCORDION, heading=_HEADING, optional_heading=_OPTIONAL
+    )
+
+    assert equipment.standard == (
+        "Dometic 133 litre fridge with freezer compartment",
+        "Flatbed microwave oven",
+    )
+    assert equipment.optional == ("Lux Pack (microwave, carpet set, and TV aerial)",)
+
+
+def test_what_sits_above_the_first_heading_is_read_only_when_asked() -> None:
+    """A page's head is where the navigation lives, so it is opt-in and needs `inside`."""
+    page = '<ul class="nav"><li>Caravans</li></ul>' + _ACCORDION
+
+    default = habitation.sectioned_equipment(
+        page, heading=_HEADING, optional_heading=_OPTIONAL
+    )
+    assert "Caravans" not in default.standard
+
+    everything = habitation.sectioned_equipment(
+        page, heading=_HEADING, optional_heading=_OPTIONAL, include_head=True
+    )
+    assert "Caravans" in everything.standard
+
+
+def test_a_container_pattern_keeps_the_navigation_out_of_the_head() -> None:
+    page = (
+        '<ul class="nav"><li>Caravans</li></ul>'
+        '<ul class="key-features"><li>End washroom with separate shower</li></ul>'
+        + _ACCORDION
+    )
+    inside = re.compile(r'<ul class="key-features">(.*?)</ul>', re.S)
+
+    equipment = habitation.sectioned_equipment(
+        page,
+        heading=_HEADING,
+        optional_heading=_OPTIONAL,
+        inside=inside,
+        include_head=True,
+    )
+
+    assert "End washroom with separate shower" in equipment.standard
+    assert "Caravans" not in equipment.standard
+
+
+def test_a_page_with_no_headings_at_all_is_read_as_one_list() -> None:
+    equipment = habitation.sectioned_equipment(
+        "<ul><li>Truma Combi 6E heating</li></ul>",
+        heading=_HEADING,
+        optional_heading=_OPTIONAL,
+    )
+
+    assert equipment.standard == ("Truma Combi 6E heating",)
+    assert equipment.optional == ()

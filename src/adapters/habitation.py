@@ -34,6 +34,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from html import unescape
 from typing import Any
 
 from ..product_model.enums import BathroomLayout, BedType, Heating, Refrigeration
@@ -250,6 +251,22 @@ _AIR_DUCTING = re.compile(
 )
 
 
+def _first_match_about_heating(
+    lines: Iterable[str], pattern: re.Pattern[str]
+) -> str | None:
+    """`_first_match`, preferring a line that is actually about the heating.
+
+    The value is the same either way — both passes use the same pattern — but the quote
+    is not, and a reviewer reads the quote. Swift's Conqueror list names a radiator on
+    "Towel rail above radiator (model specific)" long before "Alde radiator central
+    heating and water heating with daily programming with LCD touchscreen control". Both
+    settle it as wet; only the second is worth showing.
+    """
+    lines = list(lines)
+    about_heating = [line for line in lines if _ANY_HEATING.search(line)]
+    return _first_match(about_heating, pattern) or _first_match(lines, pattern)
+
+
 def heating_from(lines: Iterable[str]) -> tuple[Heating, str] | None:
     """`(Heating, the line that said so)`, or `None` when the type is not settled.
 
@@ -259,9 +276,9 @@ def heating_from(lines: Iterable[str]) -> tuple[Heating, str] | None:
     different situations — see `heating_is_unclear`.
     """
     usable = usable_lines(lines)
-    if wet_line := _first_match(usable, _WET_CENTRAL):
+    if wet_line := _first_match_about_heating(usable, _WET_CENTRAL):
         return Heating.WET_CENTRAL, wet_line
-    if warm_line := _first_match(usable, _WARM_AIR):
+    if warm_line := _first_match_about_heating(usable, _WARM_AIR):
         return Heating.BLOWN_AIR, warm_line
 
     # The weak tier, and only on a line that is talking about heating — see
@@ -344,9 +361,16 @@ def microwave_offered(lines: Iterable[str]) -> str | None:
 #: exactly the case the requester described as qualifying, *"a clear separation within one
 #: room"*, so the distinction between a permanent wall and a movable one is not one FMLV
 #: draws. `separat(e|ed|es|ing|ion|able)` all inflect from the same stem.
+#: The separating word has to be **qualifying the shower or the toilet**, which means it
+#: has to sit next to one. The window was 40 characters and spanned a comma, which let
+#: Swift's "Washroom and shower tray with foldaway washbasin and black separate vanity
+#: unit" read as a separated washroom: the word "separate" there belongs to the vanity
+#: unit and the shower is a clause away. Fifteen characters and no comma still admits
+#: every real phrasing seen — "separate cassette toilet", "separated from the toilet",
+#: "toilet and separate shower", Laika's "separable shower".
 _SEPARATE_BATHROOM = re.compile(
-    r"\bsepara(?:te|ted|tes|ting|tion|ble)\b[^.]{0,40}\b(?:shower|toilet|wc)\b"
-    r"|\b(?:shower|toilet|wc)\b[^.]{0,40}\bsepara(?:te|ted|tes|ting|tion|ble)\b",
+    r"\bsepara(?:te|ted|tes|ting|tion|ble)\b[^.,]{0,15}\b(?:shower|toilet|wc)\b"
+    r"|\b(?:shower|toilet|wc)\b[^.,]{0,15}\bsepara(?:te|ted|tes|ting|tion|ble)\b",
     re.I,
 )
 
@@ -507,7 +531,21 @@ _SEATING = re.compile(r"\blounge\b|\bdinette\b|\bsettee\b|\bseating\b", re.I)
 #: Lines that mention a bed without describing the vehicle's sleeping arrangement — an
 #: accessory, or a bed used as a landmark. Rimor's "Twin bed divider with steps. By
 #: night, a handy step for climbing into bed…" is the case in point.
-_NOT_A_BED = re.compile(r"\bdivider\b|\bstep for climbing\b|\bbed linen\b|\bmattress\b", re.I)
+#:
+#: **A door and a window are landmarks too**, and Swift's long lists are full of them:
+#: "External service doors - access under nearside front bed and larger access door under
+#: fixed beds" is about storage, and "Curtains to all windows (except kitchen, washroom
+#: and bunk bed windows)" is about curtains. Read as beds they gave the Conqueror a fixed
+#: bed and the Sprite bunks off lines describing neither.
+#:
+#: Lighting is deliberately **not** here: Dethleffs evidence the Globetrail 600 KS's bunks
+#: with "Light strip on the underside of the upper bunk bed, on both sides", which is a
+#: real statement that the bunks exist.
+_NOT_A_BED = re.compile(
+    r"\bdivider\b|\bstep for climbing\b|\bbed linen\b|\bmattress\b"
+    r"|\b(?:service|access) doors?\b|\bcurtains?\b|\bblinds?\b|\bflyscreens?\b",
+    re.I,
+)
 
 
 def bed_types_from(lines: Iterable[str]) -> tuple[list[BedType], list[str]]:
@@ -588,3 +626,90 @@ def features_from(lines: Iterable[str]) -> dict[str, Feature]:
     if bed_types:
         features["bed_types"] = Feature(bed_types, " / ".join(quotes))
     return features
+
+
+# --- Getting the lines off a page ----------------------------------------------------
+#
+# Almost every British manufacturer publishes its standard equipment the same way: an
+# accordion of headed sections, each holding a plain `<ul>`, with an "Options" or
+# "Optional upgrades" section among them. Only the markup differs, so the shape of the
+# reading lives here with the vocabulary rather than being copied into each adapter.
+
+
+@dataclass(frozen=True)
+class Equipment:
+    """A page's bulleted equipment, split by whether the vehicle actually has it.
+
+    The split is **structural — by the section a line sits in — and it has to be.**
+    `usable_lines` already discards a line that marks itself as an extra, and on some
+    pages every extra does say so. On others none of them do: Bailey's Endeavour offers
+    a "Pop-top roof to create additional high level double bed" and Swift's Sprite a
+    "Lux Pack (microwave, carpet set, and TV aerial)", neither carrying a marker of any
+    kind. Read as standard, the first gives a campervan an over-cab bed it has not got
+    and the second a microwave. Reading the heading costs nothing and does not depend on
+    a copywriter staying tidy.
+    """
+
+    standard: tuple[str, ...] = ()
+    optional: tuple[str, ...] = ()
+
+
+_LIST_ITEM = re.compile(r"<li\b[^>]*>(.*?)</li>", re.S)
+
+
+def plain_text(fragment: str) -> str:
+    """One list item or heading as a person reads it: no markup, no entities, one line."""
+    return " ".join(unescape(re.sub(r"<[^>]+>", " ", fragment)).split())
+
+
+def list_items(fragment: str, *, inside: re.Pattern[str] | None = None) -> list[str]:
+    """Every `<li>` in `fragment`, as text.
+
+    `inside` narrows it to lists in a particular container — pass one where a region
+    holds navigation or breadcrumbs as well, which is the usual reason to need it. The
+    pattern's **last group** is taken as the container's contents.
+    """
+    regions = [match.groups()[-1] for match in inside.finditer(fragment)] if inside else [fragment]
+    return [text for region in regions for item in _LIST_ITEM.findall(region) if (text := plain_text(item))]
+
+
+def sectioned_equipment(
+    page: str,
+    *,
+    heading: re.Pattern[str],
+    optional_heading: re.Pattern[str],
+    inside: re.Pattern[str] | None = None,
+    include_head: bool = False,
+    until: re.Pattern[str] | None = None,
+) -> Equipment:
+    """A page's headed equipment sections, split into what is fitted and what is offered.
+
+    `heading` matches one section's heading and captures its text in group 1; each
+    section runs from its own heading to the next. `optional_heading` decides which
+    sections are upgrades rather than equipment. `include_head` also reads whatever
+    sits above the first heading, which is where a brand may put a summary — Bailey
+    state the washroom's shape only in theirs — and which needs `inside` to be set,
+    since the head of a page is also where the navigation lives.
+
+    `until` bounds the **last** section, which otherwise runs to the end of the document
+    and swallows the page footer: Swift's "Newsletter", "Terms and Conditions", "Privacy"
+    and "Site map" all arrived as equipment before this existed. Harmless where the last
+    section is the options one, as it happens to be on every Swift page — and not
+    something to leave resting on that.
+    """
+    sections = list(heading.finditer(page))
+    if not sections:
+        return Equipment(tuple(dict.fromkeys(list_items(page, inside=inside))))
+
+    end_of_page = len(page)
+    if until and (edge := until.search(page, sections[-1].end())):
+        end_of_page = edge.start()
+
+    standard = list_items(page[: sections[0].start()], inside=inside) if include_head else []
+    optional: list[str] = []
+    for index, section in enumerate(sections):
+        end = sections[index + 1].start() if index + 1 < len(sections) else end_of_page
+        body = page[section.end() : end]
+        target = optional if optional_heading.match(plain_text(section.group(1))) else standard
+        target.extend(list_items(body, inside=inside))
+    return Equipment(tuple(dict.fromkeys(standard)), tuple(dict.fromkeys(optional)))

@@ -13,11 +13,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from src.adapters import habitation
 from src.adapters.swift import (
+    END_OF_EQUIPMENT,
     HIGH_TOP_ABOVE_MM,
+    NOT_STANDARD_SECTION,
+    SECTION_HEADING,
     SwiftProduct,
     _MARKUP,
+    _build_extracted_motorhome,
     _reconciles,
+    equipment_for,
     find_base_vehicle,
     find_body_type,
     find_elevating_roof_models,
@@ -29,7 +35,7 @@ from src.adapters.swift import (
     parse_range_page,
     range_and_model,
 )
-from src.product_model.enums import BodyType
+from src.product_model.enums import BodyType, Heating, Refrigeration
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -624,3 +630,133 @@ def test_an_undetermined_body_type_still_records_provenance() -> None:
     assert "campervan" in provenance.snippet
     assert "Ford Transit panel van in Grey Matter" in provenance.snippet
     assert "four campervan" in provenance.snippet
+
+
+# --------------------------------------------------------------------------- #
+# The equipment lists, and the habitation findings read from them
+# --------------------------------------------------------------------------- #
+
+
+def _equipment(page: str) -> habitation.Equipment:
+    return habitation.sectioned_equipment(
+        page,
+        heading=SECTION_HEADING,
+        optional_heading=NOT_STANDARD_SECTION,
+        until=END_OF_EQUIPMENT,
+    )
+
+
+def _built(page: str, *, slug: str, index_path: str, model: str) -> object:
+    equipment = _equipment(page)
+    products = parse_range_page(page, slug=slug, index_path=index_path)
+    product = next(item for item in products if item.model == model)
+    return _build_extracted_motorhome(
+        product,
+        "https://example.test",
+        payload_basis="the quick guide agrees",
+        equipment=equipment_for(
+            model, equipment, models_on_the_page=[item.model for item in products]
+        ),
+        offered=equipment.optional,
+    )
+
+
+def test_the_options_section_is_kept_out_of_the_standard_equipment() -> None:
+    equipment = _equipment(KON_TIKI)
+
+    assert equipment.standard and equipment.optional
+    assert not [line for line in equipment.standard if "Air suspension" in line]
+    assert [line for line in equipment.optional if "Air suspension" in line]
+
+
+def test_a_line_swift_qualify_but_do_not_attribute_is_read_for_nobody() -> None:
+    equipment = _equipment(KON_TIKI)
+    kept = equipment_for("774", equipment, models_on_the_page=["774", "794"])
+
+    assert [line for line in equipment.standard if "(model specific)" in line]
+    assert not [line for line in kept if "(model specific)" in line]
+
+
+def test_a_line_naming_layouts_is_kept_only_for_those_layouts() -> None:
+    equipment = _equipment(KON_TIKI)
+    models = [
+        item.model
+        for item in parse_range_page(KON_TIKI, slug="swift-kon-tiki", index_path="motorhomes")
+    ]
+
+    def has_island(model: str) -> bool:
+        kept = equipment_for(model, equipment, models_on_the_page=models)
+        return any("Rise and fall rear island bed" in line for line in kept)
+
+    assert has_island("794")  # "(794 & 894)"
+    assert not has_island("740")
+
+
+def test_an_except_qualifier_drops_the_layout_it_names_and_keeps_the_rest() -> None:
+    equipment = habitation.Equipment(
+        standard=("Storage shelf in the washroom (except 845)",)
+    )
+
+    assert equipment_for("845", equipment, models_on_the_page=["835", "845"]) == ()
+    assert equipment_for("835", equipment, models_on_the_page=["835", "845"]) == (
+        "Storage shelf in the washroom (except 845)",
+    )
+
+
+def test_a_parenthetical_naming_no_layout_is_not_a_qualifier() -> None:
+    equipment = habitation.Equipment(
+        standard=("Curtains to all windows (except the kitchen)",)
+    )
+
+    assert equipment_for("845", equipment, models_on_the_page=["835", "845"]) == (
+        "Curtains to all windows (except the kitchen)",
+    )
+
+
+def test_the_kon_tiki_habitation_is_read_from_the_range_page() -> None:
+    extracted = _built(KON_TIKI, slug="swift-kon-tiki", index_path="motorhomes", model="774")
+    motorhome = extracted.motorhome
+
+    assert motorhome.heating is Heating.WET_CENTRAL
+    assert motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert motorhome.shower_toilet_separated is True
+    assert motorhome.microwave is True
+    assert "Alde" in extracted.provenance["heating"].snippet
+
+
+def test_the_beds_are_left_to_the_reviewer() -> None:
+    """Swift describe the range's furniture, not a layout's sleeping arrangement."""
+    extracted = _built(KON_TIKI, slug="swift-kon-tiki", index_path="motorhomes", model="774")
+
+    assert extracted.motorhome.bed_types == []
+    assert "bed_types" not in extracted.provenance
+
+
+def test_the_trekker_van_names_no_microwave_anywhere() -> None:
+    extracted = _built(
+        TREKKER_VAN, slug="swift-trekker", index_path="campervans", model="X"
+    )
+
+    assert extracted.motorhome.microwave is None
+    assert "no microwave anywhere" in extracted.provenance["microwave"].snippet
+
+
+def test_a_separate_vanity_unit_does_not_separate_the_washroom() -> None:
+    """The Trekker's only "separate" is the vanity unit, a clause away from the shower."""
+    extracted = _built(
+        TREKKER_VAN, slug="swift-trekker", index_path="campervans", model="X"
+    )
+
+    assert extracted.motorhome.shower_toilet_separated is None
+
+
+def test_habitation_is_left_alone_when_no_equipment_is_supplied() -> None:
+    products = parse_range_page(KON_TIKI, slug="swift-kon-tiki", index_path="motorhomes")
+    extracted = _build_extracted_motorhome(
+        products[0], "https://example.test", payload_basis="the quick guide agrees"
+    )
+
+    assert extracted.motorhome.heating is None
+    assert extracted.motorhome.refrigeration is None
+    assert extracted.motorhome.microwave is None
+    assert "microwave" not in extracted.provenance

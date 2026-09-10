@@ -63,7 +63,6 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from html import unescape
 from pathlib import Path
 
 from ..fetch.http import Fetcher
@@ -188,64 +187,35 @@ def _hero_price(html: str) -> int | None:
 #: kinds on a page: the "Key Features" summary near the top, whose `<ul>` carries the
 #: class itself, and one collapsible section per area of the vehicle further down, each
 #: wrapping its `<ul>` in a `<div>` that carries it. The backreference takes whichever
-#: opened the block; neither ever nests another of the same tag.
+#: opened the block; neither ever nests another of the same tag. Naming the container is
+#: also what keeps the page's navigation out of the summary — see `habitation.list_items`.
 _BULLETS = re.compile(
     r'<(div|ul)\b[^>]*class="[^"]*\bbullet-points\b[^"]*"[^>]*>(.*?)</\1>', re.S
 )
-_LIST_ITEM = re.compile(r"<li\b[^>]*>(.*?)</li>", re.S)
 
-#: One collapsible section of the specification, from its heading to the next one. The
-#: `b3b` class is what tells these headings apart from the page's other `<h4>`s (the
-#: price, the share links, the model's own name).
-_SECTION = re.compile(
-    r'<h4\b[^>]*class="b3b[^"]*"[^>]*>(.*?)</h4>(.*?)(?=<h4\b[^>]*class="b3b|\Z)', re.S
-)
+#: One collapsible section of the specification. The `b3b` class is what tells these
+#: headings apart from the page's other `<h4>`s (the price, the share links, the name).
+_SECTION_HEADING = re.compile(r'<h4\b[^>]*class="b3b[^"]*"[^>]*>(.*?)</h4>', re.S)
 
 #: `OPTIONAL UPGRADES` on the motorhomes and campervans, `OPTIONAL EXTRAS` on the
 #: caravans. Everything in one is an upgrade, whether or not the individual line says so.
 _OPTIONAL_SECTION = re.compile(r"\s*optional\b", re.I)
 
 
-def _text(fragment: str) -> str:
-    """One list item or heading as a person reads it: no markup, no entities, one line."""
-    return " ".join(unescape(re.sub(r"<[^>]+>", " ", fragment)).split())
-
-
-def _bullet_lines(fragment: str) -> list[str]:
-    return [text for _tag, body in _BULLETS.findall(fragment) for item in _LIST_ITEM.findall(body) if (text := _text(item))]
-
-
-@dataclass(frozen=True)
-class BaileyEquipment:
-    """A page's bulleted equipment, split by whether the vehicle actually has it.
-
-    The split is **structural — by which section a line sits in — and it has to be.**
-    `habitation.usable_lines` already drops a line that marks itself as an option, and on
-    the Adamo every upgrade does say "(Retailer fit)". The Endeavour does not: its
-    optional list offers a "Pop-top roof to create additional high level double bed" with
-    no marker at all, so a campervan with no over-cab bed would have gained one. Reading
-    the heading costs nothing and does not depend on Bailey's copywriting staying tidy.
-    """
-
-    standard: tuple[str, ...] = ()
-    optional: tuple[str, ...] = ()
-
-
-def parse_equipment(page: str) -> BaileyEquipment:
+def parse_equipment(page: str) -> habitation.Equipment:
     """Everything the page's bulleted lists say, split into fitted and offered.
 
     Anything above the first section heading — in practice the "Key Features" summary —
     counts as standard, which is where the washroom's shape is stated: "Spacious end
     washroom with separate shower and wardrobe" appears there and nowhere else.
     """
-    sections = list(_SECTION.finditer(page))
-    head = page[: sections[0].start()] if sections else page
-    standard = _bullet_lines(head)
-    optional: list[str] = []
-    for section in sections:
-        target = optional if _OPTIONAL_SECTION.match(_text(section.group(1))) else standard
-        target.extend(_bullet_lines(section.group(2)))
-    return BaileyEquipment(tuple(dict.fromkeys(standard)), tuple(dict.fromkeys(optional)))
+    return habitation.sectioned_equipment(
+        page,
+        heading=_SECTION_HEADING,
+        optional_heading=_OPTIONAL_SECTION,
+        inside=_BULLETS,
+        include_head=True,
+    )
 
 
 def find_model_urls(range_html: str, path: str) -> list[str]:
@@ -397,7 +367,7 @@ MICROWAVE_OPTIONAL_NOTE = (
 def _build_extracted_motorhome(
     product: BaileyProduct,
     source_url: str,
-    equipment: BaileyEquipment | None = None,
+    equipment: habitation.Equipment | None = None,
 ) -> ExtractedMotorhome:
     """One model as a `Motorhome`, plus the provenance a reviewer sees beside each field.
 
