@@ -81,7 +81,7 @@ is automatic-only. Selected that way the self-check passes exactly.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from html import unescape
 from pathlib import Path
@@ -90,6 +90,7 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://elddis.co.uk"
@@ -779,9 +780,136 @@ def _hero_price(html: str) -> int | None:
     return int(match.group(1).replace(",", "")) if match else None
 
 
+# --- Equipment, for the habitation findings ------------------------------------------
+
+#: One "Highlights" section's heading — Drive, Comfort, Cook, Entertain, Practical,
+#: Style, Wash, and last of all Technical Specification. The class is what tells these
+#: apart from the page's other bold spans; Elddis render them inside the accordion's own
+#: `<button>`, so there is no heading element to anchor on.
+_SECTION_HEADING = re.compile(
+    r'<span[^>]*class="[^"]*text-left text-black"[^>]*>(.*?)</span>', re.S
+)
+
+#: The one Highlights section that is not equipment: the figures this adapter already
+#: reads properly through `spec_fields`, plus the footnotes. Reading it as prose put
+#: "Model: Autoquest APEX 196+" and "Note 11: *Standard steel wheels…" into the
+#: equipment.
+_NOT_EQUIPMENT_SECTION = re.compile(r"\s*technical specification", re.I)
+
+#: Where the Highlights accordion stops. The last section otherwise runs on into the
+#: options block and the enquiry form.
+_END_OF_EQUIPMENT = re.compile(r"ADDITIONAL OPTIONS AVAILABLE", re.I)
+
+#: Elddis bullet their equipment as `<p>` blocks of `•`-prefixed lines separated by
+#: `<br />`. There is no list element anywhere on the page, so `habitation.list_items`
+#: finds nothing and `_text_lines` — which already flattens every tag to a newline — does
+#: the job instead. The bullet character is stripped so it does not reach a reviewer
+#: inside a quoted snippet.
+_BULLET = re.compile(r"^[•·*\-\s]+")
+
+
+def _equipment_lines(fragment: str) -> list[str]:
+    return [
+        stripped
+        for line in _text_lines(fragment)
+        if (stripped := _BULLET.sub("", line).strip())
+    ]
+
+
+#: A line whose *first* words name the layouts it is about: "105,115 & 120 layouts use
+#: Dometic RCS 10,5S compressor fridge:", "150 Layout uses Dometic RML 10.4S…". Every
+#: Elddis page lists all four of the range's fridges this way, so without this the
+#: Autoquest Apex 196+ was reported with the 105/115/120 layouts' fridge.
+_LAYOUTS_PREFIX = re.compile(r"^\s*((?:CV\s*)?\d+[\d,&\s]*?)\s*layouts?\s+uses?\b", re.I)
+
+#: A bracketed qualifier that is about which layouts a line applies to — "(Available for
+#: model 255, 285 and 295)", "(selected models)", "(select models only)". A parenthetical
+#: with none of these words is not a qualifier: "Dometic series 10 fridge across all
+#: layouts (250 & 295 - 133ltrs / 255 - 177ltrs / 285 - 98ltrs)" is a list of capacities
+#: on a line that says outright it applies to everything.
+_LAYOUT_QUALIFIER = re.compile(
+    r"\(([^)]*\b(?:available for|selected|select|models?|layouts?)\b[^)]*)\)", re.I
+)
+
+#: A layout code inside a qualifier.
+_LAYOUT_CODE = re.compile(r"\b(CV\s*\d+|\d+)\b", re.I)
+
+
+def _same_layout(code: str) -> str:
+    """A layout code in the form both the copy and `_model_code` can be compared in.
+
+    `196P` is this adapter's spelling of the site's `196+`, and the marketing copy writes
+    plain `196` — it never distinguishes the two. So the trailing `P` comes off, and a
+    `CV 20` written with a space closes up.
+    """
+    return re.sub(r"\s+", "", code).upper().removesuffix("P")
+
+
+def equipment_for(model: str, lines: Iterable[str]) -> tuple[str, ...]:
+    """`lines`, narrowed to the ones true of the layout `model`.
+
+    Every Elddis model page carries the **whole range's** equipment copy and says which
+    layouts each line is about, in two different grammars — a leading "155, 185, & 196
+    layouts use…" and a trailing "(Available for model 255, 285 and 295)". Both are read,
+    and a qualifier naming no layout at all ("(select models only)") drops the line for
+    everyone, since the page does not say who it means.
+    """
+    wanted = _same_layout(model)
+    kept: list[str] = []
+    for line in lines:
+        qualifiers = [match.group(1) for match in _LAYOUT_QUALIFIER.finditer(line)]
+        if prefix := _LAYOUTS_PREFIX.match(line):
+            qualifiers.append(prefix.group(1))
+        if not qualifiers:
+            kept.append(line)
+            continue
+        named = {
+            _same_layout(code)
+            for qualifier in qualifiers
+            for code in _LAYOUT_CODE.findall(qualifier)
+        }
+        if wanted in named:
+            kept.append(line)
+    return tuple(kept)
+
+
+def parse_equipment(page: str) -> habitation.Equipment:
+    """The Highlights accordion's equipment copy.
+
+    No `optional` half: Elddis publish their extras as priced package cards rather than
+    as a section of the same list, and `ADDITIONAL OPTIONS AVAILABLE` is where the
+    reading stops. So a microwave absence here rests on the standard copy alone.
+    """
+    return habitation.sectioned_equipment(
+        page,
+        heading=_SECTION_HEADING,
+        optional_heading=_NOT_EQUIPMENT_SECTION,
+        until=_END_OF_EQUIPMENT,
+        items=_equipment_lines,
+    )
+
+
+#: How each habitation reading is introduced.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heating listed in the page's own Highlights",
+    "refrigeration": "the fridge listed in the page's own Highlights",
+    "microwave": "a microwave listed in the page's own Highlights",
+    "shower_toilet_separated": "the washroom as the Highlights describe it",
+}
+
+
 def _build_extracted_motorhome(
-    product: ElddisProduct, source_url: str
+    product: ElddisProduct,
+    source_url: str,
+    equipment: tuple[str, ...] = (),
 ) -> ExtractedMotorhome:
+    """One model as a `Motorhome`, plus the provenance a reviewer sees beside each field.
+
+    `equipment` is the page's Highlights copy narrowed to this layout by `equipment_for`.
+    What it settles about the habitation reaches the reviewer as **findings** rather than
+    proposals; see `product_model.findings`.
+    """
+    features = habitation.features_from(equipment)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -798,6 +926,18 @@ def _build_extracted_motorhome(
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
         body_type=product.body_type,
+        # Habitation, from the page's Highlights — reported as findings rather than
+        # proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        microwave=features["microwave"].value if "microwave" in features else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -902,6 +1042,23 @@ def _build_extracted_motorhome(
         + ". Paired with the range above: together they name this vehicle",
     )
 
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "read from the page")
+        record(name, f"{note}: {feature.snippet}")
+    if equipment and "microwave" not in features:
+        # Left unset, so `findings.SILENCE_MEANS` supplies the recommendation and its own
+        # wording. Elddis publish their extras as priced package cards rather than in
+        # this list, so the absence rests on the standard copy alone — said plainly.
+        record(
+            "microwave",
+            "no microwave in the page's Highlights. Elddis price their extras as "
+            "separate packages rather than listing them here, so this is the standard "
+            "specification saying nothing rather than an exhaustive list denying one",
+        )
+    if unclear := habitation.heating_is_unclear(equipment):
+        if "heating" not in features:
+            record("heating", f"heating is listed but its kind is not named: {unclear}")
+
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
@@ -928,7 +1085,7 @@ def collect(
         raise RuntimeError(message)
     sitemap_xml = sitemap.file_path.read_text(encoding="utf-8", errors="replace")
 
-    parsed: list[tuple[ElddisProduct, str]] = []
+    parsed: list[tuple[ElddisProduct, str, tuple[str, ...]]] = []
     results: list[ExtractedMotorhome] = []
     expected_by_type: dict[str, int] = {"motorhome": 0, "campervan": 0}
 
@@ -962,7 +1119,9 @@ def collect(
                 )
                 continue
 
-            parsed.append((product, model_url))
+            parsed.append(
+                (product, model_url, equipment_for(product.model, parse_equipment(html).standard))
+            )
             collected_here += 1
 
         if collected_here != len(model_urls):
@@ -979,7 +1138,7 @@ def collect(
         else {}
     )
 
-    for product, model_url in parsed:
+    for product, model_url, equipment in parsed:
         product = apply_brochure_weights(product, brochure, on_progress=on_progress)
 
         # Deliberately after the override, so the brochure's figures are checked by the
@@ -1003,7 +1162,7 @@ def collect(
                 f"left blank rather than guessed"
             )
 
-        results.append(_build_extracted_motorhome(product, model_url))
+        results.append(_build_extracted_motorhome(product, model_url, equipment))
 
     _cross_check_roster(http, expected_by_type, ranges, on_progress)
 
@@ -1012,7 +1171,7 @@ def collect(
 
 
 def _evolve_weights_look_copied(
-    parsed: list[tuple[ElddisProduct, str]],
+    parsed: list[tuple[ElddisProduct, str, tuple[str, ...]]],
     on_progress: Callable[[str], None] = lambda message: None,
 ) -> bool:
     """Whether the website is still publishing base-range weights on its Evolve pages.
@@ -1034,7 +1193,7 @@ def _evolve_weights_look_copied(
     collects no base range, and assuming the bug is still present is the safe default,
     since it costs a download rather than a wrong weight.
     """
-    by_key = {(p.manufacturer_range, p.model): p for p, _ in parsed}
+    by_key = {(p.manufacturer_range, p.model): p for p, *_rest in parsed}
     compared = copied = 0
     for (manufacturer_range, model), product in by_key.items():
         base_range = _EVOLVE_BASE_RANGES.get(manufacturer_range)

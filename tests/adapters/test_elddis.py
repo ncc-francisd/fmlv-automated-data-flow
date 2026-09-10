@@ -37,6 +37,7 @@ import pytest
 from src.adapters.elddis import (
     DEFAULT_RANGES,
     MANUFACTURER,
+    _build_extracted_motorhome,
     _kilograms,
     _leading_int,
     _millimetres,
@@ -45,13 +46,15 @@ from src.adapters.elddis import (
     _text_lines,
     apply_brochure_weights,
     count_index_cards,
+    equipment_for,
     find_brochure_url,
     find_model_urls,
     parse_brochure_weights,
+    parse_equipment,
     parse_model_page,
     spec_fields,
 )
-from src.product_model.enums import BodyType
+from src.product_model.enums import BodyType, Heating, Refrigeration
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -924,3 +927,121 @@ def test_default_ranges_cover_every_segment_with_an_fmlv_range():
 
     segments = {path.partition("/")[2] for path, _ in DEFAULT_RANGES}
     assert segments == set(_SEGMENT_RANGES)
+
+
+# --------------------------------------------------------------------------------------
+# The Highlights copy, and the habitation findings read from it
+# --------------------------------------------------------------------------------------
+
+APEX_196P = ("elddis_autoquest_apex_196p.html", "autoquest-apex", False)
+AVALON_250 = ("elddis_avalon_250.html", "avalon", False)
+CV20 = ("elddis_autoquest_cv20.html", "autoquest-cv", True)
+
+
+def _findings(case: tuple[str, str, bool]):
+    name, segment, is_campervan = case
+    page = _fixture(name)
+    product = _parse(name, segment=segment, is_campervan=is_campervan)
+    return _build_extracted_motorhome(
+        product,
+        "https://example.test",
+        equipment_for(product.model, parse_equipment(page).standard),
+    )
+
+
+def test_the_bulleted_highlights_are_read_even_though_no_list_element_exists() -> None:
+    """Elddis bullet with `•` and `<br />` inside a `<p>`, so `<li>` finds nothing."""
+    lines = parse_equipment(_fixture(APEX_196P[0])).standard
+
+    assert "Microwave as standard" in lines
+    assert not [line for line in lines if line.startswith("•")]
+
+
+def test_the_technical_specification_section_is_not_read_as_equipment() -> None:
+    """Its figures are `spec_fields`' job, and its footnotes are prose."""
+    lines = parse_equipment(_fixture(APEX_196P[0])).standard
+
+    assert not [line for line in lines if line.startswith("Model:")]
+    assert not [line for line in lines if line.startswith("Note ")]
+
+
+def test_the_options_block_is_where_the_reading_stops() -> None:
+    lines = parse_equipment(_fixture(APEX_196P[0])).standard
+
+    assert not [line for line in lines if "Black cab colour option" in line]
+
+
+def test_a_line_naming_other_layouts_is_not_read_for_this_one() -> None:
+    """Every page lists all four of the range's fridges, one line per layout group."""
+    lines = parse_equipment(_fixture(APEX_196P[0])).standard
+    kept = equipment_for("196P", lines)
+
+    assert [line for line in kept if line.startswith("155, 185, & 196 layouts")]
+    assert not [line for line in kept if line.startswith("105,115 & 120 layouts")]
+
+
+def test_a_bracketed_qualifier_naming_other_layouts_is_dropped_too() -> None:
+    """The Avalon 250 is not one of the models with a separate shower cubicle."""
+    lines = parse_equipment(_fixture(AVALON_250[0])).standard
+    kept = equipment_for("250", lines)
+
+    assert [line for line in lines if "Fully-lined separate shower cubicle" in line]
+    assert not [line for line in kept if "Fully-lined separate shower cubicle" in line]
+    assert _findings(AVALON_250).motorhome.shower_toilet_separated is None
+
+
+def test_a_qualifier_naming_no_layout_at_all_is_read_for_nobody() -> None:
+    """"(select models only)" — the page does not say which."""
+    kept = equipment_for("250", ("Shower cubicles with dual drain (select models only)",))
+
+    assert kept == ()
+
+
+def test_a_parenthetical_that_is_not_about_layouts_leaves_the_line_alone() -> None:
+    line = "Dometic series 10 fridge across all layouts (250 & 295 - 133ltrs / 255 - 177ltrs)"
+
+    assert equipment_for("250", (line,)) == (line,)
+    assert equipment_for("285", (line,)) == (line,)
+
+
+def test_the_apex_habitation_is_read_from_its_highlights() -> None:
+    extracted = _findings(APEX_196P)
+    motorhome = extracted.motorhome
+
+    assert motorhome.heating is Heating.BLOWN_AIR
+    assert motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert motorhome.microwave is True
+    assert "CompleteHeat Whale" in extracted.provenance["heating"].snippet
+
+
+def test_alde_makes_the_avalon_wet_central() -> None:
+    extracted = _findings(AVALON_250)
+
+    assert extracted.motorhome.heating is Heating.WET_CENTRAL
+    assert "Alde" in extracted.provenance["heating"].snippet
+
+
+def test_a_page_naming_no_microwave_says_where_the_extras_live() -> None:
+    extracted = _findings(CV20)
+
+    assert extracted.motorhome.microwave is None
+    assert "separate packages" in extracted.provenance["microwave"].snippet
+
+
+def test_dometics_own_frozen_compartment_evidences_the_freezer() -> None:
+    extracted = _findings(APEX_196P)
+
+    assert extracted.motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert "Frozen compartment" in extracted.provenance["refrigeration"].snippet
+
+
+def test_habitation_is_left_alone_when_no_equipment_is_supplied() -> None:
+    extracted = _build_extracted_motorhome(
+        _parse(APEX_196P[0], segment=APEX_196P[1], is_campervan=APEX_196P[2]),
+        "https://example.test",
+    )
+
+    assert extracted.motorhome.heating is None
+    assert extracted.motorhome.refrigeration is None
+    assert extracted.motorhome.microwave is None
+    assert "microwave" not in extracted.provenance

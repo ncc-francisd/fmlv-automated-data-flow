@@ -32,7 +32,7 @@ Two rules run through all of it:
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from html import unescape
 from typing import Any
@@ -108,7 +108,15 @@ def _first_match(lines: Iterable[str], pattern: re.Pattern[str]) -> str | None:
 #: fridge, because the same page routinely abbreviates: Rimor's Sarus 66 Plus summary
 #: says "141 L fridge" while its specification list says "141L fridge with freezer
 #: compartment". Reading the summary alone would silently downgrade it.
-_FREEZER = re.compile(r"\bfreezer\b|\bfreezer compartment\b|\bfridge[-/ ]freezer\b", re.I)
+#:
+#: **`frozen compartment` is Dometic's own label** and Elddis quote it verbatim —
+#: "Capacity 92L / Refrigerator compartment - 80,3L / Frozen compartment 12,1L". Without
+#: it every Elddis fridge fell through to the assumption below, which reaches the same
+#: answer but tells a reviewer the page did not say when it plainly did.
+_FREEZER = re.compile(
+    r"\bfreezer\b|\bfreezer compartment\b|\bfridge[-/ ]freezer\b|\bfrozen compartment\b",
+    re.I,
+)
 
 #: A page saying there is **no** freezer. This is now the only thing that makes a plain
 #: `fridge`, so it has to catch the ways a spec denies one — "no freezer", "without a
@@ -542,7 +550,7 @@ _SEATING = re.compile(r"\blounge\b|\bdinette\b|\bsettee\b|\bseating\b", re.I)
 #: with "Light strip on the underside of the upper bunk bed, on both sides", which is a
 #: real statement that the bunks exist.
 _NOT_A_BED = re.compile(
-    r"\bdivider\b|\bstep for climbing\b|\bbed linen\b|\bmattress\b"
+    r"\bdivider\b|\bstep for climbing\b|\bbed linen\b|\bmattress(?:es)?\b"
     r"|\b(?:service|access) doors?\b|\bcurtains?\b|\bblinds?\b|\bflyscreens?\b",
     re.I,
 )
@@ -681,6 +689,7 @@ def sectioned_equipment(
     inside: re.Pattern[str] | None = None,
     include_head: bool = False,
     until: re.Pattern[str] | None = None,
+    items: Callable[[str], list[str]] | None = None,
 ) -> Equipment:
     """A page's headed equipment sections, split into what is fitted and what is offered.
 
@@ -696,20 +705,25 @@ def sectioned_equipment(
     and "Site map" all arrived as equipment before this existed. Harmless where the last
     section is the options one, as it happens to be on every Swift page — and not
     something to leave resting on that.
+
+    `items` replaces the default `<li>` reading, for a brand that bullets its equipment
+    some other way. Elddis need it: their lists are `<p>` blocks of `•`-prefixed lines
+    separated by `<br />`, with no list element anywhere on the page.
     """
+    read = items or (lambda fragment: list_items(fragment, inside=inside))
     sections = list(heading.finditer(page))
     if not sections:
-        return Equipment(tuple(dict.fromkeys(list_items(page, inside=inside))))
+        return Equipment(tuple(dict.fromkeys(read(page))))
 
     end_of_page = len(page)
     if until and (edge := until.search(page, sections[-1].end())):
         end_of_page = edge.start()
 
-    standard = list_items(page[: sections[0].start()], inside=inside) if include_head else []
+    standard = read(page[: sections[0].start()]) if include_head else []
     optional: list[str] = []
     for index, section in enumerate(sections):
         end = sections[index + 1].start() if index + 1 < len(sections) else end_of_page
         body = page[section.end() : end]
         target = optional if optional_heading.match(plain_text(section.group(1))) else standard
-        target.extend(list_items(body, inside=inside))
+        target.extend(read(body))
     return Equipment(tuple(dict.fromkeys(standard)), tuple(dict.fromkeys(optional)))

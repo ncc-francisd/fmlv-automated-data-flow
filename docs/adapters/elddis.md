@@ -604,6 +604,64 @@ instead. Regression test:
 This is the failure mode `README.md` warns about from the other direction — a check that
 cries wolf on a legitimate run trains a reviewer to ignore it.
 
+## The habitation findings — 10 September 2026
+
+Elddis publish no floorplan drawing, but every model page carries a **Highlights**
+accordion — Drive, Comfort, Cook, Entertain, Practical, Style, Wash, and last of all
+Technical Specification — and the four factual habitation fields fall out of it:
+
+| range | heating | fridge | microwave |
+| --- | --- | --- | --- |
+| Autoquest Apex, Whirlwind GT | "CompleteHeat Whale 4.7 kW Dual-fuel … ducted heating throughout" → blown air | Dometic RMS10,5XG | "Microwave as standard" |
+| Avalon | "Alde 24-hr multi-programmable central and water heating system" → wet | Dometic series 10 | "800W Microwave with microwave isolation switch" |
+| Whirlwind GTV | "Truma Combi 4 Gas heating" → blown air | Thetford T1090 90L | none named |
+
+Two structural things about the source, both of which needed code:
+
+**There is no list element on the page.** Elddis bullet with a literal `•` and `<br />`
+inside a `<p>`, so `habitation.list_items` finds nothing. `parse_equipment` passes the
+adapter's own `_text_lines` — which already flattens every tag to a newline — as the item
+reader, and strips the bullet so it does not reach a reviewer inside a quoted snippet.
+
+**The Technical Specification section is excluded.** Read as prose it put
+"Model: Autoquest APEX 196+" and "Note 11: *Standard steel wheels on Peugeot models are
+15"…" into the equipment. Its figures are `spec_fields`' job and are read properly there.
+
+### Every page carries the whole range's copy, and says which layouts each line is for
+
+This is the important one, and it produced two wrong findings before it was handled.
+Elddis qualify in two different grammars, and `equipment_for` reads both:
+
+| the page says | what happens |
+| --- | --- |
+| `155, 185, & 196 layouts use Dometic RMS10,5XG…` | kept for those layouts only |
+| `(Available for model 255, 285 and 295)` | kept for those layouts only |
+| `(select models only)`, `(selected models)` | dropped for **everyone** — the page does not say which |
+| `Dometic series 10 fridge across all layouts (250 & 295 - 133ltrs / 255 - 177ltrs)` | not a layout qualifier; those are capacities. Kept |
+
+Without it the Autoquest Apex 196+ was reported with the 105/115/120 layouts' fridge —
+the first of the four groups the page lists, and not its own — and the **Avalon 250 was
+reported with a separated washroom** off "Fully-lined separate shower cubicle - (Available
+for model 255, 285 and 295)", which names the three layouts that are not it.
+
+Comparison is on the layout code with a trailing `P` removed, because `196P` is this
+adapter's spelling of the site's `196+` and the marketing copy writes plain `196`.
+
+### One thing the shared vocabulary had wrong
+
+Elddis quote Dometic's own label — "Capacity 92L / Refrigerator compartment - 80,3L /
+**Frozen compartment** 12,1L" — and `habitation._FREEZER` only knew the word "freezer".
+Every Elddis fridge therefore fell through to the assumption that an unstated freezer is
+probably there, which reaches the same answer but tells a reviewer the page did not say
+when it plainly did.
+
+### The microwave absence is weaker here than on Bailey or Hymer
+
+Elddis price their extras as separate **package cards** rather than as a section of the
+same list, so `parse_equipment` has no `optional` half to check and the reading stops at
+`ADDITIONAL OPTIONS AVAILABLE`. A microwave absence therefore rests on the standard copy
+alone, and the note says so rather than claiming the page denies one.
+
 ## Open items
 
 Both body-type questions are **closed**, confirmed by the requester on 21 August 2026: the
