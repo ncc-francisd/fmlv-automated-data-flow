@@ -254,8 +254,11 @@ _ANY_HEATING = re.compile(r"\bheating\b|\bheater\b|\bheat exchanger\b", re.I)
 #: leaves open. Filtered out of the heating reading entirely — including the "unclear"
 #: narration, since it is not the line anyone needs to see.
 _AUXILIARY_HEATER = re.compile(
-    r"\bauxiliar(?:y|ies)\b|\bsupplementary\b|\bbooster\b|\bsecond(?:ary)? heater\b"
-    r"|\bfrost protection\b|\bengine[- ]driven\b",
+    # `booster` has to carry its own noun. Knaus's "ALDE hot water heater including
+    # booster" is one appliance with a boost element, not two heaters, and matching the
+    # bare word threw away the line that names their whole heating system.
+    r"\bauxiliar(?:y|ies)\b|\bsupplementary\b|\bbooster heat(?:er|ing)\b"
+    r"|\bsecond(?:ary)? heater\b|\bfrost protection\b|\bengine[- ]driven\b",
     re.I,
 )
 

@@ -584,3 +584,49 @@ type, bed type and lounge position are all out-of-scope layout flags in
 `config/field_guide_motorhome.csv`, and the adapter attempts none of them. But the images
 are a genuine reference for a human filling those columns in by hand, and worth knowing
 about.
+
+## The habitation findings — 10 September 2026
+
+KNAUS attribute these better than any other manufacturer this project reads, and it
+costs no extra fetch: the price lists already downloaded for the belted-seat count mark
+**every fitting per layout** in the margin.
+
+```
+402767   Refrigerator 142 ltr.                    s  s  s  -  -
+402602   Compressor refrigerator 150 ltr. (incl. 17 ltr. freezer compartment) …
+                                                  -  -  -  s  s
+351166   Heating TRUMA Combi 6                    s  s  s  -  -
+354173   Diesel heating TRUMA Combi 6 D           -  -  -  s  s
+352533-01 ALDE hot water heating incl. booster … 2.429,-   o  o  o  o  o
+453505-15 Longitudinal washroom with shower       s  s  -  s  -
+```
+
+`s` is fitted, `o` is a priced option, `-` is not available for that layout. So the same
+per-column reading the numeric rows already get applies to the equipment rows, guarded
+the same way: **a row is used only when its marks number exactly the page's stated
+roster**, because pypdf gives no coordinates here and a short row would otherwise borrow
+its neighbour's. `_pl_standard_equipment` does it, and the part number and any trailing
+price are stripped so the reviewer reads the equipment rather than the tariff.
+
+Most brands publish one equipment list for a range and leave the reader to guess which
+layout gets what. KNAUS print the answer, and it shows: within the L!VE WAVE the 650s
+get a Truma Combi 6 and a 142-litre fridge while the 700s get the diesel Combi 6 D and
+the 150-litre compressor, and only the 700 DX gets the separate shower.
+
+**A wrapped row still counts.** Where a label runs past the column the marks land alone
+on the next line — `402985-06 Cooker-sink combination … (Dependencies:` / `ABH049)` /
+`- - - - s`. The label is rejoined from the lines above rather than the row dropped,
+because on the L!VE WAVE list the wrapped rows include the 700 MEG's only fridge.
+
+### One thing the shared vocabulary had wrong
+
+`habitation._AUXILIARY_HEATER` matched a bare `booster`, which threw away the SKY TI
+VW's "ALDE hot water heater including **booster** (DIESEL)" — one appliance with a boost
+element, not two heaters — and left the range reading wet off a floor-heating row
+instead. The word now has to carry its own noun: `booster heater`, `booster heating`.
+
+### The microwave
+
+Not one appears in any price-list column. A KNAUS list itemises every fitting with a
+part number and marks it per layout, so silence there is an answer rather than an
+omission, and the note says exactly that.

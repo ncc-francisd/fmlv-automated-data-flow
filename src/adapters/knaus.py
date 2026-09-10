@@ -113,6 +113,7 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.knaus.com"
@@ -341,6 +342,9 @@ class KnausProduct:
     mtplm_price_list: int | None = None
     berths: int | None = None
     mh_passenger_seats_inc_driver: int | None = None
+    #: The equipment rows this layout's own column of the price list marks `s`, for the
+    #: habitation findings. See `_pl_standard_equipment`.
+    standard_equipment: tuple[str, ...] = ()
 
     @property
     def label(self) -> str:
@@ -475,10 +479,13 @@ def find_price_list_url(page_html: str) -> str | None:
 
 @dataclass(frozen=True)
 class PriceListRow:
-    """The two fields read out of a price list, for one layout."""
+    """What is read out of a price list for one layout."""
 
     belts_in_driving_direction: int | None = None
     mtplm_kilograms: int | None = None
+    #: The equipment rows this layout's column marks `s`, for the habitation findings.
+    #: See `_pl_standard_equipment`.
+    standard_equipment: tuple[str, ...] = ()
 
 
 @dataclass
@@ -533,6 +540,65 @@ def _pl_row_values(page_text: str, label_pattern: str, count: int) -> list[str] 
     return values if len(values) == count else None
 
 
+#: An equipment row and its per-layout availability marks: `402767 Refrigerator 142 ltr.
+#: s s s - -`. `s` is fitted as standard, `o` is a priced option, `-` is not available
+#: for that layout — so these rows say, per column, exactly what the technical-data rows
+#: above say per column, and the same roster count guards them.
+#:
+#: This is the whole reason Knaus's habitation findings are attributable at all. Most
+#: brands publish one equipment list for a range and leave the reader to guess which
+#: layout gets what; Knaus print the answer in the margin.
+_PL_AVAILABILITY = re.compile(r"^(?P<label>.*?\S)((?:\s+[so-])+)\s*$")
+
+#: A row's own part number, stripped from the front of the quoted line. Two of them
+#: sometimes, where a layout takes a different part: `202392 221013 Seat heating`.
+_PL_PART_NUMBER = re.compile(r"^(?:\d{5,6}(?:-\d{1,2})?\s+){1,2}")
+
+#: The trailing price a priced row carries before its marks: `... 1 693,-`. Removed from
+#: the quote so a reviewer reads the equipment rather than the tariff.
+_PL_ROW_PRICE = re.compile(r"\s+\d[\d .]*,-\s*$")
+
+#: A row whose label ran past the column, leaving its marks alone on the next line:
+#: "402985-06 Cooker-sink combination … (Dependencies:" / "ABH049)" / "- - - - s". The
+#: label is rejoined from the lines above rather than the row being dropped, because on
+#: the L!VE WAVE list the wrapped rows include the 700 MEG's only fridge.
+_PL_MARKS_ONLY = re.compile(r"^[so-](?:\s+[so-])*$")
+
+
+def _pl_standard_equipment(page_text: str, count: int) -> list[list[str]]:
+    """The rows each of `count` columns marks `s`, in document order, one list per column.
+
+    A row is used only when its marks number exactly the page's stated roster — the same
+    guard `_pl_row_values` applies to the numeric rows, and for the same reason: pypdf
+    gives no coordinates here, so a short row would otherwise borrow its neighbour's.
+    """
+    columns: list[list[str]] = [[] for _ in range(count)]
+    pending: list[str] = []
+    for raw in page_text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        marks_only = _PL_MARKS_ONLY.match(line)
+        match = None if marks_only else _PL_AVAILABILITY.match(line)
+        if marks_only is None and match is None:
+            # A label that ran past the column, or ordinary prose. Kept in case the
+            # marks turn up on their own line below — see `_PL_MARKS_ONLY`.
+            pending = (pending + [line])[-3:]
+            continue
+        marks = (marks_only or match).group(0 if marks_only else 2).split()
+        label = " ".join(pending) if marks_only else match.group("label")
+        pending = []
+        if len(marks) != count:
+            continue
+        label = _PL_ROW_PRICE.sub("", _PL_PART_NUMBER.sub("", label)).strip()
+        if not label:
+            continue
+        for index, mark in enumerate(marks):
+            if mark == "s":
+                columns[index].append(label)
+    return columns
+
+
 def parse_price_list(pdf_path: Path, url: str) -> PriceList:
     """`parse_price_list_pages` over a real PDF. The PDF read is all this adds."""
     return parse_price_list_pages(
@@ -564,6 +630,9 @@ def parse_price_list_pages(pages: Iterable[str], url: str) -> PriceList:
 
         belts = _pl_row_values(text, re.escape(_BELTS_IN_DRIVING_DIRECTION), count)
         mtplm = _pl_row_values(text, re.escape(_MTPLM), count)
+        # Read off the unflattened page: the availability marks are a trailing run on
+        # each row's own line, and `text` above has joined every line into one.
+        equipment = _pl_standard_equipment(page_text, count)
         for index, model in enumerate(models):
             key = (range_label, model)
             existing = price_list.rows.get(key, PriceListRow())
@@ -574,11 +643,30 @@ def parse_price_list_pages(pages: Iterable[str], url: str) -> PriceList:
                 mtplm_kilograms=(
                     _thousands(mtplm[index]) if mtplm else existing.mtplm_kilograms
                 ),
+                standard_equipment=existing.standard_equipment + tuple(equipment[index]),
             )
     return price_list
 
 
+#: How each habitation reading is introduced. The wording says which document, because
+#: everything else this adapter records comes off the website and these do not.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heater this layout's price-list column marks as standard",
+    "refrigeration": "the fridge this layout's price-list column marks as standard",
+    "microwave": "a microwave this layout's price-list column marks as standard",
+    "shower_toilet_separated": "the washroom this layout's price-list column marks",
+    "bed_types": "the beds this layout's price-list column marks as standard",
+}
+
+
 def _build_extracted_motorhome(product: KnausProduct, price_list_url: str | None) -> ExtractedMotorhome:
+    """One layout as a `Motorhome`, plus the provenance a reviewer sees beside each field.
+
+    The habitation fields come from `product.standard_equipment` — the price list's own
+    per-layout `s` marks — and reach the reviewer as **findings** rather than proposals;
+    see `product_model.findings`.
+    """
+    features = habitation.features_from(product.standard_equipment)
     card = product.card
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -597,6 +685,19 @@ def _build_extracted_motorhome(product: KnausProduct, price_list_url: str | None
         berths=product.berths,
         body_type=product.body_type,
         year=card.year,
+        # Habitation, from the price list's per-layout marks — reported as findings
+        # rather than proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        bed_types=features["bed_types"].value if "bed_types" in features else [],
+        microwave=features["microwave"].value if "microwave" in features else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -710,6 +811,28 @@ def _build_extracted_motorhome(product: KnausProduct, price_list_url: str | None
         f"are '{product.label}'",
         url=_layout_index_url(card.category),
     )
+
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "the price list")
+        record(name, f"{note}: {feature.snippet}", url=price_list_url)
+    if product.standard_equipment and "microwave" not in features:
+        # Left unset, so `findings.SILENCE_MEANS` supplies the recommendation and its
+        # own wording. A KNAUS price list itemises every fitting with a part number and
+        # marks it per layout, so a microwave in none of those rows is not one they fit.
+        record(
+            "microwave",
+            "no microwave in this layout's price-list column. Every fitting KNAUS offer "
+            "is a numbered row marked s, o or - per layout, so its absence is an answer "
+            "rather than an omission",
+            url=price_list_url,
+        )
+    if unclear := habitation.heating_is_unclear(product.standard_equipment):
+        if "heating" not in features:
+            record(
+                "heating",
+                f"a heater is marked as standard but its kind is not named: {unclear}",
+                url=price_list_url,
+            )
 
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
@@ -947,6 +1070,7 @@ def collect(
                 mtplm_price_list=row.mtplm_kilograms,
                 berths=product.berths,
                 mh_passenger_seats_inc_driver=row.belts_in_driving_direction,
+                standard_equipment=row.standard_equipment,
             )
             if (
                 row.mtplm_kilograms is not None

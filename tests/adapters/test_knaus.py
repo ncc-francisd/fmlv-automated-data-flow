@@ -37,7 +37,7 @@ from src.adapters.knaus import (
     parse_price_list_pages,
     parse_spec_rows,
 )
-from src.product_model.enums import BodyType
+from src.product_model.enums import BodyType, Heating, Refrigeration
 from src.product_model.model import Motorhome
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -613,3 +613,101 @@ def test_a_layout_card_without_a_technical_data_link_is_dropped() -> None:
 def test_an_empty_index_yields_nothing_rather_than_raising() -> None:
     assert parse_layout_index("", "motorhomes") == []
     assert parse_spec_rows("") == []
+
+
+# --------------------------------------------------------------------------- #
+# The habitation findings, from the price list's per-layout marks
+# --------------------------------------------------------------------------- #
+
+LIVE_WAVE = "L!VE WAVE PLATINUM SELECTION"
+SKY_TI_VW = "SKY TI VW"
+
+
+def _row(name: str, range_label: str, model: str) -> PriceListRow:
+    price_list = parse_price_list_pages(_price_list_pages(name), "https://example.test/pl.pdf")
+    return price_list.rows[(range_label, model)]
+
+
+def _findings(name: str, range_label: str, model: str):
+    return _build_extracted_motorhome(
+        KnausProduct(
+            card=_card(range_label, model),
+            standard_equipment=_row(name, range_label, model).standard_equipment,
+        ),
+        "https://example.test/pl.pdf",
+    )
+
+
+def test_a_rows_marks_are_read_per_layout() -> None:
+    """`402767 Refrigerator 142 ltr. s s s - -` — three layouts have it and two do not."""
+    with_it = _row("live_wave", LIVE_WAVE, "650 MG").standard_equipment
+    without = _row("live_wave", LIVE_WAVE, "700 MEG").standard_equipment
+
+    assert "Refrigerator 142 ltr." in with_it
+    assert "Refrigerator 142 ltr." not in without
+
+
+def test_a_row_marked_o_everywhere_is_never_read_as_fitted() -> None:
+    """The L!VE WAVE prices ALDE hot water heating as a £2,429 upgrade on all five."""
+    for model in ("650 MG", "700 DX"):
+        equipment = _row("live_wave", LIVE_WAVE, model).standard_equipment
+        assert not [line for line in equipment if line.startswith("ALDE hot water heating")]
+
+
+def test_a_row_whose_marks_wrapped_onto_their_own_line_is_still_read() -> None:
+    """The 700 MEG's only fridge is on a row whose label ran past the column."""
+    equipment = _row("live_wave", LIVE_WAVE, "700 MEG").standard_equipment
+
+    assert [line for line in equipment if line.startswith("Compressor refrigerator 150 ltr.")]
+
+
+def test_the_part_number_and_price_are_stripped_from_the_quote() -> None:
+    equipment = _row("live_wave", LIVE_WAVE, "650 MG").standard_equipment
+
+    assert "Heating TRUMA Combi 6" in equipment
+    assert not [line for line in equipment if line[:6].isdigit()]
+
+
+def test_the_live_wave_habitation_is_read_from_its_own_column() -> None:
+    extracted = _findings("live_wave", LIVE_WAVE, "650 MG")
+    motorhome = extracted.motorhome
+
+    assert motorhome.heating is Heating.BLOWN_AIR
+    assert motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert "TRUMA Combi 6" in extracted.provenance["heating"].snippet
+
+
+def test_two_layouts_of_one_range_can_differ_on_the_heater() -> None:
+    """`351166 Heating TRUMA Combi 6 s s s - -` against `354173 Diesel … - - - s s`."""
+    assert "TRUMA Combi 6" in _findings("live_wave", LIVE_WAVE, "650 MG").provenance["heating"].snippet
+    assert "Diesel heating" in _findings("live_wave", LIVE_WAVE, "700 DX").provenance["heating"].snippet
+
+
+def test_alde_makes_the_sky_ti_vw_wet_central() -> None:
+    """Its "ALDE hot water heater including booster (DIESEL)" is marked `s`, not `o`."""
+    extracted = _findings("sky_ti_vw", SKY_TI_VW, "650 MEG")
+
+    assert extracted.motorhome.heating is Heating.WET_CENTRAL
+    assert "ALDE hot water heater" in extracted.provenance["heating"].snippet
+
+
+def test_a_separate_shower_room_is_read_only_for_the_layouts_that_have_one() -> None:
+    assert _findings("sky_ti_vw", SKY_TI_VW, "700 DX").motorhome.shower_toilet_separated is True
+    assert _findings("sky_ti_vw", SKY_TI_VW, "650 MEG").motorhome.shower_toilet_separated is None
+
+
+def test_the_microwave_absence_says_what_it_rests_on() -> None:
+    extracted = _findings("live_wave", LIVE_WAVE, "650 MG")
+
+    assert extracted.motorhome.microwave is None
+    assert "numbered row marked s, o or -" in extracted.provenance["microwave"].snippet
+
+
+def test_habitation_is_left_alone_when_no_price_list_covered_the_layout() -> None:
+    extracted = _build_extracted_motorhome(
+        KnausProduct(card=_card(LIVE_WAVE, "650 MG")), None
+    )
+
+    assert extracted.motorhome.heating is None
+    assert extracted.motorhome.refrigeration is None
+    assert "microwave" not in extracted.provenance
