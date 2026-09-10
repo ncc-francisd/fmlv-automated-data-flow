@@ -576,6 +576,72 @@ image like the model pages carry, so the four positional fields point at the PDF
 this the Van 238's positional fields had no row at all, which is what the requester saw on
 7 September 2026: *"I didn't see any flags saying that that wasn't completed."*
 
+## The 2027 catalogue, checked against FMLV — 10 September 2026
+
+The requester obtained `RIM_27_EU_CAT`, the **2026-2027 factory catalogue**, from a
+contact at MNC. It is a factory EU document, not a UK one, and its technical data is
+dated **May 2026**. Nothing in the adapter changed as a result; it was read as a
+cross-check and it is a good one.
+
+**It publishes no prices.** Zero, in 48 pages. That is the third independent
+confirmation of the note above — Rimor publish no price in the HTML, not in the
+leaflets, and not in the catalogue. MNC's remains the only price there is.
+
+### The specification data agrees on 30 of 30 products, across five fields
+
+Every model FMLV holds for 2027 that the catalogue also lists was compared on outside
+length, outside width, maximum outside height, MRO and certified seats. **All thirty
+agree on all five.** For a source read off two websites and checked against a document
+neither of them produced, that is as strong a result as this project has had.
+
+One thing to know before repeating the check: **the certified-seats row reads
+first-figure-wins**, and it is the opposite of the usual convention. The catalogue
+prints `Certified seats 6 / 5`, and footnote 1 explains why — *"the reduction in the
+number of approved seats increases the mass available for the installation of optional
+equipment by 85 kg for each seat removed"*. So the **higher** figure is the approved
+standard and the lower is what you get by deleting a seat to buy payload. That is not
+the Bürstner case, where the upper figure is a paid option; it is its mirror image, and
+taking the lower figure would understate eleven products. The adapter already reads it
+correctly.
+
+### Four Horus layouts are absent from the factory's 2027 line-up
+
+| in FMLV as 2027 | in the 2027 catalogue |
+| --- | --- |
+| Horus 12, 40, 66, Van 238 | **absent** |
+
+The catalogue's Horus range is four layouts — 38, 45, 54 and 95 — against the seven FMLV
+holds. This is the requester's own expectation, from 10 September: *"I think we might
+find a few more models being stood down."*
+
+**It is not proof, and must not be actioned from this document.** The roster is MNC's,
+not the factory's, and MNC's site is what a run reads. Two things have to be true before
+these are archived: MNC has to have dropped them too, and they must not be **renames** —
+Horus 12 and 54 share a 5413mm length, and 38, 40 and 66 all share 5998mm, so the old
+codes could be the new ones under another name. Rimor have renamed a whole line before
+(the Kilig `<n>` → `<n> Plus` move recorded above). Check the claimed disappearances
+against the survivors on length and MRO before believing any of them.
+
+### The five layouts MNC do not sell are confirmed exactly
+
+The catalogue lists five models FMLV has never held: **Horus 45, Kilig 73 Plus, Sarus 50,
+Sarus 69 Plus and Sarus 95 Plus.** That is byte-for-byte the list in the registry note of
+5 September — the layouts the requester confirmed MNC do not list. An independent factory
+document naming exactly those five, and no others, settles the "is the Sarus gap a
+deliberate importer decision or an unfinished page?" question left open above: it is
+deliberate, and the factory builds them for other markets.
+
+### Two smaller things
+
+* **The publisher is Luano Camp S.r.l.** The catalogue's legal page and its chassis
+  disclaimers name Luano Camp throughout, not Rimor. The brand is theirs now. Nothing in
+  FMLV changes — `fmlv_manufacturer` stays `Rimor` — but it explains the domain and is
+  worth knowing before anyone reads a Luano Camp document as a different manufacturer.
+* **The heater is confirmed blown air on all 35.** `Gas heater Combi C4` on Horus, Kilig
+  and Sarus, `Combi C6` on Super Brig and Sailer. The catalogue also gives fridge
+  capacities per layout — 70, 89, 90, 150 and 158 litres — which is finer than anything
+  the websites publish, though the habitation findings do not need it.
+
 ## What is unverified
 
 * **`ncc_supplier_name`** is `Rimor`, inherited from the seed list and **not confirmed**
