@@ -235,13 +235,29 @@ _WARM_AIR = re.compile(
 _WET_CENTRAL = re.compile(
     r"\bwet[- ]central\b|\bwet[- ]system\b|\bwet[- ]heating\b|\balde\b"
     r"|\b(?:hot|warm)[- ]water heating\b|\bheating circuit\b"
-    r"|\bwater[- ]based\b|\bradiator|\bunderfloor heating\b",
+    # `radiator` excludes the **base vehicle's** one. Bürstner's Habiton document lists
+    # "Radiator grille surround, front and rear bumpers painted in vehicle colour", which
+    # is a paint option on a Mercedes and was reading as wet central heating.
+    r"|\bwater[- ]based\b|\bradiator\b(?!\s*(?:grille?|cover|surround|trim))"
+    r"|\bunderfloor heating\b",
     re.I,
 )
 
 #: A heating system of unspecified kind, used only to tell "no heating mentioned" from
 #: "heating mentioned but the type is unclear" — the second is narrated, not proposed.
 _ANY_HEATING = re.compile(r"\bheating\b|\bheater\b|\bheat exchanger\b", re.I)
+
+#: A second heater fitted alongside the real one, which says nothing about what the
+#: vehicle's heating system *is*. Bürstner's Habiton lists "Electric auxiliary warm air
+#: heater" beside a "Diesel hybrid heating (Timberline 1.0)" whose kind it never states;
+#: read as the system, the auxiliary unit would have answered a question the document
+#: leaves open. Filtered out of the heating reading entirely — including the "unclear"
+#: narration, since it is not the line anyone needs to see.
+_AUXILIARY_HEATER = re.compile(
+    r"\bauxiliar(?:y|ies)\b|\bsupplementary\b|\bbooster\b|\bsecond(?:ary)? heater\b"
+    r"|\bfrost protection\b|\bengine[- ]driven\b",
+    re.I,
+)
 
 #: **How the plumbing gives a system away**, from the requester on 10 September 2026:
 #: *"If the spec sheet mentions fluid capacity (litres), a circulation pump, or glycol, it
@@ -285,8 +301,13 @@ def heating_from(lines: Iterable[str]) -> tuple[Heating, str] | None:
     heating system: Swift's Conqueror lists "Towel rail above radiator", Auto-Trail's
     Frontier "Washroom area radiator". Where such a page also says "Blown air heating
     outlets", the blown air is the answer and the towel rail is a fitting.
+
+    An **auxiliary** heater is discarded outright — see `_AUXILIARY_HEATER`. It is a
+    second unit alongside the real one, so it answers nothing about the system.
     """
-    usable = usable_lines(lines)
+    usable = [
+        line for line in usable_lines(lines) if not _AUXILIARY_HEATER.search(line)
+    ]
     about_heating = [line for line in usable if _ANY_HEATING.search(line)]
 
     for scope in (about_heating, usable):
@@ -310,11 +331,18 @@ def heating_is_unclear(lines: Iterable[str]) -> str | None:
 
     Worth narrating: it means the vocabulary above needs a phrase adding, rather than the
     manufacturer having said nothing.
+
+    A bare `Heating` is a section heading, not a statement, so a line that says something
+    is preferred — Bürstner's Habiton document has both, and "Diesel hybrid heating
+    (Timberline 1.0) with control panel" is the line whose kind nobody could name.
     """
-    usable = usable_lines(lines)
+    usable = [
+        line for line in usable_lines(lines) if not _AUXILIARY_HEATER.search(line)
+    ]
     if heating_from(usable) is not None:
         return None
-    return _first_match(usable, _ANY_HEATING)
+    substantive = [line for line in usable if len(line.split()) > 2]
+    return _first_match(substantive, _ANY_HEATING) or _first_match(usable, _ANY_HEATING)
 
 
 # --- Microwave -----------------------------------------------------------------------

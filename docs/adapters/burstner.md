@@ -496,6 +496,58 @@ the layouts are rendered by the page's JS bundle. Getting them needs `BrowserFet
 which this adapter otherwise has no use for. Until then the Signature habitation fields
 have to come from the brochure or from EHG.
 
+## The habitation findings — 10 September 2026
+
+The section above still describes the source correctly: the per-layout equipment tables
+mark availability with **vector graphics that do not survive extraction**, so the item
+names come through and the ticks do not. The Habiton page offers both a "90L compressor
+refrigerator (7L freezer compartment)" and a "Compressor refrigerator, 69 l" with nothing
+left in the text to say which of HM 6.0 and HM 6.1 gets which.
+
+So only what is true of **every layout in the document** is reported, and that is two
+things:
+
+* **`refrigeration`** — from the technical-data row `Refrigerator volume incl. freezer
+  (approx. l)`, whose own label states the answer. A refrigerator whose volume is quoted
+  *including* a freezer has one, whatever the litres, and the litres per column are
+  quoted to the reviewer as the evidence. This closes the "not safe for Signature"
+  caveat above from a different direction: the question is no longer which named fridge
+  a layout gets, only whether the row exists.
+* **`heating`** — one document is one range on one chassis, and Bürstner fit it one
+  heating system. B66 and the Signature SFT name "Truma Combi 6E gas / electrical";
+  the Habiton names "Diesel hybrid heating (Timberline 1.0) with control panel", whose
+  kind it never states, and that is **narrated rather than guessed**.
+
+`bed_types` is deliberately not reported for the reason the section above gives: B66 C
+alone names four different beds across three layouts.
+
+### The priced tables have to be split off, and the Signature is why
+
+Read whole, a document gets the Signature's heating exactly backwards. Its standard
+`Heating` section names a **Truma Combi 6E**, which is blown air; its options table sells
+`Hot water heating (Diesel) with integrated 10-litre boiler and 3000 W electric heating`
+under part number 711045, which is wet. Neither line marks itself as anything —
+`habitation._OPTION` sees no price on the line and no "option:" — so the only signal is
+the `Optional equipment` / `Accessories` table heading, and `standard_lines` cuts there.
+
+### Two things the shared vocabulary had wrong, both found here
+
+* **The base vehicle has a radiator too.** The Habiton lists "Radiator grille surround,
+  front and rear bumpers painted in vehicle colour", a paint option on a Mercedes, and it
+  was reading as wet central heating. `radiator` now refuses a following grille, cover,
+  surround or trim.
+* **An auxiliary heater is not the system.** The Habiton's "Electric auxiliary warm air
+  heater" would have answered blown air for a vehicle whose real heater the document
+  never classifies. Auxiliary, supplementary, booster and frost-protection heaters are
+  now discarded before the heating is read at all — including from the "unclear"
+  narration, since they are not the line anyone needs to see.
+
+### The microwave
+
+The word appears nowhere in any of the five documents, and these documents price every
+accessory Bürstner sell for the range. So the absence is recorded with that reasoning
+attached, and `findings.SILENCE_MEANS` supplies the recommendation.
+
 ## What is still unconfirmed
 
 - Whether the Signature and B66 PDFs (June 2026 edition) have since been superseded by an

@@ -61,9 +61,10 @@ from pathlib import Path
 
 from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
-from ..product_model.enums import BodyType
+from ..product_model.enums import BodyType, Refrigeration
 from ..product_model.model import Motorhome
 from . import ehg_configurator
+from . import habitation
 from .base import (
     ExtractedMotorhome,
     Provenance,
@@ -493,6 +494,10 @@ class BurstnerProduct:
     #: which is what the upper figure of a `4 - 5` seats row costs. `False` does not mean
     #: the upper figure is standard — only that this document does not price it.
     extra_belted_seat_optional: bool = False
+    #: The whole document's lines, for the habitation findings. **Document-wide, not
+    #: per column**, which is the whole reason so little is reported from them — see
+    #: `_habitation_findings`.
+    document_lines: tuple[str, ...] = ()
 
     @property
     def label(self) -> str:
@@ -523,6 +528,9 @@ def parse_document(text: str, config: _DocumentConfig) -> tuple[list[BurstnerPro
     # `DOCUMENTS` when the two disagree — `docs/adapters/README.md`'s rule that the
     # manufacturer's own current publication wins — and the make it displaced is kept
     # so the snippet can tell a reviewer the two did not agree.
+    document_lines = tuple(
+        stripped for line in text.splitlines() if (stripped := line.strip())
+    )
     extra_seat_optional = _EXTRA_BELTED_SEAT.search(text) is not None
     chassis = published_chassis(text)
     base_vehicle = chassis[0] if chassis else config.base_vehicle_manufacturer
@@ -597,6 +605,7 @@ def parse_document(text: str, config: _DocumentConfig) -> tuple[list[BurstnerPro
                     seats_overstate_standard=config.seats_overstate_standard,
                     berths=berths_pair[0] if berths_pair else None,
                     berths_published=berths_pair[1] if berths_pair else None,
+                    document_lines=document_lines,
                 )
             )
     return products, len(blocks)
@@ -698,9 +707,86 @@ def _fetch_floorplans(
     return plans
 
 
+# --- The habitation findings ---------------------------------------------------------
+
+#: Why so little is reported from a Bürstner document. The standard-equipment pages list
+#: a range's whole menu with a tick per column, and **the ticks do not survive the text
+#: extraction** — the Habiton page offers both a "90L compressor refrigerator (7L freezer
+#: compartment)" and a "Compressor refrigerator, 69 l" with nothing left in the text to
+#: say which of HM 6.0 and HM 6.1 gets which. That is the unattributable-spans problem
+#: `docs/adapters/README.md` warns about, and the honest response is to report only what
+#: is true of every layout in the document.
+_UNATTRIBUTABLE_NOTE = (
+    "read from the document as a whole rather than from this layout's column: "
+    "Bürstner's standard-equipment pages mark each layout with a tick, and the ticks do "
+    "not survive extraction from the PDF"
+)
+
+#: The specification row that settles the fridge, and the one habitation fact this
+#: document does attribute per column. Its label states the answer on its own — a
+#: refrigerator whose volume is quoted *including* a freezer has a freezer — so the row's
+#: presence is the finding and the figures in it are the evidence.
+_FRIDGE_ROW = re.compile(
+    r"^Refrigerator volume incl\. freezer.*$", re.IGNORECASE | re.MULTILINE
+)
+
+
+#: Where a document's standard equipment ends. Everything past it is priced — the
+#: `Optional equipment` table and the `Accessories` table that follows it — and reading
+#: it as fitted got the Signature's heating exactly backwards: its standard `Heating`
+#: section names `Truma Combi 6E gas / electrical`, blown air, and its options table
+#: sells `Hot water heating (Diesel) with integrated 10-litre boiler`, wet, under part
+#: number 711045. Neither line marks itself; the table heading is the only signal.
+_END_OF_STANDARD = re.compile(r"^\s*(?:Optional equipment|Accessories)\s*$")
+
+
+def standard_lines(lines: tuple[str, ...]) -> tuple[str, ...]:
+    """`lines` up to the first priced table, which is where the fitted equipment ends."""
+    for index, line in enumerate(lines):
+        if _END_OF_STANDARD.match(line):
+            return lines[:index]
+    return lines
+
+
+def _habitation_findings(
+    lines: tuple[str, ...],
+) -> tuple[dict[str, habitation.Feature], str | None]:
+    """`({field: Feature}, the unclear-heating line)` for one document.
+
+    Only `heating` and `refrigeration` are taken, and both because they are **range-wide
+    facts**: one document is one range built on one chassis with one heater, and the
+    fridge row states a freezer whatever the litres. Everything else the equipment pages
+    name — the beds above all — varies layout by layout and cannot be attributed, so it
+    is left to the drawing.
+    """
+    found: dict[str, habitation.Feature] = {}
+    lines = standard_lines(lines)
+    if heater := habitation.heating_from(lines):
+        found["heating"] = habitation.Feature(
+            heater[0],
+            heater[1],
+            note=(
+                "the heater this document names. One document is one range on one "
+                "chassis, and Bürstner fit it one heating system"
+            ),
+        )
+    if row := _FRIDGE_ROW.search("\n".join(lines)):
+        found["refrigeration"] = habitation.Feature(
+            Refrigeration.FRIDGE_FREEZER,
+            row.group(0).strip(),
+            note=(
+                "the specification's own row, whose label states the answer — a "
+                "refrigerator volume quoted *including* the freezer has one. The "
+                "litres are per layout, in the table's column order"
+            ),
+        )
+    return found, habitation.heating_is_unclear(lines)
+
+
 def _build_extracted_motorhome(
     product: BurstnerProduct, source_url: str, floorplan_url: str | None = None
 ) -> ExtractedMotorhome:
+    features, heating_unclear = _habitation_findings(product.document_lines)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -717,6 +803,13 @@ def _build_extracted_motorhome(
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
         body_type=product.body_type,
+        # Habitation, from the document as a whole — reported as findings rather than
+        # proposed, so the pipeline never writes them. See `_habitation_findings` for
+        # why only these two are taken.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
     )
 
     provenance: dict[str, Provenance] = {}
@@ -844,6 +937,36 @@ def _build_extracted_motorhome(
         provenance["berths"] = Provenance(
             source_url=source_url,
             snippet=f"{product.label} — Sleeping berths standard / max.: {product.berths_published}",
+        )
+
+    for name, feature in features.items():
+        provenance[name] = Provenance(
+            source_url=source_url,
+            snippet=(
+                f"{product.label} — {feature.note or _UNATTRIBUTABLE_NOTE}: "
+                f"{feature.snippet}"
+            ),
+        )
+    if product.document_lines and "heating" not in features and heating_unclear:
+        provenance["heating"] = Provenance(
+            source_url=source_url,
+            snippet=(
+                f"{product.label} — a heater is listed but its kind is not named: "
+                f"{heating_unclear}"
+            ),
+        )
+    if product.document_lines:
+        # Left unset, so `findings.SILENCE_MEANS` supplies the recommendation and its
+        # own wording. These documents price every accessory Bürstner sell, so a
+        # microwave that appears in neither the standard nor the accessory tables is
+        # not one they offer.
+        provenance["microwave"] = Provenance(
+            source_url=source_url,
+            snippet=(
+                f"{product.label} — the word 'microwave' appears nowhere in this "
+                f"range's prices-and-technical-data document, which prices every "
+                f"accessory Bürstner sell for it"
+            ),
         )
 
     # The positional fields no technical-data table settles — and Bürstner's settle none:

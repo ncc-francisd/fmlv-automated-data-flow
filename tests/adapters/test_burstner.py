@@ -7,12 +7,13 @@ here; `fetch.pdf` is covered in `tests/fetch/test_pdf.py`.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from src.adapters import burstner
-from src.product_model.enums import BodyType
+from src.product_model.enums import BodyType, Heating, Refrigeration
 
 from src.adapters.burstner import (
     DOCUMENTS,
@@ -709,3 +710,102 @@ def test_no_drawing_means_no_pointers() -> None:
     )
 
     assert not [e for e in extracted.provenance.values() if e.reviewer_reference]
+
+
+# --------------------------------------------------------------------------- #
+# The habitation findings
+# --------------------------------------------------------------------------- #
+
+
+def _first_built(key: str):
+    products, _tables = parse_document(_fixture(key.replace("-", "_")), DOCUMENTS_BY_KEY[key])
+    return _build_extracted_motorhome(products[0], "https://example.test/data.pdf")
+
+
+def test_the_fridge_row_is_read_because_its_own_label_states_the_answer() -> None:
+    """"Refrigerator volume incl. freezer" — a volume quoted including one has one."""
+    extracted = _first_built("b66-c")
+
+    assert extracted.motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    snippet = extracted.provenance["refrigeration"].snippet
+    assert "Refrigerator volume incl. freezer" in snippet
+
+
+def test_the_b66s_truma_combi_reads_as_blown_air() -> None:
+    extracted = _first_built("b66-td")
+
+    assert extracted.motorhome.heating is Heating.BLOWN_AIR
+    assert "Truma Combi" in extracted.provenance["heating"].snippet
+
+
+def test_the_priced_tables_are_not_read_as_fitted() -> None:
+    """The Signature's heating, which the split gets exactly backwards without it.
+
+    Its standard `Heating` section names "Truma Combi 6E gas / electrical" — blown air.
+    Its options table sells "Hot water heating (Diesel) with integrated 10-litre boiler"
+    under part 711045 — wet. Neither line marks itself; only the table heading does.
+    """
+    lines = tuple(
+        line.strip() for line in _fixture("signature_sft").splitlines() if line.strip()
+    )
+    standard = burstner.standard_lines(lines)
+
+    assert [line for line in lines if line.startswith("Hot water heating (Diesel)")]
+    assert not [line for line in standard if line.startswith("Hot water heating (Diesel)")]
+
+    extracted = _first_built("signature-sft")
+    assert extracted.motorhome.heating is Heating.BLOWN_AIR
+    assert "Truma Combi 6E" in extracted.provenance["heating"].snippet
+
+
+def test_a_heater_whose_kind_is_unnamed_is_narrated_rather_than_guessed() -> None:
+    """The Habiton's "Diesel hybrid heating (Timberline 1.0)" says neither wet nor air.
+
+    Its "Electric auxiliary warm air heater" would have answered for it, which is why
+    `habitation` discards an auxiliary unit: it is a second heater, not the system.
+    """
+    extracted = _first_built("habiton")
+
+    assert extracted.motorhome.heating is None
+    snippet = extracted.provenance["heating"].snippet
+    assert "its kind is not named" in snippet
+    assert "Timberline" in snippet
+    assert "auxiliary" not in snippet
+
+
+def test_the_base_vehicles_radiator_grille_is_not_a_heating_system() -> None:
+    """The Habiton lists "Radiator grille surround … painted in vehicle colour"."""
+    lines = tuple(
+        line.strip() for line in _fixture("habiton").splitlines() if line.strip()
+    )
+    assert [line for line in lines if line.startswith("Radiator grille")]
+
+    features, _unclear = burstner._habitation_findings(lines)
+    assert "heating" not in features
+
+
+def test_the_beds_are_left_to_the_reviewer() -> None:
+    """The equipment pages name every bed in the range with a tick per layout, and the
+    ticks do not survive the PDF, so no bed can be attributed to a layout."""
+    extracted = _first_built("habiton")
+
+    assert extracted.motorhome.bed_types == []
+    assert "bed_types" not in extracted.provenance
+
+
+def test_the_microwave_absence_says_what_it_rests_on() -> None:
+    extracted = _first_built("b66-td")
+
+    assert extracted.motorhome.microwave is None
+    assert "prices every accessory" in extracted.provenance["microwave"].snippet
+
+
+def test_habitation_is_left_alone_when_the_document_was_not_kept() -> None:
+    products, _tables = parse_document(_fixture("b66_td"), DOCUMENTS_BY_KEY["b66-td"])
+    extracted = _build_extracted_motorhome(
+        replace(products[0], document_lines=()), "https://example.test/data.pdf"
+    )
+
+    assert extracted.motorhome.heating is None
+    assert extracted.motorhome.refrigeration is None
+    assert "microwave" not in extracted.provenance
