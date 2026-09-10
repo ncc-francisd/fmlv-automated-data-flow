@@ -29,6 +29,8 @@ from src.adapters.le_voyageur import (
     LENGTH_TOLERANCE_MM,
     LIGHT_VEHICLE_MODEL,
     MATCH_THRESHOLD,
+    BODY_WIDTHS_MM,
+    INTERIOR_WIDTHS_MM,
     PRICES_BY_SIZE,
     SEATS_FROM_THE_HANDBOOK,
     LeVoyageurProduct,
@@ -42,6 +44,7 @@ from src.adapters.le_voyageur import (
     hold_disagreement,
     parse_model_page,
     plain_text,
+    width_disagreement,
 )
 from src.product_model.enums import BodyType, Heating
 
@@ -144,8 +147,8 @@ def test_a_tag_becomes_a_space_so_a_value_keeps_its_unit() -> None:
     [
         ("le_voyageur_lv6_8lf.html", "Eterna", "LV6.8LF"),
         ("le_voyageur_lv7_0gjf.html", "Eterna", "LV7.0GJF"),
-        ("le_voyageur_lvxh7_6cf.html", "Hertiage", "LVXH7.6 CF"),
-        ("le_voyageur_lvxh8_7gjf.html", "Hertiage", "LVXH8.7 GJF"),
+        ("le_voyageur_lvxh7_6cf.html", "Heritage", "LVXH7.6 CF"),
+        ("le_voyageur_lvxh8_7gjf.html", "Heritage", "LVXH8.7 GJF"),
     ],
 )
 def test_the_model_string_is_normalised_to_what_fmlv_holds(
@@ -170,10 +173,10 @@ def test_the_heading_space_is_removed_on_eterna() -> None:
     assert _parse("le_voyageur_lv7_0gjf.html").model == "LV7.0GJF"
 
 
-def test_the_range_reproduces_fmlvs_own_misspelling() -> None:
-    """`Hertiage` is what the export holds, and the adapter must not quietly fix it."""
-    assert dict(DEFAULT_RANGES)["heritage"] == "Hertiage"
-    assert _parse("le_voyageur_lvxh8_7gjf.html").manufacturer_range == "Hertiage"
+def test_the_range_matches_what_the_export_holds() -> None:
+    """FMLV's transposed spelling was corrected in Nova on 10 September 2026."""
+    assert dict(DEFAULT_RANGES)["heritage"] == "Heritage"
+    assert _parse("le_voyageur_lvxh8_7gjf.html").manufacturer_range == "Heritage"
 
 
 def test_the_match_threshold_clears_a_distinct_layout() -> None:
@@ -287,7 +290,7 @@ def test_a_failed_length_check_does_not_cost_the_other_fields() -> None:
     extracted = _build_extracted_motorhome(product)
 
     assert extracted.motorhome.mh_length_mm is None
-    assert extracted.motorhome.mh_width_mm == 2250
+    assert extracted.motorhome.mh_width_mm == 2320  # body width, from the handbook
     assert extracted.motorhome.mh_payload_kilograms == 770
     assert "mh_length_mm" not in extracted.provenance
 
@@ -506,3 +509,43 @@ def test_the_override_touches_only_the_layout_it_names() -> None:
             extracted.motorhome.mh_passenger_seats_inc_driver
             == product.mh_passenger_seats_inc_driver
         ), name
+
+
+# --------------------------------------------------------------------------- #
+# Width comes from the handbook, because the page prints the interior figure
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [("le_voyageur_lv6_8lf.html", 2300), ("le_voyageur_lvxh8_7gjf.html", 2320)],
+)
+def test_the_recorded_width_is_the_body_width(name: str, expected: int) -> None:
+    """The page's `Width` is the interior measurement; FMLV wants the body."""
+    product = _parse(name)
+    extracted = _build_extracted_motorhome(product)
+
+    assert extracted.motorhome.mh_width_mm == expected
+    assert product.mh_width_mm < expected, "the page's own row is the narrower one"
+
+
+def test_the_width_provenance_explains_why_it_is_not_the_pages_figure() -> None:
+    extracted = _build_extracted_motorhome(_parse("le_voyageur_lvxh8_7gjf.html"))
+    snippet = extracted.provenance["mh_width_mm"].snippet
+
+    assert "232 cm body width" in snippet
+    assert "interior measurement" in snippet
+
+
+def test_both_ranges_have_a_body_width_and_an_interior_width() -> None:
+    assert set(BODY_WIDTHS_MM) == set(INTERIOR_WIDTHS_MM) == {"Eterna", "Heritage"}
+    for name, body in BODY_WIDTHS_MM.items():
+        assert body > INTERIOR_WIDTHS_MM[name], name
+
+
+def test_the_pages_width_row_moving_is_narrated() -> None:
+    """Nothing is recorded from that row, so this is a tripwire, not a correction."""
+    product = _parse("le_voyageur_lvxh8_7gjf.html")
+
+    assert width_disagreement(product) is None
+    assert "re-check" in str(width_disagreement(replace(product, mh_width_mm=2400)))

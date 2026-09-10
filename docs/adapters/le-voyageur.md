@@ -562,15 +562,19 @@ will get this one wrong in a dozen places.
 matched, 4 new, 1 disappeared**, 72 proposals, 122 fields verified unchanged, 22
 findings. Five things the survey could not know, all found by building it.
 
-### FMLV spells the range `Hertiage`, and the adapter reproduces it
+### FMLV spelled the range `Hertiage`, and it was corrected in Nova
 
-The export, fetched once the supplier name arrived, holds **`Hertiage`** — the `i` and
+The export, fetched once the supplier name arrived, held **`Hertiage`** — the `i` and
 `a` transposed — on all four Héritage rows. It also settles the range/model question the
 survey left open: the range letters live in the **model**, and the two ranges use two
 spacings, `LV7.8CF` closed up against `LVXH7.9 CF` with one space.
 
-**The misspelling cannot be corrected from the adapter**, and this is worth understanding
-before anyone "fixes" it. The identity tokeniser splits on the decimal point, so:
+**Corrected 10 September 2026**, in Nova, by the requester — and `DEFAULT_RANGES` was
+flipped to `Heritage` immediately afterwards, with the export re-fetched first to confirm.
+Run #78 still matched 14 of 14, so the two sides moved together cleanly.
+
+**Why they had to move together** is worth understanding before anyone touches that line
+again. The identity tokeniser splits on the decimal point, so:
 
 | pair | score |
 | --- | --- |
@@ -579,8 +583,8 @@ before anyone "fixes" it. The identity tokeniser splits on the decimal point, so
 
 Identical scores, so no threshold tells "renamed" from "a different layout". Emitting the
 correct spelling would let a genuinely new layout claim an existing row on tie-break order
-alone. **Fix it by hand in FMLV**, then change `DEFAULT_RANGES` and the next run matches
-at 1.000.
+alone — and with the spellings disagreed, all four Héritage products would arrive as new
+beside four disappearances. **Re-fetch the export before changing that line.**
 
 That same arithmetic is why the module declares **`MATCH_THRESHOLD = 0.75`**: with the
 range reproduced exactly, true pairs score 1.000 and every false pair is 0.600 or below,
@@ -656,7 +660,24 @@ attempted because `7.5` alone is ambiguous between the CF and the GJF.
   handbook's row names the belt, which is precisely the settled three-point-belt rule's
   own test. `SEATS_FROM_THE_HANDBOOK` carries the one override, and run #77 proposes
   **2 → 4** on that layout alone.
-* **Héritage width.** The site says 2.25 m and FMLV holds 2250, so again nothing is
-  proposed. The handbook calls 225 cm the **interior** width and gives a **body** width of
-  232 cm — and the settled rule wants the body width excluding mirrors. If the handbook is
-  right, all four Héritage rows are 70 mm narrow.
+* ~~**Héritage width.**~~ **Settled 10 September 2026, and it turned out to affect both
+  ranges.** The requester: *"we go with the handbook width... it's defensible as the full
+  body width. It looks like we've taken the internal width by mistake in the past."*
+
+  The handbook prints both measurements in the same table, and the site publishes only
+  the narrower one:
+
+  | range | body width | the narrower row | the page's `Width` | FMLV held |
+  | --- | --- | --- | --- | --- |
+  | Eterna | **230 cm** | `Vehicle width (cm) 224` | 2.24 m | 2240 |
+  | Héritage | **232 cm** | `Interior width of the vehicle (cm) 225` | 2.25 m | 2250 |
+
+  Héritage names its narrower row *interior* outright. Eterna calls the equivalent row
+  `Vehicle width`, but it sits in the same position, it is narrower than the body, and
+  the mirrors-folded figure is 258 cm on both — so it is the same measurement under a
+  looser label, and **Eterna has the same error**. Run #78 proposes the correction on
+  all 18: Eterna 2240 → 2300, Héritage 2250 → 2320.
+
+  The page is therefore not a source for this field at all. `BODY_WIDTHS_MM` supplies
+  it, and `width_disagreement` watches the page's own row purely as a tripwire — if it
+  stops printing the interior figure, the handbook constants need re-checking.

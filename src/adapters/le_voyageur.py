@@ -17,7 +17,7 @@ Four things about this source drive the whole module:
   code, but its spacing does not match FMLV's and the identity tokeniser is brutal about
   it: `LV7.0 GJF` and FMLV's `LV7.0GJF` score **0.25** against each other, so emitting the
   heading as printed would orphan that product. See `_fmlv_model`.
-* **`Hertiage` is FMLV's spelling and this adapter reproduces it.** See `_FMLV_RANGES`.
+* **The range strings must match the export byte for byte.** See `DEFAULT_RANGES`.
 * **Habitation comes from the 2027 handbook, not from the page.** The pages carry
   marketing prose, and on the Héritage 8.7s that prose advertises "ALDE heating" — which
   the handbook prices as a **£2,290 option** against a standard Truma Combi 6E. Reading
@@ -49,19 +49,22 @@ INDEX_URL = f"{BASE_URL}/find-your-motorhome/"
 
 #: `(url path segment, FMLV manufacturer_range)`.
 #:
-#: **`Hertiage` is not a typo here — it is FMLV's own spelling**, transposed from
-#: Heritage, on all four rows the export holds (10 September 2026). The adapter reproduces
-#: it deliberately, because it cannot be corrected from here: the identity tokeniser
-#: scores a same-layout pair whose range spelling differs at **0.600**, and two *different*
-#: layouts in the same range also score 0.600 (`LVXH7.6 CF` against `LVXH7.9 CF`). No
-#: threshold separates "this is the same vehicle, renamed" from "this is a different
-#: vehicle", so proposing the fix risks pairing a new layout onto an existing row.
+#: **These must match the export byte for byte, and a mismatch does not degrade
+#: gracefully.** Until 10 September 2026 FMLV spelled the second range with its `i` and
+#: `a` transposed, and this table reproduced the typo deliberately. The requester
+#: corrected all four rows in Nova that day; the export was re-fetched to confirm before
+#: this line was changed.
 #:
-#: Fixing the spelling is a hand edit in FMLV. When it is done, change this to `Heritage`
-#: and the run after that will match at 1.000 again.
+#: Why the two must move together: the identity tokeniser splits on the decimal point, so
+#: a same-layout pair whose *range* spelling differs scores **0.600** — and two genuinely
+#: different layouts of one range (`LVXH7.6 CF` against `LVXH7.9 CF`) score 0.600 as
+#: well. Nothing separates "renamed" from "a different vehicle". With the spelling
+#: agreed, true pairs score 1.000 and `MATCH_THRESHOLD` excludes the rest; disagreed,
+#: every Héritage product arrives as new beside a disappearance. **Re-fetch the export
+#: before touching this line.**
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("eterna", "Eterna"),
-    ("heritage", "Hertiage"),
+    ("heritage", "Heritage"),
 )
 _FMLV_RANGES = dict(DEFAULT_RANGES)
 
@@ -81,7 +84,7 @@ LENGTH_TOLERANCE_MM = 100
 #: Base vehicle per range. `Fiat AL-KO` and `MERCEDES` are what the pages print; AL-KO is
 #: the chassis maker rather than the base vehicle and must never reach FMLV, and Mercedes
 #: is never written `Mercedes-Benz` in this role. Both go through `fmlv_base_vehicle`.
-_BASE_VEHICLES = {"Eterna": "Fiat", "Hertiage": "Mercedes"}
+_BASE_VEHICLES = {"Eterna": "Fiat", "Heritage": "Mercedes"}
 
 #: **A manually sourced constant table.** No page carries a price — checked on all 18, on
 #: the index, and in the catalogue — so these come from the 2027 UK retail price list,
@@ -99,10 +102,10 @@ PRICES_BY_SIZE: dict[tuple[str, str], int] = {
     ("Eterna", "7.5"): 137_900,
     ("Eterna", "7.8"): 140_900,
     ("Eterna", "8.5"): 151_900,
-    ("Hertiage", "6.9"): 151_000,
-    ("Hertiage", "7.6"): 159_000,
-    ("Hertiage", "7.9"): 162_000,
-    ("Hertiage", "8.7"): 172_000,
+    ("Heritage", "6.9"): 151_000,
+    ("Heritage", "7.6"): 159_000,
+    ("Heritage", "7.9"): 162_000,
+    ("Heritage", "8.7"): 172_000,
 }
 PRICE_LIST_SOURCE = "the 2027 UK retail price list, valid from 1 July 2026"
 
@@ -129,6 +132,33 @@ _HEATING_NOTE = (
 #: The one layout with a combined shower rather than a separate one, per the handbook's
 #: bathroom rows. It is the only light vehicle in the range and differs on a dozen fields.
 LIGHT_VEHICLE_MODEL = "LV7.0GJF"
+
+#: The body width FMLV should hold, per range, from the 2027 handbook.
+#:
+#: **The page's `Width` row is the interior measurement, not the body**, and FMLV has
+#: been carrying it. The handbook prints both, one under the other, in the same table:
+#:
+#: | range | body width | the narrower row | the page's `Width` |
+#: |---|---|---|---|
+#: | Eterna | **230 cm** | `Vehicle width (cm) 224` | 2.24 m |
+#: | Héritage | **232 cm** | `Interior width of the vehicle (cm) 225` | 2.25 m |
+#:
+#: Héritage names the narrower row *interior* outright. Eterna calls its equivalent row
+#: `Vehicle width`, but it sits in the same position, it is **narrower than the body**,
+#: and the mirrors-folded figure is 258 cm on both ranges — so it is the same
+#: measurement under a looser label. The site publishes only that one, so the page is
+#: simply not a source for this field.
+#:
+#: The requester's ruling, 10 September 2026: *"we go with the handbook width... it's
+#: defensible as the full body width. It looks like we've taken the internal width by
+#: mistake in the past."* Recorded against the settled rule that width excludes mirrors
+#: and awnings — it does not also exclude the walls.
+BODY_WIDTHS_MM: dict[str, int] = {"Eterna": 2300, "Heritage": 2320}
+
+#: What the page's own `Width` row reads today, per range. Not recorded — kept so a
+#: change to it is noticed, because that row moving is the signal that the page has been
+#: rebuilt and `BODY_WIDTHS_MM` needs re-checking against a fresh handbook.
+INTERIOR_WIDTHS_MM: dict[str, int] = {"Eterna": 2240, "Heritage": 2250}
 
 #: Where the 2027 handbook's belted-seat count overrules the page's `Seated places`.
 #:
@@ -289,8 +319,8 @@ def _fmlv_model(prefix: str, size: str, suffix: str, manufacturer_range: str) ->
     | range | FMLV holds | the heading prints |
     |---|---|---|
     | Eterna | `LV7.0GJF` | `LV7.0 GJF` |
-    | Hertiage | `LVXH7.9 CF` | `LVXH7.9 CF` |
-    | Hertiage | `LVXH6.9 LF` | `LVXH 6.9 LF` |
+    | Heritage | `LVXH7.9 CF` | `LVXH7.9 CF` |
+    | Heritage | `LVXH6.9 LF` | `LVXH 6.9 LF` |
 
     So Eterna closes up entirely and Héritage keeps exactly one space, before the layout
     letters. This is not cosmetic. The identity tokeniser splits on the decimal point and
@@ -515,6 +545,24 @@ def hold_disagreement(product: LeVoyageurProduct) -> str | None:
     )
 
 
+def width_disagreement(product: LeVoyageurProduct) -> str | None:
+    """Where the page's `Width` row has moved away from the interior figure it should be.
+
+    Nothing here is recorded from that row — `BODY_WIDTHS_MM` supplies the width — so
+    this is purely a tripwire. If the page stops printing the interior measurement, the
+    handbook constants are the thing to re-check.
+    """
+    published = product.mh_width_mm
+    expected = INTERIOR_WIDTHS_MM[product.manufacturer_range]
+    if published is None or published == expected:
+        return None
+    return (
+        f"the page's Width row reads {published}mm where this range has always printed "
+        f"{expected}mm; the body width is taken from the handbook, so re-check "
+        f"BODY_WIDTHS_MM against a current one"
+    )
+
+
 def chassis_disagreement(product: LeVoyageurProduct) -> str | None:
     """Where the page's chassis contradicts the range's, if it does.
 
@@ -559,7 +607,7 @@ def _build_extracted_motorhome(
         mtplm_kilograms=product.mtplm_kilograms,
         mh_payload_kilograms=product.mh_payload_kilograms,
         mh_length_mm=product.mh_length_mm,
-        mh_width_mm=product.mh_width_mm,
+        mh_width_mm=BODY_WIDTHS_MM[product.manufacturer_range],
         mh_height_mm=product.mh_height_mm,
         mh_passenger_seats_inc_driver=SEATS_FROM_THE_HANDBOOK.get(
             product.model, product.mh_passenger_seats_inc_driver
@@ -587,8 +635,13 @@ def _build_extracted_motorhome(
 
     if product.mh_length_mm is not None:
         record("mh_length_mm", f"summary block, 'Length : {product.mh_length_mm / 1000:g} m'")
-    if product.mh_width_mm is not None:
-        record("mh_width_mm", f"summary block, 'Width : {product.mh_width_mm / 1000:g} m'")
+    record(
+        "mh_width_mm",
+        f"{BODY_WIDTHS_MM[product.manufacturer_range] / 10:.0f} cm body width, from the "
+        f"2027 specifications handbook. The page's own 'Width : "
+        f"{(product.mh_width_mm or 0) / 1000:g} m' is the interior measurement — the "
+        f"handbook prints both, and FMLV wants the body width excluding mirrors",
+    )
     if product.mh_height_mm is not None:
         record(
             "mh_height_mm",
@@ -738,7 +791,11 @@ def collect(
                 f"could not be checked against the model code and is left blank"
             )
 
-        for disagreement in (hold_disagreement(product), chassis_disagreement(product)):
+        for disagreement in (
+            hold_disagreement(product),
+            chassis_disagreement(product),
+            width_disagreement(product),
+        ):
             if disagreement:
                 on_progress(f"[{product.label}] WARNING: {disagreement}")
 
