@@ -179,6 +179,32 @@ above the 2300 mm threshold, so `campervan_high_top`; the **lacquered pop-up roo
 £6,080 option**, so by the settled rule it never changes the type. FMLV agrees on all
 three.
 
+## First run — 10 September 2026, run #70
+
+**10 collected, 10 matched, 0 new, 0 disappeared**, in 17.9 seconds over eleven fetches.
+21 proposals and 109 fields verified unchanged, which is exactly what the survey
+predicted plus two things it did not:
+
+* the **`60 G` → `60G`** model tidy-up, which the requester approved on 10 September;
+* the 63T's `mh_length_mm` arriving as an **in-scope field not found** — FMLV's own 6360
+  shown beside "nothing scraped", because the self-check discarded the page's 5990. That
+  is the field working, not failing.
+
+Prices and payloads agreed on all ten, so nothing was proposed for either. The habitation
+findings produced **the floorplan pointer on all ten and nothing else**, which is correct:
+findings are recorded for new products only, and there are none.
+
+The self-check fired once, on the page it was built for:
+
+```
+[Van 63T] LENGTH DISCARDED and left for FMLV's own figure: the page states 5990mm but
+the model code implies about 6300mm, a 310mm gap against a 150mm tolerance
+```
+
+Three products were hand-checked against both the page and Pilote's documents — 75TB,
+54G and 60F — on length, width, height, payload, derived MRO, price, seats and berths.
+All three agree on all eight.
+
 ## Still unverified
 
 * **Whether id 103 `Joa Camp` still holds products.** If it does, they are the same
