@@ -130,6 +130,23 @@ _HEATING_NOTE = (
 #: bathroom rows. It is the only light vehicle in the range and differs on a dozen fields.
 LIGHT_VEHICLE_MODEL = "LV7.0GJF"
 
+#: Where the 2027 handbook's belted-seat count overrules the page's `Seated places`.
+#:
+#: **The requester's ruling, 10 September 2026**, on the one layout where the two sources
+#: disagree: *"If that says four seats with safety belts, then that's what we'll need to
+#: go with."* The page says `Seated places : 2` and FMLV held 2; the handbook's table
+#: says **4 seats with safety belts**, and every other Eterna says 4 on both sources.
+#:
+#: The handbook wins here because of what the two labels mean, not because it is newer.
+#: `Seated places` is unqualified and could be any seat in the vehicle; the handbook's row
+#: names the belt, which is exactly the settled three-point-belt rule's own test. This is
+#: the [Elddis exception](../../docs/adapters/README.md) in shape — the site normally
+#: overrules a document, and the test for departing from that is whether one of them can
+#: be shown wrong.
+#:
+#: Keep this table as small as the evidence: one entry, for one layout, from one document.
+SEATS_FROM_THE_HANDBOOK: dict[str, int] = {"LV6.8LF": 4}
+
 # --- Reading the roster ----------------------------------------------------------------
 
 #: A layout link on the index. Both absolute and root-relative forms appear.
@@ -544,7 +561,9 @@ def _build_extracted_motorhome(
         mh_length_mm=product.mh_length_mm,
         mh_width_mm=product.mh_width_mm,
         mh_height_mm=product.mh_height_mm,
-        mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
+        mh_passenger_seats_inc_driver=SEATS_FROM_THE_HANDBOOK.get(
+            product.model, product.mh_passenger_seats_inc_driver
+        ),
         berths=product.berths,
         body_type=product.body_type,
         # Findings, from the handbook's per-layout tables. Never written by the pipeline.
@@ -575,7 +594,16 @@ def _build_extracted_motorhome(
             "mh_height_mm",
             f"summary block, 'Exterior height : {product.mh_height_mm / 1000:g} m'",
         )
-    if product.mh_passenger_seats_inc_driver is not None:
+    if product.model in SEATS_FROM_THE_HANDBOOK:
+        record(
+            "mh_passenger_seats_inc_driver",
+            f"{SEATS_FROM_THE_HANDBOOK[product.model]} seats with safety belts, from "
+            f"the 2027 specifications handbook. The page's own 'Seated places : "
+            f"{product.seats_published}' is not used here: it is an unqualified count, "
+            f"it disagrees with every other layout in the range, and the handbook's row "
+            f"names the belt, which is what FMLV's field asks for",
+        )
+    elif product.mh_passenger_seats_inc_driver is not None:
         record(
             "mh_passenger_seats_inc_driver",
             f"summary block, 'Seated places : {product.seats_published}'"
@@ -713,6 +741,13 @@ def collect(
         for disagreement in (hold_disagreement(product), chassis_disagreement(product)):
             if disagreement:
                 on_progress(f"[{product.label}] WARNING: {disagreement}")
+
+        if product.model in SEATS_FROM_THE_HANDBOOK:
+            on_progress(
+                f"[{product.label}] SEATS TAKEN FROM THE HANDBOOK: "
+                f"{SEATS_FROM_THE_HANDBOOK[product.model]} belted seats, against the "
+                f"page's 'Seated places : {product.seats_published}'"
+            )
 
         if _price_for(product) is None:
             on_progress(

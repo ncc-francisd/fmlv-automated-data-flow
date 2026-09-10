@@ -646,10 +646,16 @@ attempted because `7.5` alone is ambiguous between the CF and the GJF.
 
 ### Two open questions for the requester
 
-* **The LV6.8LF's seat count.** The site says `Seated places : 2` and FMLV holds 2, so
-  nothing is proposed — but the handbook's table says **4 seats with safety belts** for
-  that layout, and every other Eterna says 4. One of the two documents is wrong about a
-  travel-seat count, which is a safety-adjacent field.
+* ~~**The LV6.8LF's seat count.**~~ **Settled 10 September 2026: the handbook wins.**
+  The site says `Seated places : 2`; the handbook says **4 seats with safety belts**, as
+  does every other Eterna on both sources. The requester's ruling: *"If that says four
+  seats with safety belts, then that's what we'll need to go with."*
+
+  The reason it departs from "the website overrules a document" is what the two labels
+  mean. `Seated places` is unqualified and could be any seat in the vehicle; the
+  handbook's row names the belt, which is precisely the settled three-point-belt rule's
+  own test. `SEATS_FROM_THE_HANDBOOK` carries the one override, and run #77 proposes
+  **2 → 4** on that layout alone.
 * **Héritage width.** The site says 2.25 m and FMLV holds 2250, so again nothing is
   proposed. The handbook calls 225 cm the **interior** width and gives a **body** width of
   232 cm — and the settled rule wants the body width excluding mirrors. If the handbook is

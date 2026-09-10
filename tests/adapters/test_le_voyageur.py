@@ -30,6 +30,7 @@ from src.adapters.le_voyageur import (
     LIGHT_VEHICLE_MODEL,
     MATCH_THRESHOLD,
     PRICES_BY_SIZE,
+    SEATS_FROM_THE_HANDBOOK,
     LeVoyageurProduct,
     _build_extracted_motorhome,
     _labelled,
@@ -382,8 +383,10 @@ def test_refrigeration_is_left_alone_rather_than_guessed() -> None:
 
 
 def test_the_optional_seat_is_kept_out_of_the_count_but_shown_to_the_reviewer() -> None:
+    # Not the LV6.8LF: its seat count comes from the handbook instead, so it would not
+    # exercise the page-reading path this test is about.
     product = replace(
-        _parse("le_voyageur_lv6_8lf.html"),
+        _parse("le_voyageur_lvxh8_7gjf.html"),
         mh_passenger_seats_inc_driver=4,
         seats_published="4+1 optional",
     )
@@ -466,3 +469,40 @@ def test_the_floorplan_reaches_the_reviewer_as_provenance() -> None:
     assert all(p.source_url == floorplan_for(_page(name), product) for p in pointers.values())
     # A field the adapter has already answered needs no pointer.
     assert "shower_toilet_separated" not in pointers
+
+
+# --------------------------------------------------------------------------- #
+# Where the handbook overrules the page
+# --------------------------------------------------------------------------- #
+
+
+def test_the_6_8s_belted_seats_come_from_the_handbook_not_the_page() -> None:
+    """The page says 2 seated places; the handbook says 4 seats with safety belts.
+
+    The requester's ruling, 10 September 2026. The handbook's row names the belt, which
+    is what FMLV's field asks for, and every other Eterna says 4 on both sources.
+    """
+    product = _parse("le_voyageur_lv6_8lf.html")
+    assert product.mh_passenger_seats_inc_driver == 2
+
+    extracted = _build_extracted_motorhome(product)
+
+    assert extracted.motorhome.mh_passenger_seats_inc_driver == 4
+    snippet = extracted.provenance["mh_passenger_seats_inc_driver"].snippet
+    assert "safety belts" in snippet
+    assert "Seated places : 2" in snippet
+
+
+def test_the_override_touches_only_the_layout_it_names() -> None:
+    """One entry, for one layout, from one document — every other page reads its own."""
+    assert set(SEATS_FROM_THE_HANDBOOK) == {"LV6.8LF"}
+
+    for name in PAGES:
+        product = _parse(name)
+        if product.model in SEATS_FROM_THE_HANDBOOK:
+            continue
+        extracted = _build_extracted_motorhome(product)
+        assert (
+            extracted.motorhome.mh_passenger_seats_inc_driver
+            == product.mh_passenger_seats_inc_driver
+        ), name
