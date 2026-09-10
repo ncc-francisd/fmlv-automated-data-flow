@@ -51,12 +51,13 @@ from src.adapters.moto_trek import (
     _value_kind,
     card_disagreements,
     find_roster,
+    parse_equipment,
     parse_index_cards,
     parse_spec_block,
     parse_vehicle_page,
     surplus_is_expected,
 )
-from src.product_model.enums import BodyType
+from src.product_model.enums import BodyType, Heating, Refrigeration
 from src.product_model.schema import IN_SCOPE, REQUIRED
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -663,3 +664,80 @@ def test_a_last_published_price_is_never_written_to_the_product() -> None:
     extracted = _build_extracted_motorhome(product, "https://moto-trek.co.uk/x/", block)
     assert extracted.motorhome.rrp_pounds is None
     assert "rrp_pounds" not in extracted.provenance
+
+
+# --------------------------------------------------------------------------- #
+# The equipment accordion, and the habitation findings read from it
+# --------------------------------------------------------------------------- #
+
+
+def _findings(name: str, slug: str):
+    page = _page(name)
+    product, block = parse_vehicle_page(page, slug)
+    assert product is not None and block is not None
+    return _build_extracted_motorhome(
+        product, "https://moto-trek.co.uk/x/", block, parse_equipment(page)
+    )
+
+
+def test_the_options_list_is_kept_out_of_the_standard_equipment() -> None:
+    equipment = parse_equipment(_page("leisure_treka_eb"))
+
+    assert "Truma Combi 4E Heating & Hot Water System" in equipment.standard
+    assert "80L 3-way Absorption Fridge (in lieu of compressor fridge)" in equipment.optional
+    assert (
+        "80L 3-way Absorption Fridge (in lieu of compressor fridge)"
+        not in equipment.standard
+    )
+
+
+def test_the_options_list_is_read_even_though_it_is_one_paragraph() -> None:
+    """The specification tabs use `<ul>`; the Options List is `<p>` with `<br />`s."""
+    equipment = parse_equipment(_page("leisure_treka_eb"))
+
+    assert "Ghost Immobiliser" in equipment.optional
+    assert "Bike Rack (2 Bikes)" in equipment.optional
+
+
+def test_the_site_footer_is_not_read_as_equipment() -> None:
+    equipment = parse_equipment(_page("leisure_treka_eb"))
+    everything = equipment.standard + equipment.optional
+
+    assert not [line for line in everything if "Privacy" in line or "Cookie" in line]
+
+
+def test_the_leisure_treka_habitation_is_read_from_its_accordion() -> None:
+    extracted = _findings("leisure_treka_eb", "leisure-treka-eb")
+    motorhome = extracted.motorhome
+
+    assert motorhome.heating is Heating.BLOWN_AIR
+    assert motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert motorhome.microwave is True
+    assert "Truma Combi 4E" in extracted.provenance["heating"].snippet
+    assert "Freezer Compartment" in extracted.provenance["refrigeration"].snippet
+
+
+def test_the_x_cite_names_no_microwave() -> None:
+    extracted = _findings("x_cite_eb_elite", "x-cite-eb-elite")
+
+    assert extracted.motorhome.microwave is None
+    assert "no microwave anywhere" in extracted.provenance["microwave"].snippet
+
+
+def test_a_page_with_no_equipment_lists_gets_no_findings() -> None:
+    """The Pioneer publishes five spec pairs and no equipment accordion at all."""
+    extracted = _findings("pioneer", "pioneer")
+
+    assert extracted.motorhome.heating is None
+    assert extracted.motorhome.refrigeration is None
+    assert "microwave" not in extracted.provenance
+
+
+def test_habitation_is_left_alone_when_no_equipment_is_supplied() -> None:
+    product, block = parse_vehicle_page(_page("leisure_treka_eb"), "leisure-treka-eb")
+    assert product is not None and block is not None
+    extracted = _build_extracted_motorhome(product, "https://moto-trek.co.uk/x/", block)
+
+    assert extracted.motorhome.heating is None
+    assert extracted.motorhome.microwave is None
+    assert "refrigeration" not in extracted.provenance

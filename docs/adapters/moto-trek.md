@@ -708,6 +708,50 @@ scope and mirrored at output instead. Worth a decision if it grates: either seat
 `config/field_guide_motorhome.csv`'s in-scope set for everyone, or the "attempted and not
 found" work lands and distinguishes it from "never attempted".
 
+## The habitation findings — 10 September 2026
+
+The vehicle pages carry a second accordion below the specification one, and it is where
+Moto-Trek say what is fitted: `<h4>` sections for Cab and Body, Heating Plumbing,
+Electrical, Kitchen, Washroom and Fitting Out, each a plain `<ul>`. Unlike the spec block
+above it, there is nothing clever about it.
+
+| | Leisure-Treka EB reads | X-Cite EB reads |
+| --- | --- | --- |
+| `heating` | "Truma Combi 4E Heating & Hot Water System" → blown air | the same |
+| `refrigeration` | "80L Fridge with Freezer Compartment" | "90L Fridge with Freezer Compartment" |
+| `microwave` | "Microwave" — a whole line to itself | not named |
+
+Three things about the reading:
+
+**The tab is the section, not the `<h4>`.** The top-level accordion has four tabs —
+Vehicle Specification, the model's own name, **Options List**, Warranty — and the Options
+List has no `<h4>` inside it at all. It is one `<p>` with an upgrade per `<br />`,
+including "80L 3-way Absorption Fridge (in lieu of compressor fridge)" and "Truma Combi
+6E Upgrade", so reading it as equipment would have replaced the standard fridge and
+heater with the paid alternatives. Splitting at the tab is what keeps them apart.
+
+**The reading stops at the footer.** Moto-Trek's site footer is `<h4>` sections of list
+items — Our Products, Legal, Quick Contact — so without a bound the last tab picks up the
+navigation.
+
+**The `*` suffix is a trim marker, not an option**, and it does not touch the habitation.
+"Colour Coded Bumpers*", "Alloy Wheels*", "120W Solar Panel*" are footnoted "*Included in
+'Elite' specification" — seven such lines on the Leisure-Treka pages, all of them cab or
+electrical. No fridge, heater, microwave or washroom line carries one, so nothing here
+depends on resolving it. If that ever changes, the footnote is on the page to read.
+
+### The Pioneer and the Tornado publish no equipment lists at all
+
+Both pages carry the specification accordion and nothing else, so they get no habitation
+findings — correctly, and the same answer the spec block gives for their five fields.
+
+### One thing the shared vocabulary had wrong
+
+The Ford Custom Campervan lists a "Webasto Diesel Night heater", which read as heating of
+an unnamed kind. A **night heater** is the campervan trade's name for a small diesel air
+heater — Webasto's Air Top and Eberspächer's Airtronic are both sold as one, and there is
+no such thing as a wet night heater. Added to the blown-air vocabulary.
+
 ## What is unverified
 
 - **Base vehicle for Euro-Treka IB and Pioneer.** FMLV has Pioneer on `IVECO`; the site's

@@ -83,6 +83,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://moto-trek.co.uk"
@@ -687,9 +688,81 @@ def card_disagreements(product: MotoTrekProduct, card: IndexCard) -> list[str]:
 # --------------------------------------------------------------------------- #
 
 
+# --- Equipment, for the habitation findings ------------------------------------------
+
+#: One top-level accordion tab's title — "Vehicle Specification", the model's own name,
+#: "Options List", "Warranty". The `<h4>`s *inside* a tab (Cab and Body, Heating
+#: Plumbing, Kitchen, Washroom) would work as headings too, but the tab is the level
+#: that separates what is fitted from what is offered, and the Options List has no `<h4>`
+#: of its own at all.
+_TAB_TITLE = re.compile(r'<div class="e-n-accordion-item-title-text">(.*?)</div>', re.S)
+
+#: The tabs that are not standard equipment. `Options List` is the important one — it
+#: prices upgrades in the same shape as the equipment, "80L 3-way Absorption Fridge (in
+#: lieu of compressor fridge)" among them.
+_NOT_STANDARD_TAB = re.compile(r"\s*(?:options?\b|warranty\b)", re.I)
+
+#: Where the accordion stops and the site footer begins. Its nav links are list items
+#: too, so without this they arrive as equipment.
+_END_OF_EQUIPMENT = re.compile(r"<h4[^>]*>\s*Our Products", re.I)
+
+#: A line break inside one of Moto-Trek's `<p>` option blocks. The Options List is a
+#: single paragraph with one upgrade per `<br />`, where the specification tabs use real
+#: `<ul>` lists — so both shapes have to be read.
+_LINE_BREAK = re.compile(r"<br\s*/?>", re.I)
+_LIST_OR_PARAGRAPH = re.compile(r"<li\b[^>]*>(.*?)</li>|<p\b[^>]*>(.*?)</p>", re.S)
+
+
+def _equipment_lines(fragment: str) -> list[str]:
+    broken = _LINE_BREAK.sub("\n", fragment)
+    return [
+        text
+        for groups in _LIST_OR_PARAGRAPH.findall(broken)
+        for part in groups
+        if part
+        for line in part.split("\n")
+        if (text := habitation.plain_text(line))
+    ]
+
+
+def parse_equipment(page: str) -> habitation.Equipment:
+    """The page's accordion, split into what is fitted and what is offered."""
+    return habitation.sectioned_equipment(
+        page,
+        heading=_TAB_TITLE,
+        optional_heading=_NOT_STANDARD_TAB,
+        until=_END_OF_EQUIPMENT,
+        items=_equipment_lines,
+    )
+
+
+#: How each habitation reading is introduced.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heater in the page's Heating Plumbing list",
+    "refrigeration": "the fridge in the page's Kitchen list",
+    "shower_toilet_separated": "the washroom as the page's Washroom list describes it",
+}
+
+#: Said when a microwave is offered but not fitted.
+MICROWAVE_OPTIONAL_NOTE = (
+    "no microwave in the standard specification; one is in the Options List rather than "
+    "fitted, so the answer for a standard vehicle is No"
+)
+
+
 def _build_extracted_motorhome(
-    product: MotoTrekProduct, source_url: str, block: SpecBlock
+    product: MotoTrekProduct,
+    source_url: str,
+    block: SpecBlock,
+    equipment: habitation.Equipment | None = None,
 ) -> ExtractedMotorhome:
+    """One model as a `Motorhome`, plus the provenance a reviewer sees beside each field.
+
+    `equipment` is the page's accordion, split by `parse_equipment`. What it settles
+    about the habitation reaches the reviewer as **findings** rather than proposals; see
+    `product_model.findings`.
+    """
+    features = habitation.features_from(equipment.standard if equipment else ())
     published = dict(block.pairs)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -706,6 +779,27 @@ def _build_extracted_motorhome(
         mh_height_mm=product.mh_height_mm,
         berths=product.berths,
         body_type=product.body_type,
+        # Habitation, from the page's own equipment accordion — reported as findings
+        # rather than proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        bed_types=features["bed_types"].value if "bed_types" in features else [],
+        microwave=(
+            features["microwave"].value
+            if "microwave" in features
+            else (
+                False
+                if equipment and habitation.microwave_offered(equipment.optional)
+                else None
+            )
+        ),
     )
 
     provenance: dict[str, Provenance] = {}
@@ -786,6 +880,19 @@ def _build_extracted_motorhome(
         f"trim ('Elite') or omits the layout code entirely (the Pioneer never states 'IB'), "
         f"so this comes from the FMLV export. Paired with the range above",
     )
+
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "read from the page")
+        record(name, f"{note}: {feature.snippet}")
+    if equipment and equipment.standard and "microwave" not in features:
+        if offered := habitation.microwave_offered(equipment.optional):
+            record("microwave", f"{MICROWAVE_OPTIONAL_NOTE}: {offered}")
+        else:
+            record("microwave", "no microwave anywhere in the page's accordion")
+    standard = equipment.standard if equipment else ()
+    if unclear := habitation.heating_is_unclear(standard):
+        if "heating" not in features:
+            record("heating", f"a heater is listed but its kind is not named: {unclear}")
 
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
@@ -929,7 +1036,9 @@ def collect(
         elif product.rrp_pounds is None:
             on_progress(f"[{product.label}] WARNING: no headline price found, left blank")
 
-        results.append(_build_extracted_motorhome(product, url, block))
+        results.append(
+            _build_extracted_motorhome(product, url, block, parse_equipment(html))
+        )
 
     on_progress(
         "seats: Moto-Trek publish no seat or seatbelt count anywhere — not on the vehicle "

@@ -205,9 +205,13 @@ def refrigeration_from(lines: Iterable[str]) -> Feature | None:
 #: water boiler" or the diesel equivalent, and not one says "blown" or "warm". The hot
 #: water boiler in those lines heats domestic water rather than radiators — the same
 #: arrangement as the Truma Combi ruled on above.
+#: `night heater` is the campervan trade's name for a small diesel air heater — Webasto's
+#: Air Top and Eberspächer's Airtronic are both sold as one, and Moto-Trek list a
+#: "Webasto Diesel Night heater". There is no such thing as a wet night heater: a water
+#: heater is sold as a water heater.
 _WARM_AIR = re.compile(
     r"\bblown[- ]air\b|\bwarm[- ]air\b|\bhot[- ]air\b|\bforced[- ]air\b"
-    r"|\bcombi\b|\bairtop\b|\bair top\b",
+    r"|\bcombi\b|\bairtop\b|\bair top\b|\bnight heater\b",
     re.I,
 )
 
