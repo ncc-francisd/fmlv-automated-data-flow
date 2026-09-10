@@ -2149,3 +2149,33 @@ def test_deciding_a_finding_is_refused(client: TestClient, db_path: Path) -> Non
     connection = store.connect(db_path)
     assert store.latest_decision(connection, finding_id) is None
     connection.close()
+
+
+def test_a_new_product_keeps_its_blue_after_being_decided(
+    client: TestClient, db_path: Path
+) -> None:
+    """The colour is how a reviewer picks the products needing a row typed into FMLV out
+    of a long Decided list, and the findings only become actionable once the decisions are
+    made — so losing the blue on acceptance threw it away at exactly the wrong moment.
+
+    Requested 10 September 2026.
+    """
+    run_id, _product_id, _finding_id = _run_with_findings(db_path)
+    # Every row, not `accept-all`, which deliberately holds back the ones a new product
+    # has nothing to accept on — see `choices.needs_selection`.
+    connection = store.connect(db_path)
+    for entry in store.list_change_queue(connection, run_id):
+        store.record_decision(
+            connection, proposed_change_id=entry.change.id, action="accept", decided_by="ben"
+        )
+    connection.close()
+
+    response = client.get(f"/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert "Pending (0)" in response.text, "the product must have left the pending group"
+    decided = response.text.split("Decided")[1]
+    assert "product-group new-product" in decided
+    assert "new product</span>" in decided
+    # And the findings are still there to act on.
+    assert "What we found on the site" in decided

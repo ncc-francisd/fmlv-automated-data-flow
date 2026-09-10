@@ -62,6 +62,7 @@ from typing import Any
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import (
     ExtractedMotorhome,
     Provenance,
@@ -378,6 +379,64 @@ def parse_layouts(index_html: str) -> list[LaikaLayout]:
     return layouts
 
 
+#: A slide, with the layout it names **and its model id**. The id is the join to the
+#: standard-equipment overlay: the slider says `data-model-id="4222660" data-name="540 -
+#: Grigio Torino"` and the overlay is `data-overlay="standard-equipment-4222660"`.
+_SLIDE_WITH_ID = re.compile(r'data-model-id="(?P<id>\d+)"[^>]*data-name="(?P<name>[^"]+)"')
+
+#: One line of a standard-equipment list. Laika print them as single-cell rows carrying
+#: their own item id.
+_EQUIPMENT_ROW = re.compile(r'<tr data-item-id="\d+">\s*<td>(?P<text>.*?)</td>', re.S)
+
+#: Where one layout's standard-equipment list begins — **the panel, not the button**.
+#:
+#: The same `data-overlay="standard-equipment-<id>"` sits on two elements: a
+#: `<button class="… open-overlay">` in the slider that opens it, and the
+#: `<div class="overlay standard-equipment-overlay">` that holds it. Taking the first
+#: match takes the button, whose region contains no rows at all — which silently cost the
+#: first layout on every page its findings, `L 2009` and `Kreos L 5009 MB` among them.
+#: Requiring the overlay class picks the panel.
+_EQUIPMENT_PANEL = (
+    r'class="overlay standard-equipment-overlay"\s+data-overlay="standard-equipment-{model_id}"'
+)
+
+
+def parse_standard_equipment(range_html: str) -> dict[str, list[str]]:
+    """`{layout name: standard equipment}` from one range page's overlays.
+
+    **The only place Laika states what is fitted.** The JSON-LD this adapter is built on
+    carries the numbers and nothing else — no heating, no fridge, no washroom — so a Laika
+    product had no habitation findings at all until this was added on 10 September 2026,
+    which the requester noticed on a new `Ecovip Performance 600`.
+
+    Keyed on the colour-stripped layout name, because the slider names a slide `540 -
+    Grigio Torino` and the same vehicle appears once per colour. See `strip_colour`.
+
+    Only the **standard** equipment overlay is read. The page also has a `technical-data`
+    overlay behind a terms-and-conditions click and a price list; neither is needed.
+    """
+    found: dict[str, list[str]] = {}
+    for slide in _SLIDE_WITH_ID.finditer(range_html):
+        name = strip_colour(slide.group("name"))
+        if name in found:
+            continue
+        panel = re.search(
+            _EQUIPMENT_PANEL.format(model_id=re.escape(slide.group("id"))), range_html
+        )
+        if panel is None:
+            continue
+        at = panel.start()
+        end = range_html.find("</table>", at)
+        segment = range_html[at : end if end > at else at + 20000]
+        lines = [
+            re.sub(r"\s+", " ", row.group("text")).strip()
+            for row in _EQUIPMENT_ROW.finditer(segment)
+        ]
+        if lines:
+            found[name] = lines
+    return found
+
+
 def parse_floorplans(range_html: str) -> dict[str, str]:
     """`{layout name: drawing URL}` from one range page's floorplan slider.
 
@@ -434,10 +493,36 @@ def _reconciles(layout: LaikaLayout) -> tuple[bool, str]:
     return True, ""
 
 
+#: How each habitation reading is introduced where `habitation` supplies no wording.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heater listed as standard equipment",
+    "refrigeration": "the fridge listed as standard equipment",
+    "shower_toilet_separated": "the washroom listed as standard equipment",
+}
+
+#: Why a microwave is reported absent. Laika's standard-equipment list is short — 21 lines
+#: naming the heater, the fridge, the battery and the washroom — so it is a highlights list
+#: rather than an exhaustive specification, and silence in it is weaker evidence than
+#: Dethleffs' or Carado's priced tables. Said plainly so a reviewer can weigh it.
+MICROWAVE_ABSENCE_NOTE = (
+    "no microwave in the standard-equipment list. Note this list is a short one — around "
+    "twenty lines — so it is a summary of what is fitted rather than an exhaustive "
+    "specification, and its silence is weaker evidence than a full priced equipment table"
+)
+
+
 def _build_extracted_motorhome(
-    layout: LaikaLayout, floorplan_url: str | None = None
+    layout: LaikaLayout,
+    floorplan_url: str | None = None,
+    equipment: list[str] | None = None,
 ) -> ExtractedMotorhome:
-    """One layout as a `Motorhome`, plus the provenance a reviewer sees beside each field."""
+    """One layout as a `Motorhome`, plus the provenance a reviewer sees beside each field.
+
+    `equipment` is the layout's standard-equipment list from its range page — the only
+    place Laika say what is fitted. It reaches the reviewer as **findings** rather than
+    proposals; see `product_model.findings`.
+    """
+    features = habitation.features_from(equipment or [])
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -454,6 +539,17 @@ def _build_extracted_motorhome(
         mh_length_mm=layout.mh_length_mm,
         mh_width_mm=layout.mh_width_mm,
         mh_height_mm=layout.mh_height_mm,
+        # Habitation, from the range page's standard-equipment list — reported as
+        # findings rather than proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
     )
 
     source = layout.source_url or f"{BASE_URL}{INDEX_PATHS[0]}"
@@ -501,6 +597,17 @@ def _build_extracted_motorhome(
             f"(Laika publish no payload)",
         )
 
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "listed as standard equipment")
+        record(name, f"{note}: {feature.snippet}")
+    if equipment and habitation.microwave_from(equipment) is None:
+        record("microwave", MICROWAVE_ABSENCE_NOTE)
+    unclear = habitation.heating_is_unclear(equipment or [])
+    if unclear and "heating" not in features:
+        # Narrated rather than guessed: the vocabulary needs a phrase adding, which is a
+        # different thing from the manufacturer saying nothing.
+        record("heating", f"a heater is listed but its kind is not named: {unclear}")
+
     if floorplan_url:
         provenance.update(floorplan_provenance(motorhome, floorplan_url, layout.label))
 
@@ -547,6 +654,7 @@ def collect(
     # One fetch per body-style page, for the drawings only — every figure came from the
     # index. A page that cannot be read costs its own drawings and nothing else.
     plans: dict[str, str] = {}
+    equipment: dict[str, list[str]] = {}
     for entry in ranges:
         label = entry[-1]
         for path in entry[:-1]:
@@ -554,11 +662,15 @@ def collect(
             if page.status_code != 200:
                 on_progress(f"[{label}] {path} returned {page.status_code}, so no floorplans")
                 continue
-            found = parse_floorplans(
-                page.file_path.read_text(encoding="utf-8", errors="replace")
-            )
+            range_html = page.file_path.read_text(encoding="utf-8", errors="replace")
+            found = parse_floorplans(range_html)
             plans.update(found)
-            on_progress(f"[{label}] {path} — {len(found)} floorplan(s)")
+            kit = parse_standard_equipment(range_html)
+            equipment.update(kit)
+            on_progress(
+                f"[{label}] {path} — {len(found)} floorplan(s), "
+                f"{len(kit)} standard-equipment list(s)"
+            )
 
     results: list[ExtractedMotorhome] = []
     for layout in layouts:
@@ -574,7 +686,10 @@ def collect(
                 f"{layout.label} — no floorplan naming this layout, so the positional "
                 f"fields carry no pointer"
             )
-        results.append(_build_extracted_motorhome(layout, plan))
+        kit = equipment.get(layout.model)
+        if kit is None:
+            on_progress(f"{layout.label} — no standard-equipment list, so no findings")
+        results.append(_build_extracted_motorhome(layout, plan, kit))
 
     on_progress(f"{len(results)} product(s) collected")
     return results

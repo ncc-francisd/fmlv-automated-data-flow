@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from src.adapters import laika
-from src.product_model.enums import BodyType
+from src.product_model.enums import BodyType, Refrigeration
 
 FIXTURES = Path(__file__).parent / "fixtures"
 INDEX = "laika_models_index_jsonld.html"
@@ -363,3 +363,79 @@ def test_no_drawing_means_no_pointers(layouts: dict[str, laika.LaikaLayout]) -> 
     extracted = laika._build_extracted_motorhome(layouts["L 5009 MB"])
 
     assert not [e for e in extracted.provenance.values() if e.reviewer_reference]
+
+
+# --------------------------------------------------------------------------- #
+# Standard equipment — the only place Laika say what is fitted
+# --------------------------------------------------------------------------- #
+
+
+def _performance_page() -> str:
+    return (FIXTURES / "laika_ecovip_performance.html").read_text(encoding="utf-8")
+
+
+def test_the_standard_equipment_is_keyed_to_its_layout() -> None:
+    """The JSON-LD this adapter is built on carries the numbers and nothing else, so until
+    10 September 2026 a Laika product had **no habitation findings at all** — which the
+    requester noticed on a new `Ecovip Performance 600`.
+
+    The join is the model id: a slider slide says `data-model-id="4223267" data-name="600 -
+    Grigio Torino"` and the panel is `data-overlay="standard-equipment-4223267"`.
+    """
+    found = laika.parse_standard_equipment(_performance_page())
+
+    assert sorted(found) == ["540", "600", "645"]
+    assert all(len(lines) > 10 for lines in found.values())
+
+
+def test_the_layout_name_is_stripped_of_its_colour() -> None:
+    """The slider names a slide `600 - Grigio Torino` and repeats the vehicle once per
+    colour — the same collapse `strip_colour` does for the roster."""
+    found = laika.parse_standard_equipment(_performance_page())
+
+    assert not any(" - " in name for name in found)
+
+
+def test_the_panel_is_read_and_not_the_button_that_opens_it() -> None:
+    """Both carry `data-overlay="standard-equipment-<id>"`, and the button's region holds
+    no rows at all. Taking the first match cost the **first layout on every page** its
+    findings — `L 2009` and `Kreos L 5009 MB` among them — and looked like the site simply
+    not publishing a list.
+    """
+    page = _performance_page()
+
+    assert "open-overlay" in page, "the fixture must still contain the trigger buttons"
+    assert laika.parse_standard_equipment(page)["540"], "the first layout must not be lost"
+
+
+def test_the_habitation_findings_come_off_that_list() -> None:
+    """`Compressor refrigerator` and `Vario-bathroom with integrated separable shower`.
+
+    The second is why `habitation` learned the word **separable**: Laika describe one room
+    in which a partition divides the shower off, which is exactly the case the requester
+    called qualifying — *"a clear separation within one room"*.
+    """
+    from src.adapters import habitation
+
+    lines = laika.parse_standard_equipment(_performance_page())["600"]
+    features = habitation.features_from(lines)
+
+    assert features["refrigeration"].value is Refrigeration.FRIDGE_FREEZER
+    assert "Compressor refrigerator" in features["refrigeration"].snippet
+    assert features["shower_toilet_separated"].value is True
+    assert "separable shower" in features["shower_toilet_separated"].snippet
+
+
+def test_a_diesel_heater_is_narrated_rather_than_guessed() -> None:
+    """`6 kW diesel heater, remotely controllable` names a fuel and a size and not a kind.
+
+    A diesel heater in a campervan is almost certainly warm-air, but "almost certainly" is
+    not what this project asserts from — so it is reported as a heater whose kind is not
+    named, which is a different statement from the manufacturer saying nothing.
+    """
+    from src.adapters import habitation
+
+    lines = laika.parse_standard_equipment(_performance_page())["600"]
+
+    assert habitation.heating_from(lines) is None
+    assert "diesel heater" in (habitation.heating_is_unclear(lines) or "")

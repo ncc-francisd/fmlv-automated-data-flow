@@ -259,8 +259,15 @@ def microwave_from(lines: Iterable[str]) -> tuple[bool, str] | None:
 #:
 #: `separate` has to sit next to the shower or the toilet, not merely somewhere on the
 #: line: "Rear twin single beds" pages also say "separate" about other things.
+#:
+#: **`separable` counts too**, which is Laika's word: *"Vario-bathroom with integrated
+#: separable shower"* — one room in which a partition divides the shower off. That is
+#: exactly the case the requester described as qualifying, *"a clear separation within one
+#: room"*, so the distinction between a permanent wall and a movable one is not one FMLV
+#: draws. `separat(e|ed|es|ing|ion|able)` all inflect from the same stem.
 _SEPARATE_BATHROOM = re.compile(
-    r"\bseparate\b[^.]{0,40}\b(?:shower|toilet|wc)\b|\b(?:shower|toilet|wc)\b[^.]{0,40}\bseparate\b",
+    r"\bsepara(?:te|ted|tes|ting|tion|ble)\b[^.]{0,40}\b(?:shower|toilet|wc)\b"
+    r"|\b(?:shower|toilet|wc)\b[^.]{0,40}\bsepara(?:te|ted|tes|ting|tion|ble)\b",
     re.I,
 )
 

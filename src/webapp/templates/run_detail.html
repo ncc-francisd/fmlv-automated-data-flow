@@ -66,8 +66,19 @@
     <h2>Decided ({{ decided|length }})</h2>
     {% for product_id, group in decided|groupby('product.id') %}
       {% set product = group[0].product %}
-      <div class="product-group">
-        <h3>{{ product.manufacturer_range }} — {{ product.model }}</h3>
+      {# A new product keeps its blue after every row is decided. Requested
+         10 September 2026: the colour is how a reviewer picks the products that need a
+         row typing into FMLV out of a long Decided list, and losing it on acceptance
+         threw that away exactly when the findings become the thing to act on. #}
+      <div class="product-group{% if not product.fmlv_product_id %} new-product{% endif %}">
+        <h3>
+          {{ product.manufacturer_range }} — {{ product.model }}
+          {% if product.fmlv_product_id %}
+            <span class="muted">#{{ product.fmlv_product_id }}</span>
+          {% else %}
+            <span class="badge new">new product</span>
+          {% endif %}
+        </h3>
         {# Repeated here as well as in the pending group: a product with every row
            decided drops out of Pending, and the findings are what a person types into
            FMLV *after* deciding, so they have to still be on the page. #}
