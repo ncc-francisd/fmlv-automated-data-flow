@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from src.adapters import adria, habitation
 from src.adapters.adria import (
     DEFAULT_RANGES,
     RANGES,
@@ -32,6 +33,7 @@ from src.adapters.adria import (
     technical_data_pdf_url,
     unwrap_livewire,
 )
+from src.product_model.enums import BedType, Heating
 from src.product_model.model import Motorhome
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -387,3 +389,87 @@ def test_an_unknown_range_pair_falls_back_to_the_label_as_the_fmlv_range() -> No
 
     assert config.fmlv_range == "Whatever"
     assert config.model_suffix is None
+
+
+# --------------------------------------------------------------------------- #
+# The habitation findings, from the technical-data sheet
+# --------------------------------------------------------------------------- #
+
+MATRIX_670DC = "adria_matrix_670dc_pdf_text.txt"
+SUPERSONIC_780DC = "adria_supersonic_780dc_pdf_text.txt"
+MATRIX_670SL = "adria_60y_matrix_670sl_pdf_text.txt"
+
+
+def _sheet(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+def _findings(name: str) -> dict[str, object]:
+    fitted, _pack = adria.fitted_equipment(_sheet(name))
+    return habitation.features_from(fitted)
+
+
+def test_the_cross_means_fitted_not_crossed_out() -> None:
+    """Settled from the sheets themselves, and the whole reading rests on it.
+
+    "Right hand drive" is marked on a right-hand-drive vehicle, and the flagship
+    Supersonic's roof air conditioning is marked where the Matrix's is not.
+    """
+    matrix, _pack = adria.fitted_equipment(_sheet(MATRIX_670DC))
+    supersonic, _pack = adria.fitted_equipment(_sheet(SUPERSONIC_780DC))
+
+    assert "Right hand drive" in matrix
+    assert "Roof-mounted air conditioning system" in supersonic
+    assert "Roof-mounted air conditioning system" not in matrix
+
+
+def test_a_line_carrying_a_value_counts_as_fitted() -> None:
+    """`Refrigerator 142 L` has a capacity where its neighbours have a mark."""
+    fitted, _pack = adria.fitted_equipment(_sheet(MATRIX_670DC))
+
+    assert "Refrigerator 142 L" in fitted
+
+
+def test_the_reading_starts_at_the_first_lettered_section() -> None:
+    """Above it sit the cover figures and the All Inclusive Pack, a priced option pack.
+
+    The pack's contents may well also be marked as fitted further down — that is what
+    buying the pack does — but the pack listing itself is not evidence of fitment, and
+    neither is "2305 total width (mm)".
+    """
+    fitted, pack = adria.fitted_equipment(_sheet(SUPERSONIC_780DC))
+
+    assert "Auxiliary hot-water heater" in pack
+    assert "total height (mm)" in pack
+    assert not [line for line in fitted if line.endswith("(mm)")]
+
+
+def test_alde_makes_the_matrix_wet_central() -> None:
+    features = _findings(MATRIX_670DC)
+
+    assert features["heating"].value is Heating.WET_CENTRAL
+    assert "Alde Compact 3030" in features["heating"].snippet
+
+
+def test_a_truma_combi_makes_the_anniversary_matrix_blown_air() -> None:
+    features = _findings(MATRIX_670SL)
+
+    assert features["heating"].value is Heating.BLOWN_AIR
+    assert "Truma Combi 6E" in features["heating"].snippet
+
+
+def test_the_bathroom_section_settles_the_washroom() -> None:
+    features = _findings(MATRIX_670DC)
+
+    assert features["shower_toilet_separated"].value is True
+    assert "Separate shower cabin" in features["shower_toilet_separated"].snippet
+
+
+def test_the_beds_differ_per_layout_because_one_sheet_is_one_vehicle() -> None:
+    assert _findings(MATRIX_670DC)["bed_types"].value == [BedType.ISLAND]
+    assert _findings(MATRIX_670SL)["bed_types"].value == [BedType.FIXED_SEPARATE]
+
+
+def test_no_sheet_names_a_microwave() -> None:
+    for name in (MATRIX_670DC, SUPERSONIC_780DC, MATRIX_670SL):
+        assert "microwave" not in _findings(name)

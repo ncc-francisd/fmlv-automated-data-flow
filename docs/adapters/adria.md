@@ -226,3 +226,38 @@ Ran the adapter live against the Matrix range (7 configurations) and compared to
   prototype scale per DESIGN.md §8.1, but worth keeping an eye on once content-hash
   gating (Phase 3, already built) is wired up against a previous run's hashes — most of
   these won't need re-fetching once a manufacturer has been run once.
+
+## The habitation findings — 10 September 2026
+
+The deferral above is closed, and the caution in it was the right one: **`✕` means
+fitted**, not crossed out. The sheets settle it themselves — `Right hand drive ✕` and
+`Driver airbag ✕` appear on a right-hand-drive vehicle, and `Roof-mounted air
+conditioning system` is unmarked on the Matrix and marked on the flagship Supersonic,
+which is the way round that makes sense. Getting it backwards would have flipped every
+habitation field on every Adria product at once, exactly as the note warned.
+
+Two more things had to be settled before anything could be read:
+
+* **A line carrying a value is fitted too.** `Refrigerator 142 L` has a capacity where
+  its neighbours have a mark, and it is the fridge line on every sheet.
+* **The reading starts at the first lettered section** (`A.`, `B.`, … `K. Heating/Air
+  Conditioning`). Above it sit the cover figures and the **ALL INCLUSIVE PACK**, a
+  priced option pack. Its contents may also be marked as fitted further down — that is
+  what buying the pack does — but the listing itself is not evidence of fitment.
+
+One sheet is one configuration, so unlike almost every other brand here there is nothing
+to attribute: all four factual fields come out per product, and so do the beds.
+
+| | Matrix Supreme 670 DC | Matrix 670 SL (60Y) | Supersonic 780 DC |
+| --- | --- | --- | --- |
+| `heating` | `Hot-water heating system Alde Compact 3030` → wet | `Gas-electric heater Truma Combi 6E` → blown air | Alde, as the Matrix |
+| `refrigeration` | `Refrigerator 142 L` | `Refrigerator 142 L` | `Refrigerator 177 L` |
+| `shower_toilet_separated` | `Separate shower cabin with solid door` → yes | the same | the same |
+| `bed_types` | `Central bed` → island | `Single beds` → fixed separate | `Central bed` → island |
+
+The beds are the proof that the attribution is real: the two Matrix layouts differ, and
+they differ correctly.
+
+**No sheet names a microwave anywhere**, and these sheets itemise every fitting a
+configuration has, so the absence is recorded with that reasoning and
+`findings.SILENCE_MEANS` supplies the recommendation.

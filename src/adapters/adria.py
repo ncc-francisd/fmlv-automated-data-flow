@@ -37,6 +37,7 @@ from ..fetch.browser import BrowserFetcher
 from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.adria.co.uk"
@@ -414,6 +415,51 @@ def cross_source_disagreements(
     return disagreements
 
 
+# --- Equipment, for the habitation findings ------------------------------------------
+
+#: A lettered equipment section — `A. Base Vehicle`, `G. Kitchen Equipment`,
+#: `K. Heating/Air Conditioning`. The first one is where the equipment list starts, and
+#: everything above it is the `ALL INCLUSIVE PACK` — a priced option pack, not fitment.
+_SECTION = re.compile(r"^[A-Z]{1,2}\. \S")
+
+#: **`✕` means fitted on these sheets, not "crossed out"**, which is the opposite of what
+#: the first survey assumed and had to be settled before anything here could be written.
+#: The proof is in the fixtures: `Right hand drive ✕` and `Driver airbag ✕` appear on a
+#: right-hand-drive vehicle, while `Roof-mounted air conditioning system` is unmarked on
+#: the Matrix and marked on the flagship Supersonic. Getting it backwards would have
+#: flipped every habitation field on every Adria product at once.
+#:
+#: A line **carrying a value** is fitted too: `Refrigerator 142 L` has a capacity where
+#: the others have a mark, and it is the fridge line on every sheet.
+_FITTED = re.compile(r"✕\s*$|\d+\s*(?:L|l|litre|ltr|W|V|Ah|kg|mm)\s*$")
+
+#: The mark itself, stripped so it never reaches a reviewer inside a quoted line.
+_MARK = re.compile(r"\s*✕\s*$")
+
+
+def fitted_equipment(text: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """`(fitted, the All Inclusive Pack)` from one technical-data sheet.
+
+    One sheet is one vehicle, so unlike most brands here there is nothing to attribute:
+    every line is about the product the sheet was fetched for.
+    """
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    start = next((index for index, line in enumerate(lines) if _SECTION.match(line)), 0)
+    fitted = tuple(
+        _MARK.sub("", line) for line in lines[start:] if _FITTED.search(line)
+    )
+    return fitted, tuple(lines[:start])
+
+
+#: How each habitation reading is introduced.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the sheet's Heating/Air Conditioning section",
+    "refrigeration": "the sheet's Kitchen Equipment section",
+    "shower_toilet_separated": "the sheet's Bathroom Equipment section",
+    "bed_types": "the sheet's own description of the beds",
+}
+
+
 def _build_extracted_motorhome(
     product: LivewireProduct,
     config: RangeConfig,
@@ -422,7 +468,17 @@ def _build_extracted_motorhome(
     pdf_specs: dict[str, PdfSpecMatch],
     base_vehicle_manufacturer: str | None,
     disagreements: dict[str, tuple[int, int]],
+    equipment: tuple[str, ...] = (),
+    inclusive_pack: tuple[str, ...] = (),
 ) -> ExtractedMotorhome:
+    """One configuration as a `Motorhome`, plus the provenance beside each field.
+
+    `equipment` is the sheet's fitted equipment from `fitted_equipment`. What it settles
+    about the habitation reaches the reviewer as **findings** rather than proposals; see
+    `product_model.findings`.
+    """
+    features = habitation.features_from(equipment)
+
     def spec(field_name: str) -> int | None:
         match = pdf_specs.get(field_name)
         return match.value if match else None
@@ -445,6 +501,23 @@ def _build_extracted_motorhome(
         mh_length_mm=spec("mh_length_mm"),
         mh_width_mm=spec("mh_width_mm"),
         mh_height_mm=spec("mh_height_mm"),
+        # Habitation, from the sheet's own equipment sections — reported as findings
+        # rather than proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        bed_types=features["bed_types"].value if "bed_types" in features else [],
+        microwave=(
+            features["microwave"].value
+            if "microwave" in features
+            else (False if habitation.microwave_offered(inclusive_pack) else None)
+        ),
     )
 
     provenance: dict[str, Provenance] = {}
@@ -478,6 +551,35 @@ def _build_extracted_motorhome(
                 f"order = {motorhome.mh_payload_kilograms}kg (not published directly)"
             ),
         )
+
+    for name, feature in features.items():
+        note = feature.note or _FEATURE_NOTES.get(name, "the sheet's equipment sections")
+        provenance[name] = Provenance(
+            source_url=pdf_url, snippet=f"{note}: {feature.snippet}"
+        )
+    if equipment and "microwave" not in features:
+        if offered := habitation.microwave_offered(inclusive_pack):
+            provenance["microwave"] = Provenance(
+                source_url=pdf_url,
+                snippet=(
+                    "no microwave in the fitted equipment; one is in the All Inclusive "
+                    f"Pack rather than fitted, so the answer as standard is No: {offered}"
+                ),
+            )
+        else:
+            provenance["microwave"] = Provenance(
+                source_url=pdf_url,
+                snippet=(
+                    "no microwave anywhere on this sheet, which itemises every fitting "
+                    "the configuration has"
+                ),
+            )
+    if unclear := habitation.heating_is_unclear(equipment):
+        if "heating" not in features:
+            provenance["heating"] = Provenance(
+                source_url=pdf_url,
+                snippet=f"a heater is listed but its kind is not named: {unclear}",
+            )
 
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
@@ -604,6 +706,7 @@ def collect(
                         pdf_specs,
                         parse_base_vehicle_manufacturer(pdf_text),
                         disagreements,
+                        *fitted_equipment(pdf_text),
                     )
                 )
 
