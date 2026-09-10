@@ -681,6 +681,38 @@ This is separate from the make-up question, which asks whether the bed exists wh
 is making it up. A bed can be both `fixed_separate_beds` and `make_up_beds` — twins that
 join into a double — because those are two facts about one bed, not two names for it.
 
+### Blown air or wet central: read the plumbing, not the fuel
+
+**The fuel and the output tell you nothing.** "6 kW diesel heater", "Gas heating, 3.5 kW"
+— neither says which kind of system it is, and the temptation to infer one is the mistake
+to avoid. The requester, 10 September 2026: *"neither of those things determine whether
+it's a wet heating system or a blown air system."*
+
+What does settle it, from the same ruling:
+
+| wet central | blown air |
+| --- | --- |
+| **Alde** — the manufacturer, more than likely a wet system | airflow in **m³/h** |
+| **glycol** | **ducting** and its diameter, e.g. 60 mm / 90 mm |
+| a **circulation pump** | **outlet vents** |
+| a **fluid capacity** in litres, an expansion vessel | |
+
+plus the phrases the sites themselves use: `hot water heating` and `warm water heating`
+(Dethleffs and Niesmann), `heating circuit`, `radiator`, `underfloor heating`, `water
+based` for wet; `blown air`, `warm air`, `hot air`, `forced air`, `Combi`, `AirTop` for
+air.
+
+**Those plumbing clues are weaker than the phrases and must be read as such.** Every one
+of them appears innocently elsewhere: a fresh water tank has a capacity in litres, an air
+conditioner quotes m³/h, and a washroom has an extractor vent. `habitation` therefore
+trusts them **only on a line that also mentions heating**, and requires "circulation"
+alongside "pump" because Eriba and Laika both list a *submersible* pump, which is the
+fresh-water one.
+
+Where nothing settles it, say so rather than guess — `habitation.heating_is_unclear`
+exists for exactly that, and Laika's "6 kW diesel heater, remotely controllable" is what it
+is for.
+
 Three traps worth knowing before writing the next one:
 
 * **A bare "wet" is not wet central heating.** "Wet room Shower and cassette toilet"
