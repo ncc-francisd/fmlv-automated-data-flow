@@ -321,6 +321,27 @@ own — the same chassis with a different gearbox — so `automatic.payload_kilo
 derives from the one `mtplm_kilograms` and its own MRO. Horus 38 and 40, Kilig 77 Plus,
 Sailer 69 and Sarus 66 Plus were all out there as well.
 
+**The arithmetic also wins over a published payload that is smaller than it.** Le Voyageur
+is the case (10 September 2026): its 2027 handbook prints MAM, MRO and payload for all 18
+layouts, and on the eight Héritage models the printed payload is *always lower* than
+MAM − MRO — by 85, 105, 165, 185, 355 and 365 kg, with only two reconciling. The Eterna
+range, in the same document, reconciles on seven of eight.
+
+The requester's ruling: *"what some manufacturers do is have two payloads, of personal
+effects and an optional equipment split. However, I think we have to stick to our rule,
+and we won't divide it into two... I would suggest that we use the calculation for payload
+because the MRO is real, the MTPLM is real, and we can reasonably use the difference."*
+
+So a printed payload that undershoots the arithmetic is read as **one fraction of a split
+the document does not label**, and the derived figure is recorded. This is the mirror of
+the caravan rule further down — there a single published figure may be the *total* where
+FMLV expects a half; here it may be a *half* where FMLV expects the total — and both
+resolve the same way, because MTPLM and MRO are the published masses and their difference
+is the capacity. **Do not populate two payload columns to make a printed figure fit**, and
+do not distrust the two masses because a third number disagrees with them.
+
+Only the motorhome fields work this way. Caravans keep the exception below.
+
 `store.changes._derived_payload_proposals` takes each mass from the site where the adapter
 found one and from FMLV where it did not, which is what the upload row will actually hold,
 and says which in the snippet. It stands down in three cases:

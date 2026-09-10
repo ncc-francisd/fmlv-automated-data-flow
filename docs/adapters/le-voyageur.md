@@ -478,10 +478,37 @@ exactly 1000.
 
 **Heritage does not: only 2 of 8 reconcile**, and the gaps are large and one-directional
 — the stated payload is always *lower* than MAM − MRO, by 85, 105, 165, 185, 355 and
-365 kg. That is not rounding and not a tolerance. Something is being subtracted that the
-document does not name, most likely a standard pack's weight. **Do not use the identity
-to fill or check a Heritage payload** until Pilote explain it; ask
-`m.storey@group-pilote.com` alongside the length question below.
+365 kg. That is not rounding and not a tolerance.
+
+**The requester settled it on 10 September 2026: derive the payload and ignore the printed
+figure.** His reading is that those numbers are one fraction of an unlabelled split —
+*"what some manufacturers do is have two payloads, of personal effects and an optional
+equipment split. However, I think we have to stick to our rule, and we won't divide it
+into two... the MRO is real, the MTPLM is real, and we can reasonably use the
+difference."*
+
+| | MAM | MRO | printed | **recorded** |
+| --- | --- | --- | --- | --- |
+| 6.9 LF | 4500 | 3680 | 820 | **820** |
+| 7.6 CF | 4500 | 3565 | 770 | **935** |
+| 7.6 GJF | 4500 | 3565 | 750 | **935** |
+| 7.9 CF | 4500 | 3655 | 760 | **845** |
+| 7.9 GJF | 4500 | 3695 | 700 | **805** |
+| 7.9 GJL | 4500 | 3820 | 680 | **680** |
+| 8.7 CF | 5500 | 4025 | 1110 | **1475** |
+| 8.7 GJF | 5500 | 4035 | 1110 | **1465** |
+
+So the identity is used on **all 18**, not just Eterna, and the printed payload is read as
+a cross-check that Heritage fails rather than as the source. The cross-manufacturer rule
+is in [`README.md`](README.md#payload-is-arithmetic-so-it-is-checkable-even-when-nothing-was-published);
+it is the mirror of the caravan case, where one published figure may be the total rather
+than a half.
+
+Two consequences worth carrying into the build. **Never split the payload across the two
+columns to make the printed figure fit** — that is the thing the rule exists to prevent.
+And **the six derived Heritage figures are the largest single group of payload proposals
+this brand will ever make**, so the first run should expect them and the reviewer should be
+told why they are larger than the brochure says.
 
 ### The model code is the length, and it is tight
 
