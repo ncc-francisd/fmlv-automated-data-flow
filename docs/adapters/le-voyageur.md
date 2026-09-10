@@ -415,3 +415,116 @@ so a rename that drops the `LV` prefix scores 0.500 against the baseline and sit
   information for the range as it stands. Possibly the cab seat type. Not used.
 - **Nothing has been run.** No adapter exists, so there are no run numbers, no real
   product counts and no reviewed diffs. The 18/16 split above is a survey prediction.
+
+## The 2027 documents — 10 September 2026
+
+The requester supplied two, by email: **`GT Le Voyageur 2027 UK.pdf`**, a specifications
+and dealer handbook, and **`LV 2027 - vehicles price list - UK - retail.pdf`**. Neither
+is on the website. Together they settle most of what the September survey left open.
+
+**A caution on the date.** The cover says *Specifications 2027* and the price list is
+headed *Pricelist 2027*, effective 1 July 2026 — but the handbook's own legal page ends
+`2026 Collection - Version 1.0 of 28 May 2026`. The collection line is stale boilerplate;
+everything else in both documents says 2027, and the prices supersede.
+
+### The roster is 18, confirmed, and here are the codes
+
+Exactly the 18 the survey predicted from `/find-your-motorhome/`.
+
+| range | codes |
+| --- | --- |
+| **Eterna** (Fiat Al-Ko) | 6.8 LF, 7.0 GJF, 7.5 CF, 7.5 GJF, 7.8 CF, 7.8 CL, 7.8 GJF, 7.8 GJL, 8.5 CF, 8.5 GJF |
+| **Heritage** (Mercedes Al-Ko) | 6.9 LF, 7.6 CF, 7.6 GJF, 7.9 CF, 7.9 GJF, 7.9 GJL, 8.7 CF, 8.7 GJF |
+
+Ten and eight. The handbook prefixes them `LV` and `LVXH` respectively, and splits each
+range into *light vehicles (LDV)* and *heavy vehicles (HDV)* — **only the Eterna 7.0 GJF
+is light**, at 3500 kg; every other layout is 4500 kg or more.
+
+### Prices are banded by size, not set per layout
+
+The most important structural fact, and it is the Rimor pattern in a different dress:
+**nine prices cover eighteen layouts.** The price list has no layout codes at all, only
+the size prefix.
+
+| Eterna | | Heritage | |
+| --- | --- | --- | --- |
+| LV 6.8 | £130,900 | LVXH 6.9 | £151,000 |
+| LV 7.0 | £131,900 | LVXH 7.6 | £159,000 |
+| LV 7.5 | £137,900 | LVXH 7.9 | £162,000 |
+| LV 7.8 | £140,900 | LVXH 8.7 | £172,000 |
+| LV 8.5 | £151,900 | | |
+
+So `LV 7.8` at £140,900 is the price of all four 7.8 layouts, and `LVXH 7.9` of all three
+7.9s. The join is on the size prefix, and it covers all 18 with none left over. **A
+per-layout price lookup would find nothing** — this must be keyed on the size.
+
+### A third price basis in the same group
+
+`RETAIL PRICE INCLUDING TRANSPORT & TAXES`. Joa's list is "incl. 20% VAT **and**
+transport" (*Delivered*); Pilote's own is "incl. VAT **excluding** transport". Three
+brands of one group, three headings, and Le Voyageur's matches Joa's rather than
+Pilote's. Confirm rather than inherit, every time.
+
+### The self-check works on Eterna and fails on Heritage
+
+The handbook prints MAM, mass in running order and payload for all 18, and its legal page
+states the identity: *"The available payload is the difference between the Maximum
+Technically Permissible Laden Mass (MTPLM) and the Mass in Running Order (MRO)."*
+
+**Eterna honours it: 7 of the 8 stated payloads reconcile exactly.** Two more are printed
+`NC` and the identity fills them (7.8 CL = 750, 7.8 GJL = 790). The eighth is a
+**typo the check catches**: the 7.0 GJF prints `1408` where 3500 − 3092 = **408**, out by
+exactly 1000.
+
+**Heritage does not: only 2 of 8 reconcile**, and the gaps are large and one-directional
+— the stated payload is always *lower* than MAM − MRO, by 85, 105, 165, 185, 355 and
+365 kg. That is not rounding and not a tolerance. Something is being subtracted that the
+document does not name, most likely a standard pack's weight. **Do not use the identity
+to fill or check a Heritage payload** until Pilote explain it; ask
+`m.storey@group-pilote.com` alongside the length question below.
+
+### The model code is the length, and it is tight
+
+Across all 18, the printed length is within **60 mm** of the code — much tighter than
+Joa's 150 mm band, because Le Voyageur round to the decimetre honestly.
+
+That resolves **the 7.6 length question this document left open**. The website says
+7.91 m; the handbook says 766 cm and the price list 7,65 m. **7.91 is the 7.9's figure** —
+the site has copied a neighbouring model's length, which is exactly the Joa 63T failure.
+Two 2027 documents agree at ~7.65 m and the code implies 7.60, so **the website is wrong
+and the 60 mm check catches it**.
+
+### Habitation, from the `● standard ○ option - not available` tables
+
+Per-layout columns, so the attribution is safe.
+
+* **Heating: Truma Combi 6E hot water/heating (diesel), standard on all 18** — blown air.
+  The Alde diesel/230 V boiler is a **£2,290 option** (and inside the Luxury and
+  Excellence packs), so by the base-vehicle rule the standard reading is blown air on
+  every layout. Do not let a pack turn it wet.
+* **Refrigeration: compression, standard on all 18.** 150–175 L on Heritage, 174 L on
+  Eterna — **except the 7.0 GJF at 90 L**, the light-chassis outlier again.
+* **Microwave: an option, not standard.** `Microwave oven OP2232 £440`, marked ○ on most
+  layouts and `-` on a few, and standard only inside the Excellence packs. Unlike Joa and
+  Pilote, the word is present — so this brand states a negative rather than being silent.
+* **Separate shower: yes on 17 of 18.** *"Separate shower with 400 x 400 mm skylight"* is
+  ● everywhere except the **Eterna 7.0 GJF**, which has *"Combined shower with sliding
+  curtain"*. A genuinely per-layout washroom fact, and the light chassis differs again.
+
+### Seats and berths, by the settled rules
+
+**Seats are 4 on all 18.** Three layouts print `● 4 - ○ 5` (Eterna 7.8 CL and 7.8 GJL,
+Heritage 7.9 GJL) with the fifth belt an £880 option, so the standard figure is 4 by the
+three-point-belt rule.
+
+**Berths come from the `Sleeping space` row: 2 on the 6.8 LF and 6.9 LF, 4 on the other
+sixteen.** `Optional extra sleeping spaces` is a separate row and stays out of it, which
+is what the September survey already concluded — now confirmed against a second document.
+
+### What the 7.0 GJF is
+
+Worth calling out as a group: it is the **only light vehicle**, and it differs on nearly
+every axis — 3500 kg not 4500, a 60-litre diesel tank not 90, a 90 L fridge not 174, a
+combined shower not a separate one, a sliding WC, no cooker hood, no separate reading
+lights, a 190 x 200 permanent bed. An adapter that treats the Eterna range as homogeneous
+will get this one wrong in a dozen places.
