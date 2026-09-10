@@ -604,7 +604,7 @@ the Bürstner case, where the upper figure is a paid option; it is its mirror im
 taking the lower figure would understate eleven products. The adapter already reads it
 correctly.
 
-### Four Horus layouts are absent from the factory's 2027 line-up
+### Four Horus layouts are absent from the catalogue, and only one is dead
 
 | in FMLV as 2027 | in the 2027 catalogue |
 | --- | --- |
@@ -614,9 +614,40 @@ The catalogue's Horus range is four layouts — 38, 45, 54 and 95 — against th
 holds. This is the requester's own expectation, from 10 September: *"I think we might
 find a few more models being stood down."*
 
-**Horus 12 is confirmed dead.** The requester heard from MNC on 10 September that it is
-no longer in their range — so at least one of the four is a genuine withdrawal and not a
-rename. The other three still have to be checked.
+**But absence from the catalogue is not withdrawal, and the factory's own site proves
+it.** `rimor.it/it/en/gamma/horus/vans`, checked on 10 September 2026, shows six current
+vans: **38, 40, 45, 54, 66 and 95**. So Horus 40 and 66 are live models the factory is
+still selling; what the catalogue omits is their *technical-data tables*, exactly as the
+leaflet check above suspected. They must not be archived.
+
+**Horus 12 is confirmed dead**, and now on two independent grounds: MNC told the
+requester on 10 September that it is out of their range, and it is absent from the
+factory's van page as well as from the catalogue. Its model page already 302s to `/`.
+
+That leaves **the Van 238** as the only one of the four still genuinely unresolved. It
+has never had a factory page, so its absence from a factory document is not evidence
+either way; MNC's listing is the only thing that can settle it.
+
+### How the 2027 rollover is being handled
+
+The requester's decision, 10 September 2026, and it needs no adapter change:
+
+> *"I will accept the changes on those models that are not in the catalogue, but I will
+> leave them as 2026 models in the output, in the download, and I'll only use the
+> catalogue models, which do line up, as 2027."*
+
+So the corrected weights and prices are taken on every layout — they are live figures
+from MNC and the factory, whatever year they belong to — and the **model year** is what
+separates the confirmed 2027 line-up from the layouts still awaiting confirmation. The
+year is an FMLV field the adapter never emits, so this is entirely a decision made at
+upload.
+
+**One consequence to act on before the new year.** `_is_current_model_year` in
+`src/cli.py` keeps only the current calendar year and the next, so a row marked 2026 is
+still diffed for the rest of 2026 — and drops out of the baseline on **1 January 2027**.
+From that morning the adapter would still collect those layouts from MNC, match nothing,
+and propose them as **new products**. Before the year turns, each 2026-marked layout has
+to be either moved to 2027 or archived.
 
 **The rest is not proof, and must not be actioned from this document.** The roster is MNC's,
 not the factory's, and MNC's site is what a run reads. Two things have to be true before
