@@ -241,9 +241,16 @@ All three agree on all eight.
 
 ## Still unverified
 
-* **Whether id 103 `Joa Camp` still holds products.** If it does, they are the same
-  vehicles under the old brand and would need archiving rather than being left to look
-  like a parallel range.
+* ~~**Whether id 103 `Joa Camp` still holds products.**~~ **Settled 11 September 2026:
+  it does, and they stay.** The requester: *"there will be some, but they are not in the
+  2027 year, and they will be removed from the site... there will be legacy pages with
+  Joa Camp on them because that's what they were. I think they can coexist. What we're
+  doing is reviewing the 2027 range."*
+
+  Nothing needs doing, and nothing can interfere: a run is filtered to one
+  `fmlv_manufacturer` before diffing, so a `Joa Camp` row is never a candidate to match
+  a `Joa by Pilote` product whatever its year — and `_is_current_model_year` would drop
+  the old years anyway. The two ids are a historical record, not a duplicate.
 * **Model year changeover.** The 2027 collection is dated 25 May 2026 and the price list
   1 June 2026, so Joa move earlier than the NEC-driven British brands. Not yet observed
   across a rollover.
