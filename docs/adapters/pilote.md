@@ -172,6 +172,40 @@ single most important thing about this source.
 | `Maximum authorised mass (MAM) (kg)` | 3500 | 3500 | 3500 | 3500 |
 | `Load capacity in kg (on basic models)` | **730** | — | — | — |
 
+### The summary strip, and the word "Berth" meaning a seat
+
+Above the button, every page carries one line in a fixed order:
+
+```
+Length 7,07 m   Width 2,79 m   Height 2,85 m
+Berth 4   Meal place 5   Sleeping place 4   Payload 485 kg
+```
+
+**`Berth` is the belted-seat count, not the berth count.** Checked against the Options
+brochure on all four sampled layouts, the mapping is:
+
+| the strip says | it means | FMLV field |
+| --- | --- | --- |
+| `Berth` | seats with safety belts | `mh_passenger_seats_inc_driver` |
+| `Meal place` | dining seats | *not recorded* |
+| `Sleeping place` | sleeping berths | `berths` |
+
+The G690GJ is the proof: strip `Berth 4 / Meal place 5 / Sleeping place 4` against the
+brochure's `Seats with safety belts 4 / Dining seats 5 / Sleeping berths 4`. The V540G
+agrees too — `4 Berth, 2 Sleeping places` against the brochure's 4 seats and 2 berths.
+
+**Reading `Berth` as berths would put the seat count in the berth column on all 43**, and
+because both are usually 4 on a coachbuilt it would look plausible in review. This is the
+single most dangerous misreading available on this source.
+
+### One layout where the strip and the brochure disagree on berths
+
+`p720u-evidence` prints `Sleeping place 2` where the brochure's Pacific Evidence table
+gives the P720U **4**. Three of the four sampled layouts agree exactly, so this is one
+disagreement rather than a broken mapping — but it must be resolved before the first run
+rather than averaged over. The site wins by the settled rule unless the brochure can be
+shown right.
+
 ### Payload is published, but in two different places
 
 The requester, 11 September 2026: *"as long as you can derive MRO and payload, to be
