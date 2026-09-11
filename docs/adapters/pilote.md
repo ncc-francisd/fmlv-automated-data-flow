@@ -276,6 +276,45 @@ The same comparison the other way: the G690GJ's popup says 707 where the brochur
 6,99 m. The site wins by the settled rule, but the two disagree often enough on length
 that it is worth raising with Pilote.
 
+## The Van Vega Standard rename, and why it cannot arrive as a correction
+
+The requester asked (11 September 2026) whether the two retired rows could come through
+as corrections rather than as a disappearance plus a new product. **They cannot, and
+forcing it would be worse than the problem.**
+
+`Pilote Van V540G` scores **0.400** against `Van Vega Standard V540G` — the layout code
+agrees but two of the three range words do not. Bridging that needs a threshold below
+0.4, and `Galaxy Expression G740FC` scores **0.500** against `Galaxy Evidence G740FC`.
+So any threshold loose enough to join the rename is also loose enough to let a £86,900
+Expression claim a £94,900 Evidence row. A visible split that a person fixes is a better
+failure than a silent merge of two different vehicles.
+
+A rename map in `diff/matching.py` would do it properly, and is worth building if this
+recurs across brands. It is not worth bolting on for two rows.
+
+### The migration table
+
+The two renames keep their layout code and every dimension, so photographs and copy carry
+straight across:
+
+| FMLV row today | product id | becomes | in run #80 |
+| --- | --- | --- | --- |
+| `Van Vega Standard` **V540G** | 8235 | `Pilote Van` **V540G** | arrives as new |
+| `Van Vega Standard` **V630S** | 8916 | `Pilote Van` **V630S** | arrives as new |
+
+The other four vans in the range, for context:
+
+| FMLV row | product id | in run #80 |
+| --- | --- | --- |
+| `Pilote Van` V600G | 6085 | matched, unchanged name |
+| `Pilote Van` V630J | 6082 | matched, unchanged name |
+| `Pilote Van` V633M | 6080 | matched, unchanged name |
+| — | — | `Pilote Van` **V630B** is genuinely new |
+
+So of the five products appearing as new, **two are renames with a source row to copy
+from and three are new vehicles**: V630B, `Galaxy Evidence` G690GJ and `Galaxy Expression`
+G720FGJ.
+
 ## The self-check, and where it breaks
 
 The model code encodes the length in decimetres, as it does at Joa and Le Voyageur — and
