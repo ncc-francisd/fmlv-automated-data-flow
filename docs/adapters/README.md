@@ -1574,6 +1574,43 @@ steps, and snapshot any XHR/fetch response whose URL matches a substring. Scroll
 triggered lazy loading is common enough on modern marketing sites that this is written
 as a generic capability, not something specific to Adria.
 
+### A specification behind a button: `click_selector`
+
+Added 11 September 2026, for Pilote, and written as a generic capability for the same
+reason. **Both `fetch()` and `fetch_with_capture()` take `click_selector`**, press the
+first element matching it, and snapshot the DOM as it then stands — so nothing downstream
+needs to know a click happened. Pair it with `settle_ms` when the content arrives over the
+network rather than from markup already present.
+
+```python
+result = browser.fetch(
+    url,
+    click_selector="text=Technical information",
+    settle_ms=3000,
+    on_progress=on_progress,
+)
+```
+
+Three things about it are deliberate, and each is a rule rather than an implementation
+detail:
+
+- **A missing selector is narrated, not raised.** A renamed button is the same class of
+  problem as a spec row that has moved: the page still yielded its markup, the fields
+  behind the click simply come back empty, and that reaches a reviewer as a field not
+  found. Raising would lose every other product in the sweep. Pass `on_progress` so the
+  miss is visible.
+- **`.first` is explicit**, so a selector matching several elements clicks the leading one
+  instead of failing a strictness check.
+- **Clicking is reading, not API access.** It lets the site's own JavaScript make the call
+  it would make for any visitor. That is categorically different from taking a credential
+  out of the page source and calling the backing service directly — Pilote's page leaks an
+  Airtable personal access token, and `pilote.md` records why that route is refused even
+  though it would be easier.
+
+The cost is real and worth planning for: a click means a full browser render per product,
+so a 43-page manufacturer takes minutes rather than the seconds a plain-HTTP sweep takes.
+Check the plain HTML first, every time.
+
 ## What to check for the next manufacturer
 
 - **Is there a brochure or price list PDF with a spec section?** Check this first — see
@@ -1587,6 +1624,11 @@ as a generic capability, not something specific to Adria.
 - Is there a "download spec sheet" / "compare" / "brochure" button? Follow it — it may
   resolve to a stable, unauthenticated, non-JS URL that's cheaper to fetch directly than
   scripting the interaction that produces it every time.
+- **Is the specification behind a button rather than absent?** Pilote's figures are in no
+  server-rendered HTML at all and appear only once "Technical information" is pressed. Try
+  `click_selector` before concluding a field cannot be collected — and note that a click
+  can reveal *more* than expected: Pilote's also yields a per-model standard-equipment
+  list, which is a better habitation source than the emailed brochure it replaced.
 - Are weights/dimensions ever in the HTML/JSON path at all, or always PDF-only? This
   was Adria's answer; DESIGN.md §9 open question 6 expects this to vary by manufacturer.
 - **Does the roster agree across the sitemap, the navigation and the range index?** Take it

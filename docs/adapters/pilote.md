@@ -61,14 +61,19 @@ that the price list calls this block *Vega Expression*; the site's own offer nam
 
 ## Three sources, and each one is needed
 
+Revised 11 September 2026, once the click existed and showed what the panel actually
+holds. Less of this comes from the emailed documents than the survey first assumed.
+
 | what | where it comes from | refetchable per run? |
 | --- | --- | --- |
 | roster, range, model | `vehicule-sitemap.xml` | **yes** |
-| length, seats, berths | Options & Offers brochure | no — emailed |
-| price | UK vehicle price list | no — emailed |
-| MTPLM, MRO, payload, width, height | the page's Technical information panel | **only behind a click** |
-| habitation findings | Options & Offers brochure fittings tables | no — emailed |
+| length, height, berths, payload | Technical information panel | **yes — behind a click** |
+| habitation findings | the panel's per-model `Standard fittings` list | **yes — behind a click** |
 | floorplan | the model page | **yes** |
+| seats | Options & Offers brochure | no — emailed |
+| price | UK vehicle price list | no — emailed |
+| **MTPLM** | **not yet found anywhere on the site** | — |
+| width | the brochure; the panel's figure includes the mirrors | no — emailed |
 
 ### The roster reconciles three ways, 43 for 43
 
@@ -90,22 +95,43 @@ adapters**.
 
 ## What is still blocking the build
 
-**The Technical information panel needs a click.** The specifications the requester
-described are fetched from Airtable when the button is pressed; the server-rendered HTML
-carries the label and no figures. `BrowserFetcher` has `fetch` and `fetch_with_capture`
-but no click support, so **a `click_selector` capability has to be added before the weights
-can be read**. That is a change to shared fetching code, not an adapter-local hack.
+**The click capability exists as of 11 September 2026** — `BrowserFetcher.fetch` and
+`fetch_with_capture` both take a `click_selector` — and it was proved against
+`/a-class/g690gj-expression/`. `click_selector="text=Technical information"` with a
+3-second settle reveals:
+
+```
+Technical information
+Length 7,07 m   Width 2,79 m   Height 2,85 m
+Berth 4   Meal place 5   Sleeping place 4   Payload 485 kg
+```
+
+and, better than expected, **a full per-model `Standard fittings` list** — Chassis-Engine,
+Cab fittings, Living area bodywork, Multimedia, Energy-Autonomy, Exterior accessories,
+Lounge and the rest, itemised for that one layout. **So the habitation findings come from
+the site after all**, not from the emailed brochure, and they are attributed to one vehicle
+by construction.
+
+**MTPLM is still not visible, and that is the open problem.** The panel gives payload but
+no maximum authorised mass. A second click on `Find all the technical characteristics`
+finds the element and changes nothing within four seconds, so it is not a simple reveal —
+it may need a longer settle, a different trigger, or the Airtable response captured
+directly via `capture_url_contains`. **Resolve this before building**, because without
+MTPLM the payload cannot be checked and `mro_kilograms` cannot be derived.
+
+Two traps visible already in that one panel:
+
+* **`Width 2,79 m` is the mirrors-open figure.** The body width is 2,32 m on an A-class.
+  Recording the panel's width unread would overstate every vehicle by half a metre — the
+  same class of error as Le Voyageur's interior width, in the other direction.
+* **`Length 7,07 m` disagrees with the brochure's 6,99 m** for that layout. One of them is
+  wrong and it is not yet known which.
 
 **Do not call Airtable directly.** The page source leaks a Pilote personal access token.
 Its scope is unknown, and querying their database is a different act from reading their
-website. The legitimate route is to render the public page and click, letting Pilote's own
-JavaScript make the call as it does for any visitor. Pilote should be told about the leak;
-the contact is Miles Storey at `m.storey@group-pilote.com`.
-
-Until the click exists, an adapter could still emit range, model, length, seats, berths,
-price and floorplan for all 43 — everything except the four weights and the two remaining
-dimensions. That is a real question for the requester: ship the partial adapter now, or
-wait for the click.
+website. The click is the legitimate route: it lets Pilote's own JavaScript make the call
+exactly as it does for any visitor. Pilote should still be told about the leak; the
+contact is Miles Storey at `m.storey@group-pilote.com`.
 
 ## The self-check, and where it breaks
 

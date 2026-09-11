@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Click-revealed specification</title>
+
+<!--
+  Stands in for a page that keeps its specification behind a button — Pilote's
+  "Technical information" panel is the real one. Three things are deliberate:
+
+  * the figures are in NO server-rendered markup, so a plain fetch cannot find them;
+  * pressing the button also makes a network request, so the same fixture exercises
+    `fetch_with_capture`'s response snapshotting on a click rather than on a scroll;
+  * the script is EXTERNAL. Inline, its own source text would contain the strings the
+    tests look for, and a "this is absent before the click" assertion could never fail.
+
+  Two elements match `.spec-button`, so a selector matching several elements is covered
+  too: the first is the real one.
+-->
+
+<h1>LV example</h1>
+<p id="always">Length : 7.85 m</p>
+
+<button class="spec-button" id="technical">Technical information</button>
+<button class="spec-button" id="decoy">Another panel</button>
+
+<div id="panel"></div>
+
+<script src="click_revealed.js"></script>

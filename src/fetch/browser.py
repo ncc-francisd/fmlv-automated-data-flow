@@ -39,6 +39,13 @@ DEFAULT_BACKOFF_SECONDS = 3.0
 #: A half-viewport step overlaps consecutive positions, so nothing is skipped.
 SCROLL_STEP_VIEWPORT_FRACTION = 0.5
 
+#: How long to wait for a `click_selector` to become clickable before giving up.
+#:
+#: Deliberately short. The button this exists for is rendered with the page, so if it is
+#: not there within a few seconds it is not coming — and a page per product means a long
+#: timeout multiplies across the whole run.
+DEFAULT_CLICK_TIMEOUT_MS = 5000
+
 
 class BrowserFetcher:
     """Renders a page with headless Chromium and snapshots the resulting HTML.
@@ -103,16 +110,40 @@ class BrowserFetcher:
         assert last_error is not None
         raise last_error
 
-    def fetch(self, url: str, *, previous_hash: str | None = None) -> FetchResult:
+    def fetch(
+        self,
+        url: str,
+        *,
+        previous_hash: str | None = None,
+        click_selector: str | None = None,
+        click_timeout_ms: int = DEFAULT_CLICK_TIMEOUT_MS,
+        settle_ms: int = 0,
+        on_progress: Callable[[str], None] = lambda message: None,
+    ) -> FetchResult:
         """Render a page and snapshot the DOM's final HTML.
 
         Retries a `wait_until` timeout (see `_goto`) but nothing else — a page that
         fails outright, or a `wait_until` that's structurally too strict for this
         page, is better surfaced immediately than retried blind.
+
+        `click_selector` presses one element before the snapshot is taken, for a site
+        that keeps its specification behind a button — see `_click`. Pair it with
+        `settle_ms` when the content arrives over the network rather than from markup
+        already in the page, so the snapshot is taken after it lands; the snapshot is of
+        the DOM as it then stands, so nothing downstream needs to know a click happened.
         """
         page = self._browser.new_page(user_agent=self.user_agent)
         try:
             response = self._goto(page, url)
+            if click_selector is not None:
+                self._click(
+                    page,
+                    click_selector,
+                    timeout_ms=click_timeout_ms,
+                    on_progress=on_progress,
+                )
+            if settle_ms:
+                page.wait_for_timeout(settle_ms)  # type: ignore[attr-defined]
             html = page.content()
             status_code = response.status if response is not None else 0  # type: ignore[attr-defined]
         finally:
@@ -130,6 +161,9 @@ class BrowserFetcher:
         scroll_pixels: int = 2000,
         scroll_pause_ms: int = 400,
         settle_ms: int = 2000,
+        click_selector: str | None = None,
+        click_timeout_ms: int = DEFAULT_CLICK_TIMEOUT_MS,
+        on_progress: Callable[[str], None] = lambda message: None,
     ) -> tuple[FetchResult, list[FetchResult]]:
         """Render a page and also snapshot any XHR/fetch response matching a URL.
 
@@ -144,6 +178,11 @@ class BrowserFetcher:
         every response whose URL contains `capture_url_contains` is snapshotted
         exactly like any other fetch, so it is just as reproducible and diffable
         (DESIGN.md §6.6) even though it never went through `Fetcher` directly.
+
+        `click_selector` presses one element after any scrolling and before the settle,
+        for a page whose data is fetched only when a button is pressed — see `_click`.
+        Scrolling first means a button below the fold is reachable; Playwright also
+        scrolls the element into view itself, so the order is belt and braces.
         """
         captured: list[tuple[str, int, str | None, bytes]] = []
 
@@ -174,6 +213,13 @@ class BrowserFetcher:
                     pixels=scroll_pixels,
                     pause_ms=scroll_pause_ms,
                 )
+            if click_selector is not None:
+                self._click(
+                    page,
+                    click_selector,
+                    timeout_ms=click_timeout_ms,
+                    on_progress=on_progress,
+                )
             page.wait_for_timeout(settle_ms)
             html = page.content()
             status_code = response.status if response is not None else 0  # type: ignore[attr-defined]
@@ -186,6 +232,43 @@ class BrowserFetcher:
             for captured_url, captured_status, content_type, body in captured
         ]
         return page_result, capture_results
+
+    @staticmethod
+    def _click(
+        page: object,
+        selector: str,
+        *,
+        timeout_ms: int,
+        on_progress: Callable[[str], None],
+    ) -> bool:
+        """Click the first element matching `selector`. `False` if it never appeared.
+
+        Some sites keep their specification behind a button and fetch it only when a
+        visitor presses it — Pilote's "Technical information" panel is the first one
+        found here, and its figures are in no server-rendered HTML at all. Clicking lets
+        the site's own JavaScript make that call exactly as it would for any visitor,
+        which is the legitimate route to data a page will happily show; it is not a way
+        to reach an API a visitor could not.
+
+        **A missing selector is narrated, not raised.** A button that has been renamed
+        is the same class of problem as a spec row that has moved: the page still
+        yielded something, the fields behind the click simply come back empty, and that
+        reaches a reviewer as a field not found rather than as a dead run. Raising here
+        would lose the other products in the sweep.
+
+        `.first` is explicit because a selector matching several elements should click
+        the leading one rather than fail a strictness check — the same forgiving
+        posture the rest of this module takes.
+        """
+        try:
+            page.locator(selector).first.click(timeout=timeout_ms)  # type: ignore[attr-defined]
+        except PlaywrightTimeoutError:
+            on_progress(
+                f"no element matching {selector!r} became clickable within "
+                f"{timeout_ms}ms, so whatever it reveals is not in this snapshot"
+            )
+            return False
+        return True
 
     @staticmethod
     def _scroll_to_bottom(page: object, *, steps: int, pixels: int, pause_ms: int) -> None:

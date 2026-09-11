@@ -171,3 +171,88 @@ def test_fetch_with_capture_finds_nothing_without_scrolling(
     )
 
     assert captured == []
+
+
+# --------------------------------------------------------------------------- #
+# Clicking a button to reveal a specification
+# --------------------------------------------------------------------------- #
+
+
+def test_a_click_reveals_content_that_is_in_no_server_rendered_markup(
+    browser_fetcher: BrowserFetcher, fixture_server: str
+) -> None:
+    """The figures behind Pilote's "Technical information" button, in miniature."""
+    url = f"{fixture_server}/click_revealed.html"
+
+    before = browser_fetcher.fetch(url)
+    after = browser_fetcher.fetch(
+        url, click_selector="#technical", settle_ms=1000
+    )
+
+    assert "MTPLM" not in before.file_path.read_text(encoding="utf-8")
+    assert "MTPLM : 4500 kg" in after.file_path.read_text(encoding="utf-8")
+
+
+def test_a_selector_matching_several_elements_clicks_the_first(
+    browser_fetcher: BrowserFetcher, fixture_server: str
+) -> None:
+    """`.spec-button` matches the real button and a decoy; the leading one wins."""
+    result = browser_fetcher.fetch(
+        f"{fixture_server}/click_revealed.html",
+        click_selector=".spec-button",
+        settle_ms=1000,
+    )
+    html = result.file_path.read_text(encoding="utf-8")
+
+    assert "MTPLM : 4500 kg" in html
+    assert "the wrong panel" not in html
+
+
+def test_a_missing_selector_is_narrated_rather_than_raised(
+    browser_fetcher: BrowserFetcher, fixture_server: str
+) -> None:
+    """A renamed button must not kill a sweep — the page still yielded its markup.
+
+    The fields behind the click come back empty, which reaches a reviewer as a field
+    not found. Raising would lose every other product in the run.
+    """
+    said: list[str] = []
+
+    result = browser_fetcher.fetch(
+        f"{fixture_server}/click_revealed.html",
+        click_selector="#renamed-last-year",
+        click_timeout_ms=1000,
+        on_progress=said.append,
+    )
+
+    assert result.status_code == 200
+    assert "Length : 7.85 m" in result.file_path.read_text(encoding="utf-8")
+    assert any("#renamed-last-year" in message for message in said)
+
+
+def test_a_click_triggered_xhr_is_snapshotted_like_any_other_fetch(
+    browser_fetcher: BrowserFetcher, fixture_server: str
+) -> None:
+    """The request the click causes is captured, so the run stays reproducible."""
+    _page, captured = browser_fetcher.fetch_with_capture(
+        f"{fixture_server}/click_revealed.html",
+        capture_url_contains="spec_payload.json",
+        click_selector="#technical",
+        settle_ms=1000,
+    )
+
+    assert len(captured) == 1
+    assert b'"mtplm": 4500' in captured[0].file_path.read_bytes()
+
+
+def test_no_click_selector_leaves_the_existing_behaviour_alone(
+    browser_fetcher: BrowserFetcher, fixture_server: str
+) -> None:
+    _page, captured = browser_fetcher.fetch_with_capture(
+        f"{fixture_server}/click_revealed.html",
+        capture_url_contains="spec_payload.json",
+        settle_ms=500,
+    )
+
+    assert captured == []
+    assert "MTPLM" not in _page.file_path.read_text(encoding="utf-8")
