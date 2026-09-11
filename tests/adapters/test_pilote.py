@@ -420,3 +420,22 @@ def test_the_click_timeout_is_longer_than_the_shared_default() -> None:
     from src.fetch.browser import DEFAULT_CLICK_TIMEOUT_MS
 
     assert pilote.CLICK_TIMEOUT_MS > DEFAULT_CLICK_TIMEOUT_MS
+
+
+def test_the_two_layouts_with_no_popup_are_known_rather_than_a_click_failure() -> None:
+    """Their pages carry no `button.btn-popup` at all — checked over plain HTTP.
+
+    Raising the click timeout from 5s to 15s changed nothing for these two, which is
+    what proved the cause was the source rather than the timing.
+    """
+    from src.adapters.pilote import LAYOUTS_WITHOUT_A_POPUP
+
+    assert LAYOUTS_WITHOUT_A_POPUP == {
+        ("Pacific Expression", "P740GJ"),
+        ("Pacific Expression", "P740C"),
+    }
+    # Every sampled layout does have one, so the gap is specific rather than general.
+    for name in PAGES:
+        product = _parse(name)
+        assert (product.manufacturer_range, product.model) not in LAYOUTS_WITHOUT_A_POPUP
+        assert popup_rows(_page(name)), name

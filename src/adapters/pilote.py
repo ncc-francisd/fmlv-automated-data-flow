@@ -78,13 +78,28 @@ CLICK_SELECTOR = "button.btn-popup"
 #: How long to let the popup's Airtable call land after the click.
 SETTLE_MS = 8000
 
-#: How long to wait for the button to become clickable.
+#: How long to wait for the button to become clickable. Three times the shared default,
+#: because these pages are heavy and a merely slow one should not cost a product its
+#: weights.
 #:
-#: Three times the shared default, because these pages are heavy and the shared 5000ms
-#: was not enough: run #79 lost the popup on **two of the 43** — the P740GJ and P740C
-#: Expression — and each arrived with no length, height or masses at all. A page that is
-#: merely slow should not cost a product its weights.
+#: It is **not** what fixes `LAYOUTS_WITHOUT_A_POPUP` — raising it from 5s to 15s changed
+#: nothing for those two, which is what proved the cause was not timing.
 CLICK_TIMEOUT_MS = 15_000
+
+#: The layouts whose page carries no popup button at all, checked 11 September 2026.
+#:
+#: Run #79 lost the popup on these two and run #80 lost it again at three times the
+#: timeout, so a plain HTTP fetch was used to settle it: `p740gj-expression` and
+#: `p740c-expression` contain **no `button.btn-popup` element**, where
+#: `p740fc-expression` beside them has exactly one. Pilote have not published a technical
+#: panel for them.
+#:
+#: So this is a gap in the source, not a fault in the click, and the right behaviour is
+#: what already happens: the length, height and both masses come back empty and reach a
+#: reviewer as fields not found, while the seats, berths, price and body type — which do
+#: not depend on the popup — are still collected. The list exists so the warning can say
+#: which of the two it is, and so a page that *gains* a button later stops being narrated.
+LAYOUTS_WITHOUT_A_POPUP = frozenset({("Pacific Expression", "P740GJ"), ("Pacific Expression", "P740C")})
 
 #: Pilote's identities collide at the 0.5 default, on two separate axes, so the
 #: per-manufacturer threshold `docs/adapters/README.md` describes is mandatory here.
@@ -607,10 +622,18 @@ def collect(
             continue
 
         if not popup_rows(page):
+            known = (product.manufacturer_range, product.model) in LAYOUTS_WITHOUT_A_POPUP
             on_progress(
-                f"[{product.label}] WARNING: the technical popup is empty, so the length, "
-                f"height and both masses are missing. The click did not land — check "
-                f"{CLICK_SELECTOR!r} still matches the button"
+                f"[{product.label}] no technical popup, so the length, height and both "
+                + (
+                    "masses are left for FMLV's own figures. This layout's page carries "
+                    "no button at all — a known gap in Pilote's own data, not a failed "
+                    "click"
+                    if known
+                    else f"masses are missing. WARNING: this is new — check "
+                    f"{CLICK_SELECTOR!r} still matches the button, because every other "
+                    f"layout has one"
+                )
             )
 
         reconciles, why_not = _reconciles(product)
