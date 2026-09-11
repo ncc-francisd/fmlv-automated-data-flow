@@ -11,8 +11,8 @@ caravans. Ten products, and FMLV already holds all ten.
   within FMLV"* — so never "correct" it to a diaeresis.
 * **It used to be Joacamp and was not part of the Pilote group.** That is visible in the
   data: the NCC list still carries a separate **id 103, `Joa Camp`**, and the site's own
-  configurator still lives on `configurateur.joa-camp.com`. Check 103 holds nothing
-  before trusting a run against 261.
+  configurator still lives on `configurateur.joa-camp.com`. **103 does hold products and
+  that is fine** — see the settled note at the end.
 * The model pages carry *"a technical panel towards the bottom of the page, which you can
   open up and view all equipment"* — correct, and it is the best thing about this source.
 * A floorplan *"possibly when you click configure"* — close. The drawings are plain
