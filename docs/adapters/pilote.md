@@ -315,6 +315,32 @@ So of the five products appearing as new, **two are renames with a source row to
 from and three are new vehicles**: V630B, `Galaxy Evidence` G690GJ and `Galaxy Expression`
 G720FGJ.
 
+### How it is being resolved: renamed in Nova, not in the pipeline
+
+The requester's decision, 11 September 2026 — the same route that settled Le Voyageur's
+`Hertiage`. He renames products **8235** and **8916** in Nova from `Van Vega Standard` to
+`Pilote Van`, and **no code changes at all**, because the adapter already emits the
+destination name.
+
+Once FMLV agrees, both match at **1.000**, keep their product ids, keep their photographs,
+and their corrections land on the existing rows. The diff should then read **3 new and 11
+disappeared** rather than 5 and 13.
+
+Why this beats the alternatives, recorded so it is not re-litigated:
+
+* **The upload already does what is wanted for a matched row.** `build_upload_products`
+  copies the whole baseline row — `images` included — and applies the approved changes on
+  top, and `manufacturer_range` is a perfectly ordinary proposable field. So a rename on a
+  *matched* product carries the id, the photographs and the new name with no special
+  handling. The gap is only that these two never match.
+* **Editing the run store by hand would work locally and help nobody**, since reviews
+  happen on the deployed VM against its own store.
+* **A rename map in `diff/matching.py` is the proper fix** and would have served Le
+  Voyageur too. Two instances is not yet a pattern; a third would justify building it.
+
+**Order matters**: rename in Nova first, then run. Running first simply reproduces the
+split, which is noise rather than harm.
+
 ## The self-check, and where it breaks
 
 The model code encodes the length in decimetres, as it does at Joa and Le Voyageur — and
