@@ -201,13 +201,34 @@ chassis base`, `"Light" heavy vehicle`, `"Heavy" 4,25 T`, `"Heavy" 4,4 T/4,5 T` 
 only the first has a value on a base model. **The base-models row is the one to take**, by
 the settled base-vehicle rule; the variants are the paid uprates.
 
-### Width is the field this source cannot answer
+### Width is the field this source cannot answer, and it is left blank
 
 The popup gives the **interior** width and the **mirrors-open** width and nothing between
 them. FMLV wants the body width, excluding mirrors — which is neither, and which the
-Options brochure's layout tables do not print either. Do not record either figure: the
-mirrors-open one overstates by 40-60 cm and the interior understates. This wants asking of
-Pilote before the first run, alongside the length question below.
+Options brochure's layout tables do not print either. The mirrors-open figure overstates
+by 40-60 cm and the interior one understates.
+
+**The requester's ruling, 11 September 2026:** *"if they don't have a figure excluding
+mirrors, we'll have to leave that blank as we don't have the correct figure, unless it's
+an existing model that appears to have the same height and length. In other words, it's
+likely to be the same outer shell."*
+
+**The adapter emits no width at all**, and that produces exactly the behaviour the second
+half of that ruling asks for, without needing to compare against the baseline:
+
+* For a **matched** product, a field the adapter did not find arrives as a no-op — the
+  reviewer sees FMLV's own figure beside "nothing scraped" and it is preserved. So where
+  the length and height come back unchanged, the existing width stands untouched, which is
+  the same-outer-shell case.
+* Where the **length or height does change**, those arrive as proposals, so the reviewer is
+  looking at the dimensions anyway and can judge whether the shell moved.
+* For a **new** product the width is simply blank, which is honest: there is no previous
+  shell to reason from.
+
+That keeps the settled rule intact — a figure that could not be found is visible and never
+inherited silently — while letting an unchanged shell keep the width someone already
+established. Worth asking Pilote for the body width anyway, alongside the length
+disagreement below.
 
 ### The Atlas length disagreement resolves in the site's favour
 
