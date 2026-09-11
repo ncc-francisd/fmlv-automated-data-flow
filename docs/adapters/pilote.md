@@ -156,6 +156,71 @@ website. The click is the legitimate route: it lets Pilote's own JavaScript make
 exactly as it does for any visitor. Pilote should still be told about the leak; the
 contact is Miles Storey at `m.storey@group-pilote.com`.
 
+## What the popup table actually holds — measured 11 September 2026
+
+Four layouts read, one per body type, with `click_selector="button.btn-popup"` and an
+8-second settle. **The table is not the same shape on every vehicle**, and that is the
+single most important thing about this source.
+
+| | V540G (van) | G690GJ | P720U | A630G |
+| --- | --- | --- | --- | --- |
+| rows in the table | **23** | 57 | 57 | 57 |
+| `Vehicle length (cm)` | 541 | 707 | 725 | 630 |
+| `Vehicle interior width (cm)` | 205 | 230 | 230 | 220 |
+| `Overall width with wing mirrors open (cm)` | 269 | 279 | 269 | 275 |
+| `Vehicle height (cm)` | 267 | 285 | 285 | 288 |
+| `Maximum authorised mass (MAM) (kg)` | 3500 | 3500 | 3500 | 3500 |
+| `Load capacity in kg (on basic models)` | **730** | — | — | — |
+
+### Payload is published, but in two different places
+
+The requester, 11 September 2026: *"as long as you can derive MRO and payload, to be
+honest, I couldn't find them."* They are both obtainable on every layout, which is why:
+
+* **Panel vans** print `Load capacity in kg (on basic models)` in the popup table — 730 on
+  the V540G — and no payload in the summary strip.
+* **Coachbuilts** do the opposite: no load-capacity row in their 57-row table, but the
+  summary strip above the button reads `Payload 485 kg` (the G690GJ).
+
+So payload is read from the popup on vans and from the strip on coachbuilts, and
+**`mro_kilograms` derives as MAM minus payload** on all 43. As at Joa, Murvi and Le
+Voyageur that derivation is true by construction and is not a self-check.
+
+The van's table also carries a row labelled literally **`undefined`, value 411**. A label
+that failed to render is not a figure to record under a guess — leave it, and do not let
+a positional read pick it up.
+
+### The MAM row is named differently by body type
+
+`Maximum authorised mass (MAM) (kg) **on basic** models` on the van against `... (kg) **-
+base** models` on the three coachbuilts. Match on `Maximum authorised mass (MAM)` and stop
+before the qualifier, or a third spelling will silently return nothing.
+
+The coachbuilt table also carries four *chassis-variant* MAM rows — `"Light" light vehicle
+chassis base`, `"Light" heavy vehicle`, `"Heavy" 4,25 T`, `"Heavy" 4,4 T/4,5 T` — of which
+only the first has a value on a base model. **The base-models row is the one to take**, by
+the settled base-vehicle rule; the variants are the paid uprates.
+
+### Width is the field this source cannot answer
+
+The popup gives the **interior** width and the **mirrors-open** width and nothing between
+them. FMLV wants the body width, excluding mirrors — which is neither, and which the
+Options brochure's layout tables do not print either. Do not record either figure: the
+mirrors-open one overstates by 40-60 cm and the interior understates. This wants asking of
+Pilote before the first run, alongside the length question below.
+
+### The Atlas length disagreement resolves in the site's favour
+
+The survey concluded from the brochure that the model code is not the length on Atlas, and
+that the check would have to be scoped around it. **The popup says otherwise**: the A630G
+is `Vehicle length (cm) 630`, exactly its code, against the brochure's 6,99 m. FMLV also
+holds 6300. Two sources and the naming convention agree, so the brochure's Atlas row is
+the outlier and **the model-code check needs no Atlas exemption after all**.
+
+The same comparison the other way: the G690GJ's popup says 707 where the brochure says
+6,99 m. The site wins by the settled rule, but the two disagree often enough on length
+that it is worth raising with Pilote.
+
 ## The self-check, and where it breaks
 
 The model code encodes the length in decimetres, as it does at Joa and Le Voyageur — and
@@ -168,10 +233,11 @@ layouts**, which are the Ford-based narrow low profiles:
 | brochure says | 6.99 m | 7.04 m | 7.25 m | 7.25 m |
 | out by | **690 mm** | **540 mm** | 350 mm | 350 mm |
 
-So the check must be **scoped to the Galaxy, Pacific and Vega codes and never applied to
-Atlas**, whose number means something other than length. A single un-scoped ±150 mm band
-would discard all four Atlas lengths — and they are the four the first run most needs to
-correct.
+**That conclusion is withdrawn — see "The Atlas length disagreement" above.** It rested on
+the brochure, and the site's own popup gives the A630G as 630 cm, exactly its code. The
+brochure's Atlas lengths are the outlier, not the naming convention, so **no Atlas
+exemption is needed** and a single band applies to all 43. The table above is kept because
+it is the evidence that the brochure and the site disagree, which still matters.
 
 The usual `payload = MTPLM − MRO` is not available until the click lands. Once it is, the
 brochure's legal page states the identity explicitly and gives the tolerance: *"the
