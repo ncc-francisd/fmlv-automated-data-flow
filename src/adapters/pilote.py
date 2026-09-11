@@ -54,14 +54,23 @@ SITEMAP_URL = f"{BASE_URL}/vehicule-sitemap.xml"
 #: the outset. But the slug carries the offer as well, and the *pair* maps exactly onto
 #: FMLV's seven live ranges, 43 pages for 43 rows.
 #:
-#: `ATLAS` is upper-case because FMLV holds it that way; the others are title case.
+#: `ATLAS` is upper-case because FMLV holds it that way.
+#:
+#: **The panel vans are `Van`, not `Pilote Van`.** FMLV renders a listing as manufacturer
+#: + range + model + base vehicle, so `Van` displays as *"Pilote Van V630S Fiat"* while
+#: `Pilote Van` would display as *"Pilote Pilote Van V630S Fiat"*. The requester spotted
+#: it on the live site, 11 September 2026. `joa.py` already follows the same convention
+#: for the same reason — its vans are `Van` and display as "Joa by Pilote Van 54G".
+#:
+#: Three FMLV rows still read `Pilote Van`; the run proposes the correction rather than
+#: needing a hand edit, which is what `MATCH_THRESHOLD` is set to allow.
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("a-class/expression", "Galaxy Expression"),
     ("a-class/evidence", "Galaxy Evidence"),
     ("low-profile/expression", "Pacific Expression"),
     ("low-profile/evidence", "Pacific Evidence"),
     ("compact-low-profile/atlas", "ATLAS"),
-    ("panel-van/pilote", "Pilote Van"),
+    ("panel-van/pilote", "Van"),
     ("panel-van/evidence", "Van Vega Evidence"),
 )
 _FMLV_RANGES = dict(DEFAULT_RANGES)
@@ -104,20 +113,34 @@ LAYOUTS_WITHOUT_A_POPUP = frozenset({("Pacific Expression", "P740GJ"), ("Pacific
 #: Pilote's identities collide at the 0.5 default, on two separate axes, so the
 #: per-manufacturer threshold `docs/adapters/README.md` describes is mandatory here.
 #:
-#: | pair | score |
-#: |---|---|
-#: | the same layout in the same range | **1.000** |
-#: | `Galaxy Expression G720FGJ` against `Galaxy Selection G720FGJ` | 0.500 |
-#: | `Galaxy Expression G740FC` against `Galaxy Evidence G740FC` | 0.500 |
-#: | `Pilote Van V540G` against `Van Vega Standard V540G` | 0.400 |
+#: | pair | score | |
+#: |---|---|---|
+#: | the same layout in the same range | **1.000** | must match |
+#: | `Van V600G` against FMLV's `Pilote Van V600G` | **0.667** | must match — a rename |
+#: | `Galaxy Expression G740FC` against `Galaxy Evidence G740FC` | 0.500 | must **not** |
+#: | `Galaxy Expression G720FGJ` against `Galaxy Selection G720FGJ` | 0.500 | must **not** |
+#: | `Van V540G` against `Van Vega Evidence V540G` | 0.500 | must **not** |
+#: | `Pacific Expression P720U` against `Pacific Evidence P720U` | 0.500 | must **not** |
 #:
-#: **Both 0.500 rows are real vehicles that are not each other.** The offer is part of the
-#: identity — G740FC is £86,900 as Expression and £94,900 as Evidence — and Sélection is a
-#: separate limited edition again. Run #79 proved the danger rather than predicting it: at
-#: the default, the newly-listed `Galaxy Expression G720FGJ` claimed the `Galaxy Selection
-#: G720FGJ` row, because Selection has no page of its own for a true 1.000 pair to beat
-#: the impostor. At 0.75 every true pair still matches and every collision is excluded.
-MATCH_THRESHOLD = 0.75
+#: **Every 0.500 row is two real vehicles that are not each other.** The offer is part of
+#: the identity — G740FC is £86,900 as Expression and £94,900 as Evidence — and Sélection
+#: is a separate limited edition again. Run #79 proved the danger rather than predicting
+#: it: at the 0.5 default the newly-listed `Galaxy Expression G720FGJ` claimed the `Galaxy
+#: Selection G720FGJ` row, because Selection has no page of its own for a true pair to
+#: beat the impostor.
+#:
+#: **0.6 sits in the gap, and the gap is what saves the three `Pilote Van` rows.** At 0.75
+#: they would arrive as new alongside three disappearances, losing their product ids and
+#: their photographs; at 0.6 they match at 0.667 and keep both. Nothing that must not
+#: match gets above 0.500, so the margin is real rather than lucky.
+#:
+#: **Matching is all it does — the range itself is not corrected by the run.**
+#: `manufacturer_range` is in `store.changes._IDENTITY_FIELDS`, the set the pipeline
+#: matches *on* rather than asks about, so no rename is proposed for a matched product
+#: and run #81 proposed none. The three rows keep reading `Pilote Van` in FMLV until
+#: someone renames them in Nova, which is a data tidy-up rather than anything this
+#: adapter can do.
+MATCH_THRESHOLD = 0.6
 
 #: How far the published length may sit from the one its model code implies.
 #:
@@ -176,12 +199,12 @@ PRICES: dict[tuple[str, str], int] = {
     ("ATLAS", "A690G"): 73_900,
     ("ATLAS", "A690GJ"): 73_900,
     ("ATLAS", "A650D"): 75_400,
-    ("Pilote Van", "V540G"): 65_400,
-    ("Pilote Van", "V600G"): 66_400,
-    ("Pilote Van", "V630J"): 68_400,
-    ("Pilote Van", "V630B"): 68_400,
-    ("Pilote Van", "V630S"): 68_400,
-    ("Pilote Van", "V633M"): 71_000,
+    ("Van", "V540G"): 65_400,
+    ("Van", "V600G"): 66_400,
+    ("Van", "V630J"): 68_400,
+    ("Van", "V630B"): 68_400,
+    ("Van", "V630S"): 68_400,
+    ("Van", "V633M"): 71_000,
     ("Van Vega Evidence", "V600G"): 73_700,
     ("Van Vega Evidence", "V630J"): 75_700,
     ("Van Vega Evidence", "V633M"): 81_900,

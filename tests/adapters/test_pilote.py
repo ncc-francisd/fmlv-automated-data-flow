@@ -81,7 +81,9 @@ def test_the_slug_pair_gives_every_fmlv_range() -> None:
     assert len(DEFAULT_RANGES) == 7
     assert dict(DEFAULT_RANGES)["a-class/expression"] == "Galaxy Expression"
     assert dict(DEFAULT_RANGES)["a-class/evidence"] == "Galaxy Evidence"
-    assert dict(DEFAULT_RANGES)["panel-van/pilote"] == "Pilote Van"
+    # `Van`, not `Pilote Van`: FMLV prepends the manufacturer when it renders a listing,
+    # so `Van` shows as "Pilote Van V630S Fiat" and `Pilote Van` would double it up.
+    assert dict(DEFAULT_RANGES)["panel-van/pilote"] == "Van"
 
 
 def test_one_layout_code_under_two_offers_is_two_products() -> None:
@@ -159,7 +161,7 @@ def test_a_tag_becomes_a_space_so_a_value_keeps_its_unit() -> None:
 @pytest.mark.parametrize(
     ("name", "expected_range", "expected_model"),
     [
-        ("pilote_v540g_pilote.html", "Pilote Van", "V540G"),
+        ("pilote_v540g_pilote.html", "Van", "V540G"),
         ("pilote_g690gj_expression.html", "Galaxy Expression", "G690GJ"),
         ("pilote_p720u_evidence.html", "Pacific Evidence", "P720U"),
         ("pilote_a630g_atlas.html", "ATLAS", "A630G"),
@@ -406,13 +408,21 @@ def test_the_match_threshold_excludes_a_different_offer() -> None:
             SimpleNamespace(manufacturer_range=right[0], model=right[1]),
         )
 
-    same = score(("Galaxy Expression", "G720FGJ"), ("Galaxy Expression", "G720FGJ"))
-    selection = score(("Galaxy Expression", "G720FGJ"), ("Galaxy Selection", "G720FGJ"))
-    evidence = score(("Galaxy Expression", "G740FC"), ("Galaxy Evidence", "G740FC"))
+    # Must match: the same vehicle, and the `Pilote Van` -> `Van` correction, which is
+    # the whole reason the threshold sits at 0.6 rather than higher.
+    assert score(("Galaxy Expression", "G720FGJ"), ("Galaxy Expression", "G720FGJ")) >= (
+        pilote.MATCH_THRESHOLD
+    )
+    assert score(("Van", "V600G"), ("Pilote Van", "V600G")) >= pilote.MATCH_THRESHOLD
 
-    assert same >= pilote.MATCH_THRESHOLD
-    assert selection < pilote.MATCH_THRESHOLD
-    assert evidence < pilote.MATCH_THRESHOLD
+    # Must not: every one of these is two real vehicles, usually at two different prices.
+    for left, right in [
+        (("Galaxy Expression", "G720FGJ"), ("Galaxy Selection", "G720FGJ")),
+        (("Galaxy Expression", "G740FC"), ("Galaxy Evidence", "G740FC")),
+        (("Van", "V540G"), ("Van Vega Evidence", "V540G")),
+        (("Pacific Expression", "P720U"), ("Pacific Evidence", "P720U")),
+    ]:
+        assert score(left, right) < pilote.MATCH_THRESHOLD, (left, right)
 
 
 def test_the_click_timeout_is_longer_than_the_shared_default() -> None:
