@@ -449,3 +449,36 @@ def test_the_two_layouts_with_no_popup_are_known_rather_than_a_click_failure() -
         product = _parse(name)
         assert (product.manufacturer_range, product.model) not in LAYOUTS_WITHOUT_A_POPUP
         assert popup_rows(_page(name)), name
+
+
+def test_the_strip_supplies_the_dimensions_when_there_is_no_popup() -> None:
+    """The P740GJ and P740C have no popup, but their strip carries the same figures.
+
+    Run #81 left both with no length, height or seats at all, because those three were
+    only ever read from the popup. The requester spotted it against the live page, which
+    plainly shows `Length 7,47 m Width 2,77 m Height 2,85 m Berth 4 ... Payload 520 kg`.
+    """
+    page = _page("pilote_g690gj_expression.html")
+    # Strip the popup out, leaving a page shaped like the two that have none.
+    without_popup = page.replace("content-popup-techdata", "content-popup-removed")
+    product = parse_model_page(without_popup, PAGES["pilote_g690gj_expression.html"])
+
+    assert product is not None
+    assert popup_rows(without_popup) == {}
+    # Recovered from the strip.
+    assert product.mh_length_mm == 7070
+    assert product.mh_height_mm == 2850
+    assert product.mh_passenger_seats_inc_driver == 4
+    assert product.berths == 4
+    assert product.mh_payload_kilograms == 485
+    # MAM exists only in the popup, so this one is honestly absent.
+    assert product.mtplm_kilograms is None
+    assert product.mro_kilograms is None
+
+
+def test_the_popup_is_preferred_over_the_strip_where_both_exist() -> None:
+    """They disagree by 20mm on the P720s and P740s; the popup is the recorded figure."""
+    product = _parse("pilote_g690gj_expression.html")
+
+    assert popup_rows(_page("pilote_g690gj_expression.html"))
+    assert product.mh_length_mm == 7070 == product.strip_length_mm

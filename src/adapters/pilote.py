@@ -105,11 +105,15 @@ CLICK_TIMEOUT_MS = 15_000
 #: `p740fc-expression` beside them has exactly one. Pilote have not published a technical
 #: panel for them.
 #:
-#: So this is a gap in the source, not a fault in the click, and the right behaviour is
-#: what already happens: the length, height and both masses come back empty and reach a
-#: reviewer as fields not found, while the seats, berths, price and body type — which do
-#: not depend on the popup — are still collected. The list exists so the warning can say
-#: which of the two it is, and so a page that *gains* a button later stops being narrated.
+#: So this is a gap in the source, not a fault in the click. **It costs far less than it
+#: first appeared**, though: run #81 left both with no length, height or seats, and the
+#: requester spotted against the live page that all three were plainly printed on it. The
+#: summary strip carries the same three measurements on every layout, so `parse_model_page`
+#: falls back to it and only **MTPLM** — which exists nowhere but the popup — is genuinely
+#: lost, taking the derived MRO with it.
+#:
+#: The list exists so the warning can say which of the two it is, and so a page that
+#: *gains* a button later stops being narrated.
 LAYOUTS_WITHOUT_A_POPUP = frozenset({("Pacific Expression", "P740GJ"), ("Pacific Expression", "P740C")})
 
 #: Pilote's identities collide at the 0.5 default, on two separate axes, so the
@@ -264,7 +268,8 @@ def find_model_urls(sitemap_xml: str, ranges: Iterable[str]) -> list[str]:
 #: is dining seats, which FMLV does not hold.
 _SUMMARY_STRIP = re.compile(
     r"Length\s*(?P<lm>\d+),(?P<lcm>\d+)\s*m\s*"
-    r"Width\s*[\d,]+\s*m\s*Height\s*[\d,]+\s*m\s*"
+    r"Width\s*[\d,]+\s*m\s*"
+    r"Height\s*(?P<hm>\d+),(?P<hcm>\d+)\s*m\s*"
     r"Berth\s*(?P<seats>\d+)\s*Meal place\s*(?P<meal>\d+)\s*"
     r"Sleeping place\s*(?P<berths>\d+)"
     r"(?:\s*Payload\s*(?P<payload>\d+)\s*kg)?",
@@ -429,8 +434,29 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
     strip = _SUMMARY_STRIP.search(text)
     strip_payload = int(strip.group("payload")) if strip and strip.group("payload") else None
     payload, payload_source = _payload_for(rows, strip_payload)
-    length_cm = _first_int(_matching(rows, _LENGTH_LABEL))
-    height_cm = _first_int(_matching(rows, _HEIGHT_LABEL))
+
+    def from_strip(metres: str, centimetres: str) -> int | None:
+        if strip is None:
+            return None
+        return int(strip.group(metres)) * 1000 + int(strip.group(centimetres)) * 10
+
+    # The popup's figures are preferred — they are stated in whole centimetres and are
+    # the ones that agree with the model code. **But the strip carries the same three
+    # measurements**, so a page with no popup is not a page with no dimensions: the
+    # P740GJ and P740C print `Length 7,47 m Width 2,77 m Height 2,85 m Berth 4 ...` like
+    # every other layout. Reading only the popup left those two with no length, height or
+    # seats at all in run #81, when all three were on the page.
+    strip_length_mm = from_strip("lm", "lcm")
+    popup_length_cm = _first_int(_matching(rows, _LENGTH_LABEL))
+    popup_height_cm = _first_int(_matching(rows, _HEIGHT_LABEL))
+    length_mm = popup_length_cm * 10 if popup_length_cm is not None else strip_length_mm
+    height_mm = (
+        popup_height_cm * 10 if popup_height_cm is not None else from_strip("hm", "hcm")
+    )
+    # `Berth` is the strip's word for a belted seat — see `_SUMMARY_STRIP`.
+    seats = _first_int(_matching(rows, _SEATS_LABEL))
+    if seats is None and strip is not None:
+        seats = int(strip.group("seats"))
 
     return PiloteProduct(
         source_url=source_url,
@@ -438,20 +464,19 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
         model=code.upper(),
         body_segment=body,
         implied_length_mm=int(code[1:4]) * 10,
-        mh_length_mm=length_cm * 10 if length_cm is not None else None,
-        mh_height_mm=height_cm * 10 if height_cm is not None else None,
-        # Seats from the popup's unambiguous labelled row; berths from the strip, which
-        # is the figure Pilote lead with and the one the brochure agrees with.
-        mh_passenger_seats_inc_driver=_first_int(_matching(rows, _SEATS_LABEL)),
+        mh_length_mm=length_mm,
+        mh_height_mm=height_mm,
+        # Seats from the popup's unambiguous row where there is one, and from the strip's
+        # `Berth` where there is not; berths always from the strip's `Sleeping place`,
+        # which is the figure Pilote lead with and the one the brochure agrees with.
+        mh_passenger_seats_inc_driver=seats,
         berths=int(strip.group("berths")) if strip else None,
+        # MAM is the one field that exists only in the popup, so the two pages without
+        # one legitimately have no MTPLM and therefore no derived MRO.
         mtplm_kilograms=_first_int(_matching(rows, _MAM_LABEL)),
         mh_payload_kilograms=payload,
         payload_source=payload_source,
-        strip_length_mm=(
-            int(strip.group("lm")) * 1000 + int(strip.group("lcm")) * 10
-            if strip
-            else None
-        ),
+        strip_length_mm=strip_length_mm,
     )
 
 
@@ -649,15 +674,15 @@ def collect(
         if not popup_rows(page):
             known = (product.manufacturer_range, product.model) in LAYOUTS_WITHOUT_A_POPUP
             on_progress(
-                f"[{product.label}] no technical popup, so the length, height and both "
+                f"[{product.label}] no technical popup, so the MTPLM and its derived MRO "
+                f"are left for FMLV's own figures — the length, height, seats, berths and "
+                f"payload come from the summary strip instead. "
                 + (
-                    "masses are left for FMLV's own figures. This layout's page carries "
-                    "no button at all — a known gap in Pilote's own data, not a failed "
-                    "click"
+                    "This layout's page carries no button at all, which is a known gap "
+                    "in Pilote's own data rather than a failed click"
                     if known
-                    else f"masses are missing. WARNING: this is new — check "
-                    f"{CLICK_SELECTOR!r} still matches the button, because every other "
-                    f"layout has one"
+                    else f"WARNING: this is new — check {CLICK_SELECTOR!r} still matches "
+                    f"the button, because every other layout has one"
                 )
             )
 
