@@ -62,8 +62,10 @@ SITEMAP_URL = f"{BASE_URL}/vehicule-sitemap.xml"
 #: it on the live site, 11 September 2026. `joa.py` already follows the same convention
 #: for the same reason — its vans are `Van` and display as "Joa by Pilote Van 54G".
 #:
-#: Three FMLV rows still read `Pilote Van`; the run proposes the correction rather than
-#: needing a hand edit, which is what `MATCH_THRESHOLD` is set to allow.
+#: Three FMLV rows still read `Pilote Van`. `MATCH_THRESHOLD` is set so they still match
+#: and keep their ids and photographs — but the run cannot rename them, because
+#: `manufacturer_range` is an identity field the pipeline matches on rather than asks
+#: about. They need renaming in Nova.
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("a-class/expression", "Galaxy Expression"),
     ("a-class/evidence", "Galaxy Evidence"),

@@ -315,31 +315,36 @@ So of the five products appearing as new, **two are renames with a source row to
 from and three are new vehicles**: V630B, `Galaxy Evidence` G690GJ and `Galaxy Expression`
 G720FGJ.
 
-### How it is being resolved: renamed in Nova, not in the pipeline
+### How it was resolved: renamed in Nova, and the range is `Van` not `Pilote Van`
 
-The requester's decision, 11 September 2026 — the same route that settled Le Voyageur's
-`Hertiage`. He renames products **8235** and **8916** in Nova from `Van Vega Standard` to
-`Pilote Van`, and **no code changes at all**, because the adapter already emits the
-destination name.
+Two steps, 11 September 2026.
 
-Once FMLV agrees, both match at **1.000**, keep their product ids, keep their photographs,
-and their corrections land on the existing rows. The diff should then read **3 new and 11
-disappeared** rather than 5 and 13.
+**First, the requester renamed products 8235 and 8916** from `Van Vega Standard`, the same
+route that settled Le Voyageur's `Hertiage`.
 
-Why this beats the alternatives, recorded so it is not re-litigated:
+**Then he spotted that the destination name was wrong.** FMLV renders a listing as
+manufacturer + range + model + base vehicle, so a range of `Pilote Van` displays as
+*"Pilote Pilote Van V630S Fiat"*. He set both rows to **`Van`**, which displays correctly
+as *"Pilote Van V630S Fiat"* — and FMLV's own data agrees: Joa by Pilote's two ranges are
+`Motorhome` and `Van`, for exactly this reason. The adapter now emits `Van`.
 
-* **The upload already does what is wanted for a matched row.** `build_upload_products`
-  copies the whole baseline row — `images` included — and applies the approved changes on
-  top, and `manufacturer_range` is a perfectly ordinary proposable field. So a rename on a
-  *matched* product carries the id, the photographs and the new name with no special
-  handling. The gap is only that these two never match.
-* **Editing the run store by hand would work locally and help nobody**, since reviews
-  happen on the deployed VM against its own store.
-* **A rename map in `diff/matching.py` is the proper fix** and would have served Le
-  Voyageur too. Two instances is not yet a pattern; a third would justify building it.
+That also let `MATCH_THRESHOLD` drop from 0.75 to 0.6, which is what rescues the three
+rows *still* named `Pilote Van`: they match at 0.667 and keep their product ids and their
+photographs, where at 0.75 they would have arrived as new alongside three disappearances.
 
-**Order matters**: rename in Nova first, then run. Running first simply reproduces the
-split, which is noise rather than harm.
+**The run cannot finish the job, though.** `manufacturer_range` sits in
+`store.changes._IDENTITY_FIELDS` — the set the pipeline matches *on* rather than asks
+about — so a matched product never gets a rename proposed, and run #81 duly proposed none.
+Products **6085 (V600G), 6082 (V630J) and 6080 (V633M)** keep reading `Pilote Van` until
+someone renames them in Nova. Matching preserves them; it does not correct them.
+
+### Run #81, after all of it
+
+**43 collected, 39 changed, 1 unchanged, 3 new, 11 disappeared**, 245 proposals, 189
+fields verified. All five existing panel vans matched and kept their ids — 8235, 8916,
+6085, 6082 and 6080 — so every photograph is preserved. The only new van is **V630B**,
+which is genuinely a new layout, and the other two new products are `Galaxy Evidence`
+G690GJ and `Galaxy Expression` G720FGJ.
 
 ## The self-check, and where it breaks
 
