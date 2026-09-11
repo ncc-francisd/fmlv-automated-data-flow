@@ -67,13 +67,11 @@ holds. Less of this comes from the emailed documents than the survey first assum
 | what | where it comes from | refetchable per run? |
 | --- | --- | --- |
 | roster, range, model | `vehicule-sitemap.xml` | **yes** |
-| length, height, berths, payload | Technical information panel | **yes — behind a click** |
-| habitation findings | the panel's per-model `Standard fittings` list | **yes — behind a click** |
+| length, width, height, **MTPLM**, payload | the popup's technical table | **yes — behind a click** |
+| berths, seats | the summary strip and the brochure | **yes** / emailed |
+| habitation findings | the page's `Standard fittings` section | **yes — server-rendered** |
 | floorplan | the model page | **yes** |
-| seats | Options & Offers brochure | no — emailed |
 | price | UK vehicle price list | no — emailed |
-| **MTPLM** | **not yet found anywhere on the site** | — |
-| width | the brochure; the panel's figure includes the mirrors | no — emailed |
 
 ### The roster reconciles three ways, 43 for 43
 
@@ -112,20 +110,45 @@ Lounge and the rest, itemised for that one layout. **So the habitation findings 
 the site after all**, not from the emailed brochure, and they are attributed to one vehicle
 by construction.
 
-**MTPLM is still not visible, and that is the open problem.** The panel gives payload but
-no maximum authorised mass. A second click on `Find all the technical characteristics`
-finds the element and changes nothing within four seconds, so it is not a simple reveal —
-it may need a longer settle, a different trigger, or the Airtable response captured
-directly via `capture_url_contains`. **Resolve this before building**, because without
-MTPLM the payload cannot be checked and `mro_kilograms` cannot be derived.
+**MTPLM is there, under a different name — found 11 September 2026.** The requester:
+*"did you know that maximum authorised mass, MAM, is for all intents and purposes the
+same as the MTPLM? I seem to remember it being the copy including MAM instead of
+MTPLM."* Exactly right, and it is why the first search missed it. The popup's own table
+reads:
 
-Two traps visible already in that one panel:
+```
+Weights - Payloads
+Maximum authorised mass (MAM) (kg) - base models   3500
+Gross train mass (GTM) (kg)                        5500
+```
 
-* **`Width 2,79 m` is the mirrors-open figure.** The body width is 2,32 m on an A-class.
-  Recording the panel's width unread would overstate every vehicle by half a metre — the
-  same class of error as Le Voyageur's interior width, in the other direction.
-* **`Length 7,07 m` disagrees with the brochure's 6,99 m** for that layout. One of them is
-  wrong and it is not yet known which.
+**So nothing is blocked.** `MAM` is `mtplm_kilograms`, the same mapping `le_voyageur.py`
+already makes from that brand's handbook — Groupe Pilote use MAM throughout, and Le
+Voyageur's own legal page uses MTPLM and MAM for the one figure in adjacent paragraphs.
+
+Two corrections to what the first attempt concluded, both mine:
+
+* **The selector must be `button.btn-popup`, not `text=Technical information`.** The
+  popup markup carries an `<h3>Technical information</h3>` *inside* itself, and a text
+  selector matches that heading before the button. Clicking a heading does nothing and
+  **does not time out**, so nothing was narrated and it looked like the panel simply had
+  no weights. See the warning in [`README.md`](README.md#a-specification-behind-a-button-click_selector).
+* **`Standard fittings` is server-rendered and needs no click at all.** It is a separate
+  page section, not a tab of the popup — the earlier note that the click revealed it was
+  wrong. The click's only job is filling `div.content-popup-techdata`, which starts empty
+  and gains a full `<table>` of technical rows.
+
+The figures land in the **rendered DOM**, so the adapter reads the table and never touches
+the Airtable JSON. `fetch(url, click_selector="button.btn-popup", settle_ms=8000)` is the
+call; the button's id is the layout's own product code (`P26I6900LHF1ST`), so the class is
+the stable half of it.
+
+Two traps remain in the *summary* strip above the button, which is not the popup table:
+
+* **Its `Width 2,79 m` is the mirrors-open figure**, against a 2,32 m body. The Le
+  Voyageur error in reverse, and the popup table is where the real widths are.
+* **Its `Length 7,07 m` disagrees with the brochure's 6,99 m** for the G690GJ. Check both
+  against the popup table before trusting either.
 
 **Do not call Airtable directly.** The page source leaks a Pilote personal access token.
 Its scope is unknown, and querying their database is a different act from reading their

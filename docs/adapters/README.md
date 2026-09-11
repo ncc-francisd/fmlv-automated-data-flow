@@ -1600,7 +1600,12 @@ detail:
   found. Raising would lose every other product in the sweep. Pass `on_progress` so the
   miss is visible.
 - **`.first` is explicit**, so a selector matching several elements clicks the leading one
-  instead of failing a strictness check.
+  instead of failing a strictness check. **This is also the trap**: prefer a selector on
+  the control itself (`button.btn-popup`) over a text match. Pilote's popup contains an
+  `<h3>Technical information</h3>`, so `text=Technical information` matches the heading
+  before the button — and **clicking the wrong element neither fails nor times out**, so
+  nothing is narrated and it looks as though the panel simply had no data. That cost an
+  afternoon and a wrong conclusion in `pilote.md`.
 - **Clicking is reading, not API access.** It lets the site's own JavaScript make the call
   it would make for any visitor. That is categorically different from taking a credential
   out of the page source and calling the backing service directly — Pilote's page leaks an
