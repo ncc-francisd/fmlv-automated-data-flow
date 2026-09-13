@@ -235,34 +235,39 @@ chassis base`, `"Light" heavy vehicle`, `"Heavy" 4,25 T`, `"Heavy" 4,4 T/4,5 T` 
 only the first has a value on a base model. **The base-models row is the one to take**, by
 the settled base-vehicle rule; the variants are the paid uprates.
 
-### Width is the field this source cannot answer, and it is left blank
+### Width: the row is mislabelled, and it is the one FMLV already uses
 
-The popup gives the **interior** width and the **mirrors-open** width and nothing between
-them. FMLV wants the body width, excluding mirrors — which is neither, and which the
-Options brochure's layout tables do not print either. The mirrors-open figure overstates
-by 40-60 cm and the interior one understates.
+**Corrected 13 September 2026.** The survey concluded that Pilote publish no body width
+and the requester ruled, reasonably, that it should be left blank. Checking the popup row
+against FMLV's own stored figures showed the premise was wrong:
 
-**The requester's ruling, 11 September 2026:** *"if they don't have a figure excluding
-mirrors, we'll have to leave that blank as we don't have the correct figure, unless it's
-an existing model that appears to have the same height and length. In other words, it's
-likely to be the same outer shell."*
+| | popup `Vehicle interior width` | popup `Overall width with wing mirrors open` | FMLV holds |
+| --- | --- | --- | --- |
+| V540G | **205** | 269 | **2050** |
+| G690GJ | **230** | 279 | **2300** |
+| P720U | **230** | 269 | **2300** |
+| A630G | **220** | 275 | **2200** |
 
-**The adapter emits no width at all**, and that produces exactly the behaviour the second
-half of that ruling asks for, without needing to compare against the baseline:
+**Four of four exact.** And it cannot be an interior measurement: 2.05 m *is* a Fiat
+Ducato's body width, which would leave nothing for the walls. Pilote's label is wrong;
+the figure is the body width, and it is what the adapter records. The mirrors-open row
+beside it is 40 to 60 cm wider and is never recorded, per the settled rule.
 
-* For a **matched** product, a field the adapter did not find arrives as a no-op — the
-  reviewer sees FMLV's own figure beside "nothing scraped" and it is preserved. So where
-  the length and height come back unchanged, the existing width stands untouched, which is
-  the same-outer-shell case.
-* Where the **length or height does change**, those arrive as proposals, so the reviewer is
-  looking at the dimensions anyway and can judge whether the shell moved.
-* For a **new** product the width is simply blank, which is honest: there is no previous
-  shell to reason from.
+So the ruling's condition — that no published figure excludes the mirrors — turned out not
+to hold. Its second half still does, for the two layouts with no popup.
 
-That keeps the settled rule intact — a figure that could not be found is visible and never
-inherited silently — while letting an unchanged shell keep the width someone already
-established. Worth asking Pilote for the body width anyway, alongside the length
-disagreement below.
+### The summary strip cannot substitute, and this is why
+
+`Width` in the strip means **two different things** depending on body type:
+
+* on a coachbuilt it is the **mirrors-open** figure — 2,79 / 2,69 / 2,75 m, exactly the
+  mirrors-open rows above;
+* on a panel van it is the **body** width — 2,05 m, the interior-labelled row.
+
+One label, two meanings, and nothing on the page distinguishes them. So a page with no
+popup gets **no width at all**, which is the requester's ruling standing where it applies.
+The P740GJ's strip shows `Width 2,77 m`; recording it would overstate that vehicle by
+470 mm against the 2300 FMLV holds for every Pacific Expression.
 
 ### The Atlas length disagreement resolves in the site's favour
 

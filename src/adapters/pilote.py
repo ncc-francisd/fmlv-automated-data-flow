@@ -22,9 +22,10 @@ Five things drive the whole module:
   summary strip instead. See `_payload_for`.
 * **MAM is MTPLM.** Pilote publish maximum authorised mass and never use the letters
   MTPLM; the two are the same figure. `le_voyageur.py` makes the same mapping.
-* **Width is deliberately not collected.** The only two widths published are the interior
-  measurement and the mirrors-open measurement, and FMLV wants neither. See the module's
-  `mh_width_mm` note in `_build_extracted_motorhome`.
+* **The width row is mislabelled, and it is the one to use.** Pilote's `Vehicle interior
+  width` is the body width — it matches FMLV exactly on all four body types, and 2.05 m
+  *is* a Ducato's body. The `Overall width with wing mirrors open` row beside it is 40 to
+  60 cm wider and is never recorded. See `_INTERIOR_WIDTH_LABEL`.
 """
 
 from __future__ import annotations
@@ -305,6 +306,25 @@ _LOAD_CAPACITY_LABEL = re.compile(r"^Load capacity in kg", re.I)
 _LENGTH_LABEL = re.compile(r"^Vehicle length \(cm\)$", re.I)
 _HEIGHT_LABEL = re.compile(r"^Vehicle height \(cm\)$", re.I)
 
+#: The body width — despite what Pilote call it.
+#:
+#: **`Vehicle interior width` is the row FMLV's figure comes from, and the label is
+#: wrong.** It matches the stored width exactly on all four body types — 205 against
+#: 2050 on the van, 230 against 2300 on the Galaxy and the Pacific, 220 against 2200 on
+#: the Atlas — and it cannot be an interior measurement: 2.05 m *is* a Fiat Ducato's
+#: body width, so there would be nothing left for the walls.
+#:
+#: The `Overall width with wing mirrors open` row beside it is the mirrors-open figure,
+#: 40 to 60 cm wider, and is never recorded — the settled rule is that width excludes
+#: mirrors and awnings.
+#:
+#: **The summary strip cannot substitute for this**, which is why a page with no popup
+#: gets no width at all. The strip's `Width` is the mirrors-open figure on a coachbuilt
+#: (2,79 / 2,69 / 2,75 m, exactly the mirrors-open rows) but the *body* width on a panel
+#: van (2,05 m). One label, two meanings, and no way to tell them apart without the popup
+#: that is missing on precisely the pages that would need it.
+_INTERIOR_WIDTH_LABEL = re.compile(r"^Vehicle interior width \(cm\)$", re.I)
+
 
 def _clean(fragment: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", fragment)).strip()
@@ -358,6 +378,7 @@ class PiloteProduct:
     implied_length_mm: int
     mh_length_mm: int | None = None
     mh_height_mm: int | None = None
+    mh_width_mm: int | None = None
     mh_passenger_seats_inc_driver: int | None = None
     berths: int | None = None
     mtplm_kilograms: int | None = None
@@ -449,6 +470,7 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
     strip_length_mm = from_strip("lm", "lcm")
     popup_length_cm = _first_int(_matching(rows, _LENGTH_LABEL))
     popup_height_cm = _first_int(_matching(rows, _HEIGHT_LABEL))
+    popup_width_cm = _first_int(_matching(rows, _INTERIOR_WIDTH_LABEL))
     length_mm = popup_length_cm * 10 if popup_length_cm is not None else strip_length_mm
     height_mm = (
         popup_height_cm * 10 if popup_height_cm is not None else from_strip("hm", "hcm")
@@ -466,6 +488,9 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
         implied_length_mm=int(code[1:4]) * 10,
         mh_length_mm=length_mm,
         mh_height_mm=height_mm,
+        mh_width_mm=(
+            popup_width_cm * 10 if popup_width_cm is not None else None
+        ),
         # Seats from the popup's unambiguous row where there is one, and from the strip's
         # `Berth` where there is not; berths always from the strip's `Sleeping place`,
         # which is the figure Pilote lead with and the one the brochure agrees with.
@@ -528,12 +553,15 @@ def length_disagreement(product: PiloteProduct) -> str | None:
 def _build_extracted_motorhome(product: PiloteProduct) -> ExtractedMotorhome:
     """One layout as a `Motorhome`, plus the provenance a reviewer sees beside each field.
 
-    **`mh_width_mm` is deliberately absent.** The only widths Pilote publish are the
-    interior measurement and the mirrors-open measurement, and FMLV wants the body width,
-    which is neither — the mirrors-open figure overstates by 40-60cm. The requester's
-    ruling, 11 September 2026, is to leave it blank; emitting nothing also preserves
-    whatever FMLV already holds on a matched product, which is the same-outer-shell case
-    he asked for.
+    **`mh_width_mm` comes from the popup's `Vehicle interior width` row**, whose label is
+    Pilote's and is wrong — see `_INTERIOR_WIDTH_LABEL`. The survey originally concluded
+    no usable width existed and the requester ruled it should be left blank; checking the
+    row against FMLV's own figures on 13 September 2026 showed it matches on all four body
+    types, so the ruling's condition — that no figure excluding mirrors is published —
+    turned out not to hold.
+
+    The two layouts with no popup still have no width, and that part of the ruling stands:
+    their summary strip prints the mirrors-open figure, which must not be recorded.
     """
     source_url = product.source_url
     motorhome = Motorhome(
@@ -549,6 +577,7 @@ def _build_extracted_motorhome(product: PiloteProduct) -> ExtractedMotorhome:
         mtplm_kilograms=product.mtplm_kilograms,
         mh_payload_kilograms=product.mh_payload_kilograms,
         mh_length_mm=product.mh_length_mm,
+        mh_width_mm=product.mh_width_mm,
         mh_height_mm=product.mh_height_mm,
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
@@ -566,6 +595,14 @@ def _build_extracted_motorhome(product: PiloteProduct) -> ExtractedMotorhome:
         record("mh_length_mm", f"popup table, 'Vehicle length (cm) {product.mh_length_mm // 10}'")
     if product.mh_height_mm is not None:
         record("mh_height_mm", f"popup table, 'Vehicle height (cm) {product.mh_height_mm // 10}'")
+    if product.mh_width_mm is not None:
+        record(
+            "mh_width_mm",
+            f"popup table, 'Vehicle interior width (cm) {product.mh_width_mm // 10}'. That "
+            f"label is Pilote's and it is wrong: the figure is the body width excluding "
+            f"mirrors, which is what FMLV holds on every layout. The row beside it, "
+            f"'Overall width with wing mirrors open', is 40-60cm wider and is not recorded",
+        )
     if product.mh_passenger_seats_inc_driver is not None:
         record(
             "mh_passenger_seats_inc_driver",

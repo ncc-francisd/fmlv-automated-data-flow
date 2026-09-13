@@ -334,16 +334,14 @@ def test_the_strip_and_the_popup_are_checked_against_each_other() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_no_width_is_recorded_at_all() -> None:
-    """Pilote publish an interior width and a mirrors-open width, and FMLV wants neither.
-
-    Emitting nothing also preserves whatever FMLV holds on a matched product, which is
-    the requester's same-outer-shell case.
-    """
+def test_the_width_provenance_warns_that_the_label_is_wrong() -> None:
+    """A reviewer seeing "interior width" in the snippet needs to know why it is used."""
     extracted = _build_extracted_motorhome(_parse("pilote_g690gj_expression.html"))
+    snippet = extracted.provenance["mh_width_mm"].snippet
 
-    assert extracted.motorhome.mh_width_mm is None
-    assert "mh_width_mm" not in extracted.provenance
+    assert "Vehicle interior width (cm) 230" in snippet
+    assert "body width excluding" in snippet
+    assert "mirrors open" in snippet
 
 
 def test_the_mam_provenance_says_it_is_the_same_figure_as_mtplm() -> None:
@@ -482,3 +480,36 @@ def test_the_popup_is_preferred_over_the_strip_where_both_exist() -> None:
 
     assert popup_rows(_page("pilote_g690gj_expression.html"))
     assert product.mh_length_mm == 7070 == product.strip_length_mm
+
+
+def test_the_width_is_the_mislabelled_interior_row() -> None:
+    """Pilote's `Vehicle interior width` is the body width, and FMLV proves it.
+
+    It matches the stored figure on all four body types, and it cannot be an interior
+    measurement: 2.05 m is a Fiat Ducato's body width, leaving nothing for the walls.
+    """
+    expected = {"V540G": 2050, "G690GJ": 2300, "P720U": 2300, "A630G": 2200}
+    for name in PAGES:
+        product = _parse(name)
+        extracted = _build_extracted_motorhome(product)
+        assert extracted.motorhome.mh_width_mm == expected[product.model], product.model
+
+
+def test_the_mirrors_open_width_is_never_recorded() -> None:
+    """It sits directly beside the row that is read, 40-60cm wider."""
+    rows = popup_rows(_page("pilote_g690gj_expression.html"))
+    mirrors = next(v for k, v in rows.items() if "mirrors open" in k.lower())
+
+    assert mirrors == "279"
+    assert _build_extracted_motorhome(_parse("pilote_g690gj_expression.html")).motorhome.mh_width_mm == 2300
+
+
+def test_a_page_with_no_popup_still_gets_no_width() -> None:
+    """Its strip prints the mirrors-open figure, which must not be recorded."""
+    page = _page("pilote_g690gj_expression.html").replace(
+        "content-popup-techdata", "content-popup-removed"
+    )
+    product = parse_model_page(page, PAGES["pilote_g690gj_expression.html"])
+
+    assert product is not None
+    assert product.mh_width_mm is None
