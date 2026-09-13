@@ -235,6 +235,47 @@ chassis base`, `"Light" heavy vehicle`, `"Heavy" 4,25 T`, `"Heavy" 4,4 T/4,5 T` 
 only the first has a value on a base model. **The base-models row is the one to take**, by
 the settled base-vehicle rule; the variants are the paid uprates.
 
+### Habitation: four more clicks, and four ways to get it wrong
+
+The requester noticed, 13 September 2026, that the new products carried no habitation
+findings at all. They were never wired up: the survey recorded `Standard fittings` as
+server-rendered, which is true of its **headings** and of nothing else.
+
+The accordion has eleven sections. Only `Chassis - Engine` is open on load; the other ten
+are `<div class="group_option_info" style="display:none"></div>` with `data-loaded="0"`,
+and each fetches its own content when clicked. Four answer FMLV columns — `Energy -
+Autonomy`, `Kitchen`, `Bathroom and toilet`, `Bedroom` — and the other six are not
+clicked, because every click is paid for on all 43 pages.
+
+Getting this working took four corrections, and three of them would have failed quietly:
+
+1. **The popup is a modal, so it must be clicked last.** Opened first, it covers the
+   accordion and all four section clicks wait out their full timeout — 79 seconds a page
+   instead of 15, with no findings.
+2. **The two body types number their sections differently.** A coachbuilt has
+   `OD_CC_CUISINE`, a panel van `OD_FOU_CUISINE` (*fourgon*). Targeting one prefix gave
+   perfect results on 37 layouts and nothing at all on the six vans.
+3. **Listing both prefixes is worse than it sounds.** Half then always miss, and each miss
+   waits out `CLICK_TIMEOUT_MS` — about a minute a page, an hour across the roster, for
+   elements that were never going to exist. `[data-group$="_CUISINE"]` matches whichever
+   is present, with one click.
+4. **The fittings are table cells, not list items.** Splitting on `</li>` found nothing
+   and returned each whole section as a single run-on line, so four sections produced four
+   "fittings" that looked like data rather than like an error.
+
+Working, one page yields around 20-25 lines and costs about 9 seconds more, taking the
+sweep from roughly 10 minutes to 16.
+
+```
+6,000 W Truma® Combi D6E hot water/heating     -> blown air
+Compression refrigerator: 150 L                 -> fridge freezer
+Bed insert between twin beds (170 cm length)    -> fixed separate beds
+```
+
+**The washroom stays unanswered on both body types**, and that is correct: the bathroom
+section lists a shower column, a skylight and a cassette toilet without ever saying the
+two are separated, and silence is not a negative.
+
 ### Width: the row is mislabelled, and it is the one FMLV already uses
 
 **Corrected 13 September 2026.** The survey concluded that Pilote publish no body width

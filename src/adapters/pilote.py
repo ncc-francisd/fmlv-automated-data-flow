@@ -22,6 +22,10 @@ Five things drive the whole module:
   summary strip instead. See `_payload_for`.
 * **MAM is MTPLM.** Pilote publish maximum authorised mass and never use the letters
   MTPLM; the two are the same figure. `le_voyageur.py` makes the same mapping.
+* **The habitation facts need four more clicks.** `Standard fittings` has eleven
+  accordion sections and ten are empty until opened, each fetching its own content. See
+  `HABITATION_SECTIONS` — and note that the sections are clicked **before** the popup,
+  because the popup is a modal that covers them.
 * **The width row is mislabelled, and it is the one to use.** Pilote's `Vehicle interior
   width` is the body width — it matches FMLV exactly on all four body types, and 2.05 m
   *is* a Ducato's body. The `Overall width with wing mirrors open` row beside it is 40 to
@@ -30,6 +34,7 @@ Five things drive the whole module:
 
 from __future__ import annotations
 
+import html
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
@@ -39,6 +44,7 @@ from ..fetch.browser import BrowserFetcher
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.pilote-motorhome.uk"
@@ -86,6 +92,47 @@ _FMLV_RANGES = dict(DEFAULT_RANGES)
 #: simply never appear. The button's `id` is the layout's own product code
 #: (`P26I6900LHF1ST`), so the class is the stable half.
 CLICK_SELECTOR = "button.btn-popup"
+
+#: The `Standard fittings` accordion sections that carry habitation facts.
+#:
+#: Eleven sections, of which **ten are empty in the HTML** — `<div
+#: class="group_option_info" style="display:none"></div>` with `data-loaded="0"` — and
+#: each fetches its own content from Airtable when opened. Only `Chassis - Engine` is
+#: expanded on load, which is why the survey's note that the fittings were
+#: server-rendered was half right and the first runs produced no findings at all.
+#:
+#: These four are the ones FMLV's habitation columns need. The other six — cab fittings,
+#: bodywork, multimedia, exterior storage, lounge, interior decor — are not clicked,
+#: because every click costs the whole sweep time and none of them answers a column.
+HABITATION_SECTIONS: tuple[str, ...] = (
+    "ENERGAUTON",  # heating
+    "CUISINE",  # refrigeration, microwave
+    "SDBWC",  # separate shower and toilet
+    "CHAMBRE",  # bed types
+)
+
+#: The two group-code prefixes, because **the body types do not share them**: a coachbuilt
+#: numbers its sections `OD_CC_CUISINE` and a panel van `OD_FOU_CUISINE` (*fourgon*).
+#: Targeting only `OD_CC_` silently produced no findings at all on the six vans while
+#: working perfectly on the other 37.
+SECTION_PREFIXES: tuple[str, ...] = ("OD_CC_", "OD_FOU_")
+
+#: Every selector one page load presses, in the order that works: the four fittings
+#: sections **first**, and the specification popup **last**. One load rather than five —
+#: see `BrowserFetcher._click_each`.
+#:
+#: **The order is load-bearing.** The popup is a modal that covers the page, so anything
+#: behind it stops being clickable: with the popup pressed first, all four accordion
+#: clicks time out and the page takes 79 seconds instead of 15 while they do. Opening the
+#: sections first and the popup last leaves everything reachable.
+#: **Matched by suffix, so one selector covers both prefixes.** Listing the prefixes
+#: explicitly means half of them always miss — a coachbuilt has no `OD_FOU_` section and a
+#: van no `OD_CC_` one — and each miss waits out the full `CLICK_TIMEOUT_MS`. That cost a
+#: minute a page, which over 43 pages is an hour of waiting for elements that were never
+#: going to be there. `[data-group$="_CUISINE"]` matches whichever exists.
+CLICK_SELECTORS: tuple[str, ...] = tuple(
+    f'div.group_option[data-group$="_{group}"]' for group in HABITATION_SECTIONS
+) + (CLICK_SELECTOR,)
 
 #: How long to let the popup's Airtable call land after the click.
 SETTLE_MS = 8000
@@ -359,6 +406,37 @@ def popup_rows(page: str) -> dict[str, str]:
     return rows
 
 
+#: One opened `Standard fittings` section, with its group code and its inner list.
+_FITTINGS_SECTION = re.compile(
+    r'data-group="(?:OD_CC_|OD_FOU_)(?P<group>[A-Z_]+)"[^>]*data-loaded="1"[^>]*>'
+    r"(?P<body>.*?)(?=<div class=\"group_option\"|</section|$)",
+    re.S,
+)
+
+#: One fitting inside an opened section. They are table cells, not list items — the first
+#: attempt split on `</li>` and `<br>`, found neither, and returned each whole section as
+#: a single run-on line, which read as one implausible fitting rather than as an error.
+_FITTING_ITEM = re.compile(r"<td[^>]*>(?P<text>.*?)</td>", re.S)
+
+
+def fittings_lines(page: str) -> tuple[str, ...]:
+    """Every standard-fitting line from the habitation sections that were opened.
+
+    A section still carrying `data-loaded="0"` is skipped rather than read as empty: it
+    means the click did not land, which is a different thing from a vehicle without a
+    fridge, and silence is not a negative.
+    """
+    lines: list[str] = []
+    for match in _FITTINGS_SECTION.finditer(page):
+        if match.group("group") not in HABITATION_SECTIONS:
+            continue
+        for item in _FITTING_ITEM.finditer(match.group("body")):
+            text = _clean(html.unescape(item.group("text")).replace(" ", " "))
+            if text:
+                lines.append(text)
+    return tuple(dict.fromkeys(lines))
+
+
 def _matching(rows: dict[str, str], pattern: re.Pattern[str]) -> str | None:
     for label, value in rows.items():
         if pattern.search(label):
@@ -550,7 +628,9 @@ def length_disagreement(product: PiloteProduct) -> str | None:
 # --- What reaches the reviewer ---------------------------------------------------------
 
 
-def _build_extracted_motorhome(product: PiloteProduct) -> ExtractedMotorhome:
+def _build_extracted_motorhome(
+    product: PiloteProduct, fittings: tuple[str, ...] = ()
+) -> ExtractedMotorhome:
     """One layout as a `Motorhome`, plus the provenance a reviewer sees beside each field.
 
     **`mh_width_mm` comes from the popup's `Vehicle interior width` row**, whose label is
@@ -564,6 +644,7 @@ def _build_extracted_motorhome(product: PiloteProduct) -> ExtractedMotorhome:
     their summary strip prints the mirrors-open figure, which must not be recorded.
     """
     source_url = product.source_url
+    features = habitation.features_from(fittings)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -582,6 +663,19 @@ def _build_extracted_motorhome(product: PiloteProduct) -> ExtractedMotorhome:
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
         body_type=product.body_type,
+        # Habitation, from the `Standard fittings` sections the run opens. Reported as
+        # findings rather than proposed, so the pipeline never writes them.
+        heating=features["heating"].value if "heating" in features else None,
+        refrigeration=(
+            features["refrigeration"].value if "refrigeration" in features else None
+        ),
+        shower_toilet_separated=(
+            features["shower_toilet_separated"].value
+            if "shower_toilet_separated" in features
+            else None
+        ),
+        bed_types=features["bed_types"].value if "bed_types" in features else [],
+        microwave=features["microwave"].value if "microwave" in features else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -654,6 +748,16 @@ def _build_extracted_motorhome(product: PiloteProduct) -> ExtractedMotorhome:
         ),
     )
 
+    for field, feature in features.items():
+        detail = f" — {feature.note}" if feature.note else ""
+        provenance[field] = Provenance(
+            source_url=source_url,
+            snippet=(
+                f"{product.label} — the Standard fittings list says "
+                f"{feature.snippet!r}{detail}"
+            ),
+        )
+
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
@@ -693,7 +797,7 @@ def collect(
     for url in urls:
         page_result = browser.fetch(
             url,
-            click_selector=CLICK_SELECTOR,
+            click_selector=CLICK_SELECTORS,
             click_timeout_ms=CLICK_TIMEOUT_MS,
             settle_ms=SETTLE_MS,
             on_progress=lambda message, url=url: on_progress(f"{url}: {message}"),
@@ -739,7 +843,7 @@ def collect(
                 f"so {PRICE_LIST_SOURCE} needs re-reading"
             )
 
-        results.append(_build_extracted_motorhome(product))
+        results.append(_build_extracted_motorhome(product, fittings_lines(page)))
 
     on_progress(f"collected {len(results)} product(s)")
     return results

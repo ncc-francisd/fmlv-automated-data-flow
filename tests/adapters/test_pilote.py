@@ -34,6 +34,7 @@ from src.adapters.pilote import (
     _build_extracted_motorhome,
     _reconciles,
     find_model_urls,
+    fittings_lines,
     length_disagreement,
     parse_model_page,
     plain_text,
@@ -513,3 +514,77 @@ def test_a_page_with_no_popup_still_gets_no_width() -> None:
 
     assert product is not None
     assert product.mh_width_mm is None
+
+
+# --------------------------------------------------------------------------- #
+# Habitation, from the Standard fittings accordion
+# --------------------------------------------------------------------------- #
+
+
+def test_the_fittings_sections_yield_their_individual_lines() -> None:
+    """They are table cells, not list items.
+
+    Splitting on `</li>` found nothing and returned each whole section as one run-on
+    line, which read as a single implausible fitting rather than as a failure — four
+    sections gave four "lines".
+    """
+    lines = fittings_lines(_page("pilote_g690gj_expression.html"))
+
+    assert len(lines) > 20
+    assert "6,000 W Truma® Combi D6E hot water/heating" in lines
+    assert "Compression refrigerator: 150 L (depending on model)" in lines
+
+
+def test_html_entities_are_unescaped() -> None:
+    """`&nbsp;` survives tag-stripping and would otherwise reach a reviewer verbatim."""
+    lines = fittings_lines(_page("pilote_g690gj_expression.html"))
+
+    assert any("1 kW or 1.7 kW" in line for line in lines)
+    assert not any("&nbsp;" in line or "\xa0" in line for line in lines)
+
+
+def test_both_body_types_yield_habitation_lines() -> None:
+    """The van numbers its sections `OD_FOU_` and the coachbuilt `OD_CC_`.
+
+    Targeting one prefix gave no findings at all on the six vans while working perfectly
+    on the other 37.
+    """
+    assert len(fittings_lines(_page("pilote_v540g_pilote.html"))) > 15
+    assert len(fittings_lines(_page("pilote_g690gj_expression.html"))) > 20
+
+
+def test_the_section_selectors_match_either_prefix_with_one_click() -> None:
+    """Listing both prefixes means half always miss, and each miss waits out the timeout.
+
+    That cost about a minute a page — an hour across the roster — for elements that were
+    never going to be there.
+    """
+    from src.adapters.pilote import CLICK_SELECTORS, HABITATION_SECTIONS
+
+    assert len(CLICK_SELECTORS) == len(HABITATION_SECTIONS) + 1
+    assert all('data-group$="_' in s for s in CLICK_SELECTORS[:-1])
+
+
+def test_the_popup_is_clicked_last_because_it_covers_the_page() -> None:
+    """It is a modal: opened first, every accordion click behind it times out."""
+    from src.adapters.pilote import CLICK_SELECTOR, CLICK_SELECTORS
+
+    assert CLICK_SELECTORS[-1] == CLICK_SELECTOR
+
+
+def test_the_habitation_findings_reach_the_reviewer_with_their_source_line() -> None:
+    page = _page("pilote_g690gj_expression.html")
+    product = _parse("pilote_g690gj_expression.html")
+    extracted = _build_extracted_motorhome(product, fittings_lines(page))
+
+    assert extracted.motorhome.heating is not None
+    assert extracted.motorhome.refrigeration is not None
+    assert "Standard fittings list says" in extracted.provenance["heating"].snippet
+    assert "Truma" in extracted.provenance["heating"].snippet
+
+
+def test_a_section_that_never_opened_is_not_read_as_an_absence() -> None:
+    """`data-loaded="0"` means the click missed, which is not "this vehicle has none"."""
+    page = _page("pilote_g690gj_expression.html").replace('data-loaded="1"', 'data-loaded="0"')
+
+    assert fittings_lines(page) == ()

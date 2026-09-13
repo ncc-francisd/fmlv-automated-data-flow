@@ -10,7 +10,7 @@ shape as a plain HTTP fetch, so downstream code doesn't need to care which one r
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
@@ -45,6 +45,9 @@ SCROLL_STEP_VIEWPORT_FRACTION = 0.5
 #: not there within a few seconds it is not coming — and a page per product means a long
 #: timeout multiplies across the whole run.
 DEFAULT_CLICK_TIMEOUT_MS = 5000
+
+#: Pause between consecutive clicks, so an opening section does not swallow the next one.
+CLICK_GAP_MS = 400
 
 
 class BrowserFetcher:
@@ -115,7 +118,7 @@ class BrowserFetcher:
         url: str,
         *,
         previous_hash: str | None = None,
-        click_selector: str | None = None,
+        click_selector: str | Sequence[str] | None = None,
         click_timeout_ms: int = DEFAULT_CLICK_TIMEOUT_MS,
         settle_ms: int = 0,
         on_progress: Callable[[str], None] = lambda message: None,
@@ -136,7 +139,7 @@ class BrowserFetcher:
         try:
             response = self._goto(page, url)
             if click_selector is not None:
-                self._click(
+                self._click_each(
                     page,
                     click_selector,
                     timeout_ms=click_timeout_ms,
@@ -161,7 +164,7 @@ class BrowserFetcher:
         scroll_pixels: int = 2000,
         scroll_pause_ms: int = 400,
         settle_ms: int = 2000,
-        click_selector: str | None = None,
+        click_selector: str | Sequence[str] | None = None,
         click_timeout_ms: int = DEFAULT_CLICK_TIMEOUT_MS,
         on_progress: Callable[[str], None] = lambda message: None,
     ) -> tuple[FetchResult, list[FetchResult]]:
@@ -214,7 +217,7 @@ class BrowserFetcher:
                     pause_ms=scroll_pause_ms,
                 )
             if click_selector is not None:
-                self._click(
+                self._click_each(
                     page,
                     click_selector,
                     timeout_ms=click_timeout_ms,
@@ -232,6 +235,35 @@ class BrowserFetcher:
             for captured_url, captured_status, content_type, body in captured
         ]
         return page_result, capture_results
+
+    @classmethod
+    def _click_each(
+        cls,
+        page: object,
+        selectors: "str | Sequence[str]",
+        *,
+        timeout_ms: int,
+        on_progress: Callable[[str], None],
+    ) -> None:
+        """Click one selector, or several in order, before the page is snapshotted.
+
+        Several is for a page whose content is spread across collapsed sections that each
+        load their own data when opened — Pilote's `Standard fittings` accordion is the
+        first, with eleven sections of which ten are empty until clicked. Opening them in
+        one page load matters: a separate fetch per section would multiply an already slow
+        sweep by the number of sections.
+
+        They are clicked in order, with a short pause between so an opening section does
+        not swallow the next click, and the caller's `settle_ms` then covers all of their
+        requests at once rather than one at a time. **A selector that never appears is
+        narrated and the rest are still clicked** — one missing section should not cost
+        the others.
+        """
+        one = isinstance(selectors, str)
+        for index, selector in enumerate([selectors] if one else list(selectors)):
+            if index:
+                page.wait_for_timeout(CLICK_GAP_MS)  # type: ignore[attr-defined]
+            cls._click(page, selector, timeout_ms=timeout_ms, on_progress=on_progress)
 
     @staticmethod
     def _click(
