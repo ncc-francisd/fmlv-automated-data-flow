@@ -173,6 +173,55 @@ disagree force zero — so all three would arrive as new beside three disappeara
 So the range is not derivable from the page heading alone, and the mapping has to be built
 against the export rather than guessed.
 
+## The 2027 changeover has started, and it is visible in the data
+
+The requester, 14 September 2026: *"some of the 2027 ranges are on the website now... very
+much about a 65 year anniversary range. Some of the models I couldn't see the technical
+specifications for, and maybe they will follow. The download brochures are still 2026, so
+that won't be very useful."*
+
+That is confirmed and it changed the design. **Between two fetches on the same day, the
+Bourton lost its summary strip**: the labels are still there and every value is blank.
+The detailed table below it was untouched.
+
+| block | before | after |
+| --- | --- | --- |
+| summary strip | 8 values | **`Seats 2` and seven empty labels** |
+| detailed table | 14 rows | 14 rows, unchanged |
+
+**So the detailed table is the source and the summary is the cross-check**, not the other
+way round. It is also the better-labelled of the two — `Overall Width (mirrors folded)`
+rather than a bare `Width` — so this costs nothing and buys resilience through a
+changeover that is happening right now.
+
+A page whose figures have not been republished must reach the reviewer as **fields not
+found**, preserving what FMLV holds, rather than as a product with no weights.
+
+### The labels themselves move
+
+The same Bourton row was `Maximum Technically Permissible Laden Mass (a) (est)` in the
+morning and `Maximum Permissable Laden Mass (a) (est)` in the afternoon — a rewording *and*
+a misspelling in one edit. **Match on the stem `Laden Mass (a)`**, never the full phrase.
+
+## Habitation is on the page, in prose
+
+No itemised fittings table, but the model copy is specific and per-model:
+
+```
+New Alde 3030 pluscombi heating and continous hot water   -> wet central
+Large refrigerator with freezer compartment                -> fridge freezer
+Dometic microwave oven                                     -> microwave
+Seperate shower and toilet (Bourton)                       -> separated
+```
+
+`Essential Habitation Equipment (d) 17kg` in the detailed table is a **mass allowance**,
+not an equipment list, and is not a habitation source.
+
+**One shared-vocabulary change was needed.** Auto-Sleepers write *"Seperate"* on every
+page, so `habitation._SEPARATE_BATHROOM` now accepts `sep[ae]rat`. Insisting on the
+dictionary spelling loses the washroom reading across the whole brand, and it is the same
+word either way.
+
 ## Still unverified
 
 * **The 635/365 question above**, which blocks the three Active products.

@@ -424,9 +424,13 @@ def microwave_offered(lines: Iterable[str]) -> str | None:
 #: unit and the shower is a clause away. Fifteen characters and no comma still admits
 #: every real phrasing seen — "separate cassette toilet", "separated from the toilet",
 #: "toilet and separate shower", Laika's "separable shower".
+#: `sep[ae]rat` covers the misspelling, which is not a typo worth being strict about:
+#: Auto-Sleepers write "Seperate shower and toilet" and "Seperate shower cubicle" on every
+#: page, so insisting on the dictionary spelling silently loses a washroom reading across
+#: a whole brand. It is the same word either way.
 _SEPARATE_BATHROOM = re.compile(
-    r"\bsepara(?:te|ted|tes|ting|tion|ble)\b[^.,]{0,15}\b(?:shower|toilet|wc)\b"
-    r"|\b(?:shower|toilet|wc)\b[^.,]{0,15}\bsepara(?:te|ted|tes|ting|tion|ble)\b",
+    r"\bsep[ae]ra(?:te|ted|tes|ting|tion|ble)\b[^.,]{0,15}\b(?:shower|toilet|wc)\b"
+    r"|\b(?:shower|toilet|wc)\b[^.,]{0,15}\bsep[ae]ra(?:te|ted|tes|ting|tion|ble)\b",
     re.I,
 )
 
