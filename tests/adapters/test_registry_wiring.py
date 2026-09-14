@@ -34,7 +34,9 @@ from src.vehicle_class import VehicleClass
 #: `habitation` is the shared feature vocabulary several adapters read their spec prose
 #: with — industry wording, not one brand's, hence its living beside them rather than
 #: inside one of them.
-_NOT_ADAPTERS = {"base", "ehg_configurator", "habitation"}
+#: `marquis` is the reader for a Marquis Leisure range page, shared by Benimar, Elnagh,
+#: Mobilvetta and Panama — an importer's page template, not a brand.
+_NOT_ADAPTERS = {"base", "ehg_configurator", "habitation", "marquis"}
 
 
 def _adapter_modules() -> list[ModuleType]:

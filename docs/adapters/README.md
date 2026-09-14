@@ -30,6 +30,26 @@ Whenever a single number cannot express the whole truth, carry the manufacturer'
 published wording into the `Provenance` snippet** — a reviewer needs to see `4-6` even
 though `berths` records `4`. Sunlight and Rimor already do this.
 
+### "Mirrors folded" is the body width on a coachbuilt and not on a van
+
+A common label, and it means different things on the two body shapes:
+
+* on a **coachbuilt**, the habitation body is around 2300 mm and overhangs the folded
+  mirrors, so the figure measures the body and is the one to record;
+* on a **panel van**, it does not. A Ducato's body is about 2050 mm and its folded mirrors
+  reach about 2260 mm, so the figure is the mirrors — and the rule above excludes them.
+
+Where a van's only published width includes the mirrors, **record nothing**. The requester,
+12 September 2026: *"if they don't have a figure excluding mirrors, we'll have to leave
+that blank as we don't have the correct figure, unless it's an existing model that appears
+to have the same height and length. In other words, it's likely to be the same outer
+shell."* Emitting nothing satisfies both halves at once — a layout FMLV already holds keeps
+the body width it has, and a new one arrives visibly blank rather than 200 mm too wide.
+
+`benimar.BenimarProduct.recorded_width_mm` is the worked example. **Mobilvetta's Admiral
+and Panama predate this and still record the mirrors-folded figure** — see
+`docs/adapters/benimar.md`.
+
 > **Auto-Trail currently diverges and needs changing.** `auto_trail.py` takes the *upper*
 > `Sleeps` figure, on the evidence that Auto-Trail's own `Max. No. of berths` row agrees
 > with it on all 21 motorhome models. That establishes the true *maximum*, which is a

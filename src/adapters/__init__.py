@@ -28,6 +28,7 @@ from __future__ import annotations
 from . import (
     adria,
     auto_sleepers,
+    benimar,
     auto_trail,
     bailey,
     bailey_caravan,
@@ -69,6 +70,7 @@ from .base import Adapter, ExtractedMotorhome, Provenance
 _MODULES: tuple[Adapter, ...] = (
     adria,
     auto_sleepers,
+    benimar,
     auto_trail,
     bailey,
     bailey_caravan,
@@ -125,6 +127,7 @@ __all__ = [
     "adapters_for",
     "adria",
     "auto_sleepers",
+    "benimar",
     "auto_trail",
     "bailey",
     "bailey_caravan",
