@@ -108,6 +108,45 @@ Eighteen site pages against nineteen live FMLV rows, and it reconciles exactly:
 19 − 2 + 1 = 18. That the arithmetic closes is the roster check `docs/adapters/README.md`
 asks for.
 
+### All 18 pass the printed self-check, and the field diff is coherent
+
+Every page was fetched and its eight summary figures read. **`MTPLM − MIRO == payload` on
+18 of 18**, exactly, with no rounding slack. Against FMLV's 2026 rows the comparison gives
+**47 field changes over 17 matched products**, and its shape is what makes it believable:
+
+| field | changes | |
+| --- | --- | --- |
+| `mh_passenger_seats_inc_driver` | **0** | 18 of 18 agree |
+| `mh_width_mm` | **0** | 18 of 18 agree |
+| `mtplm_kilograms` | **0** | 18 of 18 agree |
+| `mh_height_mm` | **17** | see below — systematic |
+| `mro_kilograms` / `mh_payload_kilograms` | 13 each | small, and they move together |
+| `berths` | 1 | KB 635, 4 → 2 |
+| `mh_length_mm` | 1 | M-Star, 6967 → 7100 |
+
+Seats, width and MTPLM agreeing on every product is strong corroboration that the parse is
+reading the right rows. The MRO and payload moves are 10-60 kg and always offset each
+other exactly, which is a manufacturer revising figures rather than a parse slipping.
+
+### The height question: does FMLV's figure include the TV aerial?
+
+**Every one of the 17 changes its height**, in two tight groups:
+
+| | FMLV | site | difference |
+| --- | --- | --- | --- |
+| Mercedes and coachbuilt Fiat | 2900 | **2865** | 35 mm |
+| Fiat campervans | 2640 | **2615** | 25 mm |
+
+That is too systematic to be a revision. The site's label is the clue: **`Overall Height
+Standard Roof (excl TV aerial)`**. So FMLV's figure very likely *includes* an aerial that
+the site's excludes.
+
+**This is not decided here**, because it turns on what FMLV's height column means and
+whether the aerial is standard equipment. If it is standard, FMLV's larger figure is right
+and the adapter should not propose 17 reductions; if it is an option, the settled
+base-vehicle rule says take the site's. The Active vans' pop-top figure (2815) is a third
+number again and is not what either holds.
+
 ### One thing to settle before building: 635 or 365?
 
 The three Active campervans are **`FG 635`, `FL 635`, `KB 635`** on the site — in the page
