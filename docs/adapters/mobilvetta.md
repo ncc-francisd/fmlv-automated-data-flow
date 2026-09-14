@@ -62,18 +62,17 @@ own heading.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | ADMIRAL K 6.3 | 2 | 4 | 6360 | 2260 | 2650 | 3500 | 376 | £79,995 |
 | K.YACHT 59 | 3 | 4 | 5990 | 2350 | 2950 | 4400 | 1502 | £109,995 |
-| K.YACHT 86 | 4 | 4 | 7470 | 2350 | 2950 | 4400 | 1222 | — |
+| K.YACHT 86 | 4 | 4 | 7470 | 2350 | 2950 | 4400 | 1222 | £119,995 |
 | K.YACHT 90 | 4 | 4 | 7470 | 2350 | 2950 | 4400 | 1252 | £119,995 |
 | K.YACHT 95 | 4 | 4 | 7410 | 2350 | 2950 | 4400 | 1262 | £118,995 |
-| K.YACHT 80 | 4 | 4 | 6990 | 2350 | 2850 | 3650 | 524 | — |
-| KEA 80 | 4 | 4 | 6990 | 2350 | 2850 | 3650 | 524 | — |
-| KEA 86 | 4 | 4 | 7470 | 2350 | 2950 | 4400 | 1212 | — |
+| K.YACHT 80 | 4 | 4 | 6990 | 2350 | 2850 | 3650 | 524 | £109,995 *(excluded)* |
+| KEA 80 | 4 | 4 | 6990 | 2350 | 2850 | 3650 | 524 | £89,995 *(excluded)* |
+| KEA 86 | 4 | 4 | 7470 | 2350 | 2950 | 4400 | 1212 | £99,995 |
 | KEA 90 | 4 | 4 | 7470 | 2350 | 2950 | 4400 | 1242 | £99,995 |
 | KEA KOMPAKT 55 | 4 | 4 | 6390 | 2150 | 2850 | 3500 | 612 | £79,995 |
 
-**Four of the ten carry no price.** They are still listed and specified, so this is a gap in
-Marquis's page rather than a discontinued layout — `rrp_pounds` stays unset on those and
-FMLV keeps whatever it holds.
+**Every layout is priced**, and all eight of the kept ones match what FMLV displays. The
+price column above was wrong in a first pass — see "The prices need the whole block".
 
 **`BELTS` is the travel-seat count and `BERTHS` the sleeping count** — named unambiguously,
 unlike Pilote where "Berth" meant a seat.
@@ -101,25 +100,46 @@ rather than glossed. The available mitigations are:
 The second is cheap and is what a first build should do. The first is worth adding only if
 the second proves insufficient.
 
-## The question the survey cannot answer: the 80s
+## The 80s are excluded, by the requester's ruling
 
-**K.YACHT 80 and KEA 80 will arrive as new products, and FMLV already holds them.**
+**Settled 14 September 2026.** FMLV's current Mobilvetta range is exactly **eight**
+vehicles — the requester checked the live site — and neither 80 is among them:
 
-FMLV's 18 live Mobilvetta rows split 8 × 2026 and 10 × 2025, and the 80s are among the
-2025 group:
+```
+KEA Kompakt 55  £79,995     ADMIRAL K 6.3  £79,995
+KEA 86          £99,995     KEA 90         £99,995
+K-YACHT 59     £109,995     K-YACHT 95    £118,995
+K-YACHT 86     £119,995     K-YACHT 90    £119,995
+```
 
-| FMLV row | year |
-| --- | --- |
-| `K-YACHT TEKNO LINE` / `80`, `80/2` | **2025** |
-| `KEA` / `80`, `80/2` | **2025** |
+His reasoning: *"They may well be sold as current stock. But remember, we're not looking
+for current stock. We're looking at the range lineup."* FMLV holds the K.YACHT 80 and
+KEA 80 only as **2025** rows, which `cli._is_current_model_year` drops from the baseline,
+so collecting them would add two products to a range that is meant to have eight.
 
-`cli._is_current_model_year` keeps only the current calendar year and the next, so every
-2025 row is dropped from the baseline before matching. The site offers both 80s as current
-2026 stock, so each would be collected, match nothing, and be proposed as new — beside
-rows that already exist.
+**So `mobilvetta-k-yacht-80-and-kea-80-2026-motorhome-range` is excluded from the roster**,
+and the remaining four pages yield exactly the eight FMLV holds.
 
-That is a data question rather than an adapter one. Either those four rows want their year
-moving to 2026, or the 80s are genuinely new listings and the old rows should be archived.
+One caveat recorded honestly: that page does not *look* like a stock page. Its URL says
+`2026-motorhome-range`, and it carries the same `Weights and Dimensions` blocks and OTR
+prices (£109,995 and £89,995) as its four siblings. If Marquis ever promote the 80s into
+the range proper, the fix is to delete one entry from `EXCLUDED_PAGES`.
+
+## Avoid the used-stock pages
+
+The requester's other warning: *"you have to avoid the used stock for sale pages and find
+this one."* The roster is taken from the brand index at `/new-motorhomes/mobilvetta` and
+restricted to `mobilvetta-*-2026-*-range` slugs, so a stock listing cannot reach it.
+
+## The prices need the whole block, not a window
+
+Every layout on the K-Yacht page is priced — £109,995, £119,995, £119,995, £118,995 — and
+all four match what FMLV displays. A first extraction using a fixed 700-character window
+after each heading lost two of them, because the price sits at the end of a block rather
+than beside the dimensions.
+
+**Three pages also carry a stray `£4,000`**, which is an offer rather than a vehicle price.
+Only a figure followed by `OTR` is a price.
 
 ## Still unverified
 
