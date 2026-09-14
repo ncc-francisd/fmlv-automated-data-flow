@@ -25,7 +25,6 @@ the three must close. Only the older Primero page is unchecked. See `_reconciles
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -86,54 +85,6 @@ DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
 EXPECTED_LAYOUTS = 16
 
 plain_text = marquis.plain_text
-
-#: A layout's `Bed Sizes` list, which runs to the footnote or the engine-and-price line.
-BED_SECTION = re.compile(r"Bed Sizes\s+(?P<beds>.*?)(?=#|[A-Z][A-Z\s.]*ENGINE|$)", re.S)
-
-#: One bed in that list: a name, then the size that ends it.
-#:
-#: The entries are run together — `Double Drop Down Bed 1400mm x 1900mm | 4'6'' x 6'2''
-#: Double Rear Bed 1390mm x 2000mm` — so the split is on the size rather than on any
-#: separator. The name may not contain a digit or a quote mark, which is what stops the
-#: previous entry's imperial measurement being read as part of the next bed's name.
-#:
-#: **The letter `x` is deliberately allowed in a name** even though the older template
-#: uses it between the two figures: excluding it turned `FIXED REAR BED` into `ED REAR
-#: BED`. The digits do the separating instead.
-BED_ENTRY = re.compile(r"""(?P<name>[^|\u00d7#\d\u2019'"]+?Bed)\s+(?:2\s*x\s*)?\d+\s*mm""", re.I)
-
-
-def _bed_lines(body: str) -> list[str]:
-    """The beds one layout's block names, as lines `habitation` can read.
-
-    **`Optional` beds are dropped.** Both Benivan layouts list an `Optional Elevating Roof
-    Bed`, which is a pop-top the buyer may not have bought — the settled rule against
-    reading a paid option as standard equipment. `habitation.usable_lines` does not catch
-    this one because the page never prices it or writes `Option:`.
-    """
-    section = BED_SECTION.search(body)
-    if section is None:
-        return []
-    names = [
-        re.sub(r"\s+", " ", match.group("name")).strip()
-        for match in BED_ENTRY.finditer(section.group("beds"))
-    ]
-    return [name for name in names if not name.lower().startswith("optional")]
-
-
-def _equipment_lines(page: str) -> list[str]:
-    """The range's standard-equipment list, minus anything naming a bed.
-
-    **A Marquis page is a range, not a layout**, so its equipment list describes up to six
-    vehicles at once. That is fine for a fridge or a heater, which the whole range shares,
-    and wrong for beds — so bed copy is excluded here and taken per layout from the block's
-    own `Bed Sizes` list instead.
-    """
-    return [
-        line
-        for line in habitation.list_items(page)
-        if "bed" not in line.lower() and "bunk" not in line.lower()
-    ]
 
 
 def find_range_urls(index_html: str, ranges: Iterable[str]) -> list[str]:
@@ -212,7 +163,7 @@ class BenimarProduct:
 def layout_blocks(page: str, source_url: str) -> list[BenimarProduct]:
     """Every layout on one range page, in page order."""
     products: list[BenimarProduct] = []
-    equipment = _equipment_lines(page)
+    equipment = marquis.equipment_lines(page)
     for heading, body in marquis.layout_blocks(marquis.plain_text(page)):
         identity = marquis.range_and_model(heading, RANGE_PREFIXES)
         if identity is None:
@@ -234,7 +185,8 @@ def layout_blocks(page: str, source_url: str) -> list[BenimarProduct]:
                 rrp_pounds=marquis.price(body),
                 base_mro_routes=tuple(marquis.base_mro_routes(body)),
                 chassis_mro_routes=tuple(marquis.chassis_mro_routes(body)),
-                copy_lines=tuple(_bed_lines(body)) + tuple(equipment),
+                copy_lines=tuple(marquis.bed_lines(body))
+                + tuple(marquis.lines_for_layout(equipment, model)),
             )
         )
     return products

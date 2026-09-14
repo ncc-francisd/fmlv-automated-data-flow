@@ -28,10 +28,8 @@ from src.adapters.benimar import (
     BODY_TYPES,
     EXPECTED_LAYOUTS,
     BenimarProduct,
-    _bed_lines,
     _build_extracted_motorhome,
     _discrepancies,
-    _equipment_lines,
     _reconciles,
     find_range_urls,
     layout_blocks,
@@ -369,37 +367,6 @@ def test_no_width_provenance_is_recorded_for_a_campervan() -> None:
 # --------------------------------------------------------------------------- #
 # Habitation, which is findings rather than proposals
 # --------------------------------------------------------------------------- #
-
-
-def test_the_beds_come_from_the_layouts_own_list() -> None:
-    """A page is a range, so a bed named in the equipment list could be another layout's."""
-    assert _bed_lines(
-        "Bed Sizes Double Drop Down Bed 1400mm x 1900mm | 4'6'' x 6'2'' "
-        "Double Rear Bed 1390mm x 2000mm | 4'6'' x 6'6'' # Garage dimensions"
-    ) == ["Double Drop Down Bed", "Double Rear Bed"]
-
-
-def test_a_bed_name_containing_an_x_survives() -> None:
-    """Excluding `x` from a bed's name turned `FIXED REAR BED` into `ED REAR BED`."""
-    assert _bed_lines("Bed Sizes FIXED REAR BED 1390mm X 2000mm | 4'6'' X 6'6''") == [
-        "FIXED REAR BED"
-    ]
-
-
-def test_an_optional_bed_is_not_read_as_standard() -> None:
-    """Both Benivan layouts offer an elevating roof bed the buyer may not have bought."""
-    beds = _bed_lines(
-        "Bed Sizes Double Rear Bed 1860mm x 1490mm | 6'1'' x 4'8'' "
-        "Optional Elevating Roof Bed 2000mm x 1300mm | 6'5'' x 4'2''"
-    )
-
-    assert beds == ["Double Rear Bed"]
-
-
-def test_the_equipment_list_never_contributes_a_bed() -> None:
-    assert not any(
-        "bed" in line.lower() for line in _equipment_lines(_page("benimar_primero.html"))
-    )
 
 
 def test_the_range_equipment_settles_the_habitation_fields() -> None:
