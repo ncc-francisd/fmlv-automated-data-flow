@@ -100,7 +100,7 @@ Read range-wide, whichever line came first would settle `shower_toilet_separated
 four. **FMLV holds No, No, Yes, Yes** across 530/560/573/579 — which is the page read per
 layout. So this is not a refinement; it is the difference between right and wrong.
 
-`marquis.lines_for_layout` handles it, and **Benimar qualifies the same way** with
+`habitation.lines_for_layout` handles it, and **Benimar qualifies the same way** with
 `(excl 286)` and `(286)` on its two fridge sizes — where both happen to be fridge-freezers
 and the fault would have gone unnoticed.
 
@@ -120,7 +120,7 @@ DOUBLE REAR BED 1300 x 1100 x 1900mm  three dimensions
 
 against Benimar's `Double Drop Down Bed 1400mm × 1900mm`. Requiring the suffix on the first
 figure found **none** of Elnagh's four drop-down beds — which FMLV holds for all four. The
-shared reader now swallows everything up to the first `mm`.
+shared reader now swallows the whole size, however the unit is placed.
 
 ## Body type
 
@@ -145,6 +145,23 @@ The page **defines MIRO in prose** in its glossary:
 
 The last block's body runs to the end of the page, so that text is inside it. Only
 `MIRO <n>kg` counts as a figure, so nothing is read from it — pinned by a test.
+
+## The Baron is also sold as the McLouis Fusion
+
+`Baron 530/560/573/579` and `Fusion 330/360/373/379` are the same four vehicles, identical
+to the kilogram on length, MTPLM, MIRO and payload, with the washroom splitting the same
+way. FMLV's four 2025 `Baron` rows sitting under **McLouis** are the direct evidence: the
+range moved brands for 2026.
+
+**The two pages disagree on the height** — Marquis publish 2950 mm here, McLouis publish
+2770 mm and repeat it in their brochure. One of the two is wrong, and the requester settled
+it on 15 September 2026 in favour of the 2950 mm FMLV already holds. **Nothing changes in
+this adapter**, which reads 2950 mm from the page anyway; the correction lives in
+`mclouis._KNOWN_HEIGHT_ERROR`.
+
+They also disagree on the belted seat count, and that one is left standing: McLouis make a
+fifth seat standard on three layouts and Marquis do not, which is a real specification
+difference between importers rather than an error.
 
 ## Still unverified
 

@@ -131,6 +131,31 @@ PRICE = re.compile(r"OTR Price From\s+£\s*(?P<price>[\d,]{5,})", re.I)
 #: The page states a rear garage per layout, with its aperture and its load limit.
 REAR_GARAGE = re.compile(r"Rear Garage Max Load (?:Capacity|Limit)\s+(\d+)\s*kg", re.I)
 
+#: `published height -> (recorded height, why)`. **A data-quality override, not a parse fix.**
+#:
+#: The Fusion is the Elnagh Baron rebadged — 330/360/373/379 against Baron 530/560/573/579,
+#: identical to the kilogram on length, MTPLM, MIRO and payload, with the washroom splitting
+#: the same way, and FMLV's four 2025 `Baron` rows sit under McLouis because the range moved
+#: to Elnagh for 2026. **One vehicle cannot have two heights.** Marquis publish 2950 mm for
+#: the Baron; McLouis publish 2770 mm here, and their 2026 brochure repeats it.
+#:
+#: The requester's decision, 15 September 2026: *"can we use the 2950 height, which is what
+#: we use on Find My Leisure Vehicle at the moment for both brands. I think that's just a
+#: typo or something, but you're right, it must be the same."* So both badges are aligned to
+#: the figure FMLV already holds, and neither brand proposes a height change.
+#:
+#: **Keyed on the published figure, not on the model**, exactly as `murvi._KNOWN_PRICE_TYPO`
+#: is keyed on the pair it resolves: the day McLouis print anything other than 2770 mm the
+#: override stops applying and the new figure is proposed normally, rather than a stale
+#: correction quietly overwriting a real change.
+_KNOWN_HEIGHT_ERROR: dict[int, tuple[int, str]] = {
+    2770: (
+        2950,
+        "the Elnagh Baron is the same vehicle rebadged and Marquis publish 2950mm for it, "
+        "which is what FMLV holds for both brands",
+    ),
+}
+
 #: A layout's bed list, between its garage figures and the small print.
 BED_SECTION = re.compile(r"Bed Sizes\s+(?P<beds>.*?)(?=IMPORTANT INFORMATION|$)", re.S)
 
@@ -224,6 +249,25 @@ class McLouisProduct:
     @property
     def label(self) -> str:
         return f"{RANGE} {self.model}"
+
+    @property
+    def recorded_height_mm(self) -> int | None:
+        """The height FMLV records, which is not the one this site prints.
+
+        See `_KNOWN_HEIGHT_ERROR`: the Elnagh Baron is the same vehicle and Marquis publish
+        2950 mm for it. The override is narrated on every run rather than applied quietly.
+        """
+        if self.mh_height_mm is None:
+            return None
+        known = _KNOWN_HEIGHT_ERROR.get(self.mh_height_mm)
+        return known[0] if known else self.mh_height_mm
+
+    @property
+    def height_override(self) -> tuple[int, str] | None:
+        """`(recorded, why)` where this layout's published height is being overridden."""
+        if self.mh_height_mm is None:
+            return None
+        return _KNOWN_HEIGHT_ERROR.get(self.mh_height_mm)
 
     @property
     def mtplm_kilograms(self) -> int | None:
@@ -321,7 +365,7 @@ def _build_extracted_motorhome(product: McLouisProduct) -> ExtractedMotorhome:
         mh_payload_kilograms=product.mh_payload_kilograms,
         mh_length_mm=product.mh_length_mm,
         mh_width_mm=product.mh_width_mm,
-        mh_height_mm=product.mh_height_mm,
+        mh_height_mm=product.recorded_height_mm,
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
         body_type=BODY_TYPE,
@@ -356,7 +400,15 @@ def _build_extracted_motorhome(product: McLouisProduct) -> ExtractedMotorhome:
             f"'Overall width (mirrors folded) {product.mh_width_mm / 1000:.2f}m'. On a "
             f"coachbuilt the body overhangs the folded mirrors, so this measures the body",
         )
-    if product.mh_height_mm is not None:
+    if (override := product.height_override) is not None:
+        record(
+            "mh_height_mm",
+            f"**not this page's figure.** It prints 'Overall height "
+            f"{product.mh_height_mm / 1000:.2f}m', and the 2026 brochure repeats it, but "
+            f"{override[1]}. One vehicle cannot have two heights; settled with the "
+            f"requester on 15 September 2026",
+        )
+    elif product.mh_height_mm is not None:
         record(
             "mh_height_mm",
             f"'Overall height {product.mh_height_mm / 1000:.2f}m'. The page adds that "
@@ -446,6 +498,13 @@ def collect(
         if not reconciles:
             on_progress(f"SKIPPED [{product.label}]: {why_not}")
             continue
+        if (override := product.height_override) is not None:
+            on_progress(
+                f"[{product.label}] NOTE: its page prints a height of "
+                f"{product.mh_height_mm}mm, but {override[0]}mm is recorded because "
+                f"{override[1]}. Settled with the requester on 15 September 2026; re-check "
+                f"if McLouis change the figure"
+            )
         if product.rrp_pounds is None:
             on_progress(
                 f"[{product.label}] WARNING: no OTR price on its page, so FMLV's own "

@@ -46,17 +46,19 @@ FMLV also holds six 2022 and one 2024 row under `Fusion 1`, and **four 2025 `Bar
 
 | layout | belts | berths | length | width | height | MTPLM | MIRO | payload | price |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Fusion 330 | 4 | 4 | 6590 | 2350 | 2770 | 3500 | 2910 | 590 | £74,995 |
-| Fusion 360 | 5 | 4 | 6990 | 2350 | 2770 | 3500 | 2910 | 590 | £77,495 |
-| Fusion 373 | 5 | 4 | 7410 | 2350 | 2770 | 3500 | 2950 | 550 | £79,495 |
-| Fusion 379 | 5 | 4 | 7410 | 2350 | 2770 | 3500 | 2940 | 560 | £79,495 |
+| Fusion 330 | 4 | 4 | 6590 | 2350 | *2770* | 3500 | 2910 | 590 | £74,995 |
+| Fusion 360 | 5 | 4 | 6990 | 2350 | *2770* | 3500 | 2910 | 590 | £77,495 |
+| Fusion 373 | 5 | 4 | 7410 | 2350 | *2770* | 3500 | 2950 | 550 | £79,495 |
+| Fusion 379 | 5 | 4 | 7410 | 2350 | *2770* | 3500 | 2940 | 560 | £79,495 |
+
+*Italic* height is what the page prints and **not** what is recorded — see below.
 
 **Dimensions are published in metres**, to two decimals — `Overall length 6.59m` — not in
 millimetres like every other brand in this group. The 360 page capitalises `Overall Length`
 where the other three do not, so the labels are matched case-insensitively.
 
-Run #91 collected four, changed four, and verified 40 fields unchanged. Every proposal was
-one of the three differences below, plus the four model-year bumps.
+Run #92 collected four, changed four, and verified 44 fields unchanged, proposing the three
+belt corrections, the one price correction and the four model-year bumps.
 
 ## The best self-check of the six
 
@@ -79,15 +81,27 @@ compare a 3500 kg chassis against a 4400 kg one.
 The first column is the base vehicle and the one recorded, per the settled rule; it is the
 3500 kg manual that the quoted price buys.
 
-## Three disagreements with FMLV, all resolved in the site's favour
+## Three disagreements with FMLV
 
-### Height: 2950 → 2770, on all four
+### Height: overridden back to FMLV's 2950, on all four
 
 The site says `Overall height 2.77m` and **the 2026 brochure independently prints `Height:
-2770  9′ 1″`**. FMLV holds 2950. The site adds that *"heights are measured on an unladen
-vehicle with the aerial in the lowest position"*, which is the same definition Auto-Sleepers
-use and which the requester settled on for that brand — one definition across every
-dimension.
+2770  9′ 1″`**. FMLV holds 2950, and so does Marquis for the Elnagh Baron — which, as
+below, is the same vehicle rebadged.
+
+**One vehicle cannot have two heights**, so this is not a case of two definitions but of one
+of the two being wrong. The requester's decision, 15 September 2026: *"can we use the 2950
+height, which is what we use on Find My Leisure Vehicle at the moment for both brands. I
+think that's just a typo or something, but you're right, it must be the same."*
+
+So `_KNOWN_HEIGHT_ERROR` records **2950** and neither brand proposes a height change. The
+override is narrated on every run and **keyed on the published figure rather than on the
+model**, exactly as `murvi._KNOWN_PRICE_TYPO` is: the day McLouis print anything other than
+2770 mm it lapses, and the new figure is proposed normally instead of a stale correction
+quietly overwriting a real change.
+
+The provenance a reviewer sees says outright that 2950 is **not this page's figure**, so it
+can never be mistaken for something McLouis published.
 
 ### Belts: 4 → 5, on the 360, 373 and 379
 
@@ -136,11 +150,14 @@ Identical to the kilogram, and the washroom splits the same way (separate on the
 layouts, combined on the two short). FMLV's four 2025 `Baron` rows sitting under **McLouis**
 are the direct evidence of the move.
 
-**The two brands disagree on exactly two things**, and both are real UK specification
-differences between importers rather than parse errors: Elnagh's page says 2950 mm where
-McLouis says 2770 mm, and Elnagh sells four belts where McLouis makes the fifth standard.
-The height disagreement is worth putting to the manufacturer — one of the two is wrong, and
-it is not something either site can settle.
+**The two brands disagree on exactly two things**, and they are resolved differently:
+
+* **the fifth belt** is a real UK specification difference between importers — McLouis make
+  it standard, *"5th Homologated seat in running order (exc 330)"*, and Elnagh do not — so
+  both are recorded as published;
+* **the height** cannot be a specification difference, because the shell is the same. One of
+  the two published figures is simply wrong, and both brands are aligned to FMLV's 2950 mm.
+  See above.
 
 ## Habitation
 
@@ -169,7 +186,10 @@ island and drop-down, which is what FMLV holds for the Baron 579.
 
 ## Still unverified
 
-* **The height disagreement with Elnagh**, above. Worth an email.
+* **Which of the two heights is physically right.** Both brands now record 2950 mm, on the
+  requester's decision, but McLouis's own site and brochure both say 2770 mm. Worth an email
+  to Auto-Sleepers so the published figure gets corrected at source; until then the override
+  carries it.
 * **Floorplans.** Not examined.
 * **The caravans export.** `35_Trigano S A McLouis` has a `touring-caravans` export, and it
   is empty.

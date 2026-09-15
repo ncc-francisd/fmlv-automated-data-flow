@@ -149,15 +149,47 @@ def test_every_layout_shares_its_width_and_height() -> None:
         assert product.mh_height_mm == 2770
 
 
-def test_the_height_is_the_one_the_brochure_prints_too() -> None:
-    """FMLV holds 2950; the site and the 2026 brochure both say 2770.
+def test_the_published_height_is_overridden_to_the_elnagh_figure() -> None:
+    """One vehicle cannot have two heights.
 
-    The site adds that heights are measured with the aerial in its lowest position.
+    The Fusion is the Elnagh Baron rebadged; Marquis publish 2950mm for it and FMLV holds
+    2950 for both brands. The requester settled it on 15 September 2026.
     """
+    for product in _all():
+        assert product.mh_height_mm == 2770
+        assert product.recorded_height_mm == 2950
+        assert _build_extracted_motorhome(product).motorhome.mh_height_mm == 2950
+
+
+def test_the_overridden_height_says_it_is_not_the_pages_figure() -> None:
+    """A reviewer must not read 2950 as something this site published."""
     snippet = _build_extracted_motorhome(_product("330")).provenance["mh_height_mm"].snippet
 
+    assert "not this page's figure" in snippet
     assert "2.77m" in snippet
-    assert "brochure prints the same figure" in snippet
+    assert "Elnagh Baron is the same vehicle" in snippet
+
+
+def test_a_corrected_height_would_end_the_override() -> None:
+    """Keyed on the published figure, so a real change is proposed rather than swallowed.
+
+    The failure this guards against is a stale correction quietly overwriting the day
+    McLouis reprint the page — the same reasoning as `murvi._KNOWN_PRICE_TYPO`.
+    """
+    corrected = replace(_product("330"), mh_height_mm=2950)
+    changed = replace(_product("330"), mh_height_mm=2880)
+
+    assert corrected.height_override is None
+    assert corrected.recorded_height_mm == 2950
+    assert changed.height_override is None
+    assert changed.recorded_height_mm == 2880
+
+
+def test_a_page_with_no_height_is_not_given_one() -> None:
+    product = replace(_product("330"), mh_height_mm=None)
+
+    assert product.recorded_height_mm is None
+    assert product.height_override is None
 
 
 def test_the_base_chassis_is_taken_not_the_uprated_ones() -> None:
