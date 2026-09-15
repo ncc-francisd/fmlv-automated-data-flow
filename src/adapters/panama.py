@@ -34,7 +34,7 @@ from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
 from . import habitation
-from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle, width_from_mirrors_folded
+from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.panamauk.co.uk"
 MANUFACTURER = "Panama"
@@ -210,21 +210,6 @@ class PanamaProduct:
         return self.mtplm_kilograms - self.mro_kilograms
 
     @property
-    def recorded_width_mm(self) -> int | None:
-        """Nothing, because **every Panama is a panel van** — see `base`.
-
-        Panama publish both mirror figures and no body width: `Overall Width (inc mirrors)
-        2275mm` and `Overall Width (mirrors folded) 2150mm`. A Ford Tourneo Custom's body
-        is about 1986 mm, so neither measures it, and the settled rule is that a recorded
-        width excludes the mirrors.
-
-        FMLV holds 2150 on its existing rows, which is the folded-mirror figure carried
-        over. Emitting nothing leaves those untouched and stops a new layout arriving
-        160 mm too wide.
-        """
-        return width_from_mirrors_folded(self.mh_width_mm, self.body_type)
-
-    @property
     def body_type(self) -> BodyType | None:
         """Every Panama is a pop-up-roof campervan below the high-top threshold.
 
@@ -332,7 +317,7 @@ def _build_extracted_motorhome(product: PanamaProduct) -> ExtractedMotorhome:
         mtplm_kilograms=product.mtplm_kilograms,
         mh_payload_kilograms=product.mh_payload_kilograms,
         mh_length_mm=product.mh_length_mm,
-        mh_width_mm=product.recorded_width_mm,
+        mh_width_mm=product.mh_width_mm,
         mh_height_mm=product.mh_height_mm,
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
@@ -361,17 +346,11 @@ def _build_extracted_motorhome(product: PanamaProduct) -> ExtractedMotorhome:
     if product.mh_length_mm is not None:
         record("mh_length_mm", f"'Overall Length ... {product.mh_length_mm}mm', {_FIRST_COLUMN}")
     if product.mh_width_mm is not None:
-        # Always recorded, never proposed: `recorded_width_mm` is `None` on every Panama.
-        # Without this the review says the width "was not found on the manufacturer's
-        # site", which is untrue and reads as a parse failure — `diff.compare` appends
-        # this to that sentence instead.
         record(
             "mh_width_mm",
-            f"no width excluding mirrors is published. The page gives 'Overall Width (inc "
-            f"mirrors) ... 2275mm' and 'Overall Width (mirrors folded) ... "
-            f"{product.mh_width_mm}mm', and a Ford Tourneo Custom's body is about 1986mm, "
-            f"so neither measures it. A recorded width excludes mirrors, so FMLV's own "
-            f"figure is kept. Settled with the requester on 12 September 2026",
+            f"'Overall Width (mirrors folded) ... {product.mh_width_mm}mm'. **The "
+            f"'(inc mirrors) ... 2275mm' figure above it is never recorded** — a column "
+            f"mixing folded and extended mirrors would mean nothing",
         )
     if product.mh_height_mm is not None:
         record("mh_height_mm", f"'Overall Height ... {product.mh_height_mm}mm'")

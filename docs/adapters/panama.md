@@ -119,37 +119,22 @@ So FMLV is **internally inconsistent** — two forward slashes and one backslash
 of the three disagree with the manufacturer. A model code is an identity, so this is the
 requester's call rather than the adapter's.
 
-## Width: not recorded at all, because every Panama is a panel van
+## Width: the folded figure, never the one beside it
 
-Panama publish **both** mirror figures and no body width:
+Panama are the only brand in the group that print **both**, which makes them the place a
+column mixing folded and extended mirrors would come from:
 
 ```
 Overall Width (inc mirrors)     7'5 1/2" | 2275mm
 Overall Width (mirrors folded)  7' 1/2"  | 2150mm
 ```
 
-A Ford Tourneo Custom's body is about **1986 mm**, so neither measures it. The 2150 mm FMLV
-holds on its existing rows is the folded-mirror figure carried over; emitting nothing leaves
-those untouched and stops a new layout arriving about 160 mm too wide.
+**2150 mm is recorded and 2275 mm never is.** A Ford Tourneo Custom's body is about
+1986 mm, so the folded figure is the mirrors rather than the body — but the settled rule is
+to reflect what the manufacturer states with the mirrors folded, whatever the body shape,
+so that one column means one thing. See `README.md`.
 
-Run #84, before this rule, proposed 2150 mm for `P\12+` and `P\50+` as new products. The
-adapter can stop asserting the figure but cannot remove one already in FMLV, so clearing or
-correcting the existing five is a manual edit.
-
-The rule and the contrast with a coachbuilt are in `README.md`; it is decided in
-`base.width_from_mirrors_folded`, which Benimar, Mobilvetta and Panama all route through.
-The requester's ruling, 12 September 2026: *"if they don't have a figure excluding mirrors,
-we'll have to leave that blank as we don't have the correct figure, unless it's an existing
-model that appears to have the same height and length."* Emitting nothing satisfies both
-halves — an existing row keeps the body width FMLV holds, and a new one arrives visibly
-blank rather than too wide.
-
-**The blank explains itself in the review.** Left to itself the pipeline says the field
-*"was not found on the manufacturer's site this run"*, which is untrue and reads as a parse
-failure — the requester asked, on 15 September 2026, why the published figure was not being
-taken. The adapter now records provenance for the field it deliberately leaves unset, and
-`diff.compare` appends it, so the row names the published figure and says why it is not the
-one FMLV wants.
+FMLV already holds 2150 on its existing rows, so nothing changes for them.
 
 ## Still unverified
 

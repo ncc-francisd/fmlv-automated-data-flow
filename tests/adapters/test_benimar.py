@@ -339,39 +339,32 @@ def test_a_block_with_a_heading_and_no_figures_is_dropped() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_a_coachbuilt_records_the_mirrors_folded_width() -> None:
-    """At 2300mm the habitation body overhangs a Ducato's folded mirrors."""
-    product = _by_model("benimar_mileo.html")["243"]
+def test_every_layout_records_the_mirrors_folded_width() -> None:
+    """Recorded as published, on the van as well as the coachbuilts.
 
-    assert product.recorded_width_mm == product.mh_width_mm == 2300
-
-
-def test_a_campervan_records_no_width_at_all() -> None:
-    """2260mm is a Ducato's folded mirrors, not its 2050mm body.
-
-    The requester's ruling: leave it blank rather than record a figure that includes the
-    mirrors. FMLV already holds 2050 for both of these, and emitting nothing keeps it.
+    The requester's decision, 15 September 2026: one column has to mean one thing, and
+    that thing is what the manufacturer states with the mirrors folded. The Benivan's
+    2260mm is wider than a Ducato's roughly 2050mm body and is recorded anyway.
     """
-    for product in _layouts("benimar_benivan.html"):
-        assert product.mh_width_mm == 2260
-        assert product.recorded_width_mm is None
-        assert _build_extracted_motorhome(product).motorhome.mh_width_mm is None
+    widths = {
+        p.model: _build_extracted_motorhome(p).motorhome.mh_width_mm
+        for p in _every_layout()
+    }
+
+    assert widths["243"] == 2300
+    assert widths["840"] == 2140
+    assert widths["144"] == widths["122"] == 2260
 
 
-def test_the_blanked_width_explains_itself_to_the_reviewer() -> None:
-    """Without this the review says the width "was not found on the manufacturer's site".
+def test_the_width_provenance_names_the_label_it_came_from() -> None:
+    snippet = (
+        _build_extracted_motorhome(_by_model("benimar_benivan.html")["144"])
+        .provenance["mh_width_mm"]
+        .snippet
+    )
 
-    That is untrue — 2260mm is right there on the page — and it reads as a parse failure.
-    The requester asked why the figure was not taken, which is exactly the question the
-    bare wording provokes. `diff.compare` appends this provenance to that sentence.
-    """
-    extracted = _build_extracted_motorhome(_by_model("benimar_benivan.html")["144"])
-    snippet = extracted.provenance["mh_width_mm"].snippet
-
-    assert extracted.motorhome.mh_width_mm is None
+    assert "MIRRORS FOLDED" in snippet
     assert "2260mm" in snippet
-    assert "folded mirrors" in snippet
-    assert "2050mm body" in snippet
 
 
 # --------------------------------------------------------------------------- #

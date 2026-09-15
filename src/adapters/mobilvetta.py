@@ -32,7 +32,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle, width_from_mirrors_folded
+from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.marquisleisure.co.uk"
 MANUFACTURER = "Mobilvetta"
@@ -222,16 +222,6 @@ class MobilvettaProduct:
         return self.mtplm_kilograms - self.mh_payload_kilograms
 
     @property
-    def recorded_width_mm(self) -> int | None:
-        """The width, but only where `mirrors folded` is the body — see `base`.
-
-        **The Admiral is the one that is not.** At 2260 mm that figure is a Ducato's folded
-        mirrors rather than its roughly 2050 mm body, which is what FMLV holds for it; the
-        coachbuilts and the A-classes overhang their mirrors, so theirs is the body.
-        """
-        return width_from_mirrors_folded(self.mh_width_mm, self.body_type)
-
-    @property
     def body_type(self) -> BodyType | None:
         return _BODY_TYPES.get(self.manufacturer_range)
 
@@ -319,7 +309,7 @@ def _build_extracted_motorhome(product: MobilvettaProduct) -> ExtractedMotorhome
         mtplm_kilograms=product.mtplm_kilograms,
         mh_payload_kilograms=product.mh_payload_kilograms,
         mh_length_mm=product.mh_length_mm,
-        mh_width_mm=product.recorded_width_mm,
+        mh_width_mm=product.mh_width_mm,
         mh_height_mm=product.mh_height_mm,
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
@@ -336,22 +326,12 @@ def _build_extracted_motorhome(product: MobilvettaProduct) -> ExtractedMotorhome
 
     if product.mh_length_mm is not None:
         record("mh_length_mm", f"'OVERALL LENGTH {product.mh_length_mm}mm'")
-    if product.recorded_width_mm is not None:
+    if product.mh_width_mm is not None:
         record(
             "mh_width_mm",
-            f"'OVERALL WIDTH (MIRRORS FOLDED) {product.recorded_width_mm}mm'. On a "
-            f"coachbuilt the body overhangs the folded mirrors, so this measures the body",
-        )
-    elif product.mh_width_mm is not None:
-        # See `benimar`: without this the review says the width "was not found", which is
-        # untrue and reads as a parse failure.
-        record(
-            "mh_width_mm",
-            f"no width excluding mirrors is published. The page's 'OVERALL WIDTH (MIRRORS "
-            f"FOLDED) {product.mh_width_mm}mm' is a Ducato's folded mirrors, not its "
-            f"roughly 2050mm body, and a recorded width excludes mirrors — so FMLV's own "
-            f"figure is kept rather than widened by about 210mm. Settled with the "
-            f"requester on 12 September 2026",
+            f"'OVERALL WIDTH (MIRRORS FOLDED) {product.mh_width_mm}mm'. Recorded as "
+            f"published: on a coachbuilt the body overhangs the folded mirrors, and on "
+            f"the Admiral it does not, but one column has to mean one thing",
         )
     if product.mh_height_mm is not None:
         record(

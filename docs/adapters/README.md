@@ -30,29 +30,31 @@ Whenever a single number cannot express the whole truth, carry the manufacturer'
 published wording into the `Provenance` snippet** — a reviewer needs to see `4-6` even
 though `berths` records `4`. Sunlight and Rimor already do this.
 
-### "Mirrors folded" is the body width on a coachbuilt and not on a van
+### "Mirrors folded" is recorded; "including mirrors" never is
 
-A common label, and it means different things on the two body shapes:
+A common label, and it does not mean the same thing on the two body shapes:
 
 * on a **coachbuilt**, the habitation body is around 2300 mm and overhangs the folded
-  mirrors, so the figure measures the body and is the one to record;
-* on a **panel van**, it does not. A Ducato's body is about 2050 mm and its folded mirrors
-  reach about 2260 mm, so the figure is the mirrors — and the rule above excludes them.
+  mirrors, so the figure measures the body;
+* on a **panel van** it does not. A Ducato's body is about 2050 mm and its folded mirrors
+  reach about 2260 mm; a Ford Tourneo Custom's is about 1986 mm against a folded 2150 mm.
 
-Where a van's only published width includes the mirrors, **record nothing**. The requester,
-12 September 2026: *"if they don't have a figure excluding mirrors, we'll have to leave
-that blank as we don't have the correct figure, unless it's an existing model that appears
-to have the same height and length. In other words, it's likely to be the same outer
-shell."* Emitting nothing satisfies both halves at once — a layout FMLV already holds keeps
-the body width it has, and a new one arrives visibly blank rather than 200 mm too wide.
+**Record the mirrors-folded figure anyway, on both.** The requester's decision, 15 September
+2026: *"I'm happy with a width stated on the website which also says width wing mirrors
+folded as being aligned and fairly consistent with everything else. We are reflecting what
+the website says about width. I don't feel comfortable with showing some measures where the
+width is with wing mirrors open and some not."*
 
-`base.width_from_mirrors_folded` decides it, and every adapter reading a `mirrors folded`
-figure routes through it — Benimar, Mobilvetta and Panama. Elnagh and McLouis sell no panel
-van, so the question does not arise for them.
+So the line that matters is **folded against extended**, not body against mirrors. Where a
+source prints both — Panama give `Overall Width (inc mirrors) 2275mm` and `Overall Width
+(mirrors folded) 2150mm` — take the folded one and never the other.
 
-**Only call it with a figure that includes the mirrors.** A source publishing a genuine body
-width for a van — Pilote's `Vehicle interior width`, which is a Ducato's 2050 mm — records
-it directly.
+This reverses a shorter-lived rule that blanked a van's width when only a mirrors figure was
+published. That kept FMLV's handful of body widths intact but left the column meaning two
+different things, and left new vans with no width at all. Consistency with what the
+manufacturer publishes won. **Expect the existing body widths to be corrected upward** —
+Benimar's Benivan and Mobilvetta's Admiral are both 2050 mm in FMLV against a published
+2260 mm.
 
 > **Auto-Trail currently diverges and needs changing.** `auto_trail.py` takes the *upper*
 > `Sleeps` figure, on the evidence that Auto-Trail's own `Max. No. of berths` row agrees

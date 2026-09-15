@@ -33,7 +33,7 @@ from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
 from . import habitation, marquis
-from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle, width_from_mirrors_folded
+from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 MANUFACTURER = "Benimar Ocarsa S.A.U."
 MANUFACTURER_DISPLAY_NAME = "Benimar"
@@ -123,27 +123,6 @@ class BenimarProduct:
     @property
     def body_type(self) -> BodyType | None:
         return BODY_TYPES.get(self.manufacturer_range)
-
-    @property
-    def recorded_width_mm(self) -> int | None:
-        """The width, but **only where `mirrors folded` is the body width.**
-
-        On a coachbuilt it is: the habitation body is 2300 mm and overhangs a Ducato's
-        folded mirrors, so the figure measures the body. **On a panel van it is not.** A
-        Ducato's body is about 2050 mm and its folded mirrors reach about 2260 mm, which
-        is what Marquis print for both Benivan layouts — so that figure is the mirrors,
-        and the settled rule is that a recorded width excludes them.
-
-        The requester's ruling, 12 September 2026: *"if they don't have a figure excluding
-        mirrors, we'll have to leave that blank as we don't have the correct figure, unless
-        it's an existing model that appears to have the same height and length"*. Emitting
-        nothing satisfies both halves — a layout FMLV already holds keeps the 2050 mm it
-        has, and a new one goes in visibly blank rather than 210 mm too wide.
-
-        The rule itself lives in `base.width_from_mirrors_folded`, which Mobilvetta's
-        Admiral and every Panama layout now route through as well.
-        """
-        return width_from_mirrors_folded(self.mh_width_mm, self.body_type)
 
     @property
     def mro_kilograms(self) -> int | None:
@@ -278,7 +257,7 @@ def _build_extracted_motorhome(product: BenimarProduct) -> ExtractedMotorhome:
         mtplm_kilograms=product.mtplm_kilograms,
         mh_payload_kilograms=product.mh_payload_kilograms,
         mh_length_mm=product.mh_length_mm,
-        mh_width_mm=product.recorded_width_mm,
+        mh_width_mm=product.mh_width_mm,
         mh_height_mm=product.mh_height_mm,
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
@@ -308,25 +287,12 @@ def _build_extracted_motorhome(product: BenimarProduct) -> ExtractedMotorhome:
 
     if product.mh_length_mm is not None:
         record("mh_length_mm", f"'OVERALL LENGTH {product.mh_length_mm}mm'")
-    if product.recorded_width_mm is not None:
+    if product.mh_width_mm is not None:
         record(
             "mh_width_mm",
-            f"'WIDTH (MIRRORS FOLDED) {product.recorded_width_mm}mm'. On a coachbuilt the "
-            f"body overhangs the folded mirrors, so this measures the body",
-        )
-    elif product.mh_width_mm is not None:
-        # Recorded even though nothing is being proposed, because the review's own
-        # wording for an unfilled field is "was not found on the manufacturer's site" —
-        # which is untrue here and reads as a parse failure. `diff.compare` appends this
-        # to that sentence, so the reviewer is told the figure exists and why it is not
-        # the one FMLV wants.
-        record(
-            "mh_width_mm",
-            f"no width excluding mirrors is published. The page's 'WIDTH (MIRRORS FOLDED) "
-            f"{product.mh_width_mm}mm' is a Ducato's folded mirrors, not its roughly "
-            f"2050mm body, and a recorded width excludes mirrors — so FMLV's own figure is "
-            f"kept rather than widened by about 210mm. Settled with the requester on "
-            f"12 September 2026",
+            f"'WIDTH (MIRRORS FOLDED) {product.mh_width_mm}mm'. Recorded as published: on "
+            f"a coachbuilt the body overhangs the folded mirrors, and on the Benivan it "
+            f"does not, but one column has to mean one thing",
         )
     if product.mh_height_mm is not None:
         record("mh_height_mm", f"'OVERALL HEIGHT (EXC TV AERIAL) {product.mh_height_mm}mm'")

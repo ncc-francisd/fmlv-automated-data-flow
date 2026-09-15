@@ -140,27 +140,24 @@ Both hand-verified against the pages, both **kept and narrated** rather than dro
 Neither is a reason to withhold a vehicle Marquis really sell, so the reconciliation judges
 only the figures that reach FMLV and reports the rest.
 
-## Width is not recorded for the Benivan
+## Width is the mirrors-folded figure, on the van as well as the coachbuilts
 
-Marquis print `Width (Mirrors Folded) 2260mm` for both Benivan layouts. **On a panel van
-that figure is the mirrors, not the body**: a Ducato's body is about 2050 mm and its folded
-mirrors reach about 2260 mm. FMLV already holds **2050** for both, and for Mobilvetta's
-Admiral campervan too.
+Marquis print `WIDTH (MIRRORS FOLDED)` for every layout, and the label does not measure the
+same thing on both body shapes: the coachbuilts' 2300 mm body overhangs a Ducato's folded
+mirrors, while the Benivan's 2260 mm **is** those mirrors, around a 2050 mm body.
 
-On a coachbuilt the same label means the opposite: the 2300 mm habitation body overhangs the
-folded mirrors, so the figure does measure the body. That is why only the campervan range
-is affected.
+**It is recorded as published on both.** The requester's decision, 15 September 2026, after
+the Benimar review raised it: *"I'm happy with a width stated on the website which also says
+width wing mirrors folded as being aligned and fairly consistent with everything else. We
+are reflecting what the website says about width. I don't feel comfortable with showing some
+measures where the width is with wing mirrors open and some not."*
 
-The requester's ruling, 12 September 2026: *"if they don't have a figure excluding mirrors,
-we'll have to leave that blank as we don't have the correct figure, unless it's an existing
-model that appears to have the same height and length."* Emitting nothing satisfies both
-halves — Benivan 144 keeps the 2050 mm FMLV holds, and the new Benivan 122 goes in visibly
-blank rather than 210 mm too wide.
+So the line that matters is folded against extended, not body against mirrors. FMLV holds
+**2050** for both Benivan layouts, so this proposes a correction upward to 2260.
 
-**It applied to Mobilvetta's Admiral K 6.3 and to every Panama layout too**, and both were
-brought onto the same rule on 15 September 2026 — the rule now lives in
-`base.width_from_mirrors_folded`. See `docs/adapters/mobilvetta.md` and `panama.md` for what
-each of those was proposing before.
+A shorter-lived rule blanked a van's width instead, on the reasoning that a recorded width
+excludes mirrors. It kept FMLV's body widths intact but left the column meaning two
+different things and left new vans with no width at all. See `README.md`.
 
 ## Benivan 161 is discontinued, not renamed
 
