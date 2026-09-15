@@ -33,7 +33,7 @@ from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
 from . import habitation, marquis
-from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
+from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle, width_from_mirrors_folded
 
 MANUFACTURER = "Benimar Ocarsa S.A.U."
 MANUFACTURER_DISPLAY_NAME = "Benimar"
@@ -140,12 +140,10 @@ class BenimarProduct:
         nothing satisfies both halves — a layout FMLV already holds keeps the 2050 mm it
         has, and a new one goes in visibly blank rather than 210 mm too wide.
 
-        **This applies to Mobilvetta's Admiral and possibly Panama too**, and neither
-        adapter has been changed; see `docs/adapters/benimar.md`.
+        The rule itself lives in `base.width_from_mirrors_folded`, which Mobilvetta's
+        Admiral and every Panama layout now route through as well.
         """
-        if self.body_type is BodyType.CAMPERVAN_HIGH_TOP:
-            return None
-        return self.mh_width_mm
+        return width_from_mirrors_folded(self.mh_width_mm, self.body_type)
 
     @property
     def mro_kilograms(self) -> int | None:
@@ -315,6 +313,20 @@ def _build_extracted_motorhome(product: BenimarProduct) -> ExtractedMotorhome:
             "mh_width_mm",
             f"'WIDTH (MIRRORS FOLDED) {product.recorded_width_mm}mm'. On a coachbuilt the "
             f"body overhangs the folded mirrors, so this measures the body",
+        )
+    elif product.mh_width_mm is not None:
+        # Recorded even though nothing is being proposed, because the review's own
+        # wording for an unfilled field is "was not found on the manufacturer's site" —
+        # which is untrue here and reads as a parse failure. `diff.compare` appends this
+        # to that sentence, so the reviewer is told the figure exists and why it is not
+        # the one FMLV wants.
+        record(
+            "mh_width_mm",
+            f"no width excluding mirrors is published. The page's 'WIDTH (MIRRORS FOLDED) "
+            f"{product.mh_width_mm}mm' is a Ducato's folded mirrors, not its roughly "
+            f"2050mm body, and a recorded width excludes mirrors — so FMLV's own figure is "
+            f"kept rather than widened by about 210mm. Settled with the requester on "
+            f"12 September 2026",
         )
     if product.mh_height_mm is not None:
         record("mh_height_mm", f"'OVERALL HEIGHT (EXC TV AERIAL) {product.mh_height_mm}mm'")

@@ -327,3 +327,32 @@ def test_the_price_names_marquis_as_the_seller_that_sets_it() -> None:
 
 def test_the_adapter_is_registered_under_its_fmlv_name() -> None:
     assert adapter_for("Panama") is panama
+
+
+def test_every_layout_records_no_width_because_they_are_all_panel_vans() -> None:
+    """Panama publish both mirror figures and no body width.
+
+    `Overall Width (inc mirrors) 2275mm` and `(mirrors folded) 2150mm`, where a Ford
+    Tourneo Custom's body is about 1986mm — so neither measures the body, and the settled
+    rule is that a recorded width excludes the mirrors. FMLV holds 2150 on its existing
+    rows and emitting nothing leaves those untouched. See `base.width_from_mirrors_folded`.
+    """
+    for name in PAGES:
+        product = _parse(name)
+        assert product.mh_width_mm == 2150
+        assert product.recorded_width_mm is None
+        extracted = _build_extracted_motorhome(product)
+        assert extracted.motorhome.mh_width_mm is None
+        # The blank explains itself, naming both published figures and the body width
+        # neither of them is.
+        snippet = extracted.provenance["mh_width_mm"].snippet
+        assert "2275mm" in snippet
+        assert "2150mm" in snippet
+        assert "1986mm" in snippet
+
+
+def test_the_page_publishes_both_mirror_figures_and_no_body_width() -> None:
+    text = plain_text(_page("panama_p57.html"))
+
+    assert "Overall Width (inc mirrors)" in text
+    assert "Overall Width (mirrors folded)" in text

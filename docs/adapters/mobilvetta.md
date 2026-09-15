@@ -141,6 +141,36 @@ than beside the dimensions.
 **Three pages also carry a stray `£4,000`**, which is an offer rather than a vehicle price.
 Only a figure followed by `OTR` is a price.
 
+## Width: recorded for the coachbuilts, not for the Admiral
+
+Marquis print `OVERALL WIDTH (MIRRORS FOLDED)` for every layout, and the label means
+opposite things on the two body shapes. The K-Yachts, the KEAs and the KEA Kompakt are
+2350 mm or 2150 mm — a habitation body that overhangs a Ducato's folded mirrors, so the
+figure measures the body and is recorded.
+
+**The Admiral K 6.3 is a panel van and its 2260 mm is not.** A Ducato's body is about
+2050 mm and its folded mirrors reach about 2260 mm; FMLV holds **2050** for it, as it does
+for Benimar's Benivan. So nothing is recorded and FMLV keeps its figure.
+
+Run #86, before this rule, proposed **`ADMIRAL K 6.3: 2050 → 2260`**. If that was accepted
+at review, FMLV now holds the mirrors figure and the adapter will preserve it rather than
+correct it — worth checking by hand.
+
+The rule and the contrast with a coachbuilt are in `README.md`; it is decided in
+`base.width_from_mirrors_folded`, which Benimar, Mobilvetta and Panama all route through.
+The requester's ruling, 12 September 2026: *"if they don't have a figure excluding mirrors,
+we'll have to leave that blank as we don't have the correct figure, unless it's an existing
+model that appears to have the same height and length."* Emitting nothing satisfies both
+halves — an existing row keeps the body width FMLV holds, and a new one arrives visibly
+blank rather than too wide.
+
+**The blank explains itself in the review.** Left to itself the pipeline says the field
+*"was not found on the manufacturer's site this run"*, which is untrue and reads as a parse
+failure — the requester asked, on 15 September 2026, why the published figure was not being
+taken. The adapter now records provenance for the field it deliberately leaves unset, and
+`diff.compare` appends it, so the row names the published figure and says why it is not the
+one FMLV wants.
+
 ## Still unverified
 
 * **Habitation.** Not examined. The Marquis pages carry marketing copy of the same shape as

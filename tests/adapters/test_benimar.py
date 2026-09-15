@@ -358,10 +358,20 @@ def test_a_campervan_records_no_width_at_all() -> None:
         assert _build_extracted_motorhome(product).motorhome.mh_width_mm is None
 
 
-def test_no_width_provenance_is_recorded_for_a_campervan() -> None:
-    extracted = _build_extracted_motorhome(_by_model("benimar_benivan.html")["144"])
+def test_the_blanked_width_explains_itself_to_the_reviewer() -> None:
+    """Without this the review says the width "was not found on the manufacturer's site".
 
-    assert "mh_width_mm" not in extracted.provenance
+    That is untrue — 2260mm is right there on the page — and it reads as a parse failure.
+    The requester asked why the figure was not taken, which is exactly the question the
+    bare wording provokes. `diff.compare` appends this provenance to that sentence.
+    """
+    extracted = _build_extracted_motorhome(_by_model("benimar_benivan.html")["144"])
+    snippet = extracted.provenance["mh_width_mm"].snippet
+
+    assert extracted.motorhome.mh_width_mm is None
+    assert "2260mm" in snippet
+    assert "folded mirrors" in snippet
+    assert "2050mm body" in snippet
 
 
 # --------------------------------------------------------------------------- #

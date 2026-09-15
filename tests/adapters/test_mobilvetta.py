@@ -216,6 +216,32 @@ def test_the_width_is_the_mirrors_folded_figure() -> None:
     assert _by_model("mobilvetta_kea.html")["90"].mh_width_mm == 2350
 
 
+def test_a_coachbuilt_records_the_mirrors_folded_width() -> None:
+    """At 2350mm the habitation body overhangs a Ducato's folded mirrors."""
+    product = _by_model("mobilvetta_kea.html")["90"]
+
+    assert product.recorded_width_mm == 2350
+    assert _build_extracted_motorhome(product).motorhome.mh_width_mm == 2350
+
+
+def test_the_admiral_records_no_width_because_it_is_a_panel_van() -> None:
+    """2260mm is a Ducato's folded mirrors, not its roughly 2050mm body.
+
+    FMLV holds 2050 for the Admiral, and emitting nothing keeps it. The requester's
+    ruling, 12 September 2026 — see `base.width_from_mirrors_folded`.
+    """
+    product = _by_model("mobilvetta_admiral.html")["K 6.3"]
+
+    assert product.mh_width_mm == 2260
+    assert product.recorded_width_mm is None
+    extracted = _build_extracted_motorhome(product)
+    assert extracted.motorhome.mh_width_mm is None
+    # The blank explains itself: the review's own wording says the field "was not found",
+    # which is untrue and reads as a parse failure.
+    assert "2260mm" in extracted.provenance["mh_width_mm"].snippet
+    assert "folded mirrors" in extracted.provenance["mh_width_mm"].snippet
+
+
 def test_the_mass_in_running_order_is_derived_and_says_so() -> None:
     """Marquis publish MTPLM and payload but no MIRO."""
     product = _by_model("mobilvetta_kea.html")["90"]

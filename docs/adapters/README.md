@@ -46,9 +46,13 @@ to have the same height and length. In other words, it's likely to be the same o
 shell."* Emitting nothing satisfies both halves at once — a layout FMLV already holds keeps
 the body width it has, and a new one arrives visibly blank rather than 200 mm too wide.
 
-`benimar.BenimarProduct.recorded_width_mm` is the worked example. **Mobilvetta's Admiral
-and Panama predate this and still record the mirrors-folded figure** — see
-`docs/adapters/benimar.md`.
+`base.width_from_mirrors_folded` decides it, and every adapter reading a `mirrors folded`
+figure routes through it — Benimar, Mobilvetta and Panama. Elnagh and McLouis sell no panel
+van, so the question does not arise for them.
+
+**Only call it with a figure that includes the mirrors.** A source publishing a genuine body
+width for a van — Pilote's `Vehicle interior width`, which is a Ducato's 2050 mm — records
+it directly.
 
 > **Auto-Trail currently diverges and needs changing.** `auto_trail.py` takes the *upper*
 > `Sleeps` figure, on the evidence that Auto-Trail's own `Max. No. of berths` row agrees

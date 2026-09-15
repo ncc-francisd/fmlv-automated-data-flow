@@ -157,9 +157,10 @@ model that appears to have the same height and length."* Emitting nothing satisf
 halves — Benivan 144 keeps the 2050 mm FMLV holds, and the new Benivan 122 goes in visibly
 blank rather than 210 mm too wide.
 
-**This very likely applies to Mobilvetta's Admiral K 6.3 and possibly to Panama**, whose
-adapters both record the mirrors-folded figure. Neither has been changed; it is a question
-for the requester because both are already deployed.
+**It applied to Mobilvetta's Admiral K 6.3 and to every Panama layout too**, and both were
+brought onto the same rule on 15 September 2026 — the rule now lives in
+`base.width_from_mirrors_folded`. See `docs/adapters/mobilvetta.md` and `panama.md` for what
+each of those was proposing before.
 
 ## Benivan 161 is discontinued, not renamed
 

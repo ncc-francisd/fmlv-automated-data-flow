@@ -22,6 +22,7 @@ from typing import Protocol
 from ..fetch.browser import BrowserFetcher
 from ..fetch.http import Fetcher
 from ..product_model.caravan import Caravan
+from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
 
 
@@ -75,6 +76,54 @@ _FMLV_BASE_VEHICLE_MAKES: dict[str, str] = {
     "renault": "Renault",
     "vw": "VW",
 }
+
+
+#: The body types built on a panel van, where a `mirrors folded` width is not the body.
+#:
+#: Every campervan variant, because the question is what the vehicle is built on rather
+#: than how tall its roof is. `MICRO` and the coachbuilts are deliberately absent: their
+#: habitation body is wider than the cab, so the same figure measures the body.
+_PANEL_VAN_BODIES = frozenset(
+    {
+        BodyType.CAMPERVAN,
+        BodyType.CAMPERVAN_ELEVATING_ROOF,
+        BodyType.CAMPERVAN_HIGH_TOP,
+        BodyType.CAMPERVAN_HIGH_TOP_ELEVATING_ROOF,
+    }
+)
+
+
+def width_from_mirrors_folded(
+    published_mm: int | None, body_type: BodyType | None
+) -> int | None:
+    """The width to record from a **`mirrors folded`** figure, or `None` if it is not one.
+
+    The label means opposite things on the two body shapes, and the settled rule in
+    `docs/adapters/README.md` is that a recorded width excludes the mirrors:
+
+    * on a **coachbuilt**, the habitation body is around 2300 mm and overhangs the folded
+      mirrors, so the figure measures the body and is recorded;
+    * on a **panel van** it does not. A Ducato's body is about 2050 mm and its folded
+      mirrors reach about 2260 mm; a Ford Tourneo Custom's body is about 1986 mm against a
+      folded 2150 mm. So the figure is the mirrors, and nothing is recorded.
+
+    The requester's ruling, 12 September 2026: *"if they don't have a figure excluding
+    mirrors, we'll have to leave that blank as we don't have the correct figure, unless
+    it's an existing model that appears to have the same height and length. In other words,
+    it's likely to be the same outer shell."* Emitting nothing satisfies both halves at
+    once — a layout FMLV already holds keeps the body width it has, and a new one arrives
+    visibly blank rather than 200 mm too wide.
+
+    **Only call this with a figure that includes the mirrors.** A source that publishes a
+    genuine body width for a van — Pilote's `Vehicle interior width`, which is a Ducato's
+    2050 mm — should record it directly and never come through here.
+
+    An unknown `body_type` keeps the figure, because a van has not been established and
+    blanking on a guess would lose a real measurement.
+    """
+    if published_mm is None or body_type is None:
+        return published_mm
+    return None if body_type in _PANEL_VAN_BODIES else published_mm
 
 
 def fmlv_base_vehicle(make: str | None) -> str | None:
