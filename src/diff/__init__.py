@@ -2,7 +2,15 @@
 
 from .classify import ChangeKind, ProductDiff, diff_products
 from .compare import FieldChange, MissingField, Priority, compare_fields, field_value, sort_changes
-from .matching import DEFAULT_THRESHOLD, MatchResult, match_products, token_similarity
+from .matching import (
+    DEFAULT_THRESHOLD,
+    NO_RENAMES,
+    MatchResult,
+    Renames,
+    match_products,
+    stale_renames,
+    token_similarity,
+)
 from .year_rollover import ROLLOVER_WINDOW, bump_year, in_rollover_window
 
 __all__ = [
@@ -19,7 +27,10 @@ __all__ = [
     "diff_products",
     "field_value",
     "in_rollover_window",
+    "NO_RENAMES",
+    "Renames",
     "match_products",
+    "stale_renames",
     "sort_changes",
     "token_similarity",
 ]

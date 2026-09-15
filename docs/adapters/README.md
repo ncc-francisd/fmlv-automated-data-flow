@@ -1246,6 +1246,45 @@ to reject its bad matches, and 0.200 is far below anything that could be *lowere
 this one while still separating real vehicles. A rename is a different operation from a
 match, and the token bag cannot express it.
 
+### Naming a rename, when the score cannot reach it
+
+An adapter can declare the pair outright instead, which is the lever the paragraph above
+says the token bag lacks. Keyed on **what the site now says**, giving **what FMLV still
+holds**:
+
+```python
+RENAMED_RANGES = {"Galaxy": "Sport"}                        # every layout in the range
+RENAMED_MODELS = {("Fusion", "330"): ("Baron", "530")}      # one layout
+```
+
+The same `getattr` opt-in as `MATCH_THRESHOLD`, read by `cli.renames` and applied by
+`diff.Renames` — see `tests/diff/test_renames.py`.
+
+**Reach for it only where the score genuinely cannot get there**, which is narrower than it
+sounds. A range merely *shortened* still matches on its own, because the layout code agrees
+and the code is most of a short name — Pilote's `Van Vega V540G` to `Van V540G` scores
+0.667 and Sunlight's `Van Adventure Edition` to `Van Adventure` scores 0.750. Declaring
+either would be dead config the day it was written. Two cases do need it:
+
+* **the layout code moved.** `token_similarity` returns 0 whenever both sides name a code
+  and none agree, deliberately, so no threshold recovers it. Auto-Sleepers' `FG635` against
+  an older export's transposed `FG365`; McLouis's `Baron 530/560/573/579` becoming
+  `Fusion 330/360/373/379` when the range moved to Elnagh.
+* **the range was replaced outright**, leaving only the code in common — 0.333, and
+  reaching that by lowering the threshold would match almost anything.
+
+**It matches; it does not rename.** `manufacturer_range` and `model` are identity fields,
+never proposed as changes, and the settled rule is that the export decides those strings. So
+this does not replace the manual FMLV edit above — it means the adapter can emit the name it
+believes is right and still land on the correct row, instead of emitting the baseline's own
+wrong value to keep the match. **Wingamm's `Coach Built low profile` is the standing
+candidate** and has not been changed.
+
+**A rename is meant to stop being needed.** Once FMLV is corrected the entry is not merely
+useless but misleading, so `diff.stale_renames` narrates any entry that did nothing — either
+the site no longer publishes the name, or the baseline no longer holds the target. Nothing
+is deleted automatically; removing it is a code change.
+
 **And `model` will not warn you.** `compare_fields` walks only fields that *have
 provenance*, while the in-scope missing-field check fires only where the adapter found
 **nothing at all** — so a `model` that was read but never given a provenance entry is

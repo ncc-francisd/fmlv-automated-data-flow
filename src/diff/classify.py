@@ -16,7 +16,7 @@ from enum import Enum
 from ..adapters.base import ExtractedProduct
 from ..product_model.product import Product
 from .compare import FieldChange, MissingField, compare_fields, sort_changes
-from .matching import DEFAULT_THRESHOLD, match_products
+from .matching import DEFAULT_THRESHOLD, NO_RENAMES, Renames, match_products
 from .year_rollover import in_rollover_window
 
 
@@ -72,6 +72,7 @@ def diff_products(
     baseline: list[Product],
     *,
     threshold: float = DEFAULT_THRESHOLD,
+    renames: Renames = NO_RENAMES,
     today: date | None = None,
 ) -> list[ProductDiff]:
     """Match, diff and classify every scraped product plus every baseline product.
@@ -80,7 +81,9 @@ def diff_products(
     naturally is (one adapter run = one manufacturer) — see `matching.match_products`.
     `today` is injectable for tests; defaults to the real today (see `year_rollover`).
     """
-    match_results = match_products(scraped, baseline, threshold=threshold)
+    match_results = match_products(
+        scraped, baseline, threshold=threshold, renames=renames
+    )
 
     diffs: list[ProductDiff] = []
     matched_baseline_indices: set[int] = set()

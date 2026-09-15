@@ -37,8 +37,8 @@ check manufacturer identity itself.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 
 from ..adapters.base import ExtractedProduct
 from ..product_model.product import Product
@@ -54,6 +54,96 @@ _WHITESPACE_ONLY = re.compile(r"\s*\Z")
 #: "Supreme 670 DC" case (see docs/adapters/adria.md), which scores well above this;
 #: revisit once a second manufacturer's naming has been checked against it.
 DEFAULT_THRESHOLD = 0.5
+
+
+def _key(text: str | None) -> str:
+    """A name reduced to what two people spelling it would still agree on.
+
+    Lower-cased and inner whitespace collapsed, so an adapter author copying `Van Vega`
+    out of an FMLV export matches `van  vega` in the scraped product. Nothing stronger:
+    a rename declares two *specific* names are one product, and quietly matching more
+    than was written down is the opposite of what it is for.
+    """
+    return " ".join((text or "").lower().split())
+
+
+@dataclass(frozen=True)
+class Renames:
+    """What a manufacturer has renamed since FMLV recorded it, for matching only.
+
+    **Most renames do not need this**, and reaching for it first would be a mistake.
+    Token overlap already carries a range whose name was shortened, because the layout
+    code still agrees and the code is most of a short name:
+
+    | rename | score | |
+    |---|---|---|
+    | Pilote `Van Vega V540G` -> `Van V540G` | 0.667 | matches already |
+    | Sunlight `Van Adventure Edition V60` -> `Van Adventure V60` | 0.750 | matches already |
+    | Auto-Sleepers `Active FG635` vs `Active FG365` | **0.000** | needs this |
+    | McLouis `Fusion 330` <- FMLV's `Baron 530` | **0.000** | needs this |
+    | a one-word range swapped, code kept | **0.333** | needs this |
+
+    So there are two cases that genuinely need naming, and the first is the important one:
+
+    * **the layout code moved.** `token_similarity` returns 0 when both sides name a code
+      and none agree — deliberately, because a code is the one part of a name meant to be
+      unique within its range. No threshold recovers that, and none should.
+    * **the range was replaced outright** rather than shortened, leaving only the code in
+      common. Reaching 0.333 by lowering `MATCH_THRESHOLD` would match almost anything.
+
+    Lowering the threshold is the blunt alternative in both: it loosens *every* pair in
+    the manufacturer, and `docs/adapters/README.md` records that Adria's good match at
+    0.667 scores lower than Etrusco's worst bad match at 0.750, so there is not always a
+    value that separates them. A rename names one pair and leaves the rest alone.
+
+    **This does not rename anything in FMLV.** `manufacturer_range` and `model` are
+    identity fields: the pipeline matches *on* them and never proposes a change to them
+    (`store.changes._IDENTITY_FIELDS`), and the settled rule is that the FMLV export
+    decides those strings. All this does is let the update land on the right row. If FMLV
+    should hold the new name, that is a manual edit — and once it is made, the entry here
+    is dead and `stale_renames` says so.
+
+    Both maps are keyed on **what the site now says** and give **what FMLV still holds**,
+    which is the direction an adapter author reads them in: the scraped name is the one
+    they have in front of them.
+    """
+
+    #: Site's range name -> FMLV's, for every layout in it. The common case: a range is
+    #: renamed and its layout codes are untouched.
+    ranges: Mapping[str, str] = field(default_factory=dict)
+
+    #: Site's `(range, model)` -> FMLV's, for one layout. Needed when the **code** moves,
+    #: which forces the score to 0 however alike the rest reads.
+    models: Mapping[tuple[str, str], tuple[str, str]] = field(default_factory=dict)
+
+    def __bool__(self) -> bool:
+        return bool(self.ranges or self.models)
+
+    def applied_to(
+        self, manufacturer_range: str | None, model: str | None
+    ) -> tuple[str | None, str | None]:
+        """One scraped identity rewritten to the name FMLV still holds, if it is renamed.
+
+        `models` is consulted first and wins outright, so a range-wide rename can carry
+        an exception for the one layout that was also renumbered.
+        """
+        whole = {
+            (_key(scraped_range), _key(scraped_model)): target
+            for (scraped_range, scraped_model), target in self.models.items()
+        }
+        renamed = whole.get((_key(manufacturer_range), _key(model)))
+        if renamed is not None:
+            return renamed
+
+        ranges = {_key(scraped): target for scraped, target in self.ranges.items()}
+        moved = ranges.get(_key(manufacturer_range))
+        if moved is not None:
+            return moved, model
+        return manufacturer_range, model
+
+
+#: No renames, which is every manufacturer but the handful that have had one.
+NO_RENAMES = Renames()
 
 
 def _is_code_fragment(token: str) -> bool:
@@ -115,8 +205,16 @@ def _codes(tokens: frozenset[str]) -> frozenset[str]:
     return frozenset(token for token in tokens if any(char.isdigit() for char in token))
 
 
-def token_similarity(left: Product, right: Product) -> float:
+def token_similarity(
+    left: Product, right: Product, *, renames: Renames = NO_RENAMES
+) -> float:
     """Jaccard similarity of the two products' range+model word bags, in [0, 1].
+
+    `renames` is applied to **`left`**, which `match_products` always calls with the
+    scraped product — a rename says what the site now calls a row FMLV still holds under
+    the old name, so it is the scraped side that gets rewritten. Rewriting is for scoring
+    only: the product keeps its own name everywhere else, and nothing proposes a change to
+    FMLV's.
 
     Zero when both sides name a layout code and none of the codes agree. Word overlap
     alone is too generous here: `Low Profiles T65` and `Low Profiles T 66S` share their
@@ -125,7 +223,7 @@ def token_similarity(left: Product, right: Product) -> float:
     part of a product's name that is *meant* to be unique within its range, so two
     products whose codes disagree are two products, however alike the rest reads.
     """
-    left_tokens = _identity_tokens(left.manufacturer_range, left.model)
+    left_tokens = _identity_tokens(*renames.applied_to(left.manufacturer_range, left.model))
     right_tokens = _identity_tokens(right.manufacturer_range, right.model)
     if not left_tokens and not right_tokens:
         return 0.0
@@ -176,6 +274,7 @@ def match_products(
     baseline: Iterable[Product],
     *,
     threshold: float = DEFAULT_THRESHOLD,
+    renames: Renames = NO_RENAMES,
 ) -> list[MatchResult]:
     """Match every scraped product to at most one baseline product, and vice versa.
 
@@ -194,7 +293,9 @@ def match_products(
     candidates: list[tuple[float, tuple[int, int], int, int]] = []
     for s_idx, extracted in enumerate(scraped_list):
         for b_idx, baseline_motorhome in enumerate(baseline_list):
-            score = token_similarity(extracted.product, baseline_motorhome)
+            score = token_similarity(
+                extracted.product, baseline_motorhome, renames=renames
+            )
             if score > 0:
                 candidates.append((score, _tie_break(baseline_motorhome), s_idx, b_idx))
 
@@ -240,3 +341,66 @@ def match_products(
             )
         )
     return results
+
+
+def stale_renames(
+    scraped: Iterable[ExtractedProduct],
+    baseline: Iterable[Product],
+    renames: Renames,
+) -> list[str]:
+    """Rename entries that did nothing this run, worded for `on_progress`.
+
+    **A rename is meant to stop being needed.** The usual end of one is that the name is
+    corrected in FMLV, at which point the entry is not merely useless but actively
+    misleading: it claims a row is called something FMLV no longer calls it, and the next
+    person reading the adapter believes it. Auto-Sleepers' transposed `FG365`/`FG635`
+    codes were a live example that FMLV has since fixed.
+
+    Two ways to be dead, and both are reported rather than assumed harmless:
+
+    * **the site no longer publishes the name being renamed** — the manufacturer moved on
+      again, or the entry was written against a spelling the adapter does not produce;
+    * **FMLV no longer holds the old name** — the row has been corrected, which is the
+      outcome the rename was buying time for.
+
+    Nothing is dropped or corrected automatically. A stale entry is a note for a person,
+    not a fault: deleting it is a code change and belongs in a commit, not in a run.
+    """
+    scraped_names = {
+        (_key(item.product.manufacturer_range), _key(item.product.model))
+        for item in scraped
+    }
+    scraped_ranges = {manufacturer_range for manufacturer_range, _model in scraped_names}
+    baseline_names = {
+        (_key(product.manufacturer_range), _key(product.model)) for product in baseline
+    }
+    baseline_ranges = {manufacturer_range for manufacturer_range, _model in baseline_names}
+
+    notes: list[str] = []
+    for scraped_range, fmlv_range in renames.ranges.items():
+        if _key(scraped_range) not in scraped_ranges:
+            notes.append(
+                f"the rename of range '{scraped_range}' to '{fmlv_range}' did nothing: "
+                f"nothing collected this run is in a range called '{scraped_range}'"
+            )
+        elif _key(fmlv_range) not in baseline_ranges:
+            notes.append(
+                f"the rename of range '{scraped_range}' to '{fmlv_range}' did nothing: "
+                f"the baseline holds no range called '{fmlv_range}', so FMLV has probably "
+                f"been corrected and this entry can be deleted"
+            )
+    for (scraped_range, scraped_model), (fmlv_range, fmlv_model) in renames.models.items():
+        if (_key(scraped_range), _key(scraped_model)) not in scraped_names:
+            notes.append(
+                f"the rename of '{scraped_range} {scraped_model}' to '{fmlv_range} "
+                f"{fmlv_model}' did nothing: nothing collected this run is called "
+                f"'{scraped_range} {scraped_model}'"
+            )
+        elif (_key(fmlv_range), _key(fmlv_model)) not in baseline_names:
+            notes.append(
+                f"the rename of '{scraped_range} {scraped_model}' to '{fmlv_range} "
+                f"{fmlv_model}' did nothing: the baseline holds no '{fmlv_range} "
+                f"{fmlv_model}', so FMLV has probably been corrected and this entry can "
+                f"be deleted"
+            )
+    return notes

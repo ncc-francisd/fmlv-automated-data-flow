@@ -61,7 +61,7 @@ from typing import Any
 
 from . import paths, store
 from .adapters import Adapter, adapter_for
-from .diff import DEFAULT_THRESHOLD, diff_products
+from .diff import DEFAULT_THRESHOLD, Renames, diff_products, stale_renames
 from .fetch.browser import BrowserFetcher
 from .fetch.http import Fetcher
 from .fetch.ncc import (
@@ -282,6 +282,32 @@ def match_threshold(adapter: Adapter) -> float:
     return float(getattr(adapter, "MATCH_THRESHOLD", DEFAULT_THRESHOLD))
 
 
+def renames(adapter: Adapter) -> Renames:
+    """What this manufacturer has renamed since FMLV recorded it, for matching only.
+
+    A manufacturer renaming a product it still sells is the one case token overlap cannot
+    solve by itself — the update then arrives as a new product beside a disappearance
+    notice for the row it duplicates, which is the shape `docs/adapters/README.md` warns
+    is *"almost always"* a rename rather than eleven new vehicles.
+
+    An adapter declares `RENAMED_RANGES` and/or `RENAMED_MODELS` as plain dicts, keyed on
+    **what the site now says** and giving **what FMLV still holds**:
+
+    ```python
+    RENAMED_RANGES = {"Van Vega": "Van"}
+    RENAMED_MODELS = {("Active", "FG635"): ("Active", "FG365")}
+    ```
+
+    The same `getattr` opt-in as `MATCH_THRESHOLD`, so no other manufacturer is affected —
+    and deliberately narrower than moving that threshold, which loosens every pair in the
+    manufacturer at once. Nothing here renames anything in FMLV; see `diff.Renames`.
+    """
+    return Renames(
+        ranges=dict(getattr(adapter, "RENAMED_RANGES", {})),
+        models=dict(getattr(adapter, "RENAMED_MODELS", {})),
+    )
+
+
 def baseline_scope(
     adapter: Adapter, ranges: Sequence[tuple[str, str]]
 ) -> Callable[[Motorhome], bool]:
@@ -484,8 +510,14 @@ def execute_run(
             )
 
             diff_started = time.monotonic()
+            adapter_renames = renames(adapter)
+            for note in stale_renames(scraped, baseline, adapter_renames):
+                on_progress(f"NOTE: {note}")
             diffs = diff_products(
-                scraped, baseline, threshold=match_threshold(adapter)
+                scraped,
+                baseline,
+                threshold=match_threshold(adapter),
+                renames=adapter_renames,
             )
             persisted = store.persist_diff(
                 connection,
