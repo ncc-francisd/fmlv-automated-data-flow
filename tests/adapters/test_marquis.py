@@ -14,11 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.adapters.marquis import (
-    bed_lines,
-    equipment_lines,
-    lines_for_layout,
-)
+from src.adapters.marquis import bed_lines, equipment_lines
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -86,43 +82,3 @@ def test_a_count_in_front_of_the_size_is_read() -> None:
 
 def test_a_block_with_no_bed_list_yields_nothing() -> None:
     assert bed_lines("BERTHS 4 BELTS 4 OVERALL LENGTH 6590mm") == []
-
-
-# --------------------------------------------------------------------------- #
-# The equipment list, which qualifies itself per layout
-# --------------------------------------------------------------------------- #
-
-
-def test_an_unqualified_line_reaches_every_layout() -> None:
-    lines = ["Truma CP Plus with LCD control panel"]
-
-    assert lines_for_layout(lines, "530") == lines
-    assert lines_for_layout(lines, "286") == lines
-
-
-def test_a_named_layout_list_restricts_the_line() -> None:
-    """Elnagh's form, and the one place it changes an answer rather than shading it."""
-    lines = ["Separate shower and toilet compartment (579 and 573 only)"]
-
-    assert lines_for_layout(lines, "573") == lines
-    assert lines_for_layout(lines, "530") == []
-
-
-def test_an_exclusion_qualifier_is_honoured() -> None:
-    """Benimar's form: `(excl 286)` means every layout but that one."""
-    lines = ["145 litre fridge/freezer with automatic energy selection (excl 286)"]
-
-    assert lines_for_layout(lines, "201") == lines
-    assert lines_for_layout(lines, "286") == []
-
-
-def test_a_parenthesis_that_is_not_a_layout_list_is_left_alone() -> None:
-    """A qualifier must be nothing but layout codes and the words joining them."""
-    lines = [
-        "Large external garage with lighting, heating & 230v socket",
-        "OVERALL WIDTH (MIRRORS FOLDED) 2350mm",
-        "MAX USER PAYLOAD (3500KG CHASSIS) Manual 590kg",
-        "Thetford cassette toilet with electric flush & 18 litre wheeled holding tank",
-    ]
-
-    assert lines_for_layout(lines, "530") == lines

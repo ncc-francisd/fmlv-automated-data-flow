@@ -689,3 +689,58 @@ def test_a_page_with_no_headings_at_all_is_read_as_one_list() -> None:
 
     assert equipment.standard == ("Truma Combi 6E heating",)
     assert equipment.optional == ()
+
+
+# --------------------------------------------------------------------------- #
+# An equipment list that qualifies itself per layout
+# --------------------------------------------------------------------------- #
+
+
+def test_an_unqualified_line_reaches_every_layout() -> None:
+    lines = ["Truma CP Plus with LCD control panel"]
+
+    assert habitation.lines_for_layout(lines, "530") == lines
+    assert habitation.lines_for_layout(lines, "286") == lines
+
+
+def test_a_named_layout_list_restricts_the_line() -> None:
+    """Elnagh's form, and the one place it changes an answer rather than shading it."""
+    lines = ["Separate shower and toilet compartment (579 and 573 only)"]
+
+    assert habitation.lines_for_layout(lines, "573") == lines
+    assert habitation.lines_for_layout(lines, "530") == []
+
+
+def test_an_exclusion_qualifier_is_honoured() -> None:
+    """Benimar's form: `(excl 286)` means every layout but that one."""
+    lines = ["145 litre fridge/freezer with automatic energy selection (excl 286)"]
+
+    assert habitation.lines_for_layout(lines, "201") == lines
+    assert habitation.lines_for_layout(lines, "286") == []
+
+
+def test_a_parenthesis_that_is_not_a_layout_list_is_left_alone() -> None:
+    """A qualifier must be nothing but layout codes and the words joining them."""
+    lines = [
+        "Large external garage with lighting, heating & 230v socket",
+        "OVERALL WIDTH (MIRRORS FOLDED) 2350mm",
+        "MAX USER PAYLOAD (3500KG CHASSIS) Manual 590kg",
+        "Thetford cassette toilet with electric flush & 18 litre wheeled holding tank",
+    ]
+
+    assert habitation.lines_for_layout(lines, "530") == lines
+
+
+def test_the_shorter_exc_spelling_is_honoured() -> None:
+    """McLouis write `(exc 330)` where Benimar write `(excl 286)`."""
+    lines = ["5th Homologated seat in running order (exc 330)"]
+
+    assert habitation.lines_for_layout(lines, "360") == lines
+    assert habitation.lines_for_layout(lines, "330") == []
+
+
+def test_model_specific_is_not_a_layout_list() -> None:
+    """McLouis also write `(model specific)`, which names nothing and so restricts nothing."""
+    lines = ["Front electric drop-down bed (model specific)"]
+
+    assert habitation.lines_for_layout(lines, "330") == lines

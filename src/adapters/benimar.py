@@ -186,7 +186,7 @@ def layout_blocks(page: str, source_url: str) -> list[BenimarProduct]:
                 base_mro_routes=tuple(marquis.base_mro_routes(body)),
                 chassis_mro_routes=tuple(marquis.chassis_mro_routes(body)),
                 copy_lines=tuple(marquis.bed_lines(body))
-                + tuple(marquis.lines_for_layout(equipment, model)),
+                + tuple(habitation.lines_for_layout(equipment, model)),
             )
         )
     return products

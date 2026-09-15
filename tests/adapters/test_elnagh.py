@@ -233,30 +233,6 @@ def test_only_the_two_long_layouts_have_a_separate_washroom() -> None:
     assert separated["560"] is None
 
 
-def test_an_unqualified_line_reaches_every_layout() -> None:
-    assert marquis.lines_for_layout(["Truma CP Plus with LCD control panel"], "530") == [
-        "Truma CP Plus with LCD control panel"
-    ]
-
-
-def test_a_parenthesis_that_is_not_a_layout_list_is_left_alone() -> None:
-    """`(230v socket)` and `(MIRRORS FOLDED)` must not be read as layout qualifiers."""
-    lines = [
-        "Large external garage with lighting, heating & 230v socket",
-        "OVERALL WIDTH (MIRRORS FOLDED) 2350mm",
-    ]
-
-    assert marquis.lines_for_layout(lines, "530") == lines
-
-
-def test_an_exclusion_qualifier_is_honoured() -> None:
-    """Benimar's form: `(excl 286)` means every layout but that one."""
-    lines = ["145 litre fridge/freezer (excl 286)"]
-
-    assert marquis.lines_for_layout(lines, "201") == lines
-    assert marquis.lines_for_layout(lines, "286") == []
-
-
 # --------------------------------------------------------------------------- #
 # Habitation, which is findings rather than proposals
 # --------------------------------------------------------------------------- #

@@ -657,6 +657,52 @@ def bed_types_from(lines: Iterable[str]) -> tuple[list[BedType], list[str]]:
 
 # --- One entry point -----------------------------------------------------------------
 
+#: A parenthetical naming the layouts a line of equipment applies to.
+#:
+#: The content must be **nothing but layout codes** and the words that join them, so
+#: `(579 and 573 only)`, `(excl 286)` and `(exc 330)` match while `(MIRRORS FOLDED)`, `(3500KG CHASSIS)`
+#: and `(230v socket)` do not. See `lines_for_layout`.
+LAYOUT_QUALIFIER = re.compile(
+    r"\(\s*(?P<qualifier>(?:exc(?:l)?\.?|only|and|or|[,/&\s]|\d{2,4})+?)\s*\)", re.I
+)
+
+
+def lines_for_layout(lines: Iterable[str], model: str) -> list[str]:
+    """The equipment lines that apply to one layout, by the list's own parentheses.
+
+    **Not every line in a range's equipment list applies to every layout in it**, and on
+    Elnagh's Baron page the qualifier decides the answer rather than shading it:
+
+    ```
+    Separate shower and toilet compartment (579 and 573 only)
+    Combined shower and toilet compartment (530 and 560 only)
+    ```
+
+    Read range-wide, whichever line came first would settle `shower_toilet_separated` for
+    all four. FMLV holds **No, No, Yes, Yes** across 530/560/573/579, which is the page read
+    per layout — so this is not a refinement, it is the difference between right and wrong.
+
+    Benimar qualifies the same way with `(excl 286)` and `(286)` on its two fridge sizes,
+    where both happen to be fridge-freezers and the fault would have gone unnoticed.
+
+    A line with no qualifier applies to everything, which is nearly all of them.
+    """
+    kept: list[str] = []
+    for line in lines:
+        match = LAYOUT_QUALIFIER.search(line)
+        if match is None:
+            kept.append(line)
+            continue
+        codes = re.findall(r"\d{2,4}", match.group("qualifier"))
+        if not codes:
+            kept.append(line)
+            continue
+        excluded = bool(re.search(r"\bexc", match.group("qualifier"), re.I))
+        if (model not in codes) if excluded else (model in codes):
+            kept.append(line)
+    return kept
+
+
 def features_from(lines: Iterable[str]) -> dict[str, Feature]:
     """Every habitation feature a manufacturer's spec prose settles, keyed by field name.
 

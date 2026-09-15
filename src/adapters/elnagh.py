@@ -18,7 +18,7 @@ Two things are worth knowing about it:
 * it is on Marquis's **older template** — `Weights and Dimensions`, shouted labels, no
   printed MIRO, and a payload row per chassis — so the mass in running order is derived;
 * its equipment list **qualifies lines per layout**, and on the one field where that
-  matters it decides the answer rather than shading it. See `marquis.lines_for_layout`.
+  matters it decides the answer rather than shading it. See `habitation.lines_for_layout`.
 """
 
 from __future__ import annotations
@@ -130,7 +130,7 @@ def layout_blocks(page: str, source_url: str) -> list[ElnaghProduct]:
                 rrp_pounds=marquis.price(body),
                 chassis_mro_routes=tuple(marquis.chassis_mro_routes(body)),
                 copy_lines=tuple(marquis.bed_lines(body))
-                + tuple(marquis.lines_for_layout(equipment, model)),
+                + tuple(habitation.lines_for_layout(equipment, model)),
             )
         )
     return products
