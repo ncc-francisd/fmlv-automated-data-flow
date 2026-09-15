@@ -239,33 +239,44 @@ City Pro and Brownie have a **body type sitting in the range column**. The reque
 "the ranges are Brownie, City Pro and Oasi" settles what they should say. Per `README.md`,
 propose *both* halves together or neither.
 
-### One of those two renames can be delivered and the other cannot
+### One of those two renames needed a declared rename to be deliverable at all
 
 `diff/matching.py` scores identity as a Jaccard similarity on the range-plus-model word
 bag, and the two corrections land on opposite sides of its 0.5 threshold:
 
-| Baseline identity | Corrected to | Score | Outcome |
+| Baseline identity | Corrected to | Score | |
 |---|---|---|---|
-| `Campervan` + `City Pro` | `City Pro` + `City Pro` | 2/3 = **0.667** | proposed normally |
-| `Coach Built low profile` + `Brownie` | `Brownie` + `Brownie` | 1/5 = **0.200** | orphans the product |
+| `Campervan` + `City Pro` | `City Pro` + `City Pro` | 2/3 = **0.667** | proposed on its own |
+| `Coach Built low profile` + `Brownie` | `Brownie` + `Brownie` | 1/5 = **0.200** | orphaned the product |
 
 Run #30 is the evidence: the scraped Brownie was classified **new** and the real one,
 `product_id` 5855, was reported **disappeared**. A rename that orphans the product it
 renames is worse than the wrong name — an upload would create a duplicate, and a reviewer
-would read a discontinuation that has not happened.
+would read a discontinuation that has not happened. So for a year the Brownie **emitted
+FMLV's own wrong range** with no provenance on either identity half: nothing was proposed,
+and the product at least kept its history.
 
-So Brownie **emits FMLV's own wrong range**, with no provenance on either half of the
-identity, and nothing is proposed: it matches at 1.000 and its weights and dimensions
-update normally. The correction is a one-line manual edit on the FMLV site, narrated on
-every run until someone makes it — then `intended_range` comes out of `_DOCUMENTS`. The
-asymmetry with City Pro is the matcher's, not Wingamm's.
+**`RENAMED_RANGES` is what makes it deliverable**, added 15 September 2026. Matching and
+proposing turn out to be separate levers:
+
+* `RENAMED_RANGES = {"Brownie": "Coach Built low profile"}` scores the scraped identity as
+  the name FMLV holds, so the product matches at **1.000**;
+* the provenance on both identity halves proposes `Coach Built low profile` -> `Brownie`
+  through the ordinary review.
+
+Run #99 confirms it: 8 scraped against 8 baseline, **0 new and 0 disappeared**, with the
+rename among the proposals. `_IDENTITY_FIELDS` was never what suppressed it — that only
+keeps those columns out of the needs-a-choice prompt for a *new* product.
+
+**Delete the `RENAMED_RANGES` entry once the rename is accepted.** `diff.stale_renames`
+narrates it on every run afterwards, because an entry claiming FMLV calls this something it
+no longer does is worse than none.
 
 This is a different failure from Bailey's, which was about accepting *one* half of a
-proposed rename. Here the rename cannot be proposed at all, because the product it belongs
-to stops being recognisable as itself. `README.md` notes that raising
-`DEFAULT_THRESHOLD` cannot be the answer to Etrusco's problem; this is the case that shows
+proposed rename — hence both halves carrying provenance here. `README.md` notes that raising
+`DEFAULT_THRESHOLD` cannot be the answer to Etrusco's problem; this was the case that showed
 lowering it is not the answer either, since 0.200 is far below any threshold that would
-still separate real vehicles.
+still separate real vehicles. Naming the pair is what neither threshold could do.
 
 ### `--range` selectors are documents, so baseline scope needs the hook
 
@@ -428,7 +439,7 @@ survey that the catalogues are where FMLV's own data came from.
   contacting Wingamm UK (01292 262233, an Ayrshire number) for the UK price list as of
   26 August 2026.** If one arrives as a document, price becomes collectable and this
   survey's price decision is the first thing to revisit.
-- **Brownie's range still needs a manual edit on the FMLV site** — the rename the pipeline
+- **Brownie's range correction is now proposed in review** (run #99), no longer a manual edit — the rename the pipeline
   cannot deliver. Once `manufacturer_range` reads `Brownie` on `product_id` 5855, drop
   `intended_range` from that document in `_DOCUMENTS` and the narration goes with it.
 - **Brownie and City Pro catalogues are from November 2023** and are the only English

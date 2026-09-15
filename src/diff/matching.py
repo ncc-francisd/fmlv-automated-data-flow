@@ -96,12 +96,23 @@ class Renames:
     0.667 scores lower than Etrusco's worst bad match at 0.750, so there is not always a
     value that separates them. A rename names one pair and leaves the rest alone.
 
-    **This does not rename anything in FMLV.** `manufacturer_range` and `model` are
-    identity fields: the pipeline matches *on* them and never proposes a change to them
-    (`store.changes._IDENTITY_FIELDS`), and the settled rule is that the FMLV export
-    decides those strings. All this does is let the update land on the right row. If FMLV
-    should hold the new name, that is a manual edit — and once it is made, the entry here
-    is dead and `stale_renames` says so.
+    **Matching is all this does; whether FMLV is corrected is a separate question, and the
+    answer is the adapter's.** A rename is proposed like any other field change when the
+    adapter records provenance for `manufacturer_range`/`model`, and suppressed when it
+    records none — `store.changes._IDENTITY_FIELDS` only keeps those columns out of the
+    *needs-a-choice* prompt for a new product, it does not stop them being compared.
+
+    Those two levers together are what makes an otherwise undeliverable correction
+    deliverable. Wingamm's Brownie is the worked example: FMLV files it under range
+    `Coach Built low profile`, a body type in the range column, and emitting the right name
+    scored 0.200 and orphaned `product_id` 5855. Naming the rename here matches it at 1.000
+    *and* lets the adapter propose the correction through review, instead of emitting
+    FMLV's own wrong value and waiting on a manual edit.
+
+    Propose **both halves of the identity or neither** — `docs/adapters/README.md` records
+    that accepting a range rename alone left Bailey's `Adamo XL` + `I` as `Adamo I`.
+
+    Once the correction is accepted the entry here is dead, and `stale_renames` says so.
 
     Both maps are keyed on **what the site now says** and give **what FMLV still holds**,
     which is the direction an adapter author reads them in: the scraped name is the one

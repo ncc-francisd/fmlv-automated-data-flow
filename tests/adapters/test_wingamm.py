@@ -69,9 +69,9 @@ def test_eight_layouts_in_three_ranges() -> None:
     layouts = [layout for document in wingamm._DOCUMENTS for layout in document.layouts]
     assert len(layouts) == 8
     # The ranges Wingamm actually sell, per the requester: Brownie, City Pro and Oasi.
-    # Brownie's is the one that cannot be written back — see the identity tests below.
+    # Every one is now emitted as published — see the identity tests below.
     assert {
-        document.intended_range or document.fmlv_range for document in wingamm._DOCUMENTS
+        document.fmlv_range for document in wingamm._DOCUMENTS
     } == {"Oasi", "Brownie", "City Pro"}
 
 
@@ -531,7 +531,6 @@ def _product(
     spec: WingammSpec | None = None,
     page: WingammPage | None = None,
     is_campervan: bool = False,
-    intended_range: str | None = None,
 ) -> WingammProduct:
     return WingammProduct(
         fmlv_range="Oasi",
@@ -559,7 +558,6 @@ def _product(
             base_vehicle_manufacturer="Fiat",
         ),
         is_campervan=is_campervan,
-        intended_range=intended_range,
     )
 
 
@@ -626,31 +624,60 @@ def test_both_halves_of_the_identity_carry_provenance() -> None:
         assert "accept both or neither" in extracted.provenance[field].snippet
 
 
-def test_an_undeliverable_rename_proposes_neither_half() -> None:
-    """Brownie's range is wrong in FMLV and stays wrong, deliberately.
+def test_the_brownie_rename_needs_a_declared_rename_to_survive_matching() -> None:
+    """Emitting the right range alone scores 0.200 and orphans `product_id` 5855.
 
-    `{coach, built, low, profile, brownie}` -> `{brownie}` scores 0.200 against
-    `matching.DEFAULT_THRESHOLD` of 0.5, so proposing it orphans `product_id` 5855 and
-    reports a discontinuation that has not happened — which run #30 did. So FMLV's own
-    range is emitted, unproposed, and the correction is narrated for a manual edit.
+    Run #30 did exactly that: a new product reported beside a discontinuation that had
+    not happened. For a year the adapter emitted FMLV's own wrong range unproposed.
+    `RENAMED_RANGES` is what makes the correction deliverable.
     """
-    from src.diff.matching import DEFAULT_THRESHOLD, _identity_tokens
+    from src.diff.matching import DEFAULT_THRESHOLD, Renames, _identity_tokens
 
-    baseline = _identity_tokens("Coach Built low profile", "Brownie")
-    renamed = _identity_tokens("Brownie", "Brownie")
-    assert len(baseline & renamed) / len(baseline | renamed) < DEFAULT_THRESHOLD
+    held = _identity_tokens("Coach Built low profile", "Brownie")
+    corrected = _identity_tokens("Brownie", "Brownie")
+    assert len(held & corrected) / len(held | corrected) < DEFAULT_THRESHOLD
 
     brownie = next(d for d in wingamm._DOCUMENTS if d.label == "Brownie")
-    assert brownie.fmlv_range == "Coach Built low profile"
-    assert brownie.intended_range == "Brownie"
+    assert brownie.fmlv_range == "Brownie"
 
+    renames = Renames(ranges=wingamm.RENAMED_RANGES)
+    assert renames.applied_to("Brownie", "Brownie") == ("Coach Built low profile", "Brownie")
+
+
+def test_the_brownie_rename_is_proposed_on_a_matched_product() -> None:
+    """Both halves carry provenance now, so the correction reaches a reviewer.
+
+    Matching and proposing are separate levers: the declared rename holds the match at
+    1.000 while the provenance here proposes the change.
+    """
+    from src.diff import Renames, diff_products  # noqa: PLC0415
+    from src.diff.classify import ChangeKind  # noqa: PLC0415
+    from src.product_model.model import Motorhome  # noqa: PLC0415
+
+    brownie = replace(_product(), fmlv_range="Brownie", model="Brownie", slug="brownie")
     extracted = wingamm._build_extracted_motorhome(
-        _product(intended_range="Brownie"), "https://example.com/pdf", "https://example.com/page"
+        brownie, "https://example.com/pdf", "https://example.com/page"
     )
-    assert "manufacturer_range" not in extracted.provenance
-    assert "model" not in extracted.provenance
-    # The weights still update — this suppresses a rename, not the whole product.
-    assert extracted.provenance["mtplm_kilograms"] is not None
+    assert "manufacturer_range" in extracted.provenance
+    assert "model" in extracted.provenance
+
+    held = Motorhome(
+        manufacturer=extracted.motorhome.manufacturer,
+        manufacturer_range="Coach Built low profile",
+        model="Brownie",
+        product_id=5855,
+    )
+    diffs = diff_products(
+        [extracted], [held], renames=Renames(ranges=wingamm.RENAMED_RANGES)
+    )
+
+    assert [diff.kind for diff in diffs] == [ChangeKind.CHANGED_FIELD]
+    assert diffs[0].fmlv_product_id == 5855
+    assert any(
+        change.field == "manufacturer_range"
+        and change.new_value == extracted.motorhome.manufacturer_range
+        for change in diffs[0].changes
+    )
 
 
 def test_the_city_pro_rename_survives_matching_and_is_proposed() -> None:
@@ -666,7 +693,7 @@ def test_the_city_pro_rename_survives_matching_and_is_proposed() -> None:
 
     city_pro = next(d for d in wingamm._DOCUMENTS if d.label == "City Pro")
     assert city_pro.fmlv_range == "City Pro"
-    assert city_pro.intended_range is None
+    assert "City Pro" not in wingamm.RENAMED_RANGES
 
 
 def test_width_and_height_provenance_explains_the_inverted_rule() -> None:

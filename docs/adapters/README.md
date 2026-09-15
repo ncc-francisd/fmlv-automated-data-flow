@@ -1273,12 +1273,18 @@ either would be dead config the day it was written. Two cases do need it:
 * **the range was replaced outright**, leaving only the code in common — 0.333, and
   reaching that by lowering the threshold would match almost anything.
 
-**It matches; it does not rename.** `manufacturer_range` and `model` are identity fields,
-never proposed as changes, and the settled rule is that the export decides those strings. So
-this does not replace the manual FMLV edit above — it means the adapter can emit the name it
-believes is right and still land on the correct row, instead of emitting the baseline's own
-wrong value to keep the match. **Wingamm's `Coach Built low profile` is the standing
-candidate** and has not been changed.
+**This makes the undeliverable rename deliverable.** Matching and proposing are separate
+levers: a rename is proposed like any other field change when the adapter records provenance
+for both identity halves, and suppressed when it records none. `_IDENTITY_FIELDS` only keeps
+those columns out of the *needs-a-choice* prompt for a new product — it does not stop them
+being compared.
+
+So an adapter that previously had to emit FMLV's own wrong value to hold the match can now
+emit the right one, declare the rename, and propose the correction through review. Wingamm's
+Brownie is the worked example: `Coach Built low profile` scored 0.200 and orphaned
+`product_id` 5855; with the rename it matches at 1.000 and proposes
+`Coach Built low profile` -> `Brownie`. Propose **both halves or neither** — accepting a
+range rename alone left Bailey's `Adamo XL` + `I` as `Adamo I`.
 
 **A rename is meant to stop being needed.** Once FMLV is corrected the entry is not merely
 useless but misleading, so `diff.stale_renames` narrates any entry that did nothing — either

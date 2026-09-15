@@ -108,9 +108,6 @@ class _Document:
     #: Whether this is a campervan rather than a coachbuilt. The only half of the body
     #: type that cannot be derived — see `body_type_for`.
     is_campervan: bool
-    #: Set only where `fmlv_range` is a value known to be wrong that is emitted anyway,
-    #: because correcting it would cost the product its history. See `_UNDELIVERABLE`.
-    intended_range: str | None = None
 
 
 #: Every Wingamm sits on a Ducato, so the make is named once here rather than repeated
@@ -184,9 +181,10 @@ _DOCUMENTS: tuple[_Document, ...] = (
     _Document(
         title_key="BROWNIE",
         label="Brownie",
-        # Wrong, and emitted anyway — see `_UNDELIVERABLE`.
-        fmlv_range="Coach Built low profile",
-        intended_range="Brownie",
+        # FMLV files this under range "Coach Built low profile", a body type in the range
+        # column. The right name is emitted and `RENAMED_RANGES` keeps the match — see
+        # the note above that constant.
+        fmlv_range="Brownie",
         layouts=(("brownie", "Brownie"),),
         is_campervan=False,
     ),
@@ -203,30 +201,28 @@ _DOCUMENTS: tuple[_Document, ...] = (
     ),
 )
 
-#: Why Brownie keeps a range everyone agrees is wrong.
+#: What FMLV still calls the Brownie, so the correction can be proposed at all.
 #:
 #: FMLV files it under `manufacturer_range` "Coach Built low profile" — a body type in the
 #: range column — and the requester confirmed on 26 August 2026 that the ranges are
-#: Brownie, City Pro and Oasi. But `diff/matching.py` scores identity as a Jaccard
-#: similarity on the range-plus-model word bag, and renaming the range to "Brownie" takes
-#: `{coach, built, low, profile, brownie}` to `{brownie}` — **0.200 against a 0.5
-#: threshold.** Run #30 proved it: the scraped Brownie was reported as a new product and
-#: the real one, `product_id` 5855, as disappeared. A rename that orphans the product it
-#: renames is worse than the wrong name, because an upload would then create a duplicate
-#: and a reviewer would read a phantom discontinuation.
+#: Brownie, City Pro and Oasi.
 #:
-#: So the wrong range is emitted, no provenance is attached to either half of the
-#: identity, and nothing is proposed — the product matches at 1.000 and its weights and
-#: dimensions update normally. The rename is a one-line manual edit on the FMLV side,
-#: narrated on every run until someone makes it. Afterwards, drop `intended_range` here.
+#: **Emitting the right name alone does not work.** `diff/matching.py` scores identity as a
+#: Jaccard similarity on the range-plus-model word bag, and "Brownie" against "Coach Built
+#: low profile Brownie" is `{brownie}` against `{coach, built, low, profile, brownie}` —
+#: **0.200 against a 0.5 threshold.** Run #30 proved it: the scraped Brownie was reported
+#: as a new product and the real one, `product_id` 5855, as disappeared. For a year the
+#: adapter emitted FMLV's own wrong range with no provenance, so nothing was proposed and
+#: the product at least kept its history.
 #:
-#: City Pro is the same class of error and *is* proposed, because its correction happens
-#: to keep enough tokens to match. The asymmetry is the matcher's, not Wingamm's.
-_UNDELIVERABLE = (
-    "cannot be proposed: renaming the range drops this product's identity score to 0.20, "
-    "below the 0.5 matching threshold, so it would orphan its FMLV product_id and report "
-    "a discontinuation that has not happened. Fix it directly on the FMLV site"
-)
+#: Naming the rename fixes both halves at once: the scraped identity is scored as the name
+#: FMLV holds, so the product matches at **1.000**, while the emitted name and its
+#: provenance propose `Coach Built low profile` -> `Brownie` through the ordinary review.
+#:
+#: **Delete this entry once the rename is accepted.** `diff.stale_renames` narrates it on
+#: every run after that, because an entry claiming FMLV calls this something it no longer
+#: does is worse than none.
+RENAMED_RANGES: dict[str, str] = {"Brownie": "Coach Built low profile"}
 
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = tuple(
     (document.title_key, document.label) for document in _DOCUMENTS
@@ -681,9 +677,6 @@ class WingammProduct:
     spec: WingammSpec
     page: WingammPage
     is_campervan: bool
-    #: The range this vehicle should be filed under, where that differs from
-    #: `fmlv_range` and cannot be proposed. See `_UNDELIVERABLE`.
-    intended_range: str | None = None
 
     @property
     def label(self) -> str:
@@ -857,17 +850,17 @@ def _build_extracted_motorhome(
     # Pro and Oasi. `docs/adapters/README.md`: propose both halves or neither, because
     # accepting a range rename alone leaves the other column behind and corrupts the name.
     #
-    # Where the correction cannot be delivered at all, *neither* half gets provenance, so
-    # neither is compared and nothing is proposed — the emitted range is FMLV's own and
-    # the product matches its row untouched. See `_UNDELIVERABLE`.
-    if product.intended_range is None:
-        identity = (
-            f"range {product.fmlv_range!r} + model {product.model!r}. These two belong "
-            f"together — accept both or neither. Wingamm publish this vehicle as "
-            f"'{product.slug}' in the {catalogue}"
-        )
-        record("manufacturer_range", MODELS_INDEX_URL, identity)
-        record("model", MODELS_INDEX_URL, identity)
+    # The Brownie's correction used to be undeliverable — it scored 0.200 and orphaned
+    # its product_id — so the wrong range was emitted with no provenance and nothing was
+    # proposed. `RENAMED_RANGES` now holds the match at 1.000, so both halves are
+    # proposed here like any other field.
+    identity = (
+        f"range {product.fmlv_range!r} + model {product.model!r}. These two belong "
+        f"together — accept both or neither. Wingamm publish this vehicle as "
+        f"'{product.slug}' in the {catalogue}"
+    )
+    record("manufacturer_range", MODELS_INDEX_URL, identity)
+    record("model", MODELS_INDEX_URL, identity)
 
     if (chassis := product.base_vehicle_manufacturer) is not None:
         record(
@@ -1070,14 +1063,7 @@ def collect(
                 spec=spec,
                 page=page,
                 is_campervan=document.is_campervan,
-                intended_range=document.intended_range,
             )
-            if document.intended_range is not None:
-                on_progress(
-                    f"[{product.label}] FMLV files this under range "
-                    f"{document.fmlv_range!r}, which is a body type, not a range. It "
-                    f"should be {document.intended_range!r}, but that {_UNDELIVERABLE}"
-                )
 
             if product.base_vehicle_manufacturer is None:
                 # City Pro is the one product where neither source names the chassis: its

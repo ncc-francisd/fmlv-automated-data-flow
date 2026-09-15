@@ -192,10 +192,10 @@ def test_an_unrenamed_product_is_returned_untouched() -> None:
 
 
 def test_the_scraped_product_keeps_its_own_name() -> None:
-    """Rewriting is for scoring only.
+    """Rewriting is for scoring only — the product itself is untouched.
 
-    The settled rule is that the FMLV export decides these strings, and
-    `store.changes._IDENTITY_FIELDS` never proposes a change to one.
+    Whether FMLV is corrected is a separate lever: the adapter's provenance on the two
+    identity halves decides that, not this.
     """
     renames = Renames(models={("Fusion", "330"): ("Baron", "530")})
     new = scraped("Fusion", "330")
