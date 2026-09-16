@@ -4,7 +4,10 @@ Surveyed 16 September 2026. **A brand new to FMLV**, which no other adapter has 
 is no manufacturer id, no supplier name, no baseline export and no existing rows. Four
 campervans on a VW Crafter.
 
-**Not yet built.** See "What is still needed" at the foot.
+**Built 16 September 2026.** Run #102: four collected, four correctly new, 44 proposals and
+10 habitation findings against an empty baseline.
+
+`manufacturer_id` **9001 is provisional and not an NCC key** — see "The id" below.
 
 ## Whose brand is it
 
@@ -221,29 +224,42 @@ Shane Devoy (MD), Scott Stephens (Commercial Director), Paul Gorry (Head of Mark
 So the `ncc_supplier_name` has no obvious external candidate: it is Atom, or Auto-Trail, and
 that is the NCC's to decide.
 
-## What is still needed before this can be built
+## The id, which is the one provisional thing
 
-1. **The NCC `manufacturer_id`.** Atom is absent from `resources/manufacturers-full-list.csv`.
-   It is an NCC-side key and inventing one silently detaches every run from its history, so
-   it has to be allocated rather than guessed.
-2. **The exact `fmlv_manufacturer` string**, which is the join key — a trailing space or
-   `Ltd` against `Ltd.` means the run finds an empty baseline and proposes every product as
-   new.
-3. **The `ncc_supplier_name`**, from the supplier drop-down on the NCC export page.
-4. ~~The official price list~~ — **supplied 16 September 2026** and recorded above.
+Atom is absent from `resources/manufacturers-full-list.csv`, whose ids stop at 275, so
+**9001 was chosen far outside that range and cannot collide**. The usual rule is never to
+invent an id, because a wrong one detaches a run from its product history — and Atom has no
+history, so the harm the rule guards against does not yet exist.
 
-   One question it raises: **can the adapter read the OTR price from the site at all?** The
-   configurator publishes the ex works and promotional figures, not the on-the-road one, and
-   the OTR column exists only in the pack. The pack says *"a complete price brochure will be
-   available to download from the ATOM Motorhomes website"* — if that appears, it is the
-   price source; if not, the OTR prices have to be carried in the adapter and re-checked by
-   hand, which is the arrangement `murvi.py` and `le_voyageur.py` already use.
+It names three things, and all three need renaming when the NCC allocate the real id:
+
+* the registry row in `config/manufacturers.csv`;
+* `data/exports/9001_Trigano/`;
+* `data/snapshots/9001/`.
+
+The requester is creating the manufacturer so a real number can replace this before the
+first upload.
+
+## An empty baseline, which no adapter has faced before
+
+`cli.latest_export` **raises** when a manufacturer has no export rather than assuming an
+empty baseline, and rightly — that guard is what stops a forgotten download turning every
+product into a duplicate. So a header-only export is kept at
+`data/exports/9001_Trigano/2026-09-16_Trigano_motorhome-campervans.xlsx`, written from
+`schema.COLUMNS`. It parses to zero products with no issues.
+
+The pipeline then says the right thing on its own:
+
+> *the export has no rows for 'Trigano', so every scraped product was classified as new —
+> check the export and that the registry's fmlv_manufacturer matches its 'manufacturer'
+> column*
+
+**Expected here and alarming anywhere else.** Once the first upload creates the four
+products, a real export replaces the empty one and the warning stops.
 
 ## Still unverified
 
-* **Whether a new manufacturer runs end to end with no baseline at all.** Every product will
-  be classified new, which is correct, but no adapter has been built against an empty
-  baseline before and the path is untested.
+* ~~Whether a new manufacturer runs end to end with no baseline~~ — **it does**, see above.
 * **Floorplans**, and whether Core B/G and Element B/G differ enough to record different
   habitation fields. The B models are described as a twin-bench layout and the G models as
   an expedition layout, but the comparison table lists identical equipment for all four.
@@ -254,3 +270,27 @@ that is the NCC's to decide.
   count is pinned, so both will surface as a roster warning rather than silently.
 * **Whether a price brochure appears on the site**, which would settle the OTR question
   above.
+
+## Two things the build changed
+
+### The equipment is in prose, not in a list
+
+`habitation.list_items` finds **twelve** items on a model page and every one is navigation:
+Atom render their specification as divs. The first run produced **zero findings** because of
+it. The facts are in the prose instead — *"There's also a 70ltr compressor fridge with
+integrated freezer included"*, *"Truma heating and hot water all as standard"* — so
+`copy_lines_from` splits the page into sentences and `habitation` reads those. Ten findings
+now.
+
+One gap left alone: the B models' *"twin benches easily make up into two single berths"*
+yields no bed type, because `habitation.bed_types_from` requires the word **bed** and this
+says **berths**. That is a shared-vocabulary change affecting every adapter, so it is not
+made here.
+
+### A row must have exactly four columns, not at least four
+
+The first version took the first four figures in a row and ignored anything after, so a
+**fifth model would have been silently dropped** — the run would collect the same four for
+ever and the roster count, which is the main defence here, would never fire. Atom have said
+in writing that a fifth is coming: four-belt four-berth models within the year, and a 6.8 m
+wheelbase after the 6 m one. The row pattern now refuses a fifth column outright.

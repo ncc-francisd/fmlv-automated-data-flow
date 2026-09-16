@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from . import (
     adria,
+    atom,
     auto_sleepers,
     auto_trail,
     bailey,
@@ -71,6 +72,7 @@ from .base import Adapter, ExtractedMotorhome, Provenance
 #: and the (manufacturer, class) key can never drift from what the module declares.
 _MODULES: tuple[Adapter, ...] = (
     adria,
+    atom,
     auto_sleepers,
     auto_trail,
     bailey,
@@ -130,6 +132,7 @@ __all__ = [
     "adapter_vehicle_class",
     "adapters_for",
     "adria",
+    "atom",
     "auto_sleepers",
     "auto_trail",
     "bailey",
