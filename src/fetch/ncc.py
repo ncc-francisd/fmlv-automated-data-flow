@@ -111,6 +111,60 @@ class NccSiteConfig:
     caravan_export_filename: str = "touring-caravans.xlsx"
 
 
+class SupplierNotListed(RuntimeError):
+    """The NCC's supplier drop-down has no such supplier.
+
+    Its own name, because it is not a fault to be retried: the supplier genuinely is not
+    there, and no amount of waiting will add it.
+    """
+
+
+def _select_supplier(page, selector: str, supplier_name: str) -> None:
+    """Pick one supplier from the NCC export drop-down, or say plainly that it is absent.
+
+    **Playwright's own failure here is 30 seconds of silence and then a locator dump.**
+    Asked for a supplier the list does not contain, `select_option` retries until it times
+    out and reports *"did not find some options"* beside the `<select>`'s markup — which
+    names neither the supplier nor the reason, and reads like the site is broken.
+
+    It is not broken. A manufacturer FMLV holds no products for has no supplier to export,
+    which is the state every brand new to FMLV starts in: Atom failed exactly this way on
+    16 September 2026, from the review app's trigger, because the trigger refreshes the
+    export before diffing and `Atom` was not yet an NCC supplier.
+
+    So the options are read first and a missing one fails immediately, naming the supplier
+    and what to do instead. The near-misses are listed because the likelier cause, once a
+    manufacturer does exist, is `ncc_supplier_name` in the registry not matching the site's
+    own spelling.
+    """
+    options = [
+        (text or "").strip()
+        for text in page.locator(f"{selector} option").all_text_contents()
+    ]
+    if supplier_name in options:
+        page.select_option(selector, label=supplier_name)
+        return
+
+    lowered = supplier_name.casefold()
+    near = [option for option in options if lowered in option.casefold()] or [
+        option for option in options if option.casefold()[:4] == lowered[:4]
+    ]
+    suggestion = (
+        f" The closest the list offers: {', '.join(repr(option) for option in near[:5])}."
+        if near
+        else ""
+    )
+    msg = (
+        f"{supplier_name!r} is not in the NCC supplier list, so there is no export to "
+        f"download.{suggestion} Either the registry's ncc_supplier_name does not match the "
+        f"site's spelling, or this manufacturer has no FMLV products yet — a brand new to "
+        f"FMLV has nothing to export, so run it from the command line against an empty "
+        f"baseline instead (`fmlv empty-baseline <manufacturer>`, then `fmlv run "
+        f"<manufacturer>`) until its first upload has created some."
+    )
+    raise SupplierNotListed(msg)
+
+
 def _ensure_toggle_off(page, selector: str) -> None:
     """Click the "Only Active..." toggle if it's currently on.
 
@@ -196,7 +250,7 @@ def download_export(
             page.goto(config.products_url)
             page.click(config.actions_dropdown_selector)
             page.click(config.export_by_supplier_selector)
-            page.select_option(config.supplier_select_selector, label=supplier_name)
+            _select_supplier(page, config.supplier_select_selector, supplier_name)
             _ensure_toggle_off(page, config.only_active_toggle_selector)
 
             on_progress(f"triggering the export download for {supplier_name!r}")
