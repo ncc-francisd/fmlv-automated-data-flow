@@ -311,6 +311,23 @@ that the registry should be corrected — a scheduled sweep would otherwise have
 way overnight. Two options differing only in case are still refused, because guessing
 between them would be worse than stopping.
 
+## A hand-run export is not the export the pipeline gets
+
+Two separate gates, and confusing them cost an afternoon:
+
+* **the NCC's "Only Active and Most Recent Year Products" checkbox** decides what the export
+  contains. It is **on** by default when you click through the Nova dialog by hand, which is
+  why Atom's first manual export came back as a bare header row — the four products existed
+  but were not yet active. `fetch.ncc` turns it **off** on every automated fetch, deliberately:
+  the baseline for a diff needs everything FMLV holds, not the live subset;
+* **the `archived` column** decides what `cli` keeps once the export is read. Archived rows
+  are dropped, because a row already gone from FMLV has nothing to diff against.
+
+So `fmlv fetch-export` sees deactivated products where a hand-run export does not. **Whether
+a deactivated product also comes back `archived=Yes` is untested** — if it does, the second
+gate drops it and the baseline empties even though the export was full. One run after
+deactivating settles it: the baseline count on the run's first summary line is the answer.
+
 ## Still unverified
 
 * ~~Whether a new manufacturer runs end to end with no baseline~~ — **it does**, see above.
