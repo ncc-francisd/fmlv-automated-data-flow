@@ -88,3 +88,41 @@ def test_no_near_miss_offers_nothing_rather_than_noise() -> None:
         _select_supplier(page, SELECTOR, "Atom")
 
     assert "closest" not in str(excinfo.value)
+
+
+def test_a_supplier_differing_only_in_case_is_used_and_flagged() -> None:
+    """The NCC spells Atom `ATOM`; the registry said `Atom` and matched nothing.
+
+    Three triggered runs died on that on 16 September 2026, and a scheduled sweep would
+    have died the same way overnight. Case alone is not worth failing a run over — but it
+    is worth saying, so the registry gets corrected rather than quietly depended upon.
+    """
+    page = _Page(["Ace Motorhomes", "ATOM", "Auto-Trail"])
+    said: list[str] = []
+
+    _select_supplier(page, SELECTOR, "Atom", said.append)
+
+    assert page.selected == "ATOM"
+    assert len(said) == 1
+    assert "'ATOM'" in said[0]
+    assert "ncc_supplier_name" in said[0]
+
+
+def test_an_exact_match_is_never_flagged() -> None:
+    page = _Page(["ATOM"])
+    said: list[str] = []
+
+    _select_supplier(page, SELECTOR, "ATOM", said.append)
+
+    assert page.selected == "ATOM"
+    assert said == []
+
+
+def test_two_options_differing_only_in_case_are_not_guessed_between() -> None:
+    """Ambiguity is the one case where carrying on would be worse than stopping."""
+    page = _Page(["ATOM", "Atom"])
+
+    with pytest.raises(SupplierNotListed):
+        _select_supplier(page, SELECTOR, "aToM")
+
+    assert page.selected is None

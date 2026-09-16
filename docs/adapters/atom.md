@@ -301,8 +301,15 @@ Until the third exists there is no export, so the pipeline cannot see the produc
 created. **Do not upload again in that state**: every run still diffs against the empty
 baseline, classifies all four as new, and a second upload would duplicate them.
 
-The name has to match `ncc_supplier_name` exactly. If the NCC create it as something other
-than `Atom`, the registry column changes rather than the record.
+**The NCC spell it `ATOM`, in capitals**, and `ncc_supplier_name` has to say so —
+`select_option` matches the drop-down's label exactly. `Atom` matched nothing and cost three
+failed triggered runs on 16 September 2026, each a thirty-second timeout whose message named
+neither the supplier nor the reason. A screenshot of the drop-down settled it.
+
+`fetch.ncc._select_supplier` now takes the site's spelling when only case differs, and warns
+that the registry should be corrected — a scheduled sweep would otherwise have died the same
+way overnight. Two options differing only in case are still refused, because guessing
+between them would be worse than stopping.
 
 ## Still unverified
 

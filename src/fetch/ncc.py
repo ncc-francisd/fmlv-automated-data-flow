@@ -119,7 +119,12 @@ class SupplierNotListed(RuntimeError):
     """
 
 
-def _select_supplier(page, selector: str, supplier_name: str) -> None:
+def _select_supplier(
+    page,
+    selector: str,
+    supplier_name: str,
+    on_progress: Callable[[str], None] = lambda message: None,
+) -> None:
     """Pick one supplier from the NCC export drop-down, or say plainly that it is absent.
 
     **Playwright's own failure here is 30 seconds of silence and then a locator dump.**
@@ -146,6 +151,22 @@ def _select_supplier(page, selector: str, supplier_name: str) -> None:
         return
 
     lowered = supplier_name.casefold()
+
+    # **Case alone is not worth failing a run over, but it is worth saying.** The NCC list
+    # spells Atom `ATOM`, and `Atom` in the registry matched nothing — three triggered runs
+    # died on it on 16 September 2026 before a screenshot of the drop-down settled it. A
+    # scheduled sweep would have died the same way, in the middle of the night, so the
+    # nearest unambiguous match is used and the registry is told to catch up.
+    same_but_for_case = [option for option in options if option.casefold() == lowered]
+    if len(same_but_for_case) == 1:
+        on_progress(
+            f"WARNING: the NCC list spells this supplier {same_but_for_case[0]!r} and the "
+            f"registry says {supplier_name!r}. Using the site's spelling — correct "
+            f"ncc_supplier_name so this stops being a guess"
+        )
+        page.select_option(selector, label=same_but_for_case[0])
+        return
+
     near = [option for option in options if lowered in option.casefold()] or [
         option for option in options if option.casefold()[:4] == lowered[:4]
     ]
@@ -250,7 +271,9 @@ def download_export(
             page.goto(config.products_url)
             page.click(config.actions_dropdown_selector)
             page.click(config.export_by_supplier_selector)
-            _select_supplier(page, config.supplier_select_selector, supplier_name)
+            _select_supplier(
+                page, config.supplier_select_selector, supplier_name, on_progress
+            )
             _ensure_toggle_off(page, config.only_active_toggle_selector)
 
             on_progress(f"triggering the export download for {supplier_name!r}")
