@@ -251,9 +251,23 @@ needs solving the day Silver or Mini Freestyle is added.
 
 `cli.latest_export` **raises** when a manufacturer has no export rather than assuming an
 empty baseline, and rightly — that guard is what stops a forgotten download turning every
-product into a duplicate. So a header-only export is kept at
-`data/exports/278_Trigano/2026-09-16_Trigano_motorhome-campervans.xlsx`, written from
-`schema.COLUMNS`. It parses to zero products with no issues.
+product into a duplicate. A genuinely new brand has no export to forget, though, so
+**`fmlv empty-baseline <manufacturer>`** writes a header-only one:
+
+```
+fmlv empty-baseline Atom
+```
+
+It is not an export and does not come from the NCC — those are downloaded per supplier and
+there is nothing to download yet. It writes the schema's header row and nothing else, into
+the same `<id>_<name>` directory a real export would, so the two are interchangeable and
+`latest_export` supersedes it the moment a real one is fetched. It **refuses** where an
+export already exists, since an empty baseline over a real one would classify every product
+as new.
+
+Deliberately a command rather than a flag on `run`, and deliberately not automatic: writing
+one is a statement that this manufacturer is new, which is exactly the thing a reviewer
+should not discover by accident.
 
 The pipeline then says the right thing on its own:
 

@@ -72,7 +72,10 @@ from .fetch.ncc import (
     download_export,
 )
 from .output import generate_upload
+import openpyxl
+
 from .product_model import caravan_io, io
+from .product_model import caravan_schema, schema
 from .product_model.model import Motorhome
 from .product_model.product import Product
 from .registry import Manufacturer, loader
@@ -719,6 +722,91 @@ def _fetch_export_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def empty_baseline(
+    *,
+    manufacturer: Manufacturer,
+    data_root: Path,
+    vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLASS,
+    today: date | None = None,
+) -> Path:
+    """Write a header-only export, so a brand FMLV holds nothing for can be run at all.
+
+    **`latest_export` raises rather than assuming an empty baseline**, and rightly: that
+    guard is what stops a forgotten `fetch-export` turning every product of an established
+    manufacturer into a duplicate. But a genuinely new brand has no export to forget — Atom
+    launched in September 2026 with no FMLV rows at all — and without a file there is
+    nothing to diff against and no way to produce the first upload.
+
+    So this writes the schema's header row and nothing else. It is **not** an export and
+    does not come from the NCC: exports are downloaded per supplier and there is nothing to
+    download yet. It exists only to let the first run happen, and the real export supersedes
+    it the moment one is fetched, `latest_export` preferring the newest file.
+
+    Deliberately a separate command rather than a flag on `run`, and deliberately not
+    automatic: writing one is a statement that this manufacturer is new, which is exactly
+    the thing a reviewer should not discover by accident.
+    """
+    directory = paths.manufacturer_exports_dir(
+        manufacturer.manufacturer_id, manufacturer.fmlv_manufacturer, root=data_root
+    )
+    directory.mkdir(parents=True, exist_ok=True)
+    stem = VehicleClass(vehicle_class).export_stem
+    dest = directory / (
+        f"{(today or date.today()).isoformat()}_"
+        f"{paths.safe_path_component(manufacturer.fmlv_manufacturer)}_{stem}.xlsx"
+    )
+
+    columns = (
+        caravan_schema.COLUMNS
+        if VehicleClass(vehicle_class) is VehicleClass.CARAVAN
+        else schema.COLUMNS
+    )
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.append(list(columns))
+    workbook.save(dest)
+    return dest
+
+
+def _empty_baseline_command(args: argparse.Namespace) -> int:
+    """`fmlv empty-baseline <manufacturer>`: a header-only export for a brand new to FMLV."""
+    registry_file = args.registry or paths.registry_path(root=args.config_dir)
+    if not registry_file.exists():
+        msg = f"manufacturer registry not found at {registry_file}"
+        raise CommandError(msg)
+
+    manufacturer = find_manufacturer(
+        loader.load(registry_file).manufacturers, args.manufacturer
+    )
+    vehicle_class = VehicleClass(args.vehicle_class)
+
+    existing = paths.manufacturer_exports_dir(
+        manufacturer.manufacturer_id, manufacturer.fmlv_manufacturer, root=args.data_dir
+    )
+    already = [
+        path
+        for path in existing.rglob("*")
+        if path.is_file()
+        and path.suffix.lower() in EXPORT_SUFFIXES
+        and vehicle_class.export_stem in path.name
+    ] if existing.exists() else []
+    if already and not args.force:
+        newest = max(already, key=lambda path: path.stat().st_mtime)
+        msg = (
+            f"{manufacturer.fmlv_manufacturer} already has an export at {newest} — an "
+            f"empty baseline would classify every product as new. Use --force only if you "
+            f"mean to override that"
+        )
+        raise CommandError(msg)
+
+    dest = empty_baseline(
+        manufacturer=manufacturer, data_root=args.data_dir, vehicle_class=vehicle_class
+    )
+    print(f"wrote an empty baseline for {manufacturer.fmlv_manufacturer} to {dest}")
+    print("every product will be classified as new until a real export replaces it")
+    return 0
+
+
 def _generate_upload_command(args: argparse.Namespace) -> int:
     """`fmlv generate-upload <run_id>`: build the upload CSV from a run's decisions.
 
@@ -902,6 +990,45 @@ def build_parser() -> argparse.ArgumentParser:
         help="run non-headless, for debugging against the real site",
     )
     fetch_export_parser.set_defaults(handler=_fetch_export_command)
+
+    empty_baseline_parser = subparsers.add_parser(
+        "empty-baseline",
+        help="write a header-only export for a brand FMLV holds no products for yet",
+    )
+    empty_baseline_parser.add_argument(
+        "manufacturer",
+        help="registry name, display name or manufacturer_id — e.g. 'Trigano', 'Atom', 278",
+    )
+    empty_baseline_parser.add_argument(
+        "--vehicle-class",
+        choices=[member.value for member in VehicleClass],
+        default=DEFAULT_VEHICLE_CLASS.value,
+        help=f"product area (default: {DEFAULT_VEHICLE_CLASS.value})",
+    )
+    empty_baseline_parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=paths.DATA_DIR,
+        help=f"root for exports (default: {paths.DATA_DIR})",
+    )
+    empty_baseline_parser.add_argument(
+        "--config-dir",
+        type=Path,
+        default=paths.CONFIG_DIR,
+        help=f"root for the manufacturer registry (default: {paths.CONFIG_DIR})",
+    )
+    empty_baseline_parser.add_argument(
+        "--registry",
+        type=Path,
+        default=None,
+        help="manufacturer registry CSV (default: <config-dir>/manufacturers.csv)",
+    )
+    empty_baseline_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="write one even though a real export already exists",
+    )
+    empty_baseline_parser.set_defaults(handler=_empty_baseline_command)
 
     generate_upload_parser = subparsers.add_parser(
         "generate-upload",
