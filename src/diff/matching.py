@@ -224,8 +224,15 @@ def token_similarity(
     `renames` is applied to **`left`**, which `match_products` always calls with the
     scraped product — a rename says what the site now calls a row FMLV still holds under
     the old name, so it is the scraped side that gets rewritten. Rewriting is for scoring
-    only: the product keeps its own name everywhere else, and nothing proposes a change to
-    FMLV's.
+    only; the product keeps its own name everywhere else.
+
+    **The better of the two scores wins, so a rename can only ever raise one.** That is
+    what makes an entry safe to leave in place across the correction it is waiting for:
+    while FMLV holds the old name the rewritten identity matches, and the moment FMLV is
+    corrected the product's own name matches instead. Scoring *only* the rewritten
+    identity meant an accepted correction orphaned the very product the rename existed to
+    protect — Wingamm's Brownie went from 1.000 to 0.200 the day its rename was accepted,
+    and `stale_renames` would only have said so alongside the broken run.
 
     Zero when both sides name a layout code and none of the codes agree. Word overlap
     alone is too generous here: `Low Profiles T65` and `Low Profiles T 66S` share their
@@ -234,10 +241,18 @@ def token_similarity(
     part of a product's name that is *meant* to be unique within its range, so two
     products whose codes disagree are two products, however alike the rest reads.
     """
-    left_tokens = _identity_tokens(*renames.applied_to(left.manufacturer_range, left.model))
     right_tokens = _identity_tokens(right.manufacturer_range, right.model)
-    if not left_tokens and not right_tokens:
-        return 0.0
+    identities = {
+        (left.manufacturer_range, left.model),
+        renames.applied_to(left.manufacturer_range, left.model),
+    }
+    return max(
+        _jaccard(_identity_tokens(*identity), right_tokens) for identity in identities
+    )
+
+
+def _jaccard(left_tokens: frozenset[str], right_tokens: frozenset[str]) -> float:
+    """The score for one pair of token bags, before any renaming."""
     union = left_tokens | right_tokens
     if not union:
         return 0.0

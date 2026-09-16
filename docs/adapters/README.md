@@ -1286,10 +1286,17 @@ Brownie is the worked example: `Coach Built low profile` scored 0.200 and orphan
 `Coach Built low profile` -> `Brownie`. Propose **both halves or neither** — accepting a
 range rename alone left Bailey's `Adamo XL` + `I` as `Adamo I`.
 
-**A rename is meant to stop being needed.** Once FMLV is corrected the entry is not merely
-useless but misleading, so `diff.stale_renames` narrates any entry that did nothing — either
-the site no longer publishes the name, or the baseline no longer holds the target. Nothing
-is deleted automatically; removing it is a code change.
+**Leave the entry in place until the correction shows up in a fresh export.** Both the
+product's own name and the rewritten one are scored and the better wins, so a rename can
+only ever *raise* a score: it matches while FMLV still holds the old name, and keeps
+matching the moment FMLV is corrected. That property is load-bearing rather than tidy —
+scoring only the rewritten identity meant accepting the Wingamm correction took the Brownie
+from 1.000 to 0.200 and orphaned the very product the rename existed to protect.
+
+**A rename is still meant to stop being needed.** Once the export shows the new name the
+entry is useless and misleading, so `diff.stale_renames` narrates any entry that did nothing
+— either the site no longer publishes the name, or the baseline no longer holds the target.
+Nothing is deleted automatically; removing it is a code change.
 
 **And `model` will not warn you.** `compare_fields` walks only fields that *have
 provenance*, while the in-scope missing-field check fires only where the adapter found

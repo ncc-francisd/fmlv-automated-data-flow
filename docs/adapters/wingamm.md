@@ -268,9 +268,12 @@ Run #99 confirms it: 8 scraped against 8 baseline, **0 new and 0 disappeared**, 
 rename among the proposals. `_IDENTITY_FIELDS` was never what suppressed it — that only
 keeps those columns out of the needs-a-choice prompt for a *new* product.
 
-**Delete the `RENAMED_RANGES` entry once the rename is accepted.** `diff.stale_renames`
-narrates it on every run afterwards, because an entry claiming FMLV calls this something it
-no longer does is worse than none.
+**Delete the `RENAMED_RANGES` entry once a fresh export shows the new name** — accepted in
+review on 16 September 2026, so it is waiting on the export rather than on the reviewer.
+Leaving it until then is safe: both identities are scored and the better wins, so the entry
+matches the old name and the corrected one alike. `diff.stale_renames` narrates it on every
+run once the baseline has moved, because an entry claiming FMLV calls this something it no
+longer does is worse than none.
 
 This is a different failure from Bailey's, which was about accepting *one* half of a
 proposed rename — hence both halves carrying provenance here. `README.md` notes that raising

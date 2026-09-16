@@ -208,13 +208,61 @@ def test_the_scraped_product_keeps_its_own_name() -> None:
 def test_the_baseline_side_is_never_rewritten() -> None:
     """A rename says what the *site* now calls a row, so only the scraped side moves.
 
-    Rewriting both would score 1.0 on a pair that does not agree, hiding a real mismatch.
+    Declared the wrong way round it must simply not fire. Rewriting the baseline too
+    would score this pair 1.0 and hide that the two names do not agree.
     """
-    renames = Renames(ranges={"Baron": "Fusion"})
+    backwards = Renames(ranges={"Fusion": "Baron"})
 
     assert token_similarity(
-        scraped("Baron", "530").motorhome, baseline("Baron", "530"), renames=renames
+        scraped("Baron", "530").motorhome, baseline("Fusion", "530"), renames=backwards
     ) < 1.0
+
+
+# --------------------------------------------------------------------------- #
+# A rename may only raise a score, so it survives the correction it waits for
+# --------------------------------------------------------------------------- #
+
+
+def test_a_rename_still_matches_once_fmlv_is_corrected() -> None:
+    """The trap this closes: an accepted correction orphaning the product it protected.
+
+    Wingamm's Brownie was declared as `Brownie` -> `Coach Built low profile` while FMLV
+    held the wrong range. The day the correction was accepted, scoring *only* the
+    rewritten identity took it from 1.000 to 0.200 — a new product beside a
+    disappearance, which is exactly what the rename existed to prevent. Both identities
+    are scored now and the better wins.
+    """
+    renames = Renames(ranges={"Brownie": "Coach Built low profile"})
+    corrected = scraped("Brownie", "Brownie")
+
+    before = baseline("Coach Built low profile", "Brownie", 5855)
+    after = baseline("Brownie", "Brownie", 5855)
+
+    assert token_similarity(corrected.motorhome, before, renames=renames) == 1.0
+    assert token_similarity(corrected.motorhome, after, renames=renames) == 1.0
+    assert match_products([corrected], [after], renames=renames)[0].baseline is after
+
+
+def test_a_rename_never_lowers_a_score_it_does_not_improve() -> None:
+    """A wrong or outdated entry cannot make matching worse than declaring none."""
+    renames = Renames(ranges={"Oasi": "Something Else Entirely"})
+    unrelated = baseline("Oasi", "610GL")
+
+    assert token_similarity(
+        scraped("Oasi", "610GL").motorhome, unrelated, renames=renames
+    ) == token_similarity(scraped("Oasi", "610GL").motorhome, unrelated)
+
+
+def test_a_moved_code_is_still_matched_both_ways_round() -> None:
+    """The same protection where the code moved rather than the range."""
+    renames = Renames(models={("Active", "FG635"): ("Active", "FG365")})
+
+    assert token_similarity(
+        scraped("Active", "FG635").motorhome, baseline("Active", "FG365"), renames=renames
+    ) == 1.0
+    assert token_similarity(
+        scraped("Active", "FG635").motorhome, baseline("Active", "FG635"), renames=renames
+    ) == 1.0
 
 
 # --------------------------------------------------------------------------- #

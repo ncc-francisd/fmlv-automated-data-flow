@@ -219,9 +219,11 @@ _DOCUMENTS: tuple[_Document, ...] = (
 #: FMLV holds, so the product matches at **1.000**, while the emitted name and its
 #: provenance propose `Coach Built low profile` -> `Brownie` through the ordinary review.
 #:
-#: **Delete this entry once the rename is accepted.** `diff.stale_renames` narrates it on
-#: every run after that, because an entry claiming FMLV calls this something it no longer
-#: does is worse than none.
+#: **Delete this entry once a fresh export shows `Brownie`.** The rename was accepted in
+#: review on 16 September 2026, so it is waiting on the export, not the reviewer. Leaving it
+#: until then is safe — `token_similarity` scores the product's own name as well as the
+#: rewritten one and takes the better, so this matches the old range and the corrected one
+#: alike. `diff.stale_renames` narrates it once the baseline has moved.
 RENAMED_RANGES: dict[str, str] = {"Brownie": "Coach Built low profile"}
 
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = tuple(
