@@ -119,8 +119,36 @@ def adapter_vehicle_class(adapter: Adapter) -> VehicleClass:
     return VehicleClass(getattr(adapter, "VEHICLE_CLASS", DEFAULT_VEHICLE_CLASS))
 
 
-ADAPTERS: dict[tuple[str, VehicleClass], Adapter] = {
-    (module.MANUFACTURER, adapter_vehicle_class(module)): module for module in _MODULES
+#: Every adapter, keyed by `(fmlv_manufacturer, fmlv_display_name, VehicleClass)`.
+#:
+#: **The display name is in the key because `fmlv_manufacturer` is not unique.** It names
+#: the legal manufacturer, and one manufacturer can own several brands, each of which FMLV
+#: files under its own id with its own display name:
+#:
+#: | id | `fmlv_manufacturer` | display name |
+#: |---|---|---|
+#: | 26 | `Swift Group Ltd` | Swift |
+#: | 228 | `Swift Group Ltd` | Bessacarr |
+#: | 264 | `Swift Group Ltd` | **Ace Motorhomes** |
+#: | 187 | `Trigano` | Silver |
+#: | 222 | `Trigano` | Mini Freestyle |
+#: | 278 | `Trigano` | **Atom** |
+#:
+#: Keyed on the manufacturer alone, a second brand's adapter would overwrite the first and
+#: one of them would become unreachable — `swift.py` and `ace.py` both declaring
+#: `Swift Group Ltd` for motorhomes. `registry.loader` cross-checks duplicate
+#: `manufacturer_id`s and `website_url`s, but not duplicate `fmlv_manufacturer`, so nothing
+#: else would have warned.
+#:
+#: The product area stays in the key for the reason it always was: one brand can need two
+#: adapters, one per area, as Bailey and Eriba do.
+ADAPTERS: dict[tuple[str, str, VehicleClass], Adapter] = {
+    (
+        module.MANUFACTURER,
+        module.MANUFACTURER_DISPLAY_NAME,
+        adapter_vehicle_class(module),
+    ): module
+    for module in _MODULES
 }
 
 __all__ = [
@@ -171,21 +199,43 @@ __all__ = [
 
 
 def adapter_for(
-    fmlv_manufacturer: str, vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLASS
+    fmlv_manufacturer: str,
+    vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLASS,
+    *,
+    display_name: str | None = None,
 ) -> Adapter | None:
     """The adapter for one manufacturer's product area, or `None` if nobody wrote one.
 
     Returning `None` rather than raising keeps "we have no adapter for this brand" a
     normal, reportable state — a sweep across the whole registry has to skip most
     manufacturers for exactly this reason until Phase 4's remaining adapters land. It is
-    now also the normal answer for "Bailey, but caravans" until that adapter exists, which
-    is why `vehicle_class` defaults rather than being required: every existing caller asks
-    the question it always asked, and gets the answer it always got.
+    also the normal answer for "Bailey, but caravans" until that adapter exists, which is
+    why `vehicle_class` defaults rather than being required.
+
+    **`display_name` is only needed where a manufacturer owns more than one brand**, which
+    is why it is optional and keyword-only: `Swift Group Ltd` is Swift, Bessacarr *and* Ace
+    Motorhomes, and `Trigano` is Silver, Mini Freestyle and Atom. Where one adapter answers
+    to the manufacturer it is returned without one, so every caller that never had a brand
+    to disambiguate keeps working. Where several do and none is named, the answer is `None`
+    rather than an arbitrary pick — silently running Swift's adapter for Ace would produce
+    a full set of plausible, wrong proposals against real `product_id`s.
     """
-    return ADAPTERS.get((fmlv_manufacturer, VehicleClass(vehicle_class)))
+    wanted = VehicleClass(vehicle_class)
+    candidates = {
+        registered_name: adapter
+        for (manufacturer, registered_name, registered_class), adapter in ADAPTERS.items()
+        if manufacturer == fmlv_manufacturer and registered_class == wanted
+    }
+    if display_name is not None and display_name in candidates:
+        return candidates[display_name]
+    if len(candidates) == 1:
+        return next(iter(candidates.values()))
+    return None
 
 
-def adapters_for(fmlv_manufacturer: str) -> dict[VehicleClass, Adapter]:
+def adapters_for(
+    fmlv_manufacturer: str, *, display_name: str | None = None
+) -> dict[VehicleClass, Adapter]:
     """Every product area this manufacturer has an adapter for.
 
     For the review app's trigger page, which has to offer "Bailey motorhomes" and "Bailey
@@ -194,6 +244,7 @@ def adapters_for(fmlv_manufacturer: str) -> dict[VehicleClass, Adapter]:
     """
     return {
         registered_class: adapter
-        for (manufacturer, registered_class), adapter in ADAPTERS.items()
+        for (manufacturer, registered_name, registered_class), adapter in ADAPTERS.items()
         if manufacturer == fmlv_manufacturer
+        and (display_name is None or registered_name == display_name)
     }

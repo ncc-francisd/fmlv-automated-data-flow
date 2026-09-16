@@ -59,6 +59,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+import openpyxl
+
 from . import paths, store
 from .adapters import Adapter, adapter_for
 from .diff import DEFAULT_THRESHOLD, Renames, diff_products, stale_renames
@@ -72,10 +74,7 @@ from .fetch.ncc import (
     download_export,
 )
 from .output import generate_upload
-import openpyxl
-
-from .product_model import caravan_io, io
-from .product_model import caravan_schema, schema
+from .product_model import caravan_io, caravan_schema, io, schema
 from .product_model.model import Motorhome
 from .product_model.product import Product
 from .registry import Manufacturer, loader
@@ -633,7 +632,11 @@ def _run_command(args: argparse.Namespace) -> int:
     manufacturer = find_manufacturer(registry.manufacturers, args.manufacturer)
 
     vehicle_class = VehicleClass(args.vehicle_class)
-    adapter = adapter_for(manufacturer.fmlv_manufacturer, vehicle_class)
+    adapter = adapter_for(
+        manufacturer.fmlv_manufacturer,
+        vehicle_class,
+        display_name=manufacturer.fmlv_display_name,
+    )
     if adapter is None:
         from .adapters import ADAPTERS, adapters_for
 

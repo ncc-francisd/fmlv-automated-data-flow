@@ -86,8 +86,10 @@ def test_this_adapter_is_registered_for_caravans_and_the_other_for_motorhomes() 
         VehicleClass.CARAVAN: eriba_caravan,
         VehicleClass.MOTORHOME: eriba,
     }
-    assert ADAPTERS[("Eriba", VehicleClass.CARAVAN)] is eriba_caravan
+    assert ADAPTERS[("Eriba", "Eriba", VehicleClass.CARAVAN)] is eriba_caravan
     assert eriba.MANUFACTURER == eriba_caravan.MANUFACTURER
+    # The pair share a display name too, so only the product area separates them.
+    assert eriba.MANUFACTURER_DISPLAY_NAME == eriba_caravan.MANUFACTURER_DISPLAY_NAME
 
 
 def test_the_range_labels_are_the_fmlv_range_names() -> None:

@@ -93,7 +93,7 @@ def test_the_two_swift_adapters_coexist() -> None:
 def test_the_caravan_adapter_declares_its_product_area() -> None:
     """Omitting `VEHICLE_CLASS` would register this module over `swift.py`'s key."""
     assert swift_caravan.VEHICLE_CLASS is VehicleClass.CARAVAN
-    assert ADAPTERS[("Swift Group Ltd", VehicleClass.CARAVAN)] is swift_caravan
+    assert ADAPTERS[("Swift Group Ltd", "Swift", VehicleClass.CARAVAN)] is swift_caravan
 
 
 def test_it_shares_the_manufacturer_string_with_the_motorhome_adapter() -> None:

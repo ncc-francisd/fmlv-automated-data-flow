@@ -89,8 +89,9 @@ def test_module_is_registered_in_adapters(name: str) -> None:
     # Edit 2 of 3: the `_MODULES` entry. This is the one that actually breaks running.
     module = getattr(adapters, name)
     manufacturer = module.MANUFACTURER
+    display_name = module.MANUFACTURER_DISPLAY_NAME
     vehicle_class = adapters.adapter_vehicle_class(module)
-    assert adapters.ADAPTERS.get((manufacturer, vehicle_class)) is module, (
+    assert adapters.ADAPTERS.get((manufacturer, display_name, vehicle_class)) is module, (
         f"adapter_for({manufacturer!r}, {vehicle_class.value!r}) does not return "
         f"src/adapters/{name}.py — add `{name},` to _MODULES in src/adapters/__init__.py"
     )
@@ -117,10 +118,13 @@ def test_module_declares_a_usable_vehicle_class(name: str) -> None:
 def test_one_manufacturer_can_hold_an_adapter_per_product_area() -> None:
     """Eight registered manufacturers build both motorhomes and touring caravans.
 
-    The key is a `(manufacturer, class)` pair so Bailey's two adapters can coexist; before
-    that the second one registered would have silently replaced the first.
+    The key is `(manufacturer, display name, class)`. The class is there so Bailey's two
+    adapters can coexist; the **display name** is there because `fmlv_manufacturer` names
+    the legal manufacturer and one of those can own several brands — `Swift Group Ltd` is
+    Swift, Bessacarr and Ace Motorhomes, and `Trigano` is Silver, Mini Freestyle and Atom.
+    Without it the second brand's adapter would silently replace the first.
     """
-    registered = {manufacturer for manufacturer, _ in adapters.ADAPTERS}
+    registered = {manufacturer for manufacturer, _display, _class in adapters.ADAPTERS}
     assert len(adapters.ADAPTERS) == len(adapters._MODULES)
     assert len(registered) <= len(adapters.ADAPTERS)
 
@@ -186,6 +190,47 @@ def test_manufacturer_matches_a_registry_row(name: str) -> None:
         f"{name}.MANUFACTURER = {module.MANUFACTURER!r} matches no fmlv_manufacturer in "
         f"config/manufacturers.csv. Known: {sorted(known)}"
     )
+
+
+@pytest.mark.parametrize("name", ADAPTER_NAMES)
+def test_display_name_matches_the_same_registry_row(name: str) -> None:
+    """`MANUFACTURER_DISPLAY_NAME` must match the **same** row's `fmlv_display_name`.
+
+    It is half of the `ADAPTERS` key, so a mismatch does what a wrong `MANUFACTURER` does:
+    `adapter_for` cannot find the adapter for the row the user asked to run. That only
+    bites where a manufacturer owns more than one brand — `adapter_for` falls back to the
+    sole candidate otherwise — which makes it exactly the kind of fault that lies dormant
+    until `Swift Group Ltd` gains its second adapter and then breaks the first.
+    """
+    module = getattr(adapters, name)
+    rows = {
+        (manufacturer.fmlv_manufacturer, manufacturer.fmlv_display_name)
+        for manufacturer in registry.load(paths.registry_path()).manufacturers
+    }
+    pair = (module.MANUFACTURER, module.MANUFACTURER_DISPLAY_NAME)
+    assert pair in rows, (
+        f"{name} declares {pair!r}, which is no (fmlv_manufacturer, fmlv_display_name) "
+        f"pair in config/manufacturers.csv"
+    )
+
+
+@pytest.mark.parametrize("name", ADAPTER_NAMES)
+def test_each_adapter_is_reachable_by_its_own_registry_row(name: str) -> None:
+    """End to end: the row a user resolves must lead back to this adapter, not another.
+
+    The check the key exists for. Two adapters sharing a `fmlv_manufacturer` and a product
+    area would previously collide in `ADAPTERS`, and whichever registered last would answer
+    for both — a full set of plausible, wrong proposals against the other brand's real
+    `product_id`s.
+    """
+    module = getattr(adapters, name)
+    found = adapters.adapter_for(
+        module.MANUFACTURER,
+        adapters.adapter_vehicle_class(module),
+        display_name=module.MANUFACTURER_DISPLAY_NAME,
+    )
+
+    assert found is module
 
 
 @pytest.mark.parametrize("name", ADAPTER_NAMES)

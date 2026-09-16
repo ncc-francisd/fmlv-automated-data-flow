@@ -43,11 +43,18 @@ def parsed(name: str) -> bailey_caravan.BaileyCaravan:
 
 
 def test_the_two_bailey_adapters_coexist() -> None:
-    """The whole point of keying `ADAPTERS` on `(manufacturer, class)`."""
+    """Why the product area is in the `ADAPTERS` key.
+
+    Bailey is one brand building two product areas, so the two modules share both a
+    `MANUFACTURER` and a `MANUFACTURER_DISPLAY_NAME` and only the area separates them —
+    the opposite of Swift and Ace Motorhomes, which share a manufacturer and are separated
+    by the display name.
+    """
     assert adapter_for("Bailey", VehicleClass.CARAVAN) is bailey_caravan
     assert adapter_for("Bailey", VehicleClass.MOTORHOME) is bailey
     assert adapter_for("Bailey") is bailey  # the default is still motorhomes
-    assert ADAPTERS[("Bailey", VehicleClass.CARAVAN)] is bailey_caravan
+    assert bailey.MANUFACTURER_DISPLAY_NAME == bailey_caravan.MANUFACTURER_DISPLAY_NAME
+    assert ADAPTERS[("Bailey", "Bailey", VehicleClass.CARAVAN)] is bailey_caravan
 
 
 def test_the_adapter_declares_itself_a_caravan_adapter() -> None:

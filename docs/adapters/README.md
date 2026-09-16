@@ -1200,6 +1200,36 @@ overview cards against six collected families is what exposed the gap. **An abse
 explain is a gap in the search, not a fact about the manufacturer** — do not write it up as a
 discontinued range until a second source agrees.
 
+### One manufacturer, several brands
+
+**`fmlv_manufacturer` is not unique**, and neither is it meant to be: it names the *legal*
+manufacturer, and one of those can own several brands, each with its own FMLV id and its own
+display name.
+
+| id | `fmlv_manufacturer` | display name |
+|---|---|---|
+| 26 | `Swift Group Ltd` | Swift |
+| 228 | `Swift Group Ltd` | Bessacarr |
+| 264 | `Swift Group Ltd` | Ace Motorhomes |
+| 187 | `Trigano` | Silver |
+| 222 | `Trigano` | Mini Freestyle |
+| 278 | `Trigano` | Atom |
+
+So **`ADAPTERS` is keyed on `(manufacturer, display name, product area)`**, and an adapter
+declares both `MANUFACTURER` and `MANUFACTURER_DISPLAY_NAME` to claim its row. Keyed on the
+manufacturer alone, the second brand's adapter would replace the first and one of them
+would answer for both — a full set of plausible, wrong proposals written against the other
+brand's real `product_id`s. `registry.loader` cross-checks duplicate `manufacturer_id`s and
+`website_url`s but not duplicate `fmlv_manufacturer`, so nothing else warns.
+
+`adapter_for` takes the display name as an optional keyword: where one adapter answers to a
+manufacturer it is returned without one, and where several do and none is named the answer
+is `None` rather than an arbitrary pick.
+
+**The baseline filter is unaffected** and still matches on `manufacturer` alone. It can be,
+because an export is downloaded per *supplier* — each brand's file holds only its own
+products, so the filter is a belt-and-braces check rather than the thing separating them.
+
 ### A brand new to FMLV needs three things created, not two
 
 Almost every manufacturer already exists in FMLV with products and an export. **A genuinely

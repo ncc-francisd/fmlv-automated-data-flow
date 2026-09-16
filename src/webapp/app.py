@@ -230,7 +230,11 @@ def check_schedule(app: FastAPI) -> list[scheduling.ScheduleEntry]:
             manufacturer = by_id.get(entry.manufacturer_id)
             if manufacturer is None:
                 continue
-            adapter = adapter_for(manufacturer.fmlv_manufacturer, entry.vehicle_class)
+            adapter = adapter_for(
+                manufacturer.fmlv_manufacturer,
+                entry.vehicle_class,
+                display_name=manufacturer.fmlv_display_name,
+            )
             if adapter is None:
                 continue
 
@@ -506,7 +510,11 @@ def create_app(
                 else f"manufacturer_id {entry.manufacturer_id}"
             )
             adapter = (
-                adapter_for(manufacturer.fmlv_manufacturer, entry.vehicle_class)
+                adapter_for(
+                    manufacturer.fmlv_manufacturer,
+                    entry.vehicle_class,
+                    display_name=manufacturer.fmlv_display_name,
+                )
                 if manufacturer
                 else None
             )
@@ -606,7 +614,11 @@ def create_app(
 
         try:
             manufacturer = find_manufacturer(manufacturers, manufacturer_name)
-            adapter = adapter_for(manufacturer.fmlv_manufacturer, selected_class)
+            adapter = adapter_for(
+                manufacturer.fmlv_manufacturer,
+                selected_class,
+                display_name=manufacturer.fmlv_display_name,
+            )
             if adapter is None:
                 # Reachable, unlike the old motorhome-only check: `_load_registry` keeps a
                 # manufacturer with an adapter in *any* area, so asking for the area it
