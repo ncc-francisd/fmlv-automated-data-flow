@@ -65,6 +65,11 @@ showed "Pilote Pilote Van V630S". So the split is:
 | `Element` | `B` | Atom Element B |
 | `Element` | `G` | Atom Element G |
 
+The press pack confirms the split outright — *"2 model ranges — CORE and ELEMENT (each
+having the 2 different layouts)"*, with **CORE the standard specification and ELEMENT the
+enhanced one** (page 7). The letters are the layout: *"2 different layouts — rear bench seat
+models and rear garage models"*, so **B is bench and G is garage**.
+
 The configurator calls them `Core 600B` and `Element 600G`, and the body copy `The Core
 600 B` — the `600` being the 5.986 m length. **That naming is deliberately not used**, on the
 requester's ruling above.
@@ -112,7 +117,9 @@ to look like a parse error:
 
 * the comparison table's `Seatbelts 2`;
 * `/faq`: *"Both models also have two designated travelling seats"*;
-* `/why-buy-an-atom`: *"Two travelling seats"*.
+* `/why-buy-an-atom`: *"Two travelling seats"*;
+* the press pack, page 7, from the other direction: *"Within the next year, we will also
+  introduce 4 seat belt 4 berth models"* — which only makes sense if today's are two.
 
 These are the cab seats. Nothing suggests a lap belt anywhere, so the settled rule to count
 three-point belts only is satisfied.
@@ -140,21 +147,37 @@ file all four as plain campervans rather than high tops.
 
 So the comparison table is the source for height, and a model page that disagrees is noise.
 
-## Prices are unsettled, and the site gives three answers
+## Prices: the press pack settles them, and explains the site
 
-| source | Core B |
-| --- | --- |
-| `/atom-config`, headline | £60,210 |
-| `/atom-config`, "Winter Sale Price" | £62,155 |
-| `/why-buy-an-atom` | "Core models start from £61,940" |
+**`ATOM - Press Presentation - Sept. 2026`, page 14**, supplied by the requester on
+16 September 2026, carries the official table. The **on-the-road price is the one recorded**,
+per the settled rule that FMLV holds the manufacturer's headline OTR figure:
 
-The "sale" price being **higher** than the headline is the clearest sign these are not
-settled. The requester, 16 September 2026: *"I think that's just a very temporary price"* —
-an official price list is to follow, and is what the adapter should use.
+| | ex works (incl. VAT) | **on the road** |
+| --- | --- | --- |
+| Core 600B | £62,155 | **£62,600** |
+| Core 600G | £61,495 | **£61,940** |
+| Element 600B | £68,480 | **£68,925** |
+| Element 600G | £67,815 | **£68,260** |
 
-Recorded here so the disagreement is not rediscovered: the configurator's other figures are
-`Core 600G £59,550`, `Element 600B £66,535`, `Element 600G £65,870`, each with a higher
-"Winter Sale Price".
+That resolves all three figures the website gives:
+
+* the configurator's **"Winter Sale Price"** is the **ex works** price — £62,155 for the
+  Core 600B, exactly the pack's column. It is mislabelled on the site, which is why it
+  appears *above* the headline rather than below it;
+* the configurator's headline (£60,210 and friends) is the **launch promotion**. Page 6:
+  *"we are aiming to have a launch promotion to enable customers to have an effective
+  starting price of £59,950 OTR"*;
+* `/why-buy-an-atom`'s *"Core models start from £61,940"* is the **Core 600G's OTR price**,
+  and agrees with the pack exactly.
+
+**So the site alone would have given the wrong figure**, and no reading of it would have
+revealed which of the three was the price. Whether the adapter can take OTR from the site at
+all is unresolved — the configurator publishes the ex works and promotional figures, not the
+OTR one. See "What is still needed".
+
+**The B costs more than the G**, in both ranges, which is worth stating because it looks
+inverted: £62,600 against £61,940, and £68,925 against £68,260.
 
 ## The self-check is weak, and that is worth stating plainly
 
@@ -173,6 +196,31 @@ What is available instead:
 
 The height is the one field where those sources **disagree**, and it is settled above.
 
+## The pack and the site disagree on the water tanks
+
+| | press pack, page 12 | `/models` comparison table |
+| --- | --- | --- |
+| Fresh | 60 ltr | 80 l |
+| Waste | 80 ltr | 60 l |
+
+**Swapped, not merely different.** Neither is a field FMLV records, so nothing turns on it —
+but it is a second place where the site and the pack disagree, after the height, and it says
+something about how settled either source is. Worth re-checking if a water capacity is ever
+added to the schema.
+
+## Sold online only, which bears on the supplier name
+
+> *"ATOM models will only be sold Online direct to end customers. They will not be a stocked
+> product at a network of dealers."* — press pack, page 15
+
+There is no importer or dealer network to name, unlike every Marquis brand. Warranty and
+service run through the ATOM sales HQ at Melton *"but will utilise Auto-Trail factory
+applications"* (page 16), and the leadership on the introductions slide is Auto-Trail's —
+Shane Devoy (MD), Scott Stephens (Commercial Director), Paul Gorry (Head of Marketing).
+
+So the `ncc_supplier_name` has no obvious external candidate: it is Atom, or Auto-Trail, and
+that is the NCC's to decide.
+
 ## What is still needed before this can be built
 
 1. **The NCC `manufacturer_id`.** Atom is absent from `resources/manufacturers-full-list.csv`.
@@ -182,7 +230,14 @@ The height is the one field where those sources **disagree**, and it is settled 
    `Ltd` against `Ltd.` means the run finds an empty baseline and proposes every product as
    new.
 3. **The `ncc_supplier_name`**, from the supplier drop-down on the NCC export page.
-4. **The official price list**, which the requester is sending.
+4. ~~The official price list~~ — **supplied 16 September 2026** and recorded above.
+
+   One question it raises: **can the adapter read the OTR price from the site at all?** The
+   configurator publishes the ex works and promotional figures, not the on-the-road one, and
+   the OTR column exists only in the pack. The pack says *"a complete price brochure will be
+   available to download from the ATOM Motorhomes website"* — if that appears, it is the
+   price source; if not, the OTR prices have to be carried in the adapter and re-checked by
+   hand, which is the arrangement `murvi.py` and `le_voyageur.py` already use.
 
 ## Still unverified
 
@@ -194,3 +249,8 @@ The height is the one field where those sources **disagree**, and it is settled 
   an expedition layout, but the comparison table lists identical equipment for all four.
 * **Whether the site settles.** The contact page carries placeholder addresses
   (`new.email1@example.com`, `tel:+4401111111111`), so it is newly launched and still moving.
+* **The 4-belt, 4-berth models** the pack promises *"within the next year"* (page 7), and the
+  6.8 m wheelbase it says may follow the 6 m one (page 6). The roster is four today and the
+  count is pinned, so both will surface as a roster warning rather than silently.
+* **Whether a price brochure appears on the site**, which would settle the OTR question
+  above.
