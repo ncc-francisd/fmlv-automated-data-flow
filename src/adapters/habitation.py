@@ -667,7 +667,29 @@ LAYOUT_QUALIFIER = re.compile(
 )
 
 
-def lines_for_layout(lines: Iterable[str], model: str) -> list[str]:
+#: A parenthetical naming layouts by letter, for manufacturers whose codes are not numbers.
+#:
+#: Only recognised against a vocabulary the adapter supplies — see `lines_for_layout`. Every
+#: token inside must be one of that manufacturer's codes, so `(DB, ET & SL)` qualifies and
+#: `(LED)`, `(5G ready)` and `(Fusion Edition Pack)` do not.
+_LETTER_QUALIFIER = re.compile(r"\(\s*(?P<qualifier>[A-Za-z][A-Za-z,&/\s]*)\)")
+
+
+def _named_codes(line: str, vocabulary: set[str]) -> set[str] | None:
+    """The layout codes a line is restricted to, or `None` if it names none."""
+    if not vocabulary:
+        return None
+    for match in _LETTER_QUALIFIER.finditer(line):
+        tokens = [token for token in re.split(r"[,&/\s]+", match.group("qualifier")) if token]
+        folded = {token.casefold() for token in tokens}
+        if folded and folded <= vocabulary:
+            return folded
+    return None
+
+
+def lines_for_layout(
+    lines: Iterable[str], model: str, *, codes: Iterable[str] = ()
+) -> list[str]:
     """The equipment lines that apply to one layout, by the list's own parentheses.
 
     **Not every line in a range's equipment list applies to every layout in it**, and on
@@ -685,18 +707,28 @@ def lines_for_layout(lines: Iterable[str], model: str) -> list[str]:
     Benimar qualifies the same way with `(excl 286)` and `(286)` on its two fridge sizes,
     where both happen to be fridge-freezers and the fault would have gone unnoticed.
 
+    **`codes` is for a manufacturer whose layouts are letters rather than numbers.** Ace
+    write `Separate shower cubicle (DB, ET & SL)`, which no pattern can tell from an
+    ordinary parenthetical — `(LED)` and `(5G ready)` look the same shape. So the adapter
+    declares its own layout vocabulary and a parenthetical qualifies only when **every**
+    token in it is one of those codes. Nothing is guessed from letters alone.
+
     A line with no qualifier applies to everything, which is nearly all of them.
     """
+    vocabulary = {code.casefold() for code in codes}
     kept: list[str] = []
     for line in lines:
         match = LAYOUT_QUALIFIER.search(line)
         if match is None:
+            named = _named_codes(line, vocabulary)
+            if named is None or model.casefold() in named:
+                kept.append(line)
+            continue
+        found = re.findall(r"\d{2,4}", match.group("qualifier"))
+        if not found:
             kept.append(line)
             continue
-        codes = re.findall(r"\d{2,4}", match.group("qualifier"))
-        if not codes:
-            kept.append(line)
-            continue
+        codes = found
         excluded = bool(re.search(r"\bexc", match.group("qualifier"), re.I))
         if (model not in codes) if excluded else (model in codes):
             kept.append(line)

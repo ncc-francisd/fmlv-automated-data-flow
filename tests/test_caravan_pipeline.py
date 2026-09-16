@@ -493,7 +493,9 @@ def test_the_run_command_asks_for_the_baseline_of_the_area_it_is_sweeping(
 
     # `_run_command` catches an adapter-side failure and reports it as exit 1.
     exit_code = cli.main(
-        ["run", "Swift Group Ltd", "--class", "caravan", "--data-dir", str(tmp_path)]
+        # `Swift` the brand, not `Swift Group Ltd` the manufacturer: the latter now names
+        # Ace Motorhomes too and resolves to no single row.
+        ["run", "Swift", "--class", "caravan", "--data-dir", str(tmp_path)]
     )
 
     assert exit_code == 1

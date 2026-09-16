@@ -215,10 +215,35 @@ def test_unknown_manufacturer_lists_the_known_ones() -> None:
         find_manufacturer([make_manufacturer()], "Hymer")
 
 
-def test_ambiguous_manufacturer_asks_for_the_id() -> None:
-    manufacturers = [make_manufacturer(), make_manufacturer(manufacturer_id=99)]
-    with pytest.raises(CommandError, match="manufacturer_id"):
-        find_manufacturer(manufacturers, "Adria")
+def test_ambiguous_manufacturer_offers_the_brands_and_their_ids() -> None:
+    """One manufacturer, several brands — `Swift Group Ltd` is Swift and Ace Motorhomes.
+
+    The message must name what tells them *apart*. Listing `fmlv_manufacturer` printed the
+    same string once per row, which is the column they collide on.
+    """
+    manufacturers = [
+        make_manufacturer(manufacturer_id=26, fmlv_display_name="Swift"),
+        make_manufacturer(manufacturer_id=264, fmlv_display_name="Ace Motorhomes"),
+    ]
+
+    with pytest.raises(CommandError) as excinfo:
+        find_manufacturer(manufacturers, "Adria Mobil")
+
+    message = str(excinfo.value)
+    assert "26 (Swift)" in message
+    assert "264 (Ace Motorhomes)" in message
+
+
+def test_a_brand_name_resolves_where_the_manufacturer_is_ambiguous() -> None:
+    """So nothing anyone would actually type is broken by the collision."""
+    manufacturers = [
+        make_manufacturer(manufacturer_id=26, fmlv_display_name="Swift"),
+        make_manufacturer(manufacturer_id=264, fmlv_display_name="Ace Motorhomes"),
+    ]
+
+    assert find_manufacturer(manufacturers, "Ace Motorhomes").manufacturer_id == 264
+    assert find_manufacturer(manufacturers, "Swift").manufacturer_id == 26
+    assert find_manufacturer(manufacturers, "264").manufacturer_id == 264
 
 
 def test_latest_export_picks_the_most_recently_modified(data_root: Path) -> None:

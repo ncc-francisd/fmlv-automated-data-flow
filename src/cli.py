@@ -125,9 +125,16 @@ def find_manufacturer(manufacturers: Sequence[Manufacturer], needle: str) -> Man
         )
         msg = f"no manufacturer matching {needle!r} in the registry. Known: {known or '(none)'}"
         raise CommandError(msg)
+    # Naming `fmlv_manufacturer` here would print the same string once per row and help
+    # nobody: the rows that collide are collided *on* that column. `Swift Group Ltd` is
+    # Swift, Bessacarr and Ace Motorhomes, so what tells them apart is the brand and the id.
+    choices = ", ".join(
+        f"{m.manufacturer_id} ({m.fmlv_display_name or m.fmlv_manufacturer})"
+        for m in matches
+    )
     msg = (
-        f"{needle!r} matches {len(matches)} registry rows "
-        f"({', '.join(m.fmlv_manufacturer for m in matches)}) — use the manufacturer_id"
+        f"{needle!r} matches {len(matches)} registry rows — one manufacturer, several "
+        f"brands. Use the brand name or the id: {choices}"
     )
     raise CommandError(msg)
 

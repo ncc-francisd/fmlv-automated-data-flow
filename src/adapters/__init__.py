@@ -26,6 +26,7 @@ same `getattr` opt-in `DEFAULT_RANGES` and `baseline_in_scope` use.
 from __future__ import annotations
 
 from . import (
+    ace,
     adria,
     atom,
     auto_sleepers,
@@ -71,6 +72,7 @@ from .base import Adapter, ExtractedMotorhome, Provenance
 #: this rather than spelled out as a dict literal, so registering one is a single edit
 #: and the (manufacturer, class) key can never drift from what the module declares.
 _MODULES: tuple[Adapter, ...] = (
+    ace,
     adria,
     atom,
     auto_sleepers,
@@ -159,6 +161,7 @@ __all__ = [
     "adapter_for",
     "adapter_vehicle_class",
     "adapters_for",
+    "ace",
     "adria",
     "atom",
     "auto_sleepers",
