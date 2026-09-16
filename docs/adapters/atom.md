@@ -7,7 +7,7 @@ campervans on a VW Crafter.
 **Built 16 September 2026.** Run #102: four collected, four correctly new, 44 proposals and
 10 habitation findings against an empty baseline.
 
-`manufacturer_id` **9001 is provisional and not an NCC key** — see "The id" below.
+FMLV manufacturer id **278**, allocated by the NCC on 16 September 2026.
 
 ## Whose brand is it
 
@@ -224,28 +224,35 @@ Shane Devoy (MD), Scott Stephens (Commercial Director), Paul Gorry (Head of Mark
 So the `ncc_supplier_name` has no obvious external candidate: it is Atom, or Auto-Trail, and
 that is the NCC's to decide.
 
-## The id, which is the one provisional thing
+## The id, and a name that is not unique
 
-Atom is absent from `resources/manufacturers-full-list.csv`, whose ids stop at 275, so
-**9001 was chosen far outside that range and cannot collide**. The usual rule is never to
-invent an id, because a wrong one detaches a run from its product history — and Atom has no
-history, so the harm the rule guards against does not yet exist.
+**278**, allocated on 16 September 2026. The build ran on a provisional 9001 before that,
+chosen outside the NCC range because Atom was absent from
+`resources/manufacturers-full-list.csv` altogether; the registry row, `data/exports/`,
+`data/snapshots/` and the three existing runs were all repointed when the real id arrived.
 
-It names three things, and all three need renaming when the NCC allocate the real id:
+**`Trigano` is not a unique `fmlv_manufacturer`, and that is worth knowing before anyone
+adds another Trigano brand.** The NCC list already holds:
 
-* the registry row in `config/manufacturers.csv`;
-* `data/exports/9001_Trigano/`;
-* `data/snapshots/9001/`.
+| id | name | display name |
+| --- | --- | --- |
+| 187 | `Trigano` | Silver |
+| 222 | `Trigano` | Mini Freestyle |
+| 278 | `Trigano` | **Atom** |
 
-The requester is creating the manufacturer so a real number can replace this before the
-first upload.
+Which confirms the naming — the Swift/Ace pattern is Trigano's own house style too — but
+`adapters.ADAPTERS` is keyed on `(manufacturer, vehicle_class)`, so **a second Trigano
+motorhome adapter would silently overwrite this one**. `registry.loader` cross-checks
+duplicate `manufacturer_id`s and duplicate `website_url`s but not duplicate
+`fmlv_manufacturer`, so nothing would warn. Left alone because no such adapter exists; it
+needs solving the day Silver or Mini Freestyle is added.
 
 ## An empty baseline, which no adapter has faced before
 
 `cli.latest_export` **raises** when a manufacturer has no export rather than assuming an
 empty baseline, and rightly — that guard is what stops a forgotten download turning every
 product into a duplicate. So a header-only export is kept at
-`data/exports/9001_Trigano/2026-09-16_Trigano_motorhome-campervans.xlsx`, written from
+`data/exports/278_Trigano/2026-09-16_Trigano_motorhome-campervans.xlsx`, written from
 `schema.COLUMNS`. It parses to zero products with no issues.
 
 The pipeline then says the right thing on its own:

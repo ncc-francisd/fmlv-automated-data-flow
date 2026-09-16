@@ -352,3 +352,50 @@ def test_the_height_provenance_explains_which_source_won() -> None:
 
 def test_the_adapter_is_registered_under_its_fmlv_name() -> None:
     assert adapter_for("Trigano") is atom
+
+
+# --------------------------------------------------------------------------- #
+# The spec rows, which are the real cross-check
+# --------------------------------------------------------------------------- #
+
+
+def test_the_spec_rows_are_recovered_as_label_and_value() -> None:
+    """Atom render these as divs, which is why `habitation.list_items` found nothing."""
+    rows = atom.spec_rows(_page("atom_core_b.html"))
+
+    assert rows["Heating & Hot Water"] == "Truma Combi Neo 4E"
+    assert rows["70ltr compressor fridge"] == "Included"
+    assert rows["Width (excl. door mirrors)"] == "2040mm"
+
+
+def test_a_model_page_agrees_with_the_comparison_table() -> None:
+    """Two independently rendered sources for the same three figures."""
+    rows = atom.spec_rows(_page("atom_core_b.html"))
+
+    assert atom.cross_check(_by_label()["Core B"], rows) == []
+
+
+def test_a_model_page_that_disagrees_is_reported() -> None:
+    """The fault this catches: the table and the page drifting apart under the parse."""
+    rows = {**atom.spec_rows(_page("atom_core_b.html")), "Length": "6200mm"}
+
+    notes = atom.cross_check(_by_label()["Core B"], rows)
+
+    assert len(notes) == 1
+    assert "5986mm for mh_length_mm" in notes[0]
+    assert "6200mm" in notes[0]
+
+
+def test_the_height_is_never_cross_checked() -> None:
+    """It disagrees by design — 2170mm on the Core pages against the table's 2710mm.
+
+    Checking it would warn on every run about something already settled.
+    """
+    assert "mh_height_mm" not in atom.CROSS_CHECKED
+    assert atom.spec_rows(_page("atom_core_b.html"))["Height"] == "2170mm"
+    assert atom.cross_check(_by_label()["Core B"], atom.spec_rows(_page("atom_core_b.html"))) == []
+
+
+def test_a_missing_row_is_not_a_disagreement() -> None:
+    """The Element pages publish no height, and an absent row contradicts nothing."""
+    assert atom.cross_check(_by_label()["Core B"], {}) == []

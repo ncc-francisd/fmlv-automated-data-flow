@@ -3,9 +3,9 @@
 `docs/adapters/atom.md` is the survey; this is what it decided.
 
 **Every other adapter diffs against an FMLV export with rows in it.** Atom launched in
-September 2026 and FMLV has none, so the baseline is empty, all four products are correctly
-new, and `MANUFACTURER_ID` is provisional until the requester creates the manufacturer at
-his first upload — see `config/manufacturers.csv`.
+September 2026 and FMLV had none, so the baseline is empty and all four products are
+correctly new until the first upload — see `config/manufacturers.csv`, which also records
+that `Trigano` is not a unique manufacturer name.
 
 The brand is Trigano's and the factory is Auto-Trail's, which is why the naming follows the
 NCC's own `264, Swift Group Ltd, Ace Motorhomes` row: the legal manufacturer is the name and
@@ -194,6 +194,46 @@ _HEIGHT_FROM_THE_TABLE = (
 )
 
 
+#: The model-page rows that must agree with the comparison table, as `field -> (row, unit)`.
+#:
+#: This is the real self-check, and it was not there until the requester pointed at the
+#: `Living Space` and `Technical Data` panels on 16 September 2026: two independently
+#: rendered sources for the same three figures, one per layout against one for all four.
+#:
+#: **Height is deliberately absent.** The two Core pages print 2170 mm against the table's
+#: 2710 mm and the two Element pages print none at all, so checking it would warn every run
+#: about a disagreement already settled. See `_HEIGHT_FROM_THE_TABLE`.
+CROSS_CHECKED: dict[str, tuple[str, str]] = {
+    "mh_length_mm": ("Length", "mm"),
+    "mh_width_mm": ("Width (excl. door mirrors)", "mm"),
+    "mtplm_kilograms": ("Max. authorised weight", "kg"),
+}
+
+
+def cross_check(product: AtomProduct, rows: dict[str, str]) -> list[str]:
+    """Where a layout's own page disagrees with the comparison table it came from.
+
+    Returns one sentence per disagreement, for `on_progress`. A model page that is simply
+    missing the row says nothing — the Element pages omit their height, and an absent row
+    is not a contradiction.
+    """
+    notes: list[str] = []
+    for field, (label, unit) in CROSS_CHECKED.items():
+        published = rows.get(label)
+        if published is None:
+            continue
+        figure = re.match(rf"\s*(\d+)\s*{unit}", published)
+        if figure is None:
+            continue
+        table = getattr(product, field)
+        if table is not None and int(figure.group(1)) != table:
+            notes.append(
+                f"the comparison table gives {table}{unit} for {field} and its own page "
+                f"gives {figure.group(1)}{unit}. The table is taken; check which is right"
+            )
+    return notes
+
+
 @dataclass(frozen=True)
 class AtomProduct:
     """One layout, from the comparison table plus the configurator."""
@@ -276,7 +316,11 @@ def _reconciles(product: AtomProduct) -> tuple[bool, str]:
     check on it, and the identity `payload == MTPLM - MRO` is true by construction. That is
     the same weak position `mobilvetta.py` records, and it is stated rather than glossed.
 
-    What is checkable:
+    The real check is not arithmetic but corroboration, and it lives in `cross_check`: each
+    layout's own page renders `Length`, `Width (excl. door mirrors)` and `Max. authorised
+    weight` independently of the comparison table, so the two must agree.
+
+    What is checkable here:
 
     * **the payload must be positive and sane.** A mass in running order read from the wrong
       layout, or a GVM read as a running order, shows up here immediately;
@@ -423,23 +467,56 @@ def _build_extracted_motorhome(product: AtomProduct) -> ExtractedMotorhome:
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
-#: One sentence of a model page's prose.
+#: One row of a model page's `Engine & Performance`, `Living Space` or `Technical Data` panel.
 #:
 #: **Atom render their specification as divs, not lists**, so `habitation.list_items` finds
 #: only the twelve navigation entries and no equipment at all — which is how the first run
-#: produced zero findings. The facts are in the prose instead: *"There's also a 70ltr
-#: compressor fridge with integrated freezer included"*, *"Truma heating and hot water all as
-#: standard"*. So the page is split into sentences and `habitation` reads those.
+#: produced zero findings. The rows are properly structured underneath, though:
+#:
+#: ```html
+#: <div class="spec-row"><span class="spec-row-l">Heating &amp; Hot Water</span>
+#:                       <span class="spec-row-v ">Truma Combi Neo 4E</span></div>
+#: ```
+#:
+#: So each row is recovered as `label value` — a clean line for `habitation`, and the
+#: `Technical Data` rows double as the cross-check against the comparison table.
+SPEC_ROW = re.compile(
+    r'<div class="spec-row">\s*<span class="spec-row-l">(?P<label>.*?)</span>\s*'
+    r'<span class="spec-row-v[^"]*">(?P<value>.*?)</span>',
+    re.S,
+)
+
+#: One sentence of a model page's prose, which carries what the rows do not — the beds, and
+#: the washroom being combined rather than separate.
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
 
 
+def _flatten(fragment: str) -> str:
+    return plain_text(fragment)
+
+
+def spec_rows(page: str) -> dict[str, str]:
+    """Every `label -> value` row on a model page, across all four of its panels."""
+    return {
+        _flatten(match.group("label")): _flatten(match.group("value"))
+        for match in SPEC_ROW.finditer(page)
+    }
+
+
 def copy_lines_from(page: str) -> list[str]:
-    """A model page's prose as sentences, for `habitation` to read."""
-    return [
+    """A model page as lines `habitation` can read: its spec rows, then its prose.
+
+    The rows carry the fittings — *"Heating & Hot Water: Truma Combi Neo 4E"*, *"70ltr
+    compressor fridge: Included"* — and the prose carries what no row states: that the
+    washroom is combined rather than separate, and what the beds are.
+    """
+    rows = [f"{label} {value}".strip() for label, value in spec_rows(page).items()]
+    prose = [
         sentence.strip()
         for sentence in _SENTENCE.split(plain_text(page))
         if sentence.strip()
     ]
+    return rows + prose
 
 
 #: A layout's own page, which carries the equipment prose the comparison table does not.
@@ -516,9 +593,10 @@ def collect(
         page = browser.fetch(f"{BASE_URL}/model/{MODEL_PAGES[key]}")
         copy_lines: tuple[str, ...] = ()
         if page.status_code == 200:
-            copy_lines = tuple(
-                copy_lines_from(page.file_path.read_text(encoding="utf-8", errors="replace"))
-            )
+            model_page = page.file_path.read_text(encoding="utf-8", errors="replace")
+            copy_lines = tuple(copy_lines_from(model_page))
+            for note in cross_check(product, spec_rows(model_page)):
+                on_progress(f"[{product.label}] WARNING: {note}")
         else:
             on_progress(
                 f"[{product.label}] its own page returned {page.status_code}, so no "
