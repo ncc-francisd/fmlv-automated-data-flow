@@ -278,6 +278,32 @@ The pipeline then says the right thing on its own:
 **Expected here and alarming anywhere else.** Once the first upload creates the four
 products, a real export replaces the empty one and the warning stops.
 
+## Uploading the products does not create the supplier
+
+**Found the hard way on 16 September 2026**, and it is the step no document described.
+
+The four products uploaded cleanly and appear in Nova with product codes. The review app's
+trigger still failed, because a triggered run refreshes the export first and the NCC's
+`Export Products by Supplier` drop-down — `select#exhibitor` — **still does not list Atom**.
+
+There is no supplier or exhibitor column anywhere in `schema.COLUMNS`, so nothing in the
+upload could have created or linked one. It is an NCC-side record, separate from the
+products and from the manufacturer, and it has to be created there.
+
+**So a brand new to FMLV needs three things, not two:**
+
+1. a **manufacturer** — 278, `Trigano` / `Atom`, created before the first run;
+2. its **products**, from the first upload;
+3. a **supplier/exhibitor record** matching `ncc_supplier_name`, which is what makes the
+   export — and therefore every future run — possible at all.
+
+Until the third exists there is no export, so the pipeline cannot see the products it just
+created. **Do not upload again in that state**: every run still diffs against the empty
+baseline, classifies all four as new, and a second upload would duplicate them.
+
+The name has to match `ncc_supplier_name` exactly. If the NCC create it as something other
+than `Atom`, the registry column changes rather than the record.
+
 ## Still unverified
 
 * ~~Whether a new manufacturer runs end to end with no baseline~~ — **it does**, see above.

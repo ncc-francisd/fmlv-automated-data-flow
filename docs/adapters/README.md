@@ -1200,6 +1200,28 @@ overview cards against six collected families is what exposed the gap. **An abse
 explain is a gap in the search, not a fact about the manufacturer** — do not write it up as a
 discontinued range until a second source agrees.
 
+### A brand new to FMLV needs three things created, not two
+
+Almost every manufacturer already exists in FMLV with products and an export. **A genuinely
+new brand has none of that**, and the bootstrap order is not obvious — Atom cost a working
+afternoon to establish it on 16 September 2026:
+
+1. a **manufacturer** row, whose `manufacturer_id` is the NCC's to allocate. Never invent
+   one; a wrong id detaches a run from its product history;
+2. its **products**, from the first upload. Until then run against `fmlv empty-baseline
+   <manufacturer>`, which writes a header-only export so `latest_export` does not refuse to
+   start, and **set the model year at upload** — the adapters emit none, and a blank year
+   drops the row out of every future baseline;
+3. a **supplier/exhibitor record** matching `ncc_supplier_name`.
+
+**The third is the one that surprises.** Uploading the products does not create it: there is
+no supplier column anywhere in `schema.COLUMNS`, so nothing in the upload can. It is a
+separate NCC-side record, and until it exists `fetch-export` has nothing to select and a
+run triggered from the review app fails on the supplier drop-down.
+
+Until all three exist, **do not upload twice**: every run still diffs against the empty
+baseline and classifies the same products as new, so a second upload duplicates them.
+
 ### Let the FMLV export decide the range and model strings, not the website
 
 **Fetch the baseline export before choosing what to put in `manufacturer_range` and `model`.**
