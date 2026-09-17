@@ -94,6 +94,34 @@ of using the current height and width if it's an existing vehicle"*.
 The consequence: the **two new F-Lines have nothing stored to preserve**, so their length,
 width and height arrive blank and need filling by hand.
 
+## The campervans live in modal dialogues, and are a different vehicle
+
+`/campervans` links **no model pages at all** — `/fuze` and `/luna` both 404. The section
+is built from modal dialogues: a card carries `data-modal-target="fuze_modal"` and the
+dialogue repeats that key. Read from there, both are collected and **neither is reported
+as discontinued**, which is what happened before this was found.
+
+**Their full specification is unreachable.** The dialogue's "View Full Specifications"
+button opens a *Flipsnack* flipbook (`player.flipsnack.com/?hash=...`) whose page is a
+7.5 KB JavaScript shell carrying no text and no PDF; the book's pages are rendered images.
+So the masses, payload and price are not emitted and FMLV's own figures stand.
+
+**They are a different vehicle and a different roof.** Ford Transit Customs at
+4.97 m × 2.08 m × **2.15 m**, against the panel vans' 2.6 m — a standard roof with a
+pop-top, so `campervan_elevating_roof`, which is what FMLV holds. Not
+`campervan_high_top`, and not `campervan_high_top_elevating_roof` either.
+
+**Both of those were asserted at some point and both were wrong**, and the real baseline
+caught each before it reached a reviewer. The lesson is the one the shared rules already
+draw for caravans — *fetch the baseline before writing a rule about what a field means* —
+and it applies just as much to a body type asserted from a sentence as to one derived from
+a figure. "All definitely high top camper vans" was true of the thirteen panel vans in
+front of us and not of the two vehicles neither of us was looking at.
+
+The roof is therefore **emitted only where the page states it**: "pop-top" appears exactly
+once in the whole document, in Luna's description. Fuze carries identity alone, so its
+stored value is preserved rather than overwritten by an assumption.
+
 ## Body type is asserted
 
 All thirteen are **`campervan_high_top`** — the requester, *"all definitely high top
@@ -123,20 +151,22 @@ and drop out on age, leaving 13 in scope:
 
 * **7 price changes** — the 5.41m trio £73,995 → £74,995, the 5.99m trio £76,950 →
   £77,995, and TEO £82,000 → £81,950.
-* **4 confirmed unchanged** — the whole 6.36m range.
+* **6 confirmed unchanged** — the whole 6.36m range, plus both campervans.
 * **2 new** — `5.99m ORA F-Line` and `5.99m SOL F-Line`.
-* **2 disappeared** — `Fuze / Conversion` and `Luna / Conversion`.
+* **nothing disappeared.**
 
 Every berth count, travel-seat count, mass and base vehicle was verified unchanged, which
 is the parse corroborated against FMLV across the board.
 
 ## Still unverified
 
-* **Fuze and Luna.** `/fuze` and `/luna` both return 404 and no index links them, yet
-  `/campervans` still describes both. They are a different, smaller vehicle — Ford,
-  3190 kg, 4970 mm, elevating roof — and FMLV holds them at model year 2026. The run
-  reports them as disappeared, which is a proposal for a person to decide, not an
-  automatic archive. **Ask whether they are discontinued.**
+* **Fuze and Luna's masses, payload and price.** Published only inside the Flipsnack
+  flipbook, whose pages are rendered images behind a JavaScript shell. The requester's
+  screenshots give them — Fuze 3190 kg GVW, 588 kg payload, £59,950 OTR; Luna 3190 kg,
+  542 kg, **£64,950** — and FMLV agrees on every one except the **Luna price, which it
+  holds as £59,950**. That looks like Fuze's figure copied across, and it cannot be
+  corrected automatically from anything this adapter can read.
+* **Fuze's roof**, likewise. Both are pop-tops, but only Luna's dialogue says so in HTML.
 * **`SKY` and `4.97m LUX`**, in FMLV at 2022–2023 only and absent from the site. Out of
   scope for the diff on age, so they are neither matched nor reported.
 * **`/2026-vantage`**, linked from the nav and not read — it may be where a new model year

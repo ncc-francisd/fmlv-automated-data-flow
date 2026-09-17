@@ -106,6 +106,22 @@ No elevating roof appears in any model's equipment list; `ELEVATING_ROOF_WORDS` 
 one per layout and narrates a hit rather than silently keeping the assertion, so the day
 Vantage add a pop-top it is a warning and not a wrong answer.
 
+## The two campervans are a different vehicle, and a different roof
+
+Fuze and Luna are **not** panel vans and must not be given the panel vans' body type. They
+are Ford Transit Customs at 4.97m x 2.08m x **2.15m**, against the panel vans' 2.6m — a
+standard-roof van with a **pop-top**, so `campervan_elevating_roof` and neither
+`campervan_high_top` nor `campervan_high_top_elevating_roof`. FMLV holds exactly that.
+
+Both over-assertions were made and both were caught by diffing against the real baseline
+before anything reached a reviewer: first the panel vans' high top, then the high-top
+*variant* of the elevating roof. The lesson is the one
+`docs/adapters/README.md` already draws for caravans — **fetch the baseline before writing
+a rule about what a field means** — and it applies to a body type asserted from a
+requester's sentence just as much as to one derived from a figure. "All definitely high
+top camper vans" was true of the thirteen panel vans in front of us and not of the two
+vehicles neither of us was looking at.
+
 ## The price is on the page, and so are the options that must not be read
 
 Every model page carries `FROM £74,995 (OTR)` — sterling, on-the-road, the manufacturer's
@@ -161,9 +177,40 @@ DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("6-36m-panel-vans", "6.36m"),
 )
 
-#: Eleven Fiats and two Fords. Vantage publish no count of their own, so this is the only
-#: thing that would notice an index page losing a card.
-EXPECTED_LAYOUTS = 13
+#: Thirteen panel vans — eleven Fiats and two Fords — plus the two campervans, Fuze and
+#: Luna. Vantage publish no count of their own, so this is the only thing that would
+#: notice an index page losing a card; it is what caught the mixed-case heading bug.
+EXPECTED_LAYOUTS = 15
+
+#: The campervan section. Two vehicles, and they are **not** panel vans — see
+#: `read_campervans`.
+CAMPERVANS_PATH = "campervans"
+
+#: `(modal key, range, model)` for the two campervans, spelt as FMLV holds them: range
+#: `Fuze`, model `Conversion`. The page heads each modal "Fuze Conversion", so the split
+#: is corroborated, but it is a constant because a modal key is not a product name.
+_CAMPERVAN_MODELS: tuple[tuple[str, str, str], ...] = (
+    ("fuze_modal", "Fuze", "Conversion"),
+    ("luna_modal", "Luna", "Conversion"),
+)
+
+#: The campervans' own prose, which is where their roof is stated: "a pop-top double bed
+#: with ladder access". Distinct from `ELEVATING_ROOF_WORDS`, which reads an equipment
+#: list — here the claim is about a **bed in the roof**, which is what makes it evidence
+#: of a raisable roof rather than the CUB's "upgrade from a pop-top" marketing comparison.
+_POP_TOP_BED = re.compile(r"pop[\s-]?top[^.]{0,40}\bbed\b", re.IGNORECASE)
+
+#: `With a Ford Transit Custom base`. The campervan modals carry no
+#: `Base Vehicle Specification` line — that is in the flipbook — so the make comes from
+#: the sentence that names it.
+_CAMPERVAN_BASE = re.compile(
+    r"\b(Ford|Fiat|Peugeot|Citro[eë]n|Volkswagen|Renault|Mercedes)\b[^.]{0,40}\bbase\b",
+    re.IGNORECASE,
+)
+
+#: How much of a campervan dialogue to read. Its description sits a few thousand
+#: characters past the key; the next dialogue is far enough away not to be reached.
+_MODAL_LENGTH = 14000
 
 _SCRIPTS = re.compile(r"<(script|style)\b.*?</\1>", re.DOTALL | re.IGNORECASE)
 _MARKUP = re.compile(r"<[^>]+>")
@@ -459,6 +506,136 @@ def build_extracted(
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
+
+@dataclass(frozen=True)
+class VantageCampervan:
+    """One of the two campervans, as much of it as the site publishes in HTML.
+
+    Deliberately thin — see `read_campervans`. Everything this does not carry is left for
+    FMLV's own figures, which are already right.
+    """
+
+    manufacturer_range: str
+    model: str
+    base_vehicle_manufacturer: str | None = None
+    #: The sentence proving the roof rises, quoted for the reviewer.
+    pop_top_evidence: str | None = None
+
+    @property
+    def label(self) -> str:
+        return f"{self.manufacturer_range} {self.model}"
+
+
+def read_campervans(page_html: str) -> list[VantageCampervan]:
+    """The two campervans from `/campervans`, which links no model pages at all.
+
+    **These are why a run must not report Fuze and Luna as discontinued.** They are real
+    and current, but the section is built from modal dialogues rather than pages: a card
+    carries `data-modal-target="fuze_modal"` and the dialogue itself repeats that key.
+    There is no `/fuze` or `/luna` — both 404 — so without this they are reported as
+    having left the range every run.
+
+    **The full specification is unreachable, and that is stated rather than worked around.**
+    The dialogue's "View Full Specifications" button opens a *Flipsnack* flipbook
+    (`player.flipsnack.com/?hash=...`), a third-party viewer whose page is a 7.5 KB
+    JavaScript shell carrying no text and no PDF; the book's pages are rendered images.
+    The masses, payload and price live only there, so none is emitted and FMLV's own
+    figures stand.
+
+    **The dialogue is found by its key's last occurrence, not by the card's heading.** The
+    card and the dialogue both name the vehicle, the card comes first, and the card carries
+    none of the prose — scoping to it read 2,600 characters of thumbnail markup and found
+    nothing.
+
+    **The roof is emitted only where the page states it, which is Luna and not Fuze.**
+    "pop-top" appears exactly once in the whole document, in Luna's description: *"In
+    addition to a pop-top double bed with ladder access"*. Fuze's own pop-top is stated
+    only inside the flipbook. So Luna carries a body type and Fuze carries none — FMLV
+    holds both as `campervan_high_top_elevating_roof` already, and emitting nothing
+    preserves that, where asserting the panel vans' fixed high top would have been a real
+    error on a live vehicle.
+    """
+    found: list[VantageCampervan] = []
+    for key, manufacturer_range, model in _CAMPERVAN_MODELS:
+        occurrences = [match.start() for match in re.finditer(re.escape(key), page_html)]
+        if not occurrences:
+            continue
+        block = _flatten(page_html[occurrences[-1] : occurrences[-1] + _MODAL_LENGTH])
+        roof = _POP_TOP_BED.search(block)
+        base = _CAMPERVAN_BASE.search(block)
+        found.append(
+            VantageCampervan(
+                manufacturer_range=manufacturer_range,
+                model=model,
+                base_vehicle_manufacturer=(
+                    fmlv_base_vehicle(base.group(1)) if base else None
+                ),
+                pop_top_evidence=(
+                    block[max(0, roof.start() - 40) : roof.end() + 40].replace("|", " ").strip()
+                    if roof
+                    else None
+                ),
+            )
+        )
+    return found
+
+
+def build_extracted_campervan(product: VantageCampervan, source_url: str) -> ExtractedMotorhome:
+    """One campervan as a `Motorhome`, carrying only what the HTML actually states."""
+    motorhome = Motorhome(
+        manufacturer=MANUFACTURER,
+        manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
+        manufacturer_range=product.manufacturer_range,
+        model=product.model,
+        base_vehicle_manufacturer=product.base_vehicle_manufacturer,
+        # Only where the page says so — see `read_campervans`. `None` leaves FMLV's own
+        # value alone, which is already right for both.
+        #
+        # **Elevating roof, not the high-top variant of it.** The two campervans are Ford
+        # Transit Customs at 2.15m overall — a standard-roof van with a pop-top, well
+        # under the ~2300mm `docs/adapters/README.md` sets for a high top, and nothing
+        # like the 2.6m panel vans. FMLV holds `campervan_elevating_roof` and is right;
+        # an earlier version of this proposed the high-top value and the baseline caught
+        # it, which is the second time on this adapter.
+        body_type=(
+            BodyType.CAMPERVAN_ELEVATING_ROOF if product.pop_top_evidence else None
+        ),
+    )
+
+    provenance: dict[str, Provenance] = {}
+
+    def record(field_name: str, snippet: str) -> None:
+        provenance[field_name] = Provenance(
+            source_url=source_url, snippet=f"{product.label} — {snippet}"
+        )
+
+    record(
+        "manufacturer_range",
+        f'range "{product.manufacturer_range}" from the campervan section, which heads '
+        f'this vehicle "{product.label}" — accept with the model, they are one name',
+    )
+    record(
+        "model",
+        f'model "{product.model}" — accept with the range, they are one name',
+    )
+    if product.base_vehicle_manufacturer is not None:
+        record(
+            "base_vehicle_manufacturer",
+            f"{product.base_vehicle_manufacturer}, from the campervan's own description "
+            f"of its base vehicle",
+        )
+    if product.pop_top_evidence:
+        record(
+            "body_type",
+            f"Campervan with an elevating roof — not the fixed high top the panel vans "
+            f"get, and not the high-top-plus-elevating-roof variant either: this is a "
+            f"standard-roof Transit Custom at 2.15m with a pop-top. Its own description "
+            f"says so: {product.pop_top_evidence!r}",
+        )
+
+    return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
+
+
 def collect(
     http: Fetcher,
     browser: object = None,  # noqa: ARG001
@@ -523,6 +700,36 @@ def collect(
                 f"read {product.label}: {product.base_vehicle_manufacturer}, "
                 f"{product.berths} berths, {product.travel_seats} travel seats, "
                 f"{product.mtplm_kilograms}kg, £{product.rrp_pounds or 0:,}"
+            )
+
+    # The two campervans, which live in modal dialogues rather than on pages of their own.
+    # Skipped on a `--range` run, which narrows to one length index and means panel vans.
+    if tuple(ranges) == DEFAULT_RANGES:
+        campervans_url = f"{BASE_URL}/{CAMPERVANS_PATH}"
+        on_progress(f"fetching the campervan section: {campervans_url}")
+        campervans_html = http.fetch(campervans_url).file_path.read_text(
+            encoding="utf-8", errors="replace"
+        )
+        campervans = read_campervans(campervans_html)
+        if not campervans:
+            on_progress(
+                f"no campervans found on {campervans_url} — Fuze and Luna will be reported "
+                f"as disappeared, so check whether they have really been withdrawn"
+            )
+        for campervan in campervans:
+            if campervan.pop_top_evidence is None:
+                # Not a reason to drop it — dropping it is what reports a live vehicle as
+                # discontinued. The body type simply goes unproposed and FMLV's stands.
+                on_progress(
+                    f"{campervan.label}: its roof is stated only inside the flipbook, so "
+                    f"no body type is proposed and FMLV's own value stands"
+                )
+            extracted.append(build_extracted_campervan(campervan, campervans_url))
+            on_progress(
+                f"read {campervan.label}: {campervan.base_vehicle_manufacturer or 'base '
+                'vehicle not stated'}. Its masses, payload and price are published only "
+                f"inside a Flipsnack flipbook, which carries no readable text, so FMLV's "
+                f"own figures stand."
             )
 
     # Length, width and height are published nowhere — said once rather than per layout,

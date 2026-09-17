@@ -143,10 +143,11 @@ def test_a_page_that_is_not_a_model_yields_nothing() -> None:
     assert parse_model_page("<html><body>Vantage</body></html>", "x") is None
 
 
-def test_the_roster_is_thirteen() -> None:
-    """Vantage publish no count, so this is the only guard against a lost card — and it
-    is what caught the mixed-case heading bug."""
-    assert EXPECTED_LAYOUTS == 13
+def test_the_panel_van_roster_is_thirteen() -> None:
+    """Vantage publish no count, so `EXPECTED_LAYOUTS` is the only guard against a lost
+    card — and it is what caught the mixed-case heading bug. It covers both sections:
+    thirteen panel vans plus the two campervans."""
+    assert EXPECTED_LAYOUTS == 15
 
 
 # --------------------------------------------------------------------------- #
@@ -282,3 +283,87 @@ def test_the_base_vehicle_snippet_says_where_it_was_read() -> None:
     extracted = build_extracted(_product("ora-f-line"), URL, basis="x")
 
     assert "own page" in extracted.provenance["base_vehicle_manufacturer"].snippet
+
+
+# --------------------------------------------------------------------------- #
+# The two campervans, which live in modal dialogues
+# --------------------------------------------------------------------------- #
+
+
+def _campervans():
+    from src.adapters.vantage import read_campervans  # noqa: PLC0415
+
+    return {c.manufacturer_range: c for c in read_campervans(_campervans_page())}
+
+
+def _campervans_page() -> str:
+    return (FIXTURES / "vantage_campervans.html").read_text(encoding="utf-8")
+
+
+def test_both_campervans_are_collected_so_neither_is_reported_as_gone() -> None:
+    """The whole point. `/fuze` and `/luna` both 404 and no index links them, so without
+    this the run says two live vehicles have left the range every time."""
+    assert set(_campervans()) == {"Fuze", "Luna"}
+    assert all(c.model == "Conversion" for c in _campervans().values())
+
+
+def test_the_campervan_section_links_no_model_pages() -> None:
+    """Which is why they are read from the dialogue markup rather than from hrefs."""
+    from src.adapters.vantage import find_model_slugs  # noqa: PLC0415
+
+    assert find_model_slugs(_campervans_page()) == []
+
+
+def test_only_luna_states_its_roof_and_only_luna_gets_a_body_type() -> None:
+    """"pop-top" appears exactly once in the whole document, in Luna's description.
+    Fuze's own pop-top is stated only inside the flipbook, which cannot be read."""
+    from src.adapters.vantage import build_extracted_campervan  # noqa: PLC0415
+
+    luna, fuze = _campervans()["Luna"], _campervans()["Fuze"]
+
+    assert luna.pop_top_evidence is not None
+    assert fuze.pop_top_evidence is None
+
+    assert build_extracted_campervan(luna, URL).motorhome.body_type is BodyType.CAMPERVAN_ELEVATING_ROOF
+    assert build_extracted_campervan(fuze, URL).motorhome.body_type is None
+
+
+def test_a_campervan_with_no_stated_roof_keeps_its_identity() -> None:
+    """Dropping it is what reports a live vehicle as discontinued, so the body type goes
+    unproposed and FMLV's own value stands instead."""
+    from src.adapters.vantage import build_extracted_campervan  # noqa: PLC0415
+
+    extracted = build_extracted_campervan(_campervans()["Fuze"], URL)
+
+    assert "manufacturer_range" in extracted.provenance
+    assert "model" in extracted.provenance
+    assert "body_type" not in extracted.provenance
+
+
+def test_the_campervans_are_not_given_the_panel_vans_body_type() -> None:
+    """They are Transit Customs at 2.15m — a standard roof with a pop-top — against the
+    panel vans' 2.6m. Both the fixed high top and the high-top-plus-elevating-roof
+    variant were asserted at some point and both were wrong."""
+    from src.adapters.vantage import build_extracted_campervan  # noqa: PLC0415
+
+    body_type = build_extracted_campervan(_campervans()["Luna"], URL).motorhome.body_type
+
+    assert body_type is BodyType.CAMPERVAN_ELEVATING_ROOF
+    assert body_type is not BodyType.CAMPERVAN_HIGH_TOP
+    assert body_type is not BodyType.CAMPERVAN_HIGH_TOP_ELEVATING_ROOF
+
+
+def test_no_mass_or_price_is_read_for_a_campervan() -> None:
+    """They are published only inside a Flipsnack flipbook, whose page is a JavaScript
+    shell carrying no text and no PDF. FMLV's own figures stand."""
+    from src.adapters.vantage import build_extracted_campervan  # noqa: PLC0415
+
+    extracted = build_extracted_campervan(_campervans()["Luna"], URL)
+
+    for field_name in ("mtplm_kilograms", "mro_kilograms", "mh_payload_kilograms", "rrp_pounds"):
+        assert getattr(extracted.motorhome, field_name) is None
+        assert field_name not in extracted.provenance
+
+
+def test_the_expected_count_covers_both_sections() -> None:
+    assert EXPECTED_LAYOUTS == 15
