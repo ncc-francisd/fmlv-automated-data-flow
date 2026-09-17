@@ -355,6 +355,35 @@ def create_app(
         runnable.sort(key=_display_name_sort_key)
         return runnable, errors
 
+    def _brand_names_by_id() -> dict[int, str]:
+        """`manufacturer_id` to the brand name a reader recognises.
+
+        **A run is recorded under `fmlv_manufacturer`**, which names the *legal*
+        manufacturer — so an Ace Motorhomes run is stored as `Swift Group Ltd`, and every
+        page that showed the recorded name said "Swift Group Ltd" whichever brand was
+        picked. The id is the only thing that tells the brands apart.
+
+        Mapped at render time rather than recorded differently, deliberately: the stored
+        name is what the FMLV export joins on and what matching uses, so it is right as it
+        stands, and mapping here fixes runs that already happened as well as future ones.
+
+        An unreadable registry costs only the labels — the caller falls back to the
+        recorded name, which is what these pages showed before they consulted the registry
+        at all.
+        """
+        try:
+            manufacturers = loader.load(app.state.registry_path).manufacturers
+        except OSError:
+            return {}
+        return {
+            m.manufacturer_id: (m.fmlv_display_name or m.fmlv_manufacturer)
+            for m in manufacturers
+        }
+
+    def _brand_of(run: store.Run) -> str:
+        """The brand this run was for, falling back to the name it was recorded under."""
+        return _brand_names_by_id().get(run.manufacturer_id) or run.fmlv_manufacturer
+
     def _run_manufacturer_options(
         connection: sqlite3.Connection,
     ) -> list[tuple[int, str]]:
@@ -378,14 +407,7 @@ def create_app(
         `/schedules` both require the file and are entitled to, because neither means
         anything without it; the runs list is not in that position.
         """
-        try:
-            manufacturers = loader.load(app.state.registry_path).manufacturers
-        except OSError:
-            manufacturers = []
-        display = {
-            m.manufacturer_id: (m.fmlv_display_name or m.fmlv_manufacturer)
-            for m in manufacturers
-        }
+        display = _brand_names_by_id()
         options = [
             (manufacturer_id, display.get(manufacturer_id) or recorded_name)
             for manufacturer_id, recorded_name in store.list_run_manufacturers(connection)
@@ -495,6 +517,7 @@ def create_app(
                 "review_summaries": review_summaries,
                 "limit": limit,
                 "manufacturers": _run_manufacturer_options(connection),
+                "brand_names": _brand_names_by_id(),
                 "selected_manufacturer_id": manufacturer_id_filter,
                 "selected_status": status,
                 "selected_start_date": start_date_filter.isoformat() if start_date_filter else "",
@@ -695,7 +718,9 @@ def create_app(
     def run_detail(request: Request, run_id: int, connection: ConnectionDep) -> HTMLResponse:
         run = _run_or_404(connection, run_id)
         if run.status == "running":
-            return _templates.TemplateResponse(request, "run_in_progress.html", {"run": run})
+            return _templates.TemplateResponse(
+                request, "run_in_progress.html", {"run": run, "brand": _brand_of(run)}
+            )
 
         queue = store.list_change_queue(connection, run_id)
         pending = [entry for entry in queue if entry.decision is None]
@@ -706,6 +731,7 @@ def create_app(
             "run_detail.html",
             {
                 "run": run,
+                "brand": _brand_of(run),
                 "pending": pending,
                 "decided": decided,
                 "disappearance_notices": disappearance_notices,

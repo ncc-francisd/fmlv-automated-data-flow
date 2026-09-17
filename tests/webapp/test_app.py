@@ -252,6 +252,56 @@ def test_a_brand_is_not_offered_its_siblings_product_areas(db_path: Path) -> Non
     assert "Bessacarr has touring caravans and motorhomes" not in response.text
 
 
+def test_a_run_is_titled_by_the_brand_not_the_legal_manufacturer(db_path: Path) -> None:
+    """A run is *recorded* under `fmlv_manufacturer`, which names the legal manufacturer.
+
+    So an Ace Motorhomes run is stored as "Swift Group Ltd", and the run page, the
+    in-progress page and the runs list all showed that — a reviewer who picked Ace was
+    handed a page headed Swift. Mapped by `manufacturer_id` at render time, which fixes
+    runs that already happened as well as future ones.
+    """
+    client = _swift_group_registry(db_path)
+    connection = store.connect(db_path)
+    try:
+        run = store.start_run(
+            connection,
+            manufacturer_id=264,
+            fmlv_manufacturer="Swift Group Ltd",
+            trigger="manual",
+        )
+        store.finish_run(connection, run.id)
+    finally:
+        connection.close()
+
+    detail = client.get(f"/runs/{run.id}").text
+    listing = client.get("/runs").text
+
+    assert "Ace Motorhomes —" in detail
+    assert "Swift Group Ltd —" not in detail
+    assert "Ace Motorhomes" in listing
+
+
+def test_a_run_whose_manufacturer_left_the_registry_keeps_its_recorded_name(
+    db_path: Path,
+) -> None:
+    """The fallback. Dropping the heading entirely would lose which brand a historic run
+    was for, so the recorded name stands when the id no longer resolves."""
+    client = _swift_group_registry(db_path)
+    connection = store.connect(db_path)
+    try:
+        run = store.start_run(
+            connection,
+            manufacturer_id=999,
+            fmlv_manufacturer="Gone Ltd",
+            trigger="manual",
+        )
+        store.finish_run(connection, run.id)
+    finally:
+        connection.close()
+
+    assert "Gone Ltd —" in client.get(f"/runs/{run.id}").text
+
+
 def test_a_manufacturer_with_no_display_name_sorts_on_the_name_shown_instead(
     db_path: Path,
 ) -> None:

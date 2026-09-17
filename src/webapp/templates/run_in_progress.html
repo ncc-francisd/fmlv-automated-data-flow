@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{{ run.fmlv_manufacturer }}{% if run.range_label %} — {{ run.range_label }}{% endif %} — run #{{ run.id }} in progress{% endblock %}
+{% block title %}{{ brand }}{% if run.range_label %} — {{ run.range_label }}{% endif %} — run #{{ run.id }} in progress{% endblock %}
 {% block content %}
   <p class="muted"><a href="/runs">← All runs</a></p>
   <h1>
-    {{ run.fmlv_manufacturer }}{% if run.range_label %} — {{ run.range_label }}{% endif %}
+    {{ brand }}{% if run.range_label %} — {{ run.range_label }}{% endif %}
     <span class="badge running">running</span>
   </h1>
   <p class="muted">Run #{{ run.id }} · {{ run.trigger }} · started {{ run.started_at|fmt_dt }}</p>

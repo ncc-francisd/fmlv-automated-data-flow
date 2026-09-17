@@ -65,9 +65,9 @@
             <td class="muted">#{{ run.id }}</td>
             <td>
               {% if run.status == "running" %}
-                {{ run.fmlv_manufacturer }}
+                {{ brand_names.get(run.manufacturer_id) or run.fmlv_manufacturer }}
               {% else %}
-                <a href="/runs/{{ run.id }}">{{ run.fmlv_manufacturer }}</a>
+                <a href="/runs/{{ run.id }}">{{ brand_names.get(run.manufacturer_id) or run.fmlv_manufacturer }}</a>
               {% endif %}
               <span class="badge vehicle-class {{ run.vehicle_class.value }}" title="{{ run.vehicle_class.label }}">{{ run.vehicle_class.badge }}</span>
             </td>
