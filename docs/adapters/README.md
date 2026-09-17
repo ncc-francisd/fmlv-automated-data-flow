@@ -1945,6 +1945,19 @@ a very small car. Weight alone would have mislabelled thirteen products across B
 Adria; Bailey's Discovery D4-2 is 995kg and FMLV holds it as rigid, as is Swift's 1043kg
 Basecamp. Folding and pop-up exist in the schema but no surveyed brand builds one yet.
 
+**Wingamm's two Rookies are the first products to meet the micro test** (17 September
+2026), and how that was found is the point. `wingamm_caravan.py` first asserted `RIGID`
+unconditionally, copying `bailey_caravan.py` and `swift_caravan.py`, and the dry run
+against the real export proposed downgrading two rows FMLV already held as `type_micro`,
+correctly. Both halves are there — 1000kg and 1200kg, and Wingamm's own word for the line
+throughout (*"Luxury Mini Caravan With Fiberglass Monocoque"*).
+
+Two things worth taking from it. **Apply the rule, do not assert its usual answer**: a
+constant is right until it is not, and the brand that breaks it will not announce itself.
+And **the manufacturer's naming can live at range level** rather than on each layout — the
+Rookie L's own page never says "mini caravan" and the range index says it of both, so an
+adapter looking only at the layout page would have got one of the pair wrong.
+
 ### A lifting roof does not change a caravan's body type
 
 **Rule from the NCC side, 7 September 2026: the type is rigid even where the manufacturer's
@@ -1966,9 +1979,9 @@ buyer means by the term. So the manufacturer's vocabulary loses to FMLV's.
 Three consequences worth keeping straight:
 
 - **`type_folding` and `type_pop_up` still have no product behind them**, and the bar for
-  either is a caravan whose **walls** fold or rise, not its roof. Together with the micro
-  rule above, `type_rigid` is now the answer for every caravan surveyed — 21 Eriba, 23
-  Bailey, 26 Swift.
+  either is a caravan whose **walls** fold or rise, not its roof. `type_rigid` is the
+  answer for every caravan surveyed but two — 21 Eriba, 23 Bailey, 26 Swift, 4 Bessacarr —
+  the exceptions being Wingamm's two Rookies, which are `type_micro` on the rule above.
 - **The manufacturer's own naming is decisive for `type_micro` and for nothing else.** That
   asymmetry is deliberate and it is easy to over-read: the micro rule spells out "the
   manufacturer calls it one", so a brand's vocabulary is *part* of that test. No other value

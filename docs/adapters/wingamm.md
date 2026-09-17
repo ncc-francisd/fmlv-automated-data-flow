@@ -453,3 +453,102 @@ survey that the catalogues are where FMLV's own data came from.
   baseline row carries `no_toilet` and `no_shower`, which is wrong — it has a rear bathroom
   with a shower column — but that is out of scope here, not something the adapter should
   quietly start writing.
+
+---
+
+# The caravans — `wingamm_caravan.py`
+
+Surveyed and built 17 September 2026. **Two caravans, one range**: `Rookie 3.5` and
+`Rookie L`, product ids 7349 and 7350. Same manufacturer row (**144**), same NCC supplier
+name (`Wingamm`); `categories` on that row became `motorhome,caravan`. Registered
+`(Wingamm, Wingamm, caravan)` — the Bailey and Eriba shape, and no ambiguity either way
+since the two modules differ by product area rather than by brand.
+
+`wingamm.py` has excluded `rookie` and `rookie-l` by name since 26 August 2026 as
+*"caravans, out of scope for this review"*. This is that scope arriving, and that
+exclusion must stay: without it both adapters would propose against the same vehicles.
+
+## There is no catalogue, so the model pages are the source
+
+Every motorhome has a catalogue PDF and **neither caravan does** — so none of the PDF
+machinery above applies. What the Rookies get is a short inline block partway down each
+model page, which is why it is hard to find by eye:
+
+```
+Rookie 3.5
+Frame: Alko Compact with Alko AKS repulsor brake
+Length: 4,990 mm with drawbar
+Travel seats: 4
+Sleeps: 2
+Total mass: 750 Kg - 1.000 Kg
+```
+
+**No width, height or headroom is published anywhere.** All three are emitted as nothing,
+so FMLV's own figures stand.
+
+## The roster is told by the drawbar
+
+The caravan index links **all twelve** Wingamm vehicles, motorhomes included, so scoping
+by which index led to a page does not work — the trap `swift.py` and `chausson.py` hit.
+The cards give a structural tell instead: **only a caravan's length is quoted "with
+drawbar"**, and only a caravan's total mass is under 1500 kg against every motorhome's
+3,500. So a third Rookie would be noticed rather than silently missed, which a hardcoded
+pair of slugs could not manage. Identity still comes from a map, because FMLV's
+`Rookie`/`3.5` split is stated nowhere on the site.
+
+## The self-check is the index card against the model page
+
+Wingamm write the figures twice, in two renderings and with **different labels** — the
+page says `Sleeps`, the card says `Berths` — and both are read and compared on length,
+berths, MTPLM and travel seats. A disagreement drops the layout. The card is required to
+*agree where it speaks* and not required to speak: the Rookie L's card gives only the
+laden mass where its page gives both.
+
+## `Total mass` is MRO to MTPLM, and FMLV proved it
+
+`750 Kg - 1.000 Kg` could have been a mass range or two plating options, and the page
+never says. FMLV holds 750/1000 and 950/1200, which settles it as running order to laden
+mass. Read the other way it would have put a 750 kg MTPLM on a caravan that can carry
+1000. Payload is then derived and goes to the personal-effects column.
+
+**The thousands separator goes both ways inside one range** — `1.000 Kg` on the Rookie,
+`1,200 Kg` on the Rookie L — so a naive parse reads the first as 1.0. `_integer` already
+handled it.
+
+## The first micros in the project
+
+See `docs/adapters/README.md`. Both meet the test — 1000 kg and 1200 kg, under the 1250 kg
+bar, and Wingamm's own word for the line — and FMLV already held both as `type_micro`.
+The first version of this adapter asserted `RIGID` like its siblings and the dry run
+proposed downgrading two correct records; the rule is applied per layout now.
+
+**The naming sits at range level**: the Rookie L's own page never says "mini caravan"
+and the index says it of both. The page is preferred where it speaks and the index stands
+in where it does not.
+
+## No price, as on the motorhome side
+
+Wingamm quote euro ex works, VAT excluded; FMLV holds a UK importer price in pounds,
+£20,420 and £28,390. Different quantities, so **no price is collected** and no conversion
+is attempted — settled with the requester on 17 September 2026, the same call the
+motorhomes already make.
+
+## Three corrections on the first run
+
+* **Rookie L berths 2 → 4.** Both the page and the card say 4; FMLV held 2 for both.
+* **Rookie L MRO 950 → 940**, and the payload with it.
+* **Length.** FMLV held **4460 mm for both**, which cannot be right for vehicles a metre
+  apart. Published: 4990 and 6000, both with drawbar.
+
+Width, headroom and price come back as confirm-or-keep rows, since nothing published
+covers them.
+
+## Still unverified
+
+* **A third caravan.** The index would surface one and the run would narrate it as having
+  no identity — it needs adding to `_MODELS` with the range and model FMLV holds.
+* **"Rookie Cross"**, a styling version of the 3.5 with no spec block of its own and no
+  FMLV row. Not collected. If Wingamm ever give it one, it appears as a new card.
+* **`internal_length_mm`.** FMLV holds 3600 on the Rookie L; the only figure near it on
+  the site is prose saying the Cross measures "3.60 meters", which is a body length and
+  is the *Rookie's*, not the L's.

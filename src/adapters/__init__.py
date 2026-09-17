@@ -64,6 +64,7 @@ from . import (
     swift_caravan,
     weinsberg,
     wingamm,
+    wingamm_caravan,
 )
 from ..vehicle_class import DEFAULT as DEFAULT_VEHICLE_CLASS
 from ..vehicle_class import VehicleClass
@@ -111,6 +112,7 @@ _MODULES: tuple[Adapter, ...] = (
     swift_caravan,
     weinsberg,
     wingamm,
+    wingamm_caravan,
 )
 
 
@@ -201,6 +203,7 @@ __all__ = [
     "swift_caravan",
     "weinsberg",
     "wingamm",
+    "wingamm_caravan",
 ]
 
 
