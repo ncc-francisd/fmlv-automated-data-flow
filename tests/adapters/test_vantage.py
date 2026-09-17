@@ -259,14 +259,20 @@ def test_a_real_elevating_roof_in_the_equipment_is_reported() -> None:
     assert elevating_roof_in(("Rear parking sensors",)) is None
 
 
-@pytest.mark.parametrize("field_name", ["mh_length_mm", "mh_width_mm", "mh_height_mm"])
-def test_no_dimension_is_emitted(field_name: str) -> None:
-    """The site's only length is the rounded range name — 5.41m against FMLV's 5413mm —
-    and no width or height is published at all. FMLV's own figures stand."""
+@pytest.mark.parametrize(
+    ("field_name", "expected"),
+    [("mh_length_mm", 5413), ("mh_width_mm", 2280), ("mh_height_mm", 2600)],
+)
+def test_the_dimensions_come_from_the_length_s_drawing(field_name: str, expected: int) -> None:
+    """Read by hand from `CUB-Measurements-.png`, because the site's only textual length is
+    the rounded range name — 5.41m against FMLV's 5413mm — and no width or height appears
+    as text at all. Every one of these matched FMLV on all eleven panel vans before the
+    constant existed, so it asserts nothing new; what it removes is three "could not be
+    validated" rows against every model on every run."""
     extracted = build_extracted(_product("cub", index_range="5.41m"), URL, basis="x")
 
-    assert getattr(extracted.motorhome, field_name) is None
-    assert field_name not in extracted.provenance
+    assert getattr(extracted.motorhome, field_name) == expected
+    assert field_name in extracted.provenance
 
 
 def test_both_halves_of_the_identity_carry_provenance() -> None:
@@ -455,10 +461,25 @@ def test_the_f_lines_share_nothing_with_the_fiat_panel_vans() -> None:
     assert set(_MANUALLY_SOURCED_DIMENSIONS_MM) == {"ORA F-Line", "SOL F-Line"}
 
 
-def test_an_existing_fiat_model_still_gets_no_dimensions() -> None:
-    """The constant is for the two new models only. FMLV already holds the other eleven
-    correctly, so emitting nothing preserves them and a reviewer confirms a no-op."""
-    extracted = build_extracted(_product("cub", index_range="5.41m"), URL, basis="x")
+def test_the_f_line_overrides_its_range_rather_than_inheriting_it() -> None:
+    """Both F-Lines sit in the 5.99m range and are not 5.99m vehicles — they are a Ford
+    Transit where the rest are Fiat Ducatos. Falling through to the range would put
+    5998x2280x2600 on a van that is 5931x2112x2650: wrong on all three, and plausible
+    enough to pass a reviewer."""
+    from src.adapters.vantage import _DIMENSIONS_BY_RANGE_MM  # noqa: PLC0415
+
+    f_line = build_extracted(_product("ora-f-line"), URL, basis="x").motorhome
+
+    assert _DIMENSIONS_BY_RANGE_MM["5.99m"] == (5998, 2280, 2600)
+    assert (f_line.mh_length_mm, f_line.mh_width_mm, f_line.mh_height_mm) == (5931, 2112, 2650)
+
+
+def test_a_range_with_no_known_dimensions_emits_none() -> None:
+    """A fourth length would arrive unmeasured rather than borrowing another's figures."""
+    from dataclasses import replace as _replace  # noqa: PLC0415
+
+    unknown = _replace(_product("cub", index_range="5.41m"), manufacturer_range="7.00m")
+    extracted = build_extracted(unknown, URL, basis="x")
 
     assert extracted.motorhome.mh_length_mm is None
     assert "mh_width_mm" not in extracted.provenance

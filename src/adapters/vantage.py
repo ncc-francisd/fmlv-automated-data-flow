@@ -237,26 +237,53 @@ _NOT_A_DRAWING = re.compile(r"logo|\d{3,4}x\d{3,4}", re.IGNORECASE)
 
 _IMG_SRC = re.compile(r'<img[^>]+?src="([^"]+)"', re.IGNORECASE)
 
+#: Every model's dimensions, in millimetres, as `(length, width, height)`, keyed on the
+#: range — which is to say on the length, since that is what a Vantage range is.
+#:
+#: **Read by hand from the drawings**, one per length, and supplied by the requester on
+#: 17 September 2026: `CUB-Measurements-.png` (5.41m), `SOL-6.png` (5.99m) and
+#: `NEO-2.png` (6.36m). Nothing here can read them — see `dimensions_drawing`.
+#:
+#: **Every figure is confirmed against FMLV**, which held all eleven panel vans at exactly
+#: these three sets before this constant existed: 11 of 11 matching on all three fields.
+#: So this asserts nothing new; what it does is stop three "could not be validated" rows
+#: appearing against every model on every run, which was thirty-three rows of noise a
+#: reviewer had to clear by hand each time.
+#:
+#: **Nothing is lost by asserting rather than deferring.** The alternative — emitting
+#: nothing and letting FMLV's value stand — cannot detect a change in the drawing either,
+#: because the drawing is pixels. Neither route sees a redesign; this one costs the
+#: reviewer less. The canary tests are what say when the figures become readable.
+#:
+#: **The width is the mirrors-folded figure throughout** (2280 on the Fiats, 2112 on the
+#: Fords), never the bare width and never the one with mirrors out —
+#: `docs/adapters/README.md`'s rule, and the choice FMLV already made.
+_DIMENSIONS_BY_RANGE_MM: dict[str, tuple[int, int, int]] = {
+    "5.41m": (5413, 2280, 2600),
+    "5.99m": (5998, 2280, 2600),
+    "6.36m": (6363, 2280, 2600),
+}
+
 #: The two F-Lines' dimensions, in millimetres, as `(length, width, height)`.
 #:
 #: **Read by hand from `Sol-F-Line-Dimensions.png`** — the drawing both F-Line pages
 #: carry — and supplied by the requester on 17 September 2026. Nothing here can read it:
 #: see `dimensions_drawing` on why every Vantage dimension is pixels.
 #:
-#: **Why a constant here and emit-nothing everywhere else.** For the eleven Fiats the
-#: blank is the right answer: FMLV already holds their figures, correctly, so emitting
-#: nothing preserves them and the reviewer confirms a no-op. **A new product has no stored
-#: value to preserve**, so for these two "leave it alone" would have meant blank forever —
-#: the same reasoning as `swift._MANUALLY_SOURCED_HEIGHT_MM`, which exists for the nine
-#: brand-new Merlins for exactly this reason.
+#: **Keyed on the model, and it overrides the range.** Both F-Lines sit in the 5.99m range
+#: and are not 5.99m vehicles: they are a Ford Transit L3 H2 where the rest are Fiat
+#: Ducatos. Falling through to `_DIMENSIONS_BY_RANGE_MM` would put 5998 x 2280 x 2600 on a
+#: van that is 5931 x 2112 x 2650 — wrong on all three, and plausible enough to pass a
+#: reviewer.
+#:
+#: These two are also the only Vantage models **FMLV does not already hold**, so unlike
+#: the other eleven there is no stored figure to fall back on and a blank would have been
+#: permanent — the reasoning behind `swift._MANUALLY_SOURCED_HEIGHT_MM` and its nine
+#: brand-new Merlins.
 #:
 #: **The width is the mirrors-folded figure**, 2112mm, not the bare 2032mm and not the
 #: 2474mm with mirrors out — `docs/adapters/README.md`'s rule, and the same choice FMLV
 #: made for the eleven Fiats, where it holds 2280 against a bare 2050.
-#:
-#: **These are a Ford Transit L3 H2 and share nothing with the Fiats.** 5931 against 5998,
-#: 2112 against 2280, 2650 against 2600. Copying the panel vans' figures across would have
-#: been wrong on all three, which is why they were not guessed at.
 #:
 #: **Like every manually sourced constant this cannot refresh itself.** It is narrated on
 #: every run, and `test_the_f_line_dimensions_are_still_not_published` is the canary that
@@ -515,7 +542,11 @@ def build_extracted(
     features = habitation.features_from(equipment)
     features.pop("bed_types", None)
 
-    dimensions = _MANUALLY_SOURCED_DIMENSIONS_MM.get(product.model)
+    # Model first, then range: the two F-Lines sit in the 5.99m range and are not 5.99m
+    # vehicles.
+    dimensions = _MANUALLY_SOURCED_DIMENSIONS_MM.get(
+        product.model
+    ) or _DIMENSIONS_BY_RANGE_MM.get(product.manufacturer_range)
     length_mm, width_mm, height_mm = dimensions if dimensions else (None, None, None)
 
     motorhome = Motorhome(
@@ -591,15 +622,15 @@ def build_extracted(
 
     if dimensions is not None:
         note = (
-            "read by hand from the dimensions drawing both F-Line pages carry, and "
-            "supplied by the requester on 17 September 2026 — Vantage publish it as an "
-            "image, so nothing can re-read it. Re-verify at model-year changeover"
+            "read by hand from this length's dimensions drawing, supplied by the "
+            "requester on 17 September 2026 — Vantage publish it as an image, so nothing "
+            "can re-read it. Re-verify at model-year changeover"
         )
         record("mh_length_mm", f"{length_mm}mm: {note}")
         record(
             "mh_width_mm",
-            f"{width_mm}mm, the figure marked 'inc.mirrors folded' — not the bare 2032mm "
-            f"and not the 2474mm with mirrors out: {note}",
+            f"{width_mm}mm, the figure the drawing marks 'inc.mirrors folded' — never "
+            f"the bare width beside it and never the one with mirrors out: {note}",
         )
         record("mh_height_mm", f"{height_mm}mm: {note}")
 
@@ -791,28 +822,23 @@ def collect(
                 on_progress(f"dropping {product.label} — {reason}")
                 continue
 
-            if product.model in _MANUALLY_SOURCED_DIMENSIONS_MM:
-                length_mm, width_mm, height_mm = _MANUALLY_SOURCED_DIMENSIONS_MM[
-                    product.model
-                ]
+            known = _MANUALLY_SOURCED_DIMENSIONS_MM.get(
+                product.model
+            ) or _DIMENSIONS_BY_RANGE_MM.get(product.manufacturer_range)
+            if known is not None:
+                length_mm, width_mm, height_mm = known
                 on_progress(
-                    f"{product.label}: proposing {length_mm}x{width_mm}x{height_mm}mm from "
-                    f"a hand-read constant — this model is new to FMLV, so there is no "
-                    f"stored figure to preserve and a blank would be permanent. The width "
-                    f"is the mirrors-folded one. This CANNOT refresh itself; re-verify it "
-                    f"at model-year changeover."
+                    f"{product.label}: {length_mm}x{width_mm}x{height_mm}mm, hand-read "
+                    f"from {dimensions_drawing(page_html) or 'the drawing'} — Vantage "
+                    f"publish dimensions only as an image. The width is the "
+                    f"mirrors-folded one. This CANNOT refresh itself; re-verify at "
+                    f"model-year changeover."
                 )
-            elif drawing := dimensions_drawing(page_html):
+            else:
                 on_progress(
-                    f"{product.label}: length, height and width are published only as a "
-                    f"drawing, so none is proposed — read them from {drawing} if a figure "
-                    f"needs filling in. It gives three widths; take the one marked "
-                    f"'inc. mirrors folded'."
-                )
-            elif dimensions_drawing(page_html) is None:
-                on_progress(
-                    f"{product.label}: no dimensions drawing on the page, so there is "
-                    f"nowhere on the site to read its length, height or width from"
+                    f"{product.label}: no dimensions are known for the {product.manufacturer_range} "
+                    f"range and none can be read from the page, so its length, width and "
+                    f"height go unproposed and FMLV's own figures stand"
                 )
 
             equipment = tuple(habitation.list_items(page_html))
