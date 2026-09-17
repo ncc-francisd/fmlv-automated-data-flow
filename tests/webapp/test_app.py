@@ -171,6 +171,87 @@ def test_the_manufacturer_dropdown_is_alphabetical(db_path: Path) -> None:
     assert options == ["Adria", "Chausson", "Morelo", "MOTO-TREK", "Weinsberg"]
 
 
+def _manufacturer_values(html: str) -> list[str]:
+    """The `value` of each option in the trigger form's manufacturer dropdown."""
+    block = re.search(r'<select id="manufacturer_name".*?</select>', html, re.DOTALL)
+    assert block is not None, "the manufacturer dropdown is missing from /trigger"
+    return re.findall(r'<option value="([^"]*)"', block.group(0))
+
+
+def _swift_group_registry(db_path: Path) -> TestClient:
+    """The three brands one manufacturer owns, as the real registry holds them."""
+    (db_path.parent / "manufacturers.csv").write_text(
+        "manufacturer_id,fmlv_manufacturer,fmlv_display_name,ncc_supplier_name,"
+        "categories,website_url\n"
+        "26,Swift Group Ltd,Swift,Swift,\"motorhome,caravan\",https://example.invalid/a\n"
+        "228,Swift Group Ltd,Bessacarr,Bessacarr Caravans,caravan,https://example.invalid/b\n"
+        "264,Swift Group Ltd,Ace Motorhomes,Ace Motorhomes,motorhome,https://example.invalid/c\n",
+        encoding="utf-8",
+    )
+    return TestClient(
+        create_app(
+            db_path,
+            registry_path=db_path.parent / "manufacturers.csv",
+            reviewers_path=db_path.parent / "reviewers.csv",
+        )
+    )
+
+
+def test_each_brand_of_one_manufacturer_is_its_own_choice(db_path: Path) -> None:
+    """The bug this guards: every option carried `fmlv_manufacturer`, so all three Swift
+    Group brands submitted the identical string. Picking Ace Motorhomes sent "Swift Group
+    Ltd", which resolves to no single row, and the redisplayed form selected the first
+    match — so the dropdown visibly changed itself to Swift and refused to run."""
+    html = _swift_group_registry(db_path).get("/trigger").text
+
+    assert _manufacturer_options(html) == ["Ace Motorhomes", "Bessacarr", "Swift"]
+    assert _manufacturer_values(html) == ["264", "228", "26"]
+
+
+def test_choosing_one_brand_reaches_that_brands_adapter(db_path: Path) -> None:
+    """End to end through the form, stopping deliberately short of starting a run.
+
+    A range no adapter has fails in `resolve_ranges`, *after* the manufacturer and the
+    adapter have been resolved — and the error names the ranges of whichever adapter was
+    found. So Ace's own ranges coming back proves the form reached Ace and not Swift,
+    without the POST going on to attempt a real NCC login.
+    """
+    client = _swift_group_registry(db_path)
+
+    response = client.post(
+        "/trigger",
+        data={
+            "manufacturer_name": "264",
+            "vehicle_class": "motorhome",
+            "range_name": "no such range",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "several brands" not in response.text
+    assert "unknown range" in response.text
+    # Ace's ranges, not Swift's — the whole point of the fix.
+    assert "Supreme" in response.text
+    assert "Kon-Tiki" not in response.text
+
+
+def test_a_brand_is_not_offered_its_siblings_product_areas(db_path: Path) -> None:
+    """The same collapse in the help text. Ace build no caravans and Bessacarr no
+    motorhomes, but keyed on the shared manufacturer each inherited the other's."""
+    client = _swift_group_registry(db_path)
+
+    response = client.post(
+        "/trigger",
+        data={"manufacturer_name": "264", "vehicle_class": "caravan"},
+    )
+
+    assert response.status_code == 422
+    assert "no caravan adapter written" in response.text
+    # The help text names only brands that genuinely build both.
+    assert "Ace Motorhomes has touring caravans" not in response.text
+    assert "Bessacarr has touring caravans and motorhomes" not in response.text
+
+
 def test_a_manufacturer_with_no_display_name_sorts_on_the_name_shown_instead(
     db_path: Path,
 ) -> None:

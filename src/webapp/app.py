@@ -344,7 +344,14 @@ def create_app(
         """
         result = loader.load(app.state.registry_path)
         errors = [issue.message for issue in result.issues if issue.severity == "error"]
-        runnable = [m for m in result.manufacturers if adapters_for(m.fmlv_manufacturer)]
+        # The brand, not just the manufacturer: `Swift Group Ltd` names three registry
+        # rows, and without it every one of them inherits every sibling's adapters —
+        # Bessacarr would be offered for motorhomes and Ace for caravans.
+        runnable = [
+            m
+            for m in result.manufacturers
+            if adapters_for(m.fmlv_manufacturer, display_name=m.fmlv_display_name)
+        ]
         runnable.sort(key=_display_name_sort_key)
         return runnable, errors
 
@@ -386,15 +393,22 @@ def create_app(
         options.sort(key=lambda option: option[1].casefold())
         return options
 
-    def _areas_by_manufacturer(manufacturers: list) -> dict[str, list[VehicleClass]]:
-        """Which product areas each manufacturer can actually be run for.
+    def _areas_by_manufacturer(manufacturers: list) -> dict[int, list[VehicleClass]]:
+        """Which product areas each registry row can actually be run for.
 
         Drives the trigger form's area choices, so a reviewer is never offered "Bailey,
         caravans" for a brand with no caravan adapter written.
+
+        **Keyed on `manufacturer_id`, which is the only unique column.** Keyed on
+        `fmlv_manufacturer` the three Swift Group rows collapsed into one entry holding
+        the *union* of their areas, and the form then offered Ace Motorhomes for touring
+        caravans and Bessacarr for motorhomes — neither of which has an adapter — and
+        said so in its own help text.
         """
         return {
-            m.fmlv_manufacturer: sorted(
-                adapters_for(m.fmlv_manufacturer), key=lambda cls: cls.value
+            m.manufacturer_id: sorted(
+                adapters_for(m.fmlv_manufacturer, display_name=m.fmlv_display_name),
+                key=lambda cls: cls.value,
             )
             for m in manufacturers
         }
@@ -584,6 +598,10 @@ def create_app(
     @app.post("/trigger", response_class=HTMLResponse)
     async def trigger_submit(
         request: Request,
+        # The dropdown sends the `manufacturer_id`, because a brand cannot be identified
+        # by `fmlv_manufacturer` where one manufacturer owns several. `find_manufacturer`
+        # accepts an id, a manufacturer or a brand, so the field keeps its name and still
+        # resolves anything a person might type into it by hand.
         manufacturer_name: str = Form(...),
         range_name: str = Form(""),
         vehicle_class: str = Form(DEFAULT_VEHICLE_CLASS.value),

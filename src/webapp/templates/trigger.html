@@ -17,9 +17,16 @@
       <div class="form-row">
         <label for="manufacturer_name">Manufacturer</label>
         <select id="manufacturer_name" name="manufacturer_name" required>
+          {# The value is the `manufacturer_id`, not the name on screen. One manufacturer
+             can own several brands — `Swift Group Ltd` is Swift, Bessacarr and Ace
+             Motorhomes — so `fmlv_manufacturer` sent all three options as the same
+             string: picking Ace submitted "Swift Group Ltd", which resolves to no single
+             row, and the redisplayed form then selected the first match and read back as
+             Swift. `cli.find_manufacturer` takes the id, the manufacturer or the brand,
+             and the id is the only one of the three guaranteed unique. #}
           {% for manufacturer in manufacturers %}
-            <option value="{{ manufacturer.fmlv_manufacturer }}"
-              {% if manufacturer.fmlv_manufacturer == submitted_manufacturer %}selected{% endif %}>
+            <option value="{{ manufacturer.manufacturer_id }}"
+              {% if manufacturer.manufacturer_id | string == submitted_manufacturer %}selected{% endif %}>
               {{ manufacturer.fmlv_display_name or manufacturer.fmlv_manufacturer }}
             </option>
           {% endfor %}
@@ -38,7 +45,7 @@
         <p class="muted">
           A manufacturer that builds both has a separate adapter for each.
           {%- for manufacturer in manufacturers %}
-            {%- set areas = areas_by_manufacturer.get(manufacturer.fmlv_manufacturer, []) %}
+            {%- set areas = areas_by_manufacturer.get(manufacturer.manufacturer_id, []) %}
             {%- if areas | length > 1 %}
               {{ manufacturer.fmlv_display_name or manufacturer.fmlv_manufacturer }} has
               {{ areas | map(attribute='label') | join(' and ') | lower }}.
