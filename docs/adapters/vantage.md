@@ -218,6 +218,19 @@ is the parse corroborated against FMLV across the board.
 * **Fuze's roof**, likewise. Both are pop-tops, but only Luna's dialogue says so in HTML.
 * **`SKY` and `4.97m LUX`**, in FMLV at 2022–2023 only and absent from the site. Out of
   scope for the diff on age, so they are neither matched nor reported.
+* **Whether the Fuze and Luna carry four travel seats or five.** Both brochure pages call
+  them *"4-berth, 5-belted seat"* and FMLV holds **4** for each. It stays at 4, settled
+  with the requester on 17 September 2026: `docs/adapters/README.md` counts **three-point
+  belts only**, and nothing published says whether all five qualify — the brochure says
+  "belted", not what kind of belt.
+
+  The likely shape of the answer, for whoever picks it up: the campervans use a **3-seat
+  Reimo Rock'n'Roll V3000** bench, so two cab seats plus three on the bench makes the five.
+  That is an inference from a third-party product's usual homologation, not a Vantage
+  statement, so it is not enough — and "however neatly they reconcile" is exactly the trap
+  the three-point rule exists for. **The answerable question is one for Vantage: are all
+  three V3000 positions three-point belts?** Until someone asks, 4 stands.
+
 * **`/2026-vantage`**, linked from the nav and not read — it may be where a new model year
   appears first.
 * **The optional packs.** Primo, Techno Plus and Style & Visibility change equipment and
