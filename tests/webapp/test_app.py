@@ -8,9 +8,10 @@ the same path a reviewer actually hits.
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -2310,3 +2311,98 @@ def test_a_new_product_keeps_its_blue_after_being_decided(
     assert "new product</span>" in decided
     # And the findings are still there to act on.
     assert "What we found on the site" in decided
+
+
+# --------------------------------------------------------------------------- #
+# A superseded run must say so
+# --------------------------------------------------------------------------- #
+
+
+def _run_against_export(db_path: Path, *, export_age_seconds: int) -> tuple[TestClient, int]:
+    """One finished run, with an export whose mtime sits either side of its finish time."""
+    (db_path.parent / "manufacturers.csv").write_text(
+        "manufacturer_id,fmlv_manufacturer,fmlv_display_name,website_url\n"
+        "3,Adria Mobil,Adria,https://example.invalid/\n",
+        encoding="utf-8",
+    )
+    connection = store.connect(db_path)
+    try:
+        run = store.start_run(
+            connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+        )
+        store.finish_run(connection, run.id)
+    finally:
+        connection.close()
+
+    export_dir = paths.manufacturer_exports_dir(3, "Adria Mobil", root=db_path.parent)
+    io.write_csv([make_baseline()], export_dir / "2026-08-01_Adria-Mobil_motorhome-campervans.csv")
+    export = next(export_dir.iterdir())
+    finished = datetime.fromisoformat(
+        store.connect(db_path).execute(
+            "SELECT finished_at FROM run WHERE id = ?", (run.id,)
+        ).fetchone()[0]
+    )
+    stamp = finished.timestamp() + export_age_seconds
+    os.utime(export, (stamp, stamp))
+
+    client = TestClient(
+        create_app(
+            db_path,
+            registry_path=db_path.parent / "manufacturers.csv",
+            reviewers_path=db_path.parent / "reviewers.csv",
+        )
+    )
+    return client, run.id
+
+
+def test_a_run_whose_export_has_been_superseded_says_so(db_path: Path) -> None:
+    """The gap this closes: a superseded run looks exactly like a current one.
+
+    Run #133 was worked through twice before anyone noticed its baseline predated a
+    rename made hours later, and nothing on the page said so.
+    """
+    client, run_id = _run_against_export(db_path, export_age_seconds=3600)
+
+    page = client.get(f"/runs/{run_id}").text
+
+    assert "exported again since this run finished" in page
+    assert "Re-run before accepting" in page
+
+
+def test_a_run_with_the_current_export_says_nothing(db_path: Path) -> None:
+    """A manually triggered run downloads its own export moments *after* it starts, so
+    comparing against the start time would flag every run ever triggered from this page.
+    Comparing against the finish time is what makes the notice usable."""
+    client, run_id = _run_against_export(db_path, export_age_seconds=-60)
+
+    assert "exported again since this run finished" not in client.get(f"/runs/{run_id}").text
+
+
+def test_a_run_with_no_export_at_all_still_renders(db_path: Path) -> None:
+    """A run page that will not render because a file is missing is worse than one
+    without this notice."""
+    (db_path.parent / "manufacturers.csv").write_text(
+        "manufacturer_id,fmlv_manufacturer,fmlv_display_name,website_url\n"
+        "3,Adria Mobil,Adria,https://example.invalid/\n",
+        encoding="utf-8",
+    )
+    connection = store.connect(db_path)
+    try:
+        run = store.start_run(
+            connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+        )
+        store.finish_run(connection, run.id)
+    finally:
+        connection.close()
+    client = TestClient(
+        create_app(
+            db_path,
+            registry_path=db_path.parent / "manufacturers.csv",
+            reviewers_path=db_path.parent / "reviewers.csv",
+        )
+    )
+
+    response = client.get(f"/runs/{run.id}")
+
+    assert response.status_code == 200
+    assert "exported again since this run finished" not in response.text

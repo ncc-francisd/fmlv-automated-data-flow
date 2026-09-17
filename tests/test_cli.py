@@ -23,6 +23,7 @@ from src.cli import (
     CommandError,
     _dedupe_baseline,
     _is_current_model_year,
+    _narrate_duplicate,
     execute_run,
     find_manufacturer,
     format_summary,
@@ -790,3 +791,64 @@ def test_generate_upload_refuses_a_run_that_has_not_succeeded(
 
     assert exit_code == 2
     assert "not 'succeeded'" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------- #
+# A collapsed baseline duplicate must not be silent
+# --------------------------------------------------------------------------- #
+
+
+def _same_named(product_id: int, year: int) -> Motorhome:
+    return Motorhome(
+        manufacturer="Swift Group Ltd",
+        manufacturer_range="1500",
+        model="SL",
+        product_id=product_id,
+        year=year,
+    )
+
+
+def test_a_discarded_duplicate_is_reported() -> None:
+    """Until this existed the removal was completely silent, and it cost real products.
+
+    Ace sold one floorplan as a 2-berth and a 4-berth and FMLV held both as `1500 SL`.
+    One of each pair never entered the diff — no match, and no disappearance notice
+    either — so the run showed two of four missing products and no sign of the rest.
+    """
+    said: list[str] = []
+    rows = [_same_named(8792, 2026), _same_named(8793, 2026)]
+
+    kept = _dedupe_baseline(rows, on_discard=_narrate_duplicate(said.append))
+
+    assert [product.product_id for product in kept] == [8792]
+    assert len(said) == 1
+    assert "8793" in said[0] and "8792" in said[0]
+    # The fix is a rename on the FMLV side, so the message has to ask for one.
+    assert "different model names" in said[0]
+
+
+def test_the_collapse_is_silent_unless_asked() -> None:
+    """The two upload-CSV call sites rebuild the same baseline and would repeat it."""
+    rows = [_same_named(8792, 2026), _same_named(8793, 2026)]
+
+    assert [product.product_id for product in _dedupe_baseline(rows)] == [8792]
+
+
+def test_nothing_is_reported_when_no_row_is_discarded() -> None:
+    said: list[str] = []
+    rows = [_same_named(8792, 2026), _same_named(8787, 2026).model_copy(update={"model": "GL"})]
+
+    _dedupe_baseline(rows, on_discard=_narrate_duplicate(said.append))
+
+    assert said == []
+
+
+def test_the_row_kept_is_still_the_newer_one() -> None:
+    """Narrating it must not change which row survives."""
+    said: list[str] = []
+    rows = [_same_named(3034, 2022), _same_named(6943, 2026)]
+
+    kept = _dedupe_baseline(rows, on_discard=_narrate_duplicate(said.append))
+
+    assert [product.product_id for product in kept] == [6943]
+    assert "3034" in said[0]

@@ -340,7 +340,11 @@ def baseline_scope(
     return lambda motorhome: bool(hook(motorhome, labels))
 
 
-def _dedupe_baseline(motorhomes: Iterable[Motorhome]) -> list[Motorhome]:
+def _dedupe_baseline(
+    motorhomes: Iterable[Motorhome],
+    *,
+    on_discard: Callable[[Product, Product], None] | None = None,
+) -> list[Motorhome]:
     """Collapse baseline rows sharing a `(manufacturer_range, model)` to the newest.
 
     See the module docstring's third bullet for why this exists — a real Swift export
@@ -349,6 +353,20 @@ def _dedupe_baseline(motorhomes: Iterable[Motorhome]) -> list[Motorhome]:
     arbitrary but stable. Rows with no `manufacturer_range` or no `model` can't be
     compared this way and are passed through untouched rather than being collapsed
     into each other by a shared blank key.
+
+    **`on_discard(kept, discarded)` is called for every row this removes**, because until
+    it existed the removal was completely silent and that cost real products. A discarded
+    row never reaches the diff: it cannot match a scraped product, and it raises no
+    disappearance notice either, so a reviewer sees no trace of it in the run at all.
+
+    Two brands have hit it. Ace sold one floorplan as a 2-berth and a 4-berth and FMLV
+    held both as `1500 SL`, so one of each pair was dropped here — and when the requester
+    asked why only two of four products were listed as missing, the answer was that the
+    other two had never entered the comparison. `murvi.py` documents the same collapse
+    against two live product ids.
+
+    The collapse is still right — see the module docstring — but it must be *visible*,
+    since the fix is a rename on the FMLV side and nobody can make it without being told.
     """
     groups: dict[tuple[str, str], list[Motorhome]] = defaultdict(list)
     passthrough: list[Motorhome] = []
@@ -362,12 +380,39 @@ def _dedupe_baseline(motorhomes: Iterable[Motorhome]) -> list[Motorhome]:
             order.append(key)
         groups[key].append(motorhome)
 
-    deduped = [
-        max(group, key=lambda motorhome: motorhome.year if motorhome.year is not None else -1)
-        for key in order
-        for group in (groups[key],)
-    ]
+    deduped: list[Motorhome] = []
+    for key in order:
+        group = groups[key]
+        kept = max(
+            group, key=lambda motorhome: motorhome.year if motorhome.year is not None else -1
+        )
+        deduped.append(kept)
+        if on_discard is not None:
+            for discarded in group:
+                if discarded is not kept:
+                    on_discard(kept, discarded)
     return passthrough + deduped
+
+
+def _narrate_duplicate(on_progress: Callable[[str], None]) -> Callable[[Product, Product], None]:
+    """An `on_discard` that tells the reviewer a baseline row left the comparison.
+
+    Worded as the thing to do about it rather than as a statistic: the row is real, it is
+    not archived, and it will keep vanishing every run until the two are told apart by
+    name in FMLV.
+    """
+
+    def narrate(kept: Product, discarded: Product) -> None:
+        on_progress(
+            f"BASELINE DUPLICATE: FMLV holds {discarded.manufacturer_range} "
+            f"{discarded.model} twice — product {discarded.product_id} "
+            f"({discarded.year}) and product {kept.product_id} ({kept.year}). Only "
+            f"{kept.product_id} is compared this run; {discarded.product_id} is left out "
+            f"entirely and will not be reported as missing either. If both are current "
+            f"vehicles, give them different model names in FMLV so each can be matched."
+        )
+
+    return narrate
 
 
 def resolve_ranges(adapter: Adapter, wanted: Sequence[str]) -> tuple[tuple[str, ...], ...]:
@@ -495,12 +540,17 @@ def execute_run(
                 )
 
             baseline = _dedupe_baseline(
-                product
-                for product in read_baseline(export_path, vehicle_class)
-                if product.manufacturer == manufacturer.fmlv_manufacturer
-                and not product.archived
-                and _is_current_model_year(product.year)
-                and (in_scope is None or in_scope(product))
+                (
+                    product
+                    for product in read_baseline(export_path, vehicle_class)
+                    if product.manufacturer == manufacturer.fmlv_manufacturer
+                    and not product.archived
+                    and _is_current_model_year(product.year)
+                    and (in_scope is None or in_scope(product))
+                ),
+                # Narrated here and not at the two upload-CSV call sites, which rebuild
+                # the same baseline and would repeat every line after the review.
+                on_discard=_narrate_duplicate(on_progress),
             )
 
             # One browser process and one HTTP client for the whole run — the browser

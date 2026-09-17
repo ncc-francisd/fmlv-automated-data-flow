@@ -24,6 +24,15 @@
   {% if run.error_message %}
     <p class="form-error">{{ run.error_message }}</p>
   {% endif %}
+  {% if newer_export_at %}
+    {# A superseded run is indistinguishable from a current one without this. #}
+    <p class="form-error">
+      FMLV has been exported again since this run finished, at
+      {{ newer_export_at|fmt_dt }}. This page was compared against the older export, so
+      anything corrected in FMLV since then is not reflected here.
+      <strong>Re-run before accepting these changes.</strong>
+    </p>
+  {% endif %}
 
   <div id="reviewer-bar">
     <label for="reviewer-name">Reviewing as:</label>

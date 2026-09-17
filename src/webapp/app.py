@@ -355,6 +355,44 @@ def create_app(
         runnable.sort(key=_display_name_sort_key)
         return runnable, errors
 
+    def _export_newer_than_run(run: store.Run) -> str | None:
+        """When a newer export arrived than the one this run compared against, or `None`.
+
+        **A superseded run looks exactly like a current one**, which cost a reviewer a
+        morning: run #133 was worked through twice before anyone noticed its baseline
+        predated a rename made hours later, and nothing on the page said so.
+
+        `Run` does not record which export it used, so this compares the newest export
+        on disk against the run's **finish** time rather than its start. That is the
+        distinction that makes it usable: a manually triggered run downloads a fresh
+        export moments *after* it starts, so comparing against `started_at` would flag
+        every run ever triggered from this page.
+
+        Anything that goes wrong here — no registry row, no export, an unparseable
+        timestamp — returns `None`. A run page that will not render because a file is
+        missing is worse than one without this notice.
+        """
+        if run.finished_at is None:
+            return None
+        try:
+            manufacturers = loader.load(app.state.registry_path).manufacturers
+            manufacturer = next(
+                m for m in manufacturers if m.manufacturer_id == run.manufacturer_id
+            )
+            export_path = latest_export(
+                root=app.state.data_root,
+                manufacturer_id=manufacturer.manufacturer_id,
+                manufacturer_name=manufacturer.fmlv_manufacturer,
+                vehicle_class=run.vehicle_class,
+            )
+            exported_at = datetime.fromtimestamp(export_path.stat().st_mtime, tz=UTC)
+            finished_at = datetime.fromisoformat(run.finished_at)
+        except (CommandError, OSError, StopIteration, ValueError):
+            return None
+        if exported_at <= finished_at:
+            return None
+        return exported_at.isoformat()
+
     def _brand_names_by_id() -> dict[int, str]:
         """`manufacturer_id` to the brand name a reader recognises.
 
@@ -732,6 +770,7 @@ def create_app(
             {
                 "run": run,
                 "brand": _brand_of(run),
+                "newer_export_at": _export_newer_than_run(run),
                 "pending": pending,
                 "decided": decided,
                 "disappearance_notices": disappearance_notices,
