@@ -423,3 +423,53 @@ def test_a_page_with_no_spec_block_has_no_drawing() -> None:
 
     assert dimensions_drawing("<html><body>Vantage</body></html>") is None
     assert dimensions_drawing(_page("stock")) is None
+
+
+def test_the_f_lines_get_their_dimensions_from_a_hand_read_constant() -> None:
+    """The two new models have no stored figure to preserve, so emit-nothing would have
+    meant blank forever — `swift._MANUALLY_SOURCED_HEIGHT_MM`'s reasoning exactly."""
+    extracted = build_extracted(_product("ora-f-line"), URL, basis="x")
+
+    assert extracted.motorhome.mh_length_mm == 5931
+    assert extracted.motorhome.mh_width_mm == 2112
+    assert extracted.motorhome.mh_height_mm == 2650
+
+
+def test_the_f_line_width_is_the_mirrors_folded_one() -> None:
+    """2112mm, not the bare 2032 and not the 2474 with mirrors out — the same choice FMLV
+    made for the eleven Fiats, where it holds 2280 against a bare 2050."""
+    snippet = build_extracted(_product("ora-f-line"), URL, basis="x").provenance[
+        "mh_width_mm"
+    ].snippet
+
+    assert "2112mm" in snippet
+    assert "inc.mirrors folded" in snippet
+
+
+def test_the_f_lines_share_nothing_with_the_fiat_panel_vans() -> None:
+    """5931 against 5998, 2112 against 2280, 2650 against 2600. Copying the panel vans'
+    figures across would have been wrong on all three."""
+    from src.adapters.vantage import _MANUALLY_SOURCED_DIMENSIONS_MM  # noqa: PLC0415
+
+    assert _MANUALLY_SOURCED_DIMENSIONS_MM["ORA F-Line"] == (5931, 2112, 2650)
+    assert set(_MANUALLY_SOURCED_DIMENSIONS_MM) == {"ORA F-Line", "SOL F-Line"}
+
+
+def test_an_existing_fiat_model_still_gets_no_dimensions() -> None:
+    """The constant is for the two new models only. FMLV already holds the other eleven
+    correctly, so emitting nothing preserves them and a reviewer confirms a no-op."""
+    extracted = build_extracted(_product("cub", index_range="5.41m"), URL, basis="x")
+
+    assert extracted.motorhome.mh_length_mm is None
+    assert "mh_width_mm" not in extracted.provenance
+
+
+def test_the_f_line_dimensions_are_still_not_published() -> None:
+    """The canary. A manually sourced constant cannot refresh itself, so this says when
+    Vantage start publishing these as text and the constant can go."""
+    for number in ("5931", "2112", "2650", "2032", "2474"):
+        assert number not in _page("ora-f-line"), (
+            f"{number} is now in the F-Line page's markup — Vantage may have started "
+            f"publishing dimensions as text, so _MANUALLY_SOURCED_DIMENSIONS_MM should "
+            f"be replaced by a parse"
+        )

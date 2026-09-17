@@ -237,6 +237,35 @@ _NOT_A_DRAWING = re.compile(r"logo|\d{3,4}x\d{3,4}", re.IGNORECASE)
 
 _IMG_SRC = re.compile(r'<img[^>]+?src="([^"]+)"', re.IGNORECASE)
 
+#: The two F-Lines' dimensions, in millimetres, as `(length, width, height)`.
+#:
+#: **Read by hand from `Sol-F-Line-Dimensions.png`** — the drawing both F-Line pages
+#: carry — and supplied by the requester on 17 September 2026. Nothing here can read it:
+#: see `dimensions_drawing` on why every Vantage dimension is pixels.
+#:
+#: **Why a constant here and emit-nothing everywhere else.** For the eleven Fiats the
+#: blank is the right answer: FMLV already holds their figures, correctly, so emitting
+#: nothing preserves them and the reviewer confirms a no-op. **A new product has no stored
+#: value to preserve**, so for these two "leave it alone" would have meant blank forever —
+#: the same reasoning as `swift._MANUALLY_SOURCED_HEIGHT_MM`, which exists for the nine
+#: brand-new Merlins for exactly this reason.
+#:
+#: **The width is the mirrors-folded figure**, 2112mm, not the bare 2032mm and not the
+#: 2474mm with mirrors out — `docs/adapters/README.md`'s rule, and the same choice FMLV
+#: made for the eleven Fiats, where it holds 2280 against a bare 2050.
+#:
+#: **These are a Ford Transit L3 H2 and share nothing with the Fiats.** 5931 against 5998,
+#: 2112 against 2280, 2650 against 2600. Copying the panel vans' figures across would have
+#: been wrong on all three, which is why they were not guessed at.
+#:
+#: **Like every manually sourced constant this cannot refresh itself.** It is narrated on
+#: every run, and `test_the_f_line_dimensions_are_still_not_published` is the canary that
+#: says when Vantage start publishing them as text and this can go.
+_MANUALLY_SOURCED_DIMENSIONS_MM: dict[str, tuple[int, int, int]] = {
+    "ORA F-Line": (5931, 2112, 2650),
+    "SOL F-Line": (5931, 2112, 2650),
+}
+
 _SCRIPTS = re.compile(r"<(script|style)\b.*?</\1>", re.DOTALL | re.IGNORECASE)
 _MARKUP = re.compile(r"<[^>]+>")
 
@@ -486,11 +515,17 @@ def build_extracted(
     features = habitation.features_from(equipment)
     features.pop("bed_types", None)
 
+    dimensions = _MANUALLY_SOURCED_DIMENSIONS_MM.get(product.model)
+    length_mm, width_mm, height_mm = dimensions if dimensions else (None, None, None)
+
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
         manufacturer_range=product.manufacturer_range,
         model=product.model,
+        mh_length_mm=length_mm,
+        mh_width_mm=width_mm,
+        mh_height_mm=height_mm,
         berths=product.berths,
         mh_passenger_seats_inc_driver=product.travel_seats,
         base_vehicle_manufacturer=product.base_vehicle_manufacturer,
@@ -553,6 +588,20 @@ def build_extracted(
             f"FROM £{product.rrp_pounds:,} (OTR) — the headline on-the-road price, not "
             f"one of the quotation calculator's option prices lower down the page",
         )
+
+    if dimensions is not None:
+        note = (
+            "read by hand from the dimensions drawing both F-Line pages carry, and "
+            "supplied by the requester on 17 September 2026 — Vantage publish it as an "
+            "image, so nothing can re-read it. Re-verify at model-year changeover"
+        )
+        record("mh_length_mm", f"{length_mm}mm: {note}")
+        record(
+            "mh_width_mm",
+            f"{width_mm}mm, the figure marked 'inc.mirrors folded' — not the bare 2032mm "
+            f"and not the 2474mm with mirrors out: {note}",
+        )
+        record("mh_height_mm", f"{height_mm}mm: {note}")
 
     record(
         "body_type",
@@ -742,14 +791,25 @@ def collect(
                 on_progress(f"dropping {product.label} — {reason}")
                 continue
 
-            if drawing := dimensions_drawing(page_html):
+            if product.model in _MANUALLY_SOURCED_DIMENSIONS_MM:
+                length_mm, width_mm, height_mm = _MANUALLY_SOURCED_DIMENSIONS_MM[
+                    product.model
+                ]
+                on_progress(
+                    f"{product.label}: proposing {length_mm}x{width_mm}x{height_mm}mm from "
+                    f"a hand-read constant — this model is new to FMLV, so there is no "
+                    f"stored figure to preserve and a blank would be permanent. The width "
+                    f"is the mirrors-folded one. This CANNOT refresh itself; re-verify it "
+                    f"at model-year changeover."
+                )
+            elif drawing := dimensions_drawing(page_html):
                 on_progress(
                     f"{product.label}: length, height and width are published only as a "
                     f"drawing, so none is proposed — read them from {drawing} if a figure "
                     f"needs filling in. It gives three widths; take the one marked "
                     f"'inc. mirrors folded'."
                 )
-            else:
+            elif dimensions_drawing(page_html) is None:
                 on_progress(
                     f"{product.label}: no dimensions drawing on the page, so there is "
                     f"nowhere on the site to read its length, height or width from"

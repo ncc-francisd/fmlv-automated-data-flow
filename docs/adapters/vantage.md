@@ -124,10 +124,24 @@ the one image in the Vehicle Specification block that is neither the chassis log
 photograph, and WordPress stamps every resized photograph with its pixel size
 (`AVAST_CUB-1-1200x772.jpg`), which separates them cleanly.
 
-The consequence that remains: the **two new F-Lines have nothing stored to preserve**, so
-their length, width and height arrive blank and need filling by hand — from
-`Sol-F-Line-Dimensions.png`, and **not** from the Fiats' 2280 × 2600, since they are a
-different bodyshell.
+### The two F-Lines are the exception, and carry a hand-read constant
+
+For the eleven Fiats the blank is the right answer: FMLV holds their figures already, so
+emitting nothing preserves them. **A new product has no stored value to preserve**, so for
+the two F-Lines "leave it alone" would have meant blank forever — the reasoning behind
+`swift._MANUALLY_SOURCED_HEIGHT_MM`, which exists for nine brand-new Merlins for exactly
+this reason.
+
+`_MANUALLY_SOURCED_DIMENSIONS_MM` therefore holds **5931 × 2112 × 2650** for both, read
+from `Sol-F-Line-Dimensions.png` and supplied by the requester on 17 September 2026. The
+width is the **mirrors-folded** 2112, not the bare 2032 and not the 2474 with mirrors out.
+
+They share nothing with the Fiats — 5931 against 5998, 2112 against 2280, 2650 against
+2600 — so copying the panel vans' figures across would have been wrong on all three.
+
+Like every manually sourced constant it **cannot refresh itself**. It is narrated on every
+run, and `test_the_f_line_dimensions_are_still_not_published` is the canary that says when
+Vantage start publishing these as text and the constant can go.
 
 ## The campervans live in modal dialogues, and are a different vehicle
 
