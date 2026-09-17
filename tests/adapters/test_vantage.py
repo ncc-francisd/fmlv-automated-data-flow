@@ -367,3 +367,59 @@ def test_no_mass_or_price_is_read_for_a_campervan() -> None:
 
 def test_the_expected_count_covers_both_sections() -> None:
     assert EXPECTED_LAYOUTS == 15
+
+
+# --------------------------------------------------------------------------- #
+# The dimensions drawing — every figure published, published as pixels
+# --------------------------------------------------------------------------- #
+
+
+def test_the_dimensions_drawing_is_found_and_absolute() -> None:
+    """Returned so a reviewer filling a blank dimension is pointed at it, since nothing
+    can read it: the drawing gives the length, the height and three widths, and not one
+    of those numbers appears anywhere in the page's HTML."""
+    from src.adapters.vantage import BASE_URL, dimensions_drawing  # noqa: PLC0415
+
+    drawing = dimensions_drawing(_page("cub"))
+
+    assert drawing is not None
+    assert drawing.startswith(BASE_URL)
+    assert drawing.endswith("CUB-Measurements-.png")
+
+
+def test_the_drawings_numbers_are_in_no_page_text() -> None:
+    """The reason none of them is emitted. 5413, 2050, 2280 and 2480 are all on the CUB's
+    drawing and none is in its markup."""
+    for number in ("5413", "2050", "2280", "2480"):
+        assert number not in _page("cub")
+
+
+def test_the_drawing_is_not_found_by_its_filename() -> None:
+    """They are called `CUB-Measurements-.png`, `SOL-6.png` and `NEO-2.png`, with no
+    pattern between them. A filename filter found three of thirteen and reported the
+    other ten as having no drawing at all."""
+    from src.adapters.vantage import dimensions_drawing  # noqa: PLC0415
+
+    drawing = dimensions_drawing(_page("ora-f-line"))
+
+    assert drawing is not None
+    assert "measure" not in drawing.lower().rsplit("/", 1)[-1].replace("dimensions", "")
+
+
+def test_a_photograph_is_not_mistaken_for_the_drawing() -> None:
+    """WordPress stamps a resized image with its pixel size, which is what separates the
+    photographs from the drawings — `AVAST_CUB-1-1200x772.jpg` against `SOL-6.png`."""
+    from src.adapters.vantage import _NOT_A_DRAWING  # noqa: PLC0415
+
+    assert _NOT_A_DRAWING.search("AVAST_CUB-1-1200x772.jpg")
+    assert _NOT_A_DRAWING.search("IMG_6713-1-1067x800.jpg")
+    assert _NOT_A_DRAWING.search("Fiat-Logo.png")
+    assert not _NOT_A_DRAWING.search("SOL-6.png")
+    assert not _NOT_A_DRAWING.search("CUB-Measurements-.png")
+
+
+def test_a_page_with_no_spec_block_has_no_drawing() -> None:
+    from src.adapters.vantage import dimensions_drawing  # noqa: PLC0415
+
+    assert dimensions_drawing("<html><body>Vantage</body></html>") is None
+    assert dimensions_drawing(_page("stock")) is None

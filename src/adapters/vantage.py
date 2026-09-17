@@ -84,10 +84,19 @@ trusted at all.
 Emitting 5410 would degrade eleven good figures to make a blank go away, which
 `docs/adapters/README.md` forbids — a figure that cannot be found is left alone.
 
-**No width or height is published anywhere on the site.** Both are emitted as nothing, so
-FMLV's own figures stand and arrive as a flagged no-op the reviewer can confirm — the
-requester's instruction, 17 September 2026: *"we'll have to have the option of using the
-current height and width if it's an existing vehicle"*.
+**Every dimension is published, and published as pixels.** Each model page carries a
+drawing giving the length, the height "inc. Hekis" and three widths — bare, "inc. mirrors
+folded" and "inc. mirrors" — and not one of those numbers is in the HTML. So all three
+fields are emitted as nothing, FMLV's own figures stand and arrive as a flagged no-op the
+reviewer can confirm — the requester's instruction, 17 September 2026: *"we'll have to
+have the option of using the current height and width if it's an existing vehicle"* — and
+`dimensions_drawing` names the drawing per layout so a blank can be filled without
+hunting.
+
+**The drawings corroborate FMLV rather than contradicting it.** The CUB's gives 5413,
+2600 and 2280 inc. mirrors folded; FMLV holds exactly those three, the 2280 included
+rather than the bare 2050 or the 2480 with mirrors out — which is what the mirrors-folded
+rule asks for. Leaving the stored figures alone was right, and is now evidenced.
 
 The consequence to know: the **two new F-Line models have no stored figure to preserve**,
 so their length, width and height arrive blank and need filling by hand. That is narrated
@@ -211,6 +220,22 @@ _CAMPERVAN_BASE = re.compile(
 #: How much of a campervan dialogue to read. Its description sits a few thousand
 #: characters past the key; the next dialogue is far enough away not to be reached.
 _MODAL_LENGTH = 14000
+
+#: Where the dimensions drawing lives on a model page. Everything under the "Vehicle
+#: Specification" heading, which is the block that carries the chassis logo, a photograph
+#: and the drawing.
+_SPEC_BLOCK_HEADING = "Vehicle Specification"
+_SPEC_BLOCK_LENGTH = 6000
+
+#: What the drawing is *not*: the chassis maker's logo, and any photograph. WordPress
+#: stamps a resized image with its pixel size (`AVAST_CUB-1-1200x772.jpg`,
+#: `IMG_6713-1-1067x800.jpg`), and the drawings are served at their natural size, so that
+#: suffix separates them cleanly. Matching on the drawing's *name* does not work — they
+#: are called `CUB-Measurements-.png`, `SOL-6.png` and `NEO-2.png`, with no pattern, and a
+#: filename filter found three of thirteen and reported the other ten as having none.
+_NOT_A_DRAWING = re.compile(r"logo|\d{3,4}x\d{3,4}", re.IGNORECASE)
+
+_IMG_SRC = re.compile(r'<img[^>]+?src="([^"]+)"', re.IGNORECASE)
 
 _SCRIPTS = re.compile(r"<(script|style)\b.*?</\1>", re.DOTALL | re.IGNORECASE)
 _MARKUP = re.compile(r"<[^>]+>")
@@ -375,6 +400,43 @@ def parse_model_page(page_html: str, slug: str, *, index_range: str | None = Non
         payload_kilograms=_int(_PAYLOAD.search(text).group(1) if _PAYLOAD.search(text) else None),
         rrp_pounds=_int(price.group(1)) if price else None,
     )
+
+
+
+def dimensions_drawing(page_html: str) -> str | None:
+    """The URL of this model's dimensions drawing, or `None`.
+
+    **Vantage publish every dimension, and publish them as pixels.** The drawing gives
+    the length, the height "inc. Hekis", and three widths — bare, "inc. mirrors folded"
+    and "inc. mirrors" — and not one of those numbers appears anywhere in the page's
+    HTML. So nothing here can read them, and this returns the URL instead: a reviewer
+    filling a blank dimension is pointed straight at the drawing rather than hunting for
+    it.
+
+    **The drawings corroborate FMLV rather than replacing it**, which is why not reading
+    them costs nothing on an existing vehicle. The CUB's gives 5413, 2600 and 2280 (inc.
+    mirrors folded), and FMLV holds exactly those three — including 2280 rather than the
+    bare 2050 or the 2480 with mirrors out, which is what `docs/adapters/README.md`'s
+    mirrors-folded rule asks for. It matters for a product FMLV does *not* hold, where
+    the field arrives blank and someone has to type it.
+
+    **One drawing serves a whole length.** `SOL-6.png` is on all four 5.99m pages and
+    `NEO-2.png` on all four 6.36m ones, which is correct rather than careless — those
+    models share a bodyshell, and it is the same reason the range is the length here. The
+    two F-Lines share `Sol-F-Line-Dimensions.png` for the same reason; they are the Ford
+    pair.
+    """
+    start = page_html.find(_SPEC_BLOCK_HEADING)
+    if start < 0:
+        return None
+    block = page_html[start : start + _SPEC_BLOCK_LENGTH]
+    for src in _IMG_SRC.findall(block):
+        if _NOT_A_DRAWING.search(src.rsplit("/", 1)[-1]):
+            continue
+        # Absolute, because the point of returning it is that somebody opens it. The
+        # site writes these as site-relative paths.
+        return f"{BASE_URL}{src}" if src.startswith("/") else src
+    return None
 
 
 def _reconciles(product: VantageProduct) -> tuple[bool, str]:
@@ -680,6 +742,19 @@ def collect(
                 on_progress(f"dropping {product.label} — {reason}")
                 continue
 
+            if drawing := dimensions_drawing(page_html):
+                on_progress(
+                    f"{product.label}: length, height and width are published only as a "
+                    f"drawing, so none is proposed — read them from {drawing} if a figure "
+                    f"needs filling in. It gives three widths; take the one marked "
+                    f"'inc. mirrors folded'."
+                )
+            else:
+                on_progress(
+                    f"{product.label}: no dimensions drawing on the page, so there is "
+                    f"nowhere on the site to read its length, height or width from"
+                )
+
             equipment = tuple(habitation.list_items(page_html))
             if roof_line := elevating_roof_in(equipment):
                 on_progress(
@@ -735,9 +810,10 @@ def collect(
     # Length, width and height are published nowhere — said once rather than per layout,
     # because it is the same sentence thirteen times.
     on_progress(
-        "no length, width or height is published on any model page: the only length is "
-        "the rounded range name (5.41m against FMLV's 5413mm), so all three are left "
-        "alone and FMLV's figures stand. A model new to FMLV arrives with all three blank."
+        "no length, width or height is published as text on any model page — every one is "
+        "in a drawing, as pixels, and the only figure in the HTML is the rounded range "
+        "name (5.41m against FMLV's 5413mm). So all three are left alone, FMLV's figures "
+        "stand, and each layout above names the drawing to read them from."
     )
     if len(extracted) != EXPECTED_LAYOUTS:
         on_progress(

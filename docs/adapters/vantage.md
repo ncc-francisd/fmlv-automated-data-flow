@@ -81,18 +81,53 @@ Line`**. Nothing else would have noticed — the run looked entirely successful 
 `EXPECTED_LAYOUTS` was the only thing that disagreed. It is the clearest case in the
 project for keeping a published count even when the manufacturer does not supply one.
 
-## Length, width and height are not emitted
+## Every dimension is published, and published as pixels
 
-**The site rounds and FMLV does not.** The only length published is the range name,
-`5.41m`, against FMLV's **5413**; the others are 5998 and 6363. Emitting 5410 would
-degrade eleven good figures to fill a blank.
+Each model page carries a **drawing** giving the length, the height "inc. Hekis" and
+**three widths** — bare, "inc. mirrors folded" and "inc. mirrors". Not one of those
+numbers appears anywhere in the page's HTML, so nothing can read them. The only figure in
+the markup is the rounded range name, `5.41m` against FMLV's **5413**.
 
-**No width or height appears anywhere.** Both are left alone so FMLV's figures stand and
-arrive as a flagged no-op — the requester's instruction: *"we'll have to have the option
-of using the current height and width if it's an existing vehicle"*.
+So all three fields are emitted as nothing and FMLV's figures stand, arriving as a flagged
+no-op — the requester's instruction: *"we'll have to have the option of using the current
+height and width if it's an existing vehicle"*. `dimensions_drawing` then **names the
+drawing per layout**, so a blank can be filled without hunting for it.
 
-The consequence: the **two new F-Lines have nothing stored to preserve**, so their length,
-width and height arrive blank and need filling by hand.
+**The drawings corroborate FMLV rather than contradicting it**, which is why not reading
+them costs nothing on an existing vehicle:
+
+| the CUB's drawing | FMLV |
+| --- | --- |
+| 5413 length | **5413** |
+| 2600 (inc. Hekis) | **2600** |
+| **2280 (inc. mirrors folded)** | **2280** |
+| 2050 bare / 2480 inc. mirrors | *neither* |
+
+FMLV holds the mirrors-folded figure on all eleven panel vans, which is exactly what the
+mirrors-folded rule in `docs/adapters/README.md` asks for. Leaving the stored figures
+alone was right, and is now evidenced rather than merely cautious.
+
+**One drawing serves a whole length**, and that is correct rather than careless — those
+models share a bodyshell, which is the same reason the range *is* the length here:
+
+| length | drawing | models |
+| --- | --- | --- |
+| 5.41m | `CUB-Measurements-.png`, `MED-2.png` | CUB / GEM, MED |
+| 5.99m | `SOL-6.png` | MAX, ORA, SOL, TEO |
+| 6.36m | `NEO-2.png` | EOS, NEO, RIO, VUE |
+| F-Line | `Sol-F-Line-Dimensions.png` | both Fords |
+
+**The drawing is not found by its filename.** They are called `CUB-Measurements-.png`,
+`SOL-6.png` and `NEO-2.png`, with no pattern between them — a filename filter found three
+of thirteen and reported the other ten as having none at all. It is found instead by being
+the one image in the Vehicle Specification block that is neither the chassis logo nor a
+photograph, and WordPress stamps every resized photograph with its pixel size
+(`AVAST_CUB-1-1200x772.jpg`), which separates them cleanly.
+
+The consequence that remains: the **two new F-Lines have nothing stored to preserve**, so
+their length, width and height arrive blank and need filling by hand — from
+`Sol-F-Line-Dimensions.png`, and **not** from the Fiats' 2280 × 2600, since they are a
+different bodyshell.
 
 ## The campervans live in modal dialogues, and are a different vehicle
 
