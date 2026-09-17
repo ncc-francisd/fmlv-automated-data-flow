@@ -1230,6 +1230,32 @@ is `None` rather than an arbitrary pick.
 because an export is downloaded per *supplier* — each brand's file holds only its own
 products, so the filter is a belt-and-braces check rather than the thing separating them.
 
+### Sole UK distribution is not a dealer special
+
+The caravan export has three dealer columns — `dealer`, `dealer_specials_range` and
+`dealer_model_variant` — and **no adapter writes any of them.** A brand sold through one
+retailer looks like a dealer special from every angle except the one that counts.
+
+Bessacarr, 17 September 2026, is the case that settled it. `bessacarrcaravan.co.uk` is
+titled *"Bessacarr By Design | Couplands Caravans Ltd"*, Couplands are the only retailer,
+the vehicles are rebadged Swift Elegance Grandes, and FMLV already holds a **predecessor
+range filed as a dealer special** — `Cameo by Design`, same dealer, all three columns
+filled. Every signal pointed one way and the conclusion was still wrong.
+
+What decides it:
+
+* **does the brand have its own public-facing site**, separate from the retailer's own? A
+  dealer special lives on the dealer's site among the other makes they sell;
+* **does the parent still run a dealer-special programme at all?** Swift have stopped, so
+  a current Swift-built range cannot be one whatever it resembles;
+* **sole distribution is an ordinary arrangement.** Benimar is sold in the UK only through
+  Marquis Leisure and is unambiguously a brand; the same is true of several importers.
+
+An adapter that fills these columns asserts a commercial relationship it cannot see from a
+spec page. Leave them blank and let a person set them — and if a range really is a dealer
+special, that is an NCC-side decision about which manufacturer row it belongs to, not
+something for an adapter to encode.
+
 ### A brand new to FMLV needs three things created, not two
 
 Almost every manufacturer already exists in FMLV with products and an export. **A genuinely

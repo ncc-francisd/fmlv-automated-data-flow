@@ -28,7 +28,7 @@ Two consequences worth knowing:
   Motorhomes)"*. `fmlv run "Ace Motorhomes"` and `fmlv run "Swift"` both work;
 * `adapter_for` returns `None` for an ambiguous manufacturer rather than picking one.
 
-Bessacarr will be the third, and needs no further change.
+Bessacarr became the third on 17 September 2026 and needed no further change — `bessacarr.py` registered under `(Swift Group Ltd, Bessacarr, caravan)` with three lines in `adapters/__init__.py` and nothing else. It also made the *caravan* half ambiguous, so `fmlv run "Swift Group Ltd"` now resolves in neither product area; see `docs/adapters/bessacarr.md`.
 
 ## The source: the site publishes its own spec sheet as JSON
 
@@ -161,8 +161,8 @@ down`, with sizes — which is better than the range prose and is per layout.
 
 ## Still unverified
 
-* **Bessacarr**, id 228, which is the third brand under this manufacturer and has no adapter.
-  Nothing further is needed in the wiring for it.
+* ~~**Bessacarr**, id 228~~ — built 17 September 2026, caravans only. See
+  `docs/adapters/bessacarr.md`.
 * **Floorplans**, and the `tour360Url` and `videoTourTikTokId` fields, which are not read.
 * **`optionalExtras`**, which carries priced options per layout — an automatic gearbox, a
   comfort pack — and is not read. It is what explains the RLT discrepancy.

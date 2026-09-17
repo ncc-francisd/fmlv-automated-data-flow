@@ -82,9 +82,20 @@ def guide() -> swift_caravan.GuideSpecs:
 
 def test_the_two_swift_adapters_coexist() -> None:
     """Swift is the second manufacturer to hold both product areas."""
-    assert adapter_for(swift_caravan.MANUFACTURER, VehicleClass.CARAVAN) is swift_caravan
-    # The brand is needed now: `Swift Group Ltd` also names Ace Motorhomes, so the
-    # manufacturer alone is ambiguous for motorhomes and answers nothing.
+    # The brand is needed in **both** areas now. `Swift Group Ltd` names Ace Motorhomes
+    # as well as Swift for motorhomes, and Bessacarr as well as Swift for caravans, so
+    # the manufacturer alone is ambiguous either way and answers nothing — which is the
+    # point: served this adapter, a Bessacarr run would propose Swift's 26 caravans
+    # against Bessacarr's four real product ids.
+    assert adapter_for(swift_caravan.MANUFACTURER, VehicleClass.CARAVAN) is None
+    assert (
+        adapter_for(
+            swift_caravan.MANUFACTURER,
+            VehicleClass.CARAVAN,
+            display_name=swift_caravan.MANUFACTURER_DISPLAY_NAME,
+        )
+        is swift_caravan
+    )
     assert adapter_for(swift.MANUFACTURER, VehicleClass.MOTORHOME) is None
     assert (
         adapter_for(
