@@ -65,6 +65,7 @@ from . import (
     vantage,
     vantourer,
     weinsberg,
+    westfalia,
     wingamm,
     wingamm_caravan,
 )
@@ -115,6 +116,7 @@ _MODULES: tuple[Adapter, ...] = (
     vantage,
     vantourer,
     weinsberg,
+    westfalia,
     wingamm,
     wingamm_caravan,
 )
@@ -208,6 +210,7 @@ __all__ = [
     "vantage",
     "vantourer",
     "weinsberg",
+    "westfalia",
     "wingamm",
     "wingamm_caravan",
 ]
