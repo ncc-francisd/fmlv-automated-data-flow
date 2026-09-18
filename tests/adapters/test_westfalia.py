@@ -288,3 +288,84 @@ def test_both_halves_of_the_identity_carry_provenance() -> None:
 
     assert "manufacturer_range" in provenance
     assert "model" in provenance
+
+
+# --------------------------------------------------------------------------- #
+# The range page's own specification table
+# --------------------------------------------------------------------------- #
+
+
+def test_the_page_table_is_read_for_a_single_layout_range() -> None:
+    """A far better source than either PDF: per layout, one figure per field, and no
+    variants to choose between — unlike the brochure, whose James Cook panel offers five
+    heights and two masses."""
+    from src.adapters.westfalia import parse_specification_table  # noqa: PLC0415
+
+    page = (FIXTURES / "westfalia_james_cook_page.html").read_text(encoding="utf-8")
+
+    assert parse_specification_table(page, "Length") == 5932
+    assert parse_specification_table(page, "Width") == 2050
+    assert parse_specification_table(page, "Height") == 2850
+    assert parse_specification_table(page, "Seats") == 4
+    assert parse_specification_table(page, "Mass in Running Order") == 2886
+
+
+def test_the_page_is_what_fmlv_was_populated_from() -> None:
+    """Every dimension on it matches FMLV exactly, which is why it is preferred to the
+    brochure where the two disagree about the masses."""
+    from src.adapters.westfalia import parse_specification_table  # noqa: PLC0415
+
+    page = (FIXTURES / "westfalia_james_cook_page.html").read_text(encoding="utf-8")
+
+    assert parse_specification_table(page, "Length") == 5932  # FMLV holds 5932
+    assert parse_specification_table(page, "Height") == 2850  # FMLV holds 2850
+
+
+def test_a_page_without_the_table_yields_nothing() -> None:
+    from src.adapters.westfalia import parse_specification_table  # noqa: PLC0415
+
+    assert parse_specification_table("<html></html>", "Length") is None
+
+
+def test_the_cheapest_price_is_the_base_trim() -> None:
+    """James Cook is priced Classic manual, Classic automatic and Premium; FMLV holds the
+    Classic manual. The same base-vehicle rule Columbus needs."""
+    from src.adapters.westfalia import parse_cheapest_price  # noqa: PLC0415
+
+    text = (
+        "2.0 L R4 150 BHP CLASSIC (Manual Transmission) - - £ 95.637\n"
+        "2.0 L R4 150 BHP CLASSIC (Automatic Transmission) 31 - £ 98.542\n"
+        "2.0 L R4 190 BHP PREMIUM (incl. All-Wheel Drive) £ 114.731\n"
+        "Trailer socket, 13-pin 2 E43 £ 278\n"
+    )
+
+    assert parse_cheapest_price(text) == 95_637
+
+
+def test_a_missing_field_never_drops_a_layout() -> None:
+    """The Club Joker Urban's page gives dimensions and no masses, and it was dropped once
+    for want of a permissible total weight its page has never stated — coming back in the
+    diff as discontinued."""
+    product = westfalia.WestfaliaProduct(
+        manufacturer_range="Club Joker Urban",
+        model="Club Joker Urban",
+        base_vehicle="Ford",
+        mh_length_mm=5050,
+    )
+
+    assert _reconciles(product)[0] is True
+
+
+def test_an_implausible_figure_still_drops_a_layout() -> None:
+    product = westfalia.WestfaliaProduct(
+        manufacturer_range="Columbus", model="540 D", base_vehicle="Fiat", mh_length_mm=900
+    )
+
+    assert _reconciles(product)[0] is False
+
+
+def test_berths_are_never_proposed() -> None:
+    """The pages say 4 where FMLV holds 2, and these have pop-up roofs that sleep two
+    more — so 4 looks like the roof raised rather than the base vehicle."""
+    assert "BERTHS NOT PROPOSED" in westfalia.BERTHS_NOT_READ
+    assert all("berths" not in entry.from_page for entry in westfalia.RANGES)

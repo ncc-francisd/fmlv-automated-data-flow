@@ -167,10 +167,22 @@ class Range:
     fmlv_range: str
     base_vehicle: str
     models: tuple[str, ...]
-    #: Whether this range's documents are read for figures. `False` collects the identity
-    #: alone, which is what stops a live product being reported as discontinued while
-    #: leaving every stored figure untouched.
+    #: Whether the **price list** is read for this range. `False` means the range has no
+    #: usable one, and only the brochure is consulted.
     figures: bool = True
+    #: Which fields the **range page's own specification table** may supply. Preferred to
+    #: the brochure wherever both have a figure, because the page is per layout and
+    #: carries no variants to choose between.
+    from_page: tuple[str, ...] = ()
+    #: Whether this range's price list is read for its **price** alone. A single-layout
+    #: range has no columns to align, so the cheapest vehicle price in the document is its
+    #: base price — see `parse_cheapest_price`.
+    price_from_list: bool = False
+    #: Which fields the **brochure** may supply, for a range whose price list is unusable.
+    #: Named explicitly rather than "everything readable", because the brochures publish
+    #: several variants of some fields and only one of the vehicle FMLV holds — see
+    #: `RANGES`. A field not named here is left alone whatever the document says.
+    from_brochure: tuple[str, ...] = ()
 
 
 #: Every range FMLV holds. **Only Columbus carries figures**; the other four are here so
@@ -199,24 +211,52 @@ class Range:
 #: made from the run rather than from a fresh survey.
 RANGES: tuple[Range, ...] = (
     Range("columbus", "Columbus", "Fiat", ("540 D", "600 D", "600 E", "640 E")),
-    Range("james-cook", "James Cook", "Mercedes", ("600 D",), figures=False),
-    Range("jules-verne", "Jules Verne", "Mercedes", ("Jules Verne",), figures=False),
-    Range("sven-hedin", "Sven Hedin", "MAN", ("Sven Hedin",), figures=False),
     Range(
-        "club-joker-urban", "Club Joker Urban", "Ford", ("Club Joker Urban",), figures=False
+        "james-cook", "James Cook", "Mercedes", ("600 D",), figures=False,
+        from_page=("length", "width", "height", "seats", "mro", "mtplm"),
+        price_from_list=True,
+    ),
+    Range(
+        "jules-verne", "Jules Verne", "Mercedes", ("Jules Verne",), figures=False,
+        from_page=("length", "width", "height", "seats", "mro", "mtplm"),
+    ),
+    Range(
+        "sven-hedin", "Sven Hedin", "MAN", ("Sven Hedin",), figures=False,
+        from_page=("length", "width", "height", "seats", "mro", "mtplm"),
+    ),
+    Range(
+        "club-joker-urban", "Club Joker Urban", "Ford", ("Club Joker Urban",),
+        figures=False,
+        from_page=("length", "width", "height"),
+        price_from_list=True,
     ),
 )
 
 #: What each brochure says about the masses of a range this adapter does not take figures
 #: from — quoted in the run so the gap is a decision waiting, not a silence.
 UNREAD_MASSES: dict[str, str] = {
-    "James Cook": "Classic 3,075kg / Premium 2,930kg, both at 3,500kg — FMLV holds 2,930, "
-    "the Premium, and the price list heads two columns where FMLV has one row",
-    "Jules Verne": "no mass panel and no price list at all",
-    "Sven Hedin": "2,955kg / 3,500kg, which is what FMLV already holds",
-    "Club Joker Urban": "2,608kg Classic, 2,715kg Premium, at 3,300kg — FMLV holds the "
-    "Classic figure",
+    "James Cook": "NOTE its mass: the page says 2,886kg where the brochure says Classic "
+    "3,075 / Premium 2,930 and FMLV holds 2,930. The page is preferred because every "
+    "dimension on it matches FMLV exactly, but the three disagree and a reviewer should "
+    "look.",
+    "Jules Verne": "Its page table is complete and agrees with FMLV on every figure read.",
+    "Sven Hedin": "NOTE its mass: the page says 2,965kg against the brochure's 2,955 and "
+    "FMLV's 2,955 — a 10kg difference worth a look.",
+    "Club Joker Urban": "Its page gives no mass, seats or permissible weight, so only the "
+    "dimensions are read and they match FMLV already.",
 }
+
+#: **Berths are read from no source here**, deliberately. The range pages state 4 for the
+#: James Cook, Jules Verne and Club Joker Urban where FMLV holds 2, and these are vans with
+#: pop-up roofs that add two — so the page's figure looks like the roof raised, and
+#: `docs/adapters/README.md` records the base vehicle rather than the optioned one. Taking
+#: it would add two optional berths to four live products. Left for a person to settle.
+BERTHS_NOT_READ = (
+    "BERTHS NOT PROPOSED: the range pages say 4 for the James Cook, Jules Verne and Club "
+    "Joker Urban where FMLV holds 2. These have pop-up roofs that sleep two more, so 4 "
+    "looks like the roof raised rather than the base vehicle. FMLV's figures stand until "
+    "somebody rules on it."
+)
 
 #: Ranges on the guide page that are deliberately not collected, so the roster check
 #: reports only something genuinely new.
@@ -384,6 +424,129 @@ def parse_brochure_masses(text: str) -> dict[str, tuple[int, int]]:
     return masses
 
 
+
+#: `B: Length 5.932 mm`, `C: Width 2.050 mm`, `Height 2.050 mm` — the brochure's own
+#: dimensions panel, which is a different block from the mass panel and was missed on the
+#: first pass.
+#:
+#: **The figures carry spaces inside them.** Sven Hedin's brochure extracts as
+#: `A: Wheelbase 3 640 m m B: Length 5 986 mm C: Width 2 040 mm D: Height 2 67 0 mm`, so
+#: `2 67 0` is 2,670 and even the unit is split. Every separator — space or dot — is
+#: stripped before the figure is read.
+_BROCHURE_DIMENSION = r"{label}\s*:?\s*([\d.\s]+?)\s*m\s*m"
+
+
+def parse_brochure_dimension(text: str, label: str) -> int | None:
+    """One labelled dimension from the brochure, in millimetres.
+
+    **Only a label with a single figure after it can be read this way**, which is why
+    `Range.from_brochure` names the fields rather than this function taking whatever it
+    finds: James Cook's panel lists *five* heights (`Height Classic`, `Height Classic PR`,
+    `Height Premium`, `Height Premium Offroad`, `Height Premium PR`) and Sven Hedin's two,
+    one of them with the pop-up roof raised. Taking the first would put a variant's height
+    on the base vehicle.
+    """
+    import re as _re
+
+    match = _re.search(_BROCHURE_DIMENSION.format(label=label), text, _re.IGNORECASE)
+    return _number(match.group(1)) if match else None
+
+
+def parse_brochure_single_mass(text: str) -> tuple[int | None, int | None]:
+    """`(mass in running order, permissible total weight)` where the panel gives one pair.
+
+    The **first** mass and the one after the final slash, which is what the two usable
+    shapes need:
+
+        2 955 kg / 3 500 kg                                        -> (2955, 3500)
+        2.608 kg (Classic), Premium version from 2.715 kg / 3.300 kg -> (2608, 3300)
+
+    Club Joker Urban's is the reason it is the *first* rather than the last: FMLV holds the
+    Classic, and the pair a naive reader finds is `2.715 / 3.300`, the Premium, 107kg out.
+
+    James Cook's shape — `Classic : 3.075 kg, Premium : 2.930 kg / 3.500 kg` — would give
+    the Classic here, and FMLV holds the **Premium**. So James Cook does not name `mro` in
+    `from_brochure`, and this function is never asked about it.
+    """
+    import re as _re
+
+    panel = _MASS_PANEL.search(text)
+    if panel is None:
+        return None, None
+    block = panel.group(0)
+    masses = _re.findall(r"([\d.\s]+?)\s*kg", block)
+    if not masses:
+        return None, None
+    total = _re.search(r"/\s*([\d.\s]+?)\s*kg", block)
+    return _number(masses[0]), (_number(total.group(1)) if total else None)
+
+
+
+#: One row of a range page's own specification table, which is a far better source than
+#: either PDF for a single-layout range — and, on the evidence, **the source FMLV was
+#: populated from**: every length, width and height in it matches FMLV exactly across all
+#: four ranges that have one.
+#:
+#:     James Cook 600 D Specification
+#:     Length                 5932 mm
+#:     Width                  2050 mm
+#:     Height                 2850 mm
+#:     Mass in Running Order  2886 kg
+#:     Permissible Weight     3500 kg
+#:     Seats                     4
+#:     Berths                    4
+#:
+#: Per layout, one figure per field, no variants to choose between — none of which is true
+#: of the brochure, whose James Cook panel offers five heights and two masses.
+_SPEC_ROW = r"\|\s*{label}\s*\|\s*([\d,]+)\s*(?:mm|kg)?\s*\|"
+
+#: Tags become pipes so a label and its value stay separable, the same treatment the
+#: price-list rows get.
+_TAGS = re.compile(r"<[^>]+>")
+_SCRIPTS_HTML = re.compile(r"<(script|style)\b.*?</\1>", re.DOTALL | re.IGNORECASE)
+
+
+def parse_specification_table(page_html: str, label: str) -> int | None:
+    """One labelled figure from a range page's specification table.
+
+    **The page disagrees with the brochure on the masses**, and that is a finding rather
+    than a parsing problem: the page gives the James Cook 2,886kg where the brochure gives
+    Classic 3,075 and Premium 2,930, and the Sven Hedin 2,965 against the brochure's
+    2,955. FMLV holds the brochure's figures on both. Since every dimension here matches
+    FMLV and the masses do not, the page looks like FMLV's original source with its masses
+    since revised — so the difference is proposed, and a reviewer decides.
+    """
+    from html import unescape as _unescape
+
+    text = _TAGS.sub("|", _SCRIPTS_HTML.sub(" ", page_html))
+    text = re.sub(r"(\|\s*)+", "|", re.sub(r"\s+", " ", _unescape(text)))
+    match = re.search(_SPEC_ROW.format(label=re.escape(label)), text, re.IGNORECASE)
+    return _number(match.group(1)) if match else None
+
+
+
+def parse_cheapest_price(text: str) -> int | None:
+    """The base price of a single-layout range: the cheapest vehicle price in its list.
+
+    The same base-vehicle rule Columbus needs, and for the same reason — a range is priced
+    once per engine and trim, so there is no single row to read:
+
+        2.0 L R4 150 BHP CLASSIC (Manual Transmission)       £ 95.637
+        2.0 L R4 150 BHP CLASSIC (Automatic Transmission)    £ 98.542
+        2.0 L R4 190 BHP PREMIUM (incl. All-Wheel Drive)     £114.731
+
+    The cheapest is the standard engine on the standard trim, and it is what FMLV holds.
+    `MINIMUM_VEHICLE_PRICE` keeps the options out: the same document prices a £278 trailer
+    socket and a £2,026 set of headlights.
+    """
+    prices = [
+        value
+        for token in re.findall(r"£\s*([\d.]+)", text)
+        if (value := _number(token)) is not None and value >= MINIMUM_VEHICLE_PRICE
+    ]
+    return min(prices) if prices else None
+
+
 def find_brochure_url(page_html: str) -> str | None:
     """The brochure linked from a range page, or `None`."""
     match = _BROCHURE_HREF.search(page_html)
@@ -406,6 +569,7 @@ class WestfaliaProduct:
     mtplm_kilograms: int | None = None
     rrp_pounds: int | None = None
     mro_kilograms: int | None = None
+    travel_seats: int | None = None
     #: What the brochure said the permissible total weight was, kept so the two documents
     #: can be compared — see `_reconciles`.
     brochure_mtplm_kilograms: int | None = None
@@ -423,18 +587,41 @@ class WestfaliaProduct:
 
 
 def read_price_list(
-    text: str, entry: Range, masses: dict[str, tuple[int, int]] | None = None
+    text: str,
+    entry: Range,
+    masses: dict[str, tuple[int, int]] | None = None,
+    brochure_text: str = "",
+    page_html: str = "",
 ) -> list[WestfaliaProduct]:
     """Every layout of one range, read against its configured columns."""
     width = len(entry.models)
     if not entry.figures:
-        # Identity alone. Every figure stays `None`, so `diff.compare` proposes nothing
-        # and FMLV's own values stand.
+        # No usable price list. The range page's own specification table is preferred where
+        # it has a figure; the brochure fills what it does not. Anything neither names is
+        # left `None`, so nothing is proposed for it and FMLV's value stands.
+        take = set(entry.from_page)
+        page_of = {
+            "length": "Length", "width": "Width", "height": "Height",
+            "seats": "Seats", "mro": "Mass in Running Order",
+            "mtplm": "Permissible Weight",
+        }
+        figures = {
+            field: parse_specification_table(page_html, page_of[field])
+            for field in take
+            if field in page_of
+        }
         return [
             WestfaliaProduct(
                 manufacturer_range=entry.fmlv_range,
                 model=model,
                 base_vehicle=entry.base_vehicle,
+                mh_length_mm=figures.get("length"),
+                mh_width_mm=figures.get("width"),
+                mh_height_mm=figures.get("height"),
+                travel_seats=figures.get("seats"),
+                mro_kilograms=figures.get("mro"),
+                mtplm_kilograms=figures.get("mtplm"),
+                rrp_pounds=parse_cheapest_price(text) if entry.price_from_list else None,
             )
             for model in entry.models
         ]
@@ -461,61 +648,56 @@ def read_price_list(
 
 
 def _reconciles(product: WestfaliaProduct) -> tuple[bool, str]:
-    """Whether a layout's figures are present and plausible.
+    """Whether a layout's figures are present, plausible and agreed between documents.
 
-    **This is not an arithmetic self-check and does not pretend to be** — the source
-    publishes no payload and no mass in running order, so nothing constrains anything. It
-    is a sanity bound plus the column-count assertions made while parsing, and that is the
-    weakest position of any adapter in the project. See the module docstring.
+    **A missing field never drops a layout.** Every source here publishes a different
+    subset — the Club Joker Urban's page gives dimensions and no masses, the Jules Verne's
+    gives everything, Columbus's price list gives no seat count — and dropping a product
+    for a field its documents do not carry retires a live vehicle. It cost the Club Joker
+    Urban exactly that once: it was dropped for want of a permissible total weight its page
+    has never stated, and came back in the diff as discontinued.
+
+    What is checked is what is *present*: that each figure is plausible, that the two
+    documents agree where both speak, and that the mass in running order sits below the
+    permissible total weight.
     """
-    if product.mh_length_mm is None and product.mtplm_kilograms is None:
-        # An identity-only range. Nothing to check, and nothing will be proposed — see
-        # `RANGES` on why it is collected at all.
-        return True, "identity only; no figures are read for this range"
-
-    missing = [
-        name
-        for name, value in (
-            ("a length", product.mh_length_mm),
-            ("a permissible total weight", product.mtplm_kilograms),
-        )
-        if value is None
-    ]
-    if missing:
-        return False, f"the price list gives no {', no '.join(missing)} for it"
-
-    if not 4_000 <= product.mh_length_mm <= 8_000:
+    if product.mh_length_mm is not None and not 4_000 <= product.mh_length_mm <= 8_000:
         return False, f"a length of {product.mh_length_mm}mm is not a panel van"
-    if not 2_500 <= product.mtplm_kilograms <= 5_000:
-        return False, f"a permissible total weight of {product.mtplm_kilograms}kg is implausible"
 
-    # The one genuinely independent check this source offers: the price list and the
-    # brochure are written separately and both state the permissible total weight.
+    if product.mtplm_kilograms is not None and not 2_500 <= product.mtplm_kilograms <= 5_000:
+        return False, (
+            f"a permissible total weight of {product.mtplm_kilograms}kg is implausible"
+        )
+
+    # The one genuinely independent check: the price list and the brochure are written
+    # separately and both state the permissible total weight.
     if (
         product.brochure_mtplm_kilograms is not None
+        and product.mtplm_kilograms is not None
         and product.brochure_mtplm_kilograms != product.mtplm_kilograms
     ):
         return False, (
             f"the price list gives a permissible total weight of "
-            f"{product.mtplm_kilograms}kg and the brochure {product.brochure_mtplm_kilograms}kg"
+            f"{product.mtplm_kilograms}kg and the brochure "
+            f"{product.brochure_mtplm_kilograms}kg"
         )
 
-    if product.mro_kilograms is not None and product.mro_kilograms >= product.mtplm_kilograms:
+    if (
+        product.mro_kilograms is not None
+        and product.mtplm_kilograms is not None
+        and product.mro_kilograms >= product.mtplm_kilograms
+    ):
         return False, (
             f"a mass in running order of {product.mro_kilograms}kg is not below the "
             f"permissible total weight of {product.mtplm_kilograms}kg"
         )
 
-    if product.brochure_mtplm_kilograms is not None:
+    if product.payload_kilograms is not None:
         return True, (
-            f"the price list and the brochure agree on {product.mtplm_kilograms}kg, and the "
-            f"brochure's {product.mro_kilograms}kg in running order leaves "
-            f"{product.payload_kilograms}kg"
+            f"{product.mtplm_kilograms}kg less {product.mro_kilograms}kg in running order "
+            f"leaves {product.payload_kilograms}kg"
         )
-    return True, (
-        f"{product.mh_length_mm}mm at {product.mtplm_kilograms}kg — the brochure has no "
-        f"mass for this layout, so nothing checks it by arithmetic"
-    )
+    return True, "every figure its documents publish, and nothing inferred beyond them"
 
 
 def build_extracted(
@@ -532,6 +714,7 @@ def build_extracted(
         mh_height_mm=product.mh_height_mm,
         mtplm_kilograms=product.mtplm_kilograms,
         mro_kilograms=product.mro_kilograms,
+        mh_passenger_seats_inc_driver=product.travel_seats,
         mh_payload_kilograms=product.payload_kilograms,
         rrp_pounds=product.rrp_pounds,
         base_vehicle_manufacturer=fmlv_base_vehicle(product.base_vehicle),
@@ -569,6 +752,11 @@ def build_extracted(
             "mtplm_kilograms",
             f"Permissible total weight: {product.mtplm_kilograms}kg, on the Light-Chassis. "
             f"A Maxi Chassis is offered as an upgrade and is not the base vehicle",
+        )
+    if product.travel_seats is not None:
+        record(
+            "mh_passenger_seats_inc_driver",
+            f"Seats: {product.travel_seats}, from the range page's own specification table",
         )
     if product.mro_kilograms is not None:
         record(
@@ -612,12 +800,34 @@ def collect(
 
     for entry in RANGES:
         if not entry.figures:
-            for product in read_price_list("", entry):
-                extracted.append(build_extracted(product, GUIDE_URL, basis="identity only"))
+            page_url = f"{GUIDE_URL}{entry.slug}/"
+            page = http.fetch(page_url).file_path.read_text(encoding="utf-8", errors="replace")
+            brochure_url = find_brochure_url(page)
+            brochure_text = (
+                extract_text(http.fetch(brochure_url).file_path).text if brochure_url else ""
+            )
+            price_text = ""
+            if entry.price_from_list:
+                price_url = find_price_list_url(page)
+                if price_url is None:
+                    on_progress(
+                        f"{entry.fmlv_range}: no price list linked, so no price is proposed"
+                    )
+                else:
+                    price_text = extract_text(http.fetch(price_url).file_path).text
+            for product in read_price_list(price_text, entry, None, brochure_text, page):
+                reconciles, reason = _reconciles(product)
+                if not reconciles:
+                    on_progress(f"dropping {product.label} — {reason}")
+                    continue
+                extracted.append(
+                    build_extracted(product, brochure_url or GUIDE_URL, basis=reason)
+                )
             on_progress(
-                f"{entry.fmlv_range}: collected by name only so it is not reported as "
-                f"discontinued; no figure is proposed and FMLV's stand. Its brochure says "
-                f"{UNREAD_MASSES.get(entry.fmlv_range, 'nothing readable')}."
+                f"{entry.fmlv_range}: no usable price list, so it is read from its own "
+                f"page's specification table for "
+                f"{', '.join(entry.from_page) or 'nothing'}. "
+                f"{UNREAD_MASSES.get(entry.fmlv_range, '')}"
             )
             continue
 
@@ -701,5 +911,6 @@ def collect(
             f"expected {EXPECTED_LAYOUTS} layouts and collected {len(extracted)} — check "
             f"whether the Columbus range has really changed"
         )
+    on_progress(BERTHS_NOT_READ)
     on_progress(f"collected {len(extracted)} Westfalia layout(s)")
     return extracted
