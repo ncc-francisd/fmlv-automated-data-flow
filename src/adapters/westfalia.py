@@ -228,6 +228,8 @@ RANGES: tuple[Range, ...] = (
         "club-joker-urban", "Club Joker Urban", "Ford", ("Club Joker Urban",),
         figures=False,
         from_page=("length", "width", "height", "berths"),
+        # Its page carries no mass at all; its brochure does, and names the Classic first.
+        from_brochure=("mro", "mtplm"),
         price_from_list=True,
     ),
 )
@@ -242,8 +244,9 @@ UNREAD_MASSES: dict[str, str] = {
     "Jules Verne": "Its page table is complete and agrees with FMLV on every figure read.",
     "Sven Hedin": "NOTE its mass: the page says 2,965kg against the brochure's 2,955 and "
     "FMLV's 2,955 — a 10kg difference worth a look.",
-    "Club Joker Urban": "Its page gives no mass, seats or permissible weight, so only the "
-    "dimensions are read and they match FMLV already.",
+    "Club Joker Urban": "Its page carries no mass, so those come from its brochure "
+    "(2,608kg Classic, not the 2,715kg Premium) and match FMLV. Its seat count is on "
+    "neither document.",
 }
 
 #: **Berths come from the page and include the roof bed**, which was settled by the
@@ -623,6 +626,16 @@ def read_price_list(
             for field in take
             if field in page_of
         }
+        # The brochure fills what the page does not carry — never the other way round. The
+        # page is preferred because its dimensions match FMLV exactly where the brochure's
+        # do not always, but a field the page simply omits is better taken than left blank.
+        wanted = set(entry.from_brochure)
+        if wanted:
+            brochure_mro, brochure_mtplm = parse_brochure_single_mass(brochure_text)
+            if "mro" in wanted and figures.get("mro") is None:
+                figures["mro"] = brochure_mro
+            if "mtplm" in wanted and figures.get("mtplm") is None:
+                figures["mtplm"] = brochure_mtplm
         return [
             WestfaliaProduct(
                 manufacturer_range=entry.fmlv_range,
@@ -934,6 +947,13 @@ def collect(
             f"expected {EXPECTED_LAYOUTS} layouts and collected {len(extracted)} — check "
             f"whether the Columbus range has really changed"
         )
+    on_progress(
+        "PUBLISHED NOWHERE, and so left alone: the Columbus seat count (its range page has "
+        "no specification table at all, being four layouts, and its price list states no "
+        "seats); a price for the Jules Verne and the Sven Hedin (neither has a price list "
+        "carrying one — Sven Hedin's two 'price lists' are colour and equipment sheets); "
+        "and the Sven Hedin berth count. FMLV's own figures stand for every one."
+    )
     on_progress(BERTHS_FROM_PAGE)
     on_progress(f"collected {len(extracted)} Westfalia layout(s)")
     return extracted
