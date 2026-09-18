@@ -770,6 +770,10 @@ def create_app(
             {
                 "run": run,
                 "brand": _brand_of(run),
+                # Which fields were checked and matched, so "no row" can be told apart
+                # from "never looked at" — see `store.verified_fields_by_product`, which
+                # has existed since 8 September for this and was never rendered.
+                "verified_fields": store.verified_fields_by_product(connection, run_id),
                 "newer_export_at": _export_newer_than_run(run),
                 "pending": pending,
                 "decided": decided,

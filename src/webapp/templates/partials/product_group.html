@@ -16,6 +16,23 @@
       decision flow entirely.
     #}
     {% include "partials/findings.html" %}
+    {#
+      What was checked and found already correct. Without this a field with no row is
+      ambiguous — checked and matching, never looked at, or withheld — and the requester
+      has asked which three times: the Kilig 77 Plus bed types on 8 September, and the
+      Westfalia Columbus prices on 18 September, where all four matched to the pound and
+      so said nothing at all.
+    #}
+    {% set checked = verified_fields.get(product.id, []) %}
+    {% if checked %}
+      <details class="verified-fields">
+        <summary class="muted">
+          {{ checked | length }} field{{ '' if checked | length == 1 else 's' }}
+          checked and already correct
+        </summary>
+        <p class="muted">{{ checked | join(', ') }}</p>
+      </details>
+    {% endif %}
     {% set pending_entries = entries | selectattr('decision', 'none') | list %}
     {% set ns2 = namespace(unset=0) %}
     {% for entry in pending_entries %}

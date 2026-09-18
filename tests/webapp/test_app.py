@@ -2406,3 +2406,47 @@ def test_a_run_with_no_export_at_all_still_renders(db_path: Path) -> None:
 
     assert response.status_code == 200
     assert "exported again since this run finished" not in response.text
+
+
+def test_a_field_checked_and_matching_is_shown_as_such(
+    client: TestClient, db_path: Path, run_ready_for_upload: int
+) -> None:
+    """A field with no row is ambiguous — checked and matching, never looked at, or
+    withheld. The requester has asked which three times, most recently of the Westfalia
+    Columbus prices, all four of which matched FMLV to the pound and so said nothing.
+
+    `store.verified_fields_by_product` has existed since 8 September for exactly this and
+    was never rendered.
+    """
+    run_id = run_ready_for_upload
+    connection = store.connect(db_path)
+    try:
+        product = store.list_change_queue(connection, run_id)[0].product
+        store.record_verification(
+            connection, run_id=run_id, product_id=product.id, field="rrp_pounds"
+        )
+        # A pending row so the product renders at all — a product whose every field
+        # matched has no entries and never appears on the page.
+        store.record_proposed_change(
+            connection,
+            run_id=run_id,
+            product_id=product.id,
+            field="mh_length_mm",
+            old_value="5988",
+            new_value="5998",
+        )
+    finally:
+        connection.close()
+
+    page = client.get(f"/runs/{run_id}").text
+
+    assert "checked and already correct" in page
+    assert "rrp_pounds" in page
+
+
+def test_a_product_with_nothing_verified_says_nothing(
+    client: TestClient, run_ready_for_upload: int
+) -> None:
+    run_id = run_ready_for_upload
+
+    assert "checked and already correct" not in client.get(f"/runs/{run_id}").text
