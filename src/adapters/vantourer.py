@@ -102,27 +102,27 @@ importer defines the range, that reads as not sold here yet, so it is **excluded
 narrated every run** rather than silently missing: the day a UK price appears it should be
 collected.
 
-## Body type is not emitted, and the reason is worth reading
+## Body type is not emitted, and FMLV's values are right
 
-Every one of these is 2,580 mm tall, so the roof-class half of the campervan rule is not in
-doubt. **What is in doubt is the pop-up roof**, and FMLV cannot currently be right:
+Every one of these is 2,580 mm tall, so the roof class is not in doubt — they are all high
+tops. **The pop-up roof is fitted per variant**, and FMLV records exactly that:
 
 | | 540 D | 600 D | 600 L | 630 L |
 | --- | --- | --- | --- | --- |
-| standard | elevating | high top | **high top** | high top |
+| standard | elevating | high top | high top | high top |
 | GO! | elevating | high top | **elevating** | high top |
 
-The same floorplan is held both ways in the 600 L, and the 630 L is held as high top in one
-trim though the price list shows it cannot take the roof at all (`Bed in the pop-up roof …
-–`). Meanwhile the website calls it *"the optional VANTourer pop-up roof"*, and under the
-base-vehicle rule an option does not change the base vehicle — which would make all eight
-`campervan_high_top`.
+The survey read that pattern as an inconsistency — the 600 L held both ways across its two
+trims — and proposed that the roof being "optional" made all eight plain high tops. **The
+requester checked the photographs on 18 September 2026 and it is neither.** The 600 L and
+the 600 L GO! are both high tops and only the GO! has the elevating roof; the 540 D has it
+in both trims and the 600 D and 630 L in neither. So the roof follows the individual
+variant, not the floorplan and not the trim.
 
-That is probably the right answer and it is **not asserted here**, deliberately. The
-evidence is one word on a marketing page, the price list does not show the roof as a priced
-line, and a body type asserted from partial evidence has already been wrong twice this
-month on `vantage.py`. So the field is left alone, FMLV's values stand, and the run states
-the contradiction so a person decides it once.
+Nothing in the price list says which variants carry it, so **nothing here can derive it and
+the field is left alone**. That was the right call for the wrong reason, and the reason is
+worth correcting in place: an apparent inconsistency in the baseline is not evidence the
+baseline is wrong.
 """
 
 from __future__ import annotations
@@ -723,12 +723,11 @@ def collect(
     # Said once per run, not per product. Both are judgements for a person, and neither is
     # something this adapter should quietly decide — see the module docstring.
     on_progress(
-        "BODY TYPE NOT PROPOSED: FMLV holds these eight inconsistently — the 600 L as a "
-        "high top and the 600 L GO! as an elevating roof, though they are one floorplan, "
-        "and the 630 L as a high top though the price list shows it cannot take the "
-        "pop-up roof at all. VANTourer call the roof 'optional', which under the "
-        "base-vehicle rule would make all eight campervan_high_top. That needs deciding "
-        "once by a person rather than asserting from a marketing page."
+        "BODY TYPE NOT PROPOSED, and FMLV's values are right: every one of these is a high "
+        "top, and the pop-up roof is fitted to particular variants rather than to a whole "
+        "floorplan or a whole trim — the 540 D has it in both trims, the 600 L only as the "
+        "GO!, and the 600 D and 630 L in neither. The price list does not say which "
+        "variants carry it, so nothing here can derive it. Leave the stored values alone."
     )
     on_progress(
         "the website also lists a 600 Ds, which appears in NO UK document — no UK price "

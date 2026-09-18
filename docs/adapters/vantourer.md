@@ -120,27 +120,31 @@ anything**, nor a line in the UK price list. Under "the UK importer defines the 
 that reads as not sold here yet, so it is **excluded and narrated every run**: the day a UK
 price appears it should be collected.
 
-## Body type is not emitted, and that is a decision for a person
+## Body type is not emitted, and FMLV's values are right
 
-Every one is 2,580 mm tall, so the roof class is not in doubt. **The pop-up roof is**, and
-FMLV cannot currently be right:
+Every one is 2,580 mm tall, so the roof class is not in doubt — they are all high tops.
+**The pop-up roof is fitted per variant**, and FMLV records exactly that:
 
 | | 540 D | 600 D | 600 L | 630 L |
 | --- | --- | --- | --- | --- |
-| standard | elevating | high top | **high top** | high top |
+| standard | elevating | high top | high top | high top |
 | GO! | elevating | high top | **elevating** | high top |
 
-The same floorplan is held both ways in the 600 L, and the 630 L is held as a high top in
-one trim though the price list shows it cannot take the roof at all (`Bed in the pop-up
-roof … –`). The website calls it *"the optional VANTourer pop-up roof"*, and under the
-base-vehicle rule an option does not change the base vehicle — which would make all eight
-`campervan_high_top`.
+The survey read that as an inconsistency — the 600 L held both ways across its two trims,
+and the 630 L marked high top though the price list shows it cannot take the roof — and
+proposed that the website calling the roof *"optional"* made all eight plain high tops.
 
-That is probably the right answer and it is **deliberately not asserted**. The evidence is
-one word on a marketing page, the price list does not show the roof as a priced line, and a
-body type asserted from partial evidence has already been wrong twice this month on
-`vantage.py`. The field is left alone, FMLV's values stand, and the run states the
-contradiction so a person settles it once.
+**The requester checked the photographs on 18 September 2026 and it is neither.** The
+600 L and the 600 L GO! are both high tops, and only the GO! carries the elevating roof.
+The 540 D has it in both trims; the 600 D and 630 L in neither. The roof follows the
+individual variant, not the floorplan and not the trim — which is why no rule over the
+price list's columns could have produced it.
+
+Nothing in the price list says which variants carry the roof, so **nothing here can derive
+it and the field is left alone**. The decision not to assert was right; the reasoning
+behind it was not, and the correction is worth keeping: *an apparent inconsistency in the
+baseline is not evidence the baseline is wrong.* Asserting all eight as high tops would
+have quietly removed a real elevating roof from two vehicles.
 
 ## The first run
 
