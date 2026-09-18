@@ -9,6 +9,8 @@ permissible weight and prices; the brochure has the mass in running order.
 
 from __future__ import annotations
 
+import re
+
 from dataclasses import replace
 from pathlib import Path
 
@@ -364,21 +366,18 @@ def test_an_implausible_figure_still_drops_a_layout() -> None:
     assert _reconciles(product)[0] is False
 
 
-def test_berths_include_the_standard_roof_bed() -> None:
-    """Settled by the requester, 18 September 2026: a standard elevating roof with a bed
-    in it adds its two berths. FMLV records three of these as elevating-roof campervans
-    and its James Cook height is the brochure's pop-up-roof figure, so the roof is on the
-    vehicle FMLV holds — while its berth count says otherwise."""
-    from src.adapters.westfalia import parse_specification_table  # noqa: PLC0415
-
-    page = (FIXTURES / "westfalia_james_cook_page.html").read_text(encoding="utf-8")
-
-    assert parse_specification_table(page, "Berths") == 4
-    assert "roof bed" in westfalia.BERTHS_FROM_PAGE.lower() or "roof" in westfalia.BERTHS_FROM_PAGE
+def test_berths_are_not_proposed_because_the_roof_is_optional() -> None:
+    """The rule is the requester's — a standard roof bed counts — and the premise was
+    wrong. Every brochure shows `2 + 2` and footnotes the extra two as an optional pop-up
+    roof, and Columbus's price list carries that roof as a £10,682 package. So the base is
+    2, which is what FMLV holds, and the pages' 4 is the roof raised."""
+    assert "NOT PROPOSED" in westfalia.BERTHS_FROM_PAGE
+    assert all("berths" not in entry.from_page for entry in westfalia.RANGES)
 
 
-def test_a_range_whose_page_states_no_berths_proposes_none() -> None:
-    """Sven Hedin's table has no berth row."""
-    sven = next(e for e in westfalia.RANGES if e.fmlv_range == "Sven Hedin")
+def test_the_brochure_marks_the_extra_berths_optional() -> None:
+    """`2 + 2*` with `*optional pop-up roof bed` — the document explains its own asterisk."""
+    brochure = _brochure()
 
-    assert "berths" not in sven.from_page
+    assert re.search(r"\d\s*\+\s*\d\s*\*", brochure)
+    assert "optional pop-up roof" in brochure

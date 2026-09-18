@@ -213,12 +213,12 @@ RANGES: tuple[Range, ...] = (
     Range("columbus", "Columbus", "Fiat", ("540 D", "600 D", "600 E", "640 E")),
     Range(
         "james-cook", "James Cook", "Mercedes", ("600 D",), figures=False,
-        from_page=("length", "width", "height", "seats", "berths", "mro", "mtplm"),
+        from_page=("length", "width", "height", "seats", "mro", "mtplm"),
         price_from_list=True,
     ),
     Range(
         "jules-verne", "Jules Verne", "Mercedes", ("Jules Verne",), figures=False,
-        from_page=("length", "width", "height", "seats", "berths", "mro", "mtplm"),
+        from_page=("length", "width", "height", "seats", "mro", "mtplm"),
     ),
     Range(
         "sven-hedin", "Sven Hedin", "MAN", ("Sven Hedin",), figures=False,
@@ -227,7 +227,7 @@ RANGES: tuple[Range, ...] = (
     Range(
         "club-joker-urban", "Club Joker Urban", "Ford", ("Club Joker Urban",),
         figures=False,
-        from_page=("length", "width", "height", "berths"),
+        from_page=("length", "width", "height"),
         # Its page carries no mass at all; its brochure does, and names the Classic first.
         from_brochure=("mro", "mtplm"),
         price_from_list=True,
@@ -249,28 +249,36 @@ UNREAD_MASSES: dict[str, str] = {
     "neither document.",
 }
 
-#: **Berths come from the page and include the roof bed**, which was settled by the
-#: requester on 18 September 2026: *"if they have a roof, with a roof bed in them, an
-#: elevating roof, with a sleeping area, and if that's standard, then the berths would be
-#: four, because you add the extra two. That's the rule."*
+#: **Berths are not read from anywhere**, and the reasoning went round twice before
+#: landing — so it is set down in full.
 #:
-#: The adapter first withheld them, reading the pages' 4 against FMLV's 2 as the roof
-#: raised on an optioned vehicle. Two things say otherwise, and both are in FMLV's own
-#: data: it records the Jules Verne, the Club Joker Urban and the Sven Hedin as
-#: **elevating-roof campervans**, so the roof is part of the base vehicle it holds; and its
-#: James Cook height of 2,850mm is exactly the brochure's *"Height Classic PR"* — the
-#: pop-up-roof variant — against 2,750mm for the same van without one.
+#: The range pages state **4**; FMLV holds **2**. The requester's rule, 18 September 2026:
+#: *"if they have a roof, with a roof bed in them, an elevating roof, with a sleeping
+#: area, and if that's standard, then the berths would be four, because you add the extra
+#: two. That's the rule."*
 #:
-#: So FMLV's own rows describe vehicles that have the roof, while counting berths as though
-#: they did not. The pages' 4 is right and the run proposes it.
+#: The rule is right and the premise was wrong. **Every brochure marks the extra two as
+#: optional**, and says so in its own footnote:
 #:
-#: **Sven Hedin's page states no berth count**, so nothing is proposed for it.
+#: | range | icon strip | its own note |
+#: | --- | --- | --- |
+#: | Columbus | `2 + 2*` | `*optional pop-up roof bed` |
+#: | Sven Hedin | `2 + 2*` | `*optional pop-up roof` |
+#: | James Cook | `2 + 2` | `*optional pop-up roof bed` |
+#: | Club Joker Urban | `2 + 2` | `*optional (Premium version)` |
+#: | Jules Verne | `2+2` | — |
+#:
+#: Columbus settles it beyond doubt: its price list carries the pop-up roof as a priced
+#: package, `Westfalia Pack Pop Up Roof Plus … £10.682`. An option does not change the base
+#: vehicle, so the base is 2 and the pages' 4 is the roof raised.
+#:
+#: Berths were briefly proposed as 4 on three products before the brochures were read.
+#: They are not proposed at all now, and FMLV's 2 stands — which the brochures agree with.
 BERTHS_FROM_PAGE = (
-    "BERTHS INCLUDE THE ROOF BED: the pages say 4 for the James Cook, Jules Verne and Club "
-    "Joker Urban where FMLV holds 2. These carry an elevating roof with a bed as standard — "
-    "FMLV records three of them as elevating-roof campervans, and its James Cook height of "
-    "2,850mm is the brochure's pop-up-roof figure — so the roof's two berths count. Sven "
-    "Hedin's page states no berth count and nothing is proposed for it."
+    "BERTHS NOT PROPOSED: the range pages say 4 where FMLV holds 2, but every brochure "
+    "shows '2 + 2' and footnotes the extra two as an optional pop-up roof — and Columbus's "
+    "price list carries that roof as a GBP10,682 package. A standard roof bed would count; "
+    "an optional one does not, so the base is 2 and FMLV's figures stand."
 )
 
 #: Ranges on the guide page that are deliberately not collected, so the roster check
