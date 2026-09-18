@@ -364,8 +364,21 @@ def test_an_implausible_figure_still_drops_a_layout() -> None:
     assert _reconciles(product)[0] is False
 
 
-def test_berths_are_never_proposed() -> None:
-    """The pages say 4 where FMLV holds 2, and these have pop-up roofs that sleep two
-    more — so 4 looks like the roof raised rather than the base vehicle."""
-    assert "BERTHS NOT PROPOSED" in westfalia.BERTHS_NOT_READ
-    assert all("berths" not in entry.from_page for entry in westfalia.RANGES)
+def test_berths_include_the_standard_roof_bed() -> None:
+    """Settled by the requester, 18 September 2026: a standard elevating roof with a bed
+    in it adds its two berths. FMLV records three of these as elevating-roof campervans
+    and its James Cook height is the brochure's pop-up-roof figure, so the roof is on the
+    vehicle FMLV holds — while its berth count says otherwise."""
+    from src.adapters.westfalia import parse_specification_table  # noqa: PLC0415
+
+    page = (FIXTURES / "westfalia_james_cook_page.html").read_text(encoding="utf-8")
+
+    assert parse_specification_table(page, "Berths") == 4
+    assert "roof bed" in westfalia.BERTHS_FROM_PAGE.lower() or "roof" in westfalia.BERTHS_FROM_PAGE
+
+
+def test_a_range_whose_page_states_no_berths_proposes_none() -> None:
+    """Sven Hedin's table has no berth row."""
+    sven = next(e for e in westfalia.RANGES if e.fmlv_range == "Sven Hedin")
+
+    assert "berths" not in sven.from_page

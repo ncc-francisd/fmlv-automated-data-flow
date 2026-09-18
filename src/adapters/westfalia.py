@@ -213,12 +213,12 @@ RANGES: tuple[Range, ...] = (
     Range("columbus", "Columbus", "Fiat", ("540 D", "600 D", "600 E", "640 E")),
     Range(
         "james-cook", "James Cook", "Mercedes", ("600 D",), figures=False,
-        from_page=("length", "width", "height", "seats", "mro", "mtplm"),
+        from_page=("length", "width", "height", "seats", "berths", "mro", "mtplm"),
         price_from_list=True,
     ),
     Range(
         "jules-verne", "Jules Verne", "Mercedes", ("Jules Verne",), figures=False,
-        from_page=("length", "width", "height", "seats", "mro", "mtplm"),
+        from_page=("length", "width", "height", "seats", "berths", "mro", "mtplm"),
     ),
     Range(
         "sven-hedin", "Sven Hedin", "MAN", ("Sven Hedin",), figures=False,
@@ -227,7 +227,7 @@ RANGES: tuple[Range, ...] = (
     Range(
         "club-joker-urban", "Club Joker Urban", "Ford", ("Club Joker Urban",),
         figures=False,
-        from_page=("length", "width", "height"),
+        from_page=("length", "width", "height", "berths"),
         price_from_list=True,
     ),
 )
@@ -246,16 +246,28 @@ UNREAD_MASSES: dict[str, str] = {
     "dimensions are read and they match FMLV already.",
 }
 
-#: **Berths are read from no source here**, deliberately. The range pages state 4 for the
-#: James Cook, Jules Verne and Club Joker Urban where FMLV holds 2, and these are vans with
-#: pop-up roofs that add two — so the page's figure looks like the roof raised, and
-#: `docs/adapters/README.md` records the base vehicle rather than the optioned one. Taking
-#: it would add two optional berths to four live products. Left for a person to settle.
-BERTHS_NOT_READ = (
-    "BERTHS NOT PROPOSED: the range pages say 4 for the James Cook, Jules Verne and Club "
-    "Joker Urban where FMLV holds 2. These have pop-up roofs that sleep two more, so 4 "
-    "looks like the roof raised rather than the base vehicle. FMLV's figures stand until "
-    "somebody rules on it."
+#: **Berths come from the page and include the roof bed**, which was settled by the
+#: requester on 18 September 2026: *"if they have a roof, with a roof bed in them, an
+#: elevating roof, with a sleeping area, and if that's standard, then the berths would be
+#: four, because you add the extra two. That's the rule."*
+#:
+#: The adapter first withheld them, reading the pages' 4 against FMLV's 2 as the roof
+#: raised on an optioned vehicle. Two things say otherwise, and both are in FMLV's own
+#: data: it records the Jules Verne, the Club Joker Urban and the Sven Hedin as
+#: **elevating-roof campervans**, so the roof is part of the base vehicle it holds; and its
+#: James Cook height of 2,850mm is exactly the brochure's *"Height Classic PR"* — the
+#: pop-up-roof variant — against 2,750mm for the same van without one.
+#:
+#: So FMLV's own rows describe vehicles that have the roof, while counting berths as though
+#: they did not. The pages' 4 is right and the run proposes it.
+#:
+#: **Sven Hedin's page states no berth count**, so nothing is proposed for it.
+BERTHS_FROM_PAGE = (
+    "BERTHS INCLUDE THE ROOF BED: the pages say 4 for the James Cook, Jules Verne and Club "
+    "Joker Urban where FMLV holds 2. These carry an elevating roof with a bed as standard — "
+    "FMLV records three of them as elevating-roof campervans, and its James Cook height of "
+    "2,850mm is the brochure's pop-up-roof figure — so the roof's two berths count. Sven "
+    "Hedin's page states no berth count and nothing is proposed for it."
 )
 
 #: Ranges on the guide page that are deliberately not collected, so the roster check
@@ -570,6 +582,7 @@ class WestfaliaProduct:
     rrp_pounds: int | None = None
     mro_kilograms: int | None = None
     travel_seats: int | None = None
+    berths: int | None = None
     #: What the brochure said the permissible total weight was, kept so the two documents
     #: can be compared — see `_reconciles`.
     brochure_mtplm_kilograms: int | None = None
@@ -602,7 +615,7 @@ def read_price_list(
         take = set(entry.from_page)
         page_of = {
             "length": "Length", "width": "Width", "height": "Height",
-            "seats": "Seats", "mro": "Mass in Running Order",
+            "seats": "Seats", "berths": "Berths", "mro": "Mass in Running Order",
             "mtplm": "Permissible Weight",
         }
         figures = {
@@ -619,6 +632,7 @@ def read_price_list(
                 mh_width_mm=figures.get("width"),
                 mh_height_mm=figures.get("height"),
                 travel_seats=figures.get("seats"),
+                berths=figures.get("berths"),
                 mro_kilograms=figures.get("mro"),
                 mtplm_kilograms=figures.get("mtplm"),
                 rrp_pounds=parse_cheapest_price(text) if entry.price_from_list else None,
@@ -714,6 +728,7 @@ def build_extracted(
         mh_height_mm=product.mh_height_mm,
         mtplm_kilograms=product.mtplm_kilograms,
         mro_kilograms=product.mro_kilograms,
+        berths=product.berths,
         mh_passenger_seats_inc_driver=product.travel_seats,
         mh_payload_kilograms=product.payload_kilograms,
         rrp_pounds=product.rrp_pounds,
@@ -752,6 +767,14 @@ def build_extracted(
             "mtplm_kilograms",
             f"Permissible total weight: {product.mtplm_kilograms}kg, on the Light-Chassis. "
             f"A Maxi Chassis is offered as an upgrade and is not the base vehicle",
+        )
+    if product.berths is not None:
+        record(
+            "berths",
+            f"Berths: {product.berths}, from the range page's own specification table. "
+            f"These campervans have an elevating roof with a bed in it as standard, and "
+            f"the rule is that a standard roof bed counts — so the roof's two berths are "
+            f"part of the figure",
         )
     if product.travel_seats is not None:
         record(
@@ -911,6 +934,6 @@ def collect(
             f"expected {EXPECTED_LAYOUTS} layouts and collected {len(extracted)} — check "
             f"whether the Columbus range has really changed"
         )
-    on_progress(BERTHS_NOT_READ)
+    on_progress(BERTHS_FROM_PAGE)
     on_progress(f"collected {len(extracted)} Westfalia layout(s)")
     return extracted
