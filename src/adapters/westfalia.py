@@ -275,10 +275,11 @@ UNREAD_MASSES: dict[str, str] = {
 #: Berths were briefly proposed as 4 on three products before the brochures were read.
 #: They are not proposed at all now, and FMLV's 2 stands — which the brochures agree with.
 BERTHS_FROM_PAGE = (
-    "BERTHS NOT PROPOSED: the range pages say 4 where FMLV holds 2, but every brochure "
-    "shows '2 + 2' and footnotes the extra two as an optional pop-up roof — and Columbus's "
-    "price list carries that roof as a GBP10,682 package. A standard roof bed would count; "
-    "an optional one does not, so the base is 2 and FMLV's figures stand."
+    "BERTHS COME FROM THE BROCHURE'S ICON STRIP, which prints '2 + 2' and footnotes the "
+    "second figure as an optional pop-up roof — priced at GBP10,682 in Columbus's own "
+    "price list. The base figure is recorded, so these read 2 and not the range pages' 4, "
+    "which is the roof raised. A standard roof bed would have counted; an optional one "
+    "does not."
 )
 
 #: Ranges on the guide page that are deliberately not collected, so the roster check
@@ -570,6 +571,61 @@ def parse_cheapest_price(text: str) -> int | None:
     return min(prices) if prices else None
 
 
+
+#: The berth figure in a brochure's icon strip: `2 + 2*`, base plus the optional pop-up
+#: roof. Single digits, because these are berth counts and a wider pattern would match a
+#: date or a dimension.
+#:
+#: **Two alternatives, because the strips extract with their icons run together** and the
+#: tightest of them loses the spaces on both sides of the pair:
+#:
+#: - `clean` is the ordinary case, `2 + 2*` or `2+2`, standing on its own word boundaries.
+#: - `glued` is the Club Joker Urban, whose whole strip comes out as
+#:   `25 L2 + 24 / 6 Gaz` — berths `2 + 2` with the seats `4 / 6` welded to the second 2,
+#:   and the first 2 welded to the litres before it. Neither boundary survives, so `clean`
+#:   never fires and that model alone reported no berths at all.
+#:
+#: Read on its own, `2 + 24 / 6` is as consistent with "2 + 24" as with "2 + 2". The
+#: **Jules Verne brochure settles it**, carrying both forms: the same glued `2+24 / 6`
+#: *and* a labelled row, `Places couchage Berths Schlafplätze 2+2 2+2 2+2`. So the glued
+#: form is berths followed by seats, and `glued` requires that trailing `4 / 6` seat pair
+#: before it will read a pair whose left boundary is missing.
+#:
+#: That trailing requirement is what keeps `glued` narrow enough to be safe. The Columbus
+#: brochure's strip throws off fragments like `90 L1 + 1 2*4` and `Gaz1 + 14 2*`, which
+#: also have no left boundary; neither is followed by a seat pair, so neither matches, and
+#: Columbus still reads a clean 2 rather than disagreeing with itself down to nothing.
+_BERTH_ICON = re.compile(
+    r"\b(?P<clean>\d)\s*\+\s*\d\b"
+    r"|(?<!\d)(?P<glued>\d)\s*\+\s*\d(?=\d\s*/\s*\d)"
+)
+
+
+def parse_brochure_berths(text: str) -> int | None:
+    """The **base** berth count from the brochure's icon strip, or `None`.
+
+    Every Westfalia brochure prints `2 + 2` against a bed icon and footnotes the second
+    figure as an optional pop-up roof — `*optional pop-up roof bed` on the Columbus and
+    James Cook, `*optional pop-up roof` on the Sven Hedin, `*optional (Premium version)`
+    on the Club Joker Urban. Columbus's price list prices that roof at £10,682. So the
+    **first** figure is the vehicle as sold and the second needs an option, which is the
+    berth rule in `docs/adapters/README.md`.
+
+    **Every pair in the document must agree**, and `None` is returned otherwise. A
+    brochure covers several layouts, each with its own strip, and a range whose layouts
+    differ cannot be served by one figure — better to propose nothing than to put the
+    540 D's berths on the 640 E. It also makes a stray digit pair harmless.
+
+    This is read rather than withheld because the figure *is* published and a reviewer
+    should see it confirmed. Not reading it left "could not be validated" against a field
+    printed plainly in the brochure — which is what prompted the requester to ask, twice.
+    """
+    bases = {
+        int(match["clean"] or match["glued"]) for match in _BERTH_ICON.finditer(text)
+    }
+    return bases.pop() if len(bases) == 1 else None
+
+
 def find_brochure_url(page_html: str) -> str | None:
     """The brochure linked from a range page, or `None`."""
     match = _BROCHURE_HREF.search(page_html)
@@ -653,7 +709,7 @@ def read_price_list(
                 mh_width_mm=figures.get("width"),
                 mh_height_mm=figures.get("height"),
                 travel_seats=figures.get("seats"),
-                berths=figures.get("berths"),
+                berths=parse_brochure_berths(brochure_text),
                 mro_kilograms=figures.get("mro"),
                 mtplm_kilograms=figures.get("mtplm"),
                 rrp_pounds=parse_cheapest_price(text) if entry.price_from_list else None,
@@ -675,6 +731,7 @@ def read_price_list(
             mh_height_mm=dimensions[index][2],
             mtplm_kilograms=weights[index] if index < len(weights) else None,
             rrp_pounds=prices[index] if index < len(prices) else None,
+            berths=parse_brochure_berths(brochure_text),
             mro_kilograms=(masses or {}).get(model.upper(), (None, None))[0],
             brochure_mtplm_kilograms=(masses or {}).get(model.upper(), (None, None))[1],
         )
@@ -894,6 +951,7 @@ def collect(
             continue
 
         masses: dict[str, tuple[int, int]] = {}
+        brochure_text = ""
         brochure_url = find_brochure_url(page)
         if brochure_url is None:
             on_progress(
@@ -902,7 +960,8 @@ def collect(
             )
         else:
             brochure = extract_text(http.fetch(brochure_url).file_path)
-            masses = parse_brochure_masses(brochure.text)
+            brochure_text = brochure.text
+            masses = parse_brochure_masses(brochure_text)
             on_progress(
                 f"read {len(masses)} mass(es) in running order from {brochure_url}"
                 if masses
@@ -910,7 +969,9 @@ def collect(
                     f"changed; FMLV's figures stand"
             )
 
-        products = read_price_list(document.text, entry, masses)
+        # The brochure is already in hand for the masses; it carries the berth icon
+        # too, and Columbus's four layouts have no berth row anywhere else.
+        products = read_price_list(document.text, entry, masses, brochure_text)
         if not products:
             on_progress(
                 f"no L/W/H row with {len(entry.models)} columns in {url} — the table's "
@@ -956,11 +1017,14 @@ def collect(
             f"whether the Columbus range has really changed"
         )
     on_progress(
-        "PUBLISHED NOWHERE, and so left alone: the Columbus seat count (its range page has "
-        "no specification table at all, being four layouts, and its price list states no "
-        "seats); a price for the Jules Verne and the Sven Hedin (neither has a price list "
-        "carrying one — Sven Hedin's two 'price lists' are colour and equipment sheets); "
-        "and the Sven Hedin berth count. FMLV's own figures stand for every one."
+        "NOT READ, and so left alone: the Columbus and Club Joker Urban seat counts, and "
+        "a price for the Jules Verne and the Sven Hedin. Neither of those two has a price "
+        "list carrying one — Sven Hedin's two 'price lists' are colour and equipment "
+        "sheets. The seat counts are printed in the brochures' icon strips but extract "
+        "garbled: Columbus's comes out as '90 L1 + 1 2*4 100 L' on one page and "
+        "'90 L Gaz1 + 14 2*' on another, with the figures in a different order each time, "
+        "and Club Joker Urban's gives '4 / 6' without saying which applies. Reading a "
+        "number out of either would be guesswork. FMLV's own figures stand for every one."
     )
     on_progress(BERTHS_FROM_PAGE)
     on_progress(f"collected {len(extracted)} Westfalia layout(s)")

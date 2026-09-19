@@ -366,13 +366,47 @@ def test_an_implausible_figure_still_drops_a_layout() -> None:
     assert _reconciles(product)[0] is False
 
 
-def test_berths_are_not_proposed_because_the_roof_is_optional() -> None:
+def test_berths_are_read_from_the_brochure_not_the_range_page() -> None:
     """The rule is the requester's — a standard roof bed counts — and the premise was
     wrong. Every brochure shows `2 + 2` and footnotes the extra two as an optional pop-up
     roof, and Columbus's price list carries that roof as a £10,682 package. So the base is
-    2, which is what FMLV holds, and the pages' 4 is the roof raised."""
-    assert "NOT PROPOSED" in westfalia.BERTHS_FROM_PAGE
+    2, which is what FMLV holds, and the pages' 4 is the roof raised.
+
+    The figure is *read* rather than withheld, so a reviewer sees it confirmed instead of
+    "could not be validated" against a number printed plainly in the brochure."""
+    assert "BROCHURE" in westfalia.BERTHS_FROM_PAGE
     assert all("berths" not in entry.from_page for entry in westfalia.RANGES)
+
+
+def test_the_base_berth_figure_is_taken_from_the_icon_strip() -> None:
+    """`2 + 2*` is base plus the optional roof, so the recorded figure is the first."""
+    assert westfalia.parse_brochure_berths("Places couchage Berths 2 + 2*") == 2
+
+
+def test_a_glued_seat_pair_does_not_hide_the_berths() -> None:
+    """The Club Joker Urban's whole icon strip extracts as one run, with the seats welded
+    to the berths and the berths welded to the litres before them. It was the one model
+    reporting no berth count at all, against a brochure that plainly shows one."""
+    strip = "Places carte grise 2,75 kg25  L / 15  L25 L2 + 24 / 6 Gaz"
+
+    assert westfalia.parse_brochure_berths(strip) == 2
+
+
+def test_a_glued_pair_without_seats_after_it_is_not_read() -> None:
+    """What makes the glued reading safe. `2 + 24` alone is as consistent with 24 as with
+    2 followed by a 4, and it is only the trailing `4 / 6` seat pair that settles it — the
+    Jules Verne brochure carries both that glued form and a labelled `2+2` row. Columbus
+    throws off left-boundary-less fragments like `90 L1 + 1 2*4` with no seat pair after
+    them; reading those would have made Columbus disagree with itself down to nothing."""
+    columbus = "Places couchage 2 + 2*  Eau 90 L1 + 1 2*4 100 L / 100 L"
+
+    assert westfalia.parse_brochure_berths(columbus) == 2
+
+
+def test_layouts_that_disagree_propose_no_berths() -> None:
+    """One brochure covers several layouts, and a figure that differs between them cannot
+    be put on all of them. Better to propose nothing than the 540 D's berths on the 640 E."""
+    assert westfalia.parse_brochure_berths("Berths 2 + 2* and elsewhere 4 + 2*") is None
 
 
 def test_the_brochure_marks_the_extra_berths_optional() -> None:
