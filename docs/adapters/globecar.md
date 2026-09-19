@@ -216,6 +216,35 @@ for a person to enter, not proposed.
 The no-op "in scope but not found" rows are `rrp_pounds` and `base_vehicle_manufacturer`,
 neither of which this site publishes.
 
+## Reviving the three 2022 rows — what was done, and what is still outstanding
+
+Rather than let the run mint four new products, the requester brought the three 2022
+`H - Line` rows forward on 2026-09-19, keeping their FMLV product ids: year to 2027,
+`archived` to No, range to `Summit`, model to the bare number. Verified against a fresh
+export, and the matcher then pairs ten of the eleven layouts at 1.000 exact, leaving only
+Summit 600L genuinely new.
+
+That was worth doing for what the ids carry: **18 images and 8 hand-entered habitation
+flags per product** (`sleeping_area_rear`, `make_up_beds`, `transverse_bed`, `side_kitchen`,
+`side_shower_toilet`, `front_lounge`, `blown_air_heating`, `fridge`). A new product starts
+with none of it, and the habitation flags in particular are only ever *findings* here —
+nobody types them twice willingly.
+
+**Outstanding: the images on 2955, 2956 and 2957 are the 2022 vehicles and need replacing.**
+Nothing in this pipeline touches images, so this is a manual job at upload time. Recorded
+here because it is invisible from the data: the rows look complete.
+
+**The catch that makes it fragile.** `build_upload_products` skips any product with no
+accepted or corrected decision, so a revived row reaches the site *only* if at least one of
+its changes is accepted — the upload copies the baseline row, rename included, and applies
+the decisions on top. The edits were made in Nova, which shows in the export but not on the
+site, so an omitted product keeps its old name there.
+
+Summit 540 and Summit 600 are safe, having three and two changes each. **Summit 640 offers
+exactly one: seats 4 to 3.** Rejecting it drops the product from the upload and strands the
+rename. If the 4 is to be kept, *correct* the change back to 4 rather than rejecting it — a
+correction is still a decision.
+
 ## Fetches per run
 
 Twelve: the range index to confirm the roster, and eleven layout pages.
