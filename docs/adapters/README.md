@@ -378,6 +378,17 @@ and says which in the snippet. It stands down in three cases:
 * **caravans** — `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the
   personal-effects half of a split, and one published figure may be the total. Deriving it would be wrong.
 
+**One brand is a documented exception, and the exception is decided by its own baseline,
+not by an adapter's preference.** T@B (19 September 2026) derives the payload after all,
+because all 23 rows of its export hold `personal_effects_payload_kilograms` *exactly*
+equal to MTPLM minus MRO with `optional_equipment_payload_kilograms` empty on every one —
+so for that brand FMLV plainly uses the arithmetic. What forced the question is that T@B
+publishes a `Maximum payload` assuming full gas bottles and a full water tank: 57kg on the
+320 against an arithmetic 147, which is the same homologation trap `knaus.py` and
+`weinsberg.py` already record for the rest of the Knaus Tabbert group. Before deriving a
+caravan payload, check the brand's own baseline the same way; the general rule still
+holds for every other caravan brand surveyed.
+
 Each is gated by `was_previously_rejected` like any other proposal, and suppresses the
 confirm-or-replace row for its own field, so a reviewer never sees "the existing figure
 is wrong" directly above "confirm the existing figure".
