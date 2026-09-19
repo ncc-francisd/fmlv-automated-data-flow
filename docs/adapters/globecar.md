@@ -124,26 +124,49 @@ The export holds 24 rows; `_is_current_model_year` keeps ten — three 2026 and 
 | Summit Shine | 540, 600, 600L, 640 | 2027 | yes | yes |
 | Summit | 540, 600, 600L, 640 | — | **no** | yes |
 
-So the run should report **7 matched, 4 new, 3 disappeared** — and the new and the
-disappeared are mostly the same vehicles. Checked against the disappearance notices before
-calling anything new, as the rename rule requires, the three Elegance layouts line up with
-three of the four Summits by exterior length, exactly:
+So the run reports **7 matched, 4 new, 3 disappeared**.
 
-| Elegance (2026) | length | Summit (site) | length |
+### The four new Summits, and where they came from
+
+**Match on the mass in running order, not on length.** Every Globecar is built on one of
+three Ducato wheelbases, so 5413, 5998 and 6358 mm are shared by four unrelated products
+each and carry no identifying information at all. The MRO is the one figure a trim level
+does not change.
+
+| new (site) | MRO | FMLV predecessor | its MRO |
 |---|---|---|---|
-| R Roadscout | 5413 | Summit 540 | 5413 |
-| Globescout | 5998 | Summit 600 | 5998 |
-| Campscout | 6358 | Summit 640 | 6358 |
+| Summit 540 | 2680 | 2022 `H - Line` / `Summit 540` (2955) | **2680** |
+| Summit 600 | 2835 | 2022 `H - Line` / `Summit 600` (2956) | **2835** |
+| Summit 640 | 2960 | 2022 `H - Line` / `Summit 640` (2957) | **2960** |
+| Summit 600L | 2835 | *(none)* | — |
 
-Their masses have moved a little with the model year (Roadscout MRO 2720 → Summit 540
-2680; Globescout 2820 → 2835; Campscout 2970 → 2960), which is a respec, not a different
-vehicle. **Only Summit 600L is genuinely a new layout.**
+Summit 640 is identical to its predecessor on all three masses. Summit 540 has been uprated
+from 3300 to 3500 kg, which lifts its payload 620 → 820. Summit 600 is unchanged in mass,
+and FMLV's 2022 payload of 465 kg is simply wrong for it — 3500 − 2835 is 665, which is
+what the site publishes. **Summit 600L is genuinely new**: the H-Line had no 600L.
 
-**A wrinkle for the requester.** FMLV also holds 2022 rows under range `H - Line` with
-models `Summit 540`, `Summit 600` and `Summit 640` — the same names, in the old
-range-and-model arrangement. The year filter drops them, so they are not in the baseline
-and the adapter cannot match them. Creating the four Summits as new products will therefore
-sit alongside those older rows rather than replace them.
+So the plain Summit range never went away. FMLV has not carried it forward since 2022, and
+`_is_current_model_year` hides those rows from the matcher, so the adapter cannot reach
+them and proposes four new products instead.
+
+**This matters before the run is accepted.** Products 2955 (`Summit 540`) and 2957
+(`Summit 640`) are *not* archived. Accepting the four new products leaves them alongside
+live 2022 rows for the same vehicles. Whether to create new products or bring the H-Line
+rows forward to 2027 is a decision for the requester, and a Nova job either way.
+
+### The three disappearances are a genuine withdrawal
+
+`Elegance` is the old **D-line** — `R Roadscout`, `Globescout`, `Campscout` — and it is a
+separate product family from the Summit line, which has existed alongside it since 2022.
+It is not the Summit range under another name.
+
+The same MRO test proves it. The three hold **2720**, **2820** and **2970**, and the site's
+eleven layouts publish only 2680, 2695, 2835, 2890, 2960 and 3010. **Not one of the three
+appears anywhere on the current site.** The D-line has been dropped from the UK range.
+
+*This paragraph corrects an earlier reading in this document, which claimed the three were
+the Summits renamed. That was argued from exterior length, which — see above — is the one
+attribute on this site that cannot distinguish one model from another.*
 
 ## Field mapping
 
@@ -182,9 +205,9 @@ The four new products, hand-checked against their pages:
 | Summit 600L | 5998 | 3500 | 2835 | 665 | 2 | 4 |
 | Summit 640 | 6358 | 3500 | 2960 | 540 | 2 | 3 |
 
-The three disappearances are the 2026 `Elegance` rows, and they are the rename described
-above rather than a withdrawal. Each raises a notice rather than a change, so nothing is
-proposed for them; retiring them is a manual step in Nova.
+The three disappearances are the 2026 `Elegance` rows — the withdrawn D-line, not a
+rename; see above. Each raises a notice rather than a change, so nothing is proposed for
+them, and retiring them is a manual step in Nova.
 
 Habitation findings on all eleven: `blown_air_heating` from `Heating: Truma Combi 4`, and
 `fridge_freezer` from `Refrigerator in L (capacity/including freezer): ca. 100/8`. Stated
