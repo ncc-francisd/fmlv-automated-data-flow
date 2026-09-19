@@ -701,7 +701,9 @@ def _run_command(args: argparse.Namespace) -> int:
         # one, so a bare "no adapter written for 'Bailey'" would read as plainly wrong to
         # someone who has just run Bailey successfully.
         other_areas = sorted(other.label for other in adapters_for(manufacturer.fmlv_manufacturer))
-        available = sorted(f"{name} ({registered.value})" for name, registered in ADAPTERS)
+        available = sorted(
+            f"{name} ({registered.value})" for name, _display, registered in ADAPTERS
+        )
         msg = (
             f"no {vehicle_class.value} adapter written for "
             f"{manufacturer.fmlv_manufacturer!r} yet."
