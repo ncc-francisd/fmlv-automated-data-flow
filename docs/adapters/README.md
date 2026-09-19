@@ -1335,6 +1335,33 @@ to reject its bad matches, and 0.200 is far below anything that could be *lowere
 this one while still separating real vehicles. A rename is a different operation from a
 match, and the token bag cannot express it.
 
+### Deciding whether it *is* a rename: match on a mass, never on a dimension
+
+Before declaring a pair, or telling anyone that a disappearing product is really a new one
+under another name, the two have to be shown to be the same vehicle. **Exterior dimensions
+cannot show that**, and reaching for them is the easy mistake.
+
+Globecar is the case (19 September 2026). Its eleven layouts publish three exterior
+lengths — 5413, 5998 and 6358 mm — because every one is built on one of three Ducato
+wheelbases. Four unrelated products share 5413: a Summit, a Summit Prime, a Summit Shine
+and a withdrawn Roadscout. Matching on length paired three disappearing products with
+three new ones, neatly and completely wrongly, and the neatness was the tell — a
+coachbuilder's whole range agreeing on three numbers means the numbers describe the
+chassis, not the model.
+
+**The mass in running order does identify a vehicle**, because it is the one figure a trim
+level, a model-year refresh and a rename all leave alone. On that test Globecar's three
+withdrawn products hold 2720, 2820 and 2970, and the site's eleven layouts publish only
+2680, 2695, 2835, 2890, 2960 and 3010 — not one of the three appears anywhere, so the
+range really had gone. The four new products' true predecessors were elsewhere in the
+export entirely, matching on 2680, 2835 and 2960 exactly.
+
+So: compare MRO first, then MTPLM and payload. Treat agreement on length, width or height
+as worth nothing on its own, and be suspicious of a *tidy* correspondence rather than
+reassured by it. The same applies to the sanity check in `CLAUDE.md` — an implausible
+number of new products usually means a rename, but which rename has to be evidenced on a
+figure that varies between models.
+
 ### Naming a rename, when the score cannot reach it
 
 An adapter can declare the pair outright instead, which is the lever the paragraph above
