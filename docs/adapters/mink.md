@@ -159,8 +159,39 @@ still stops a five-figure number being read as its last four.
 The same glued-text shape as Westfalia's berth icons, and worth expecting from any
 dimensioned drawing.
 
-### Price
+## A second UK source, and the price (added 2026-09-21)
 
-Confirmed with the requester on 2026-09-21: there are no prices in the catalogue and none
-on the distributor's site, so FMLV's own stand untouched and the requester adds a "from"
-price at upload.
+The requester then supplied <https://mink-campers.co.uk/> — **Mink Campers UK**, the
+importer's own brand site, and the only place in any source that publishes a price. Each
+model page heads itself `MINK-S FROM £19,995.00`, on the road.
+
+| model | Mink Campers UK | FMLV |
+|---|---|---|
+| S | £19,995 | £19,995 |
+| **X** | **£20,995** | £21,995 |
+| E | £21,995 | £21,995 |
+
+Under the settled rule the UK importer decides what a thing costs, so this is recorded and
+it corrects the X by £1,000.
+
+**Two things on that site are deliberately not used.**
+
+Its `/specification/` page looks like a spec sheet and is not one: a single generic block
+headed "MINK CAMPER" with one set of masses (750 / 510 / 240, which are the E's) and a
+`From £15,995.00 OTR` matching none of the three real prices. Only the per-model pages are
+read. Its dimensions — 4116 / 2811 / 2080 / 1511 / 1829 — do independently confirm the
+catalogue drawing's, which is worth having.
+
+**The model name and the price sit in two separate headings**,
+`<h1>MINK-S</h1><h1>FROM £19,995.00</h1>`, so they only match as one phrase once the
+markup between them is stripped. Without that the price was found on no page at all and
+the run silently proposed none — the second time on this brand that a parse looked fine
+and read nothing.
+
+### The Z, better evidenced
+
+The UK brand site **lists `MINK-Z` in its navigation**, which no other source does — but
+the link points at `#`, and `/mink-z/` and every variant 404s there as they do everywhere
+else. So the Z is a menu entry with no content anywhere: either announced and not yet
+published, or withdrawn and not yet removed. Still a question for the requester, but now
+a sharper one.

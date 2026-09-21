@@ -187,3 +187,38 @@ def test_the_masses_must_be_ordered_and_plausible() -> None:
 
     absurd = MinkCaravan("S", 7500, 5200, 1850, 4120, 2100)
     assert _reconciles(absurd)[0] is False
+
+
+# --- the price, from the UK brand site ----------------------------------------------
+
+
+@pytest.fixture
+def uk_page() -> str:
+    return (FIXTURES / "mink_uk_model_page_x.html").read_text(encoding="utf-8")
+
+
+def test_the_price_is_read_from_the_uk_brand_site(uk_page: str) -> None:
+    """The only place a price is published: neither the catalogue nor the dealer's
+    pages carry one. FMLV holds 21,995 for the X, which this corrects."""
+    assert mink.parse_uk_price(uk_page) == ("X", 20995)
+
+
+def test_the_model_name_and_the_price_sit_in_separate_headings(uk_page: str) -> None:
+    """`<h1>MINK-X</h1><h1>FROM £20,995.00</h1>` — matched as one phrase only after the
+    markup between them is stripped. Without that the price was silently never found."""
+    assert "</h1>" in uk_page
+    assert "MINK-X FROM" not in uk_page
+
+    assert mink.parse_uk_price(uk_page) is not None
+
+
+def test_the_price_carries_its_own_model(uk_page: str) -> None:
+    """Taken from the same match as the figure, so a page cannot price another caravan.
+    `collect` refuses the price outright when the two disagree."""
+    model, _pounds = mink.parse_uk_price(uk_page)
+
+    assert model == "X"
+
+
+def test_a_page_with_no_headline_price_yields_none() -> None:
+    assert mink.parse_uk_price("<h1>MINK-Q</h1><p>Coming soon</p>") is None

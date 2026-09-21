@@ -62,6 +62,18 @@ The drawing carries one height and the page does not say which of the three it i
 from, so attributing 1829 to a particular model would be a guess. Nothing is emitted and
 FMLV's own figures stand.
 
+## The price comes from the UK brand site, and nowhere else has one
+
+`mink-campers.co.uk` is **Mink Campers UK**, the importer's own brand site, and each of
+its three model pages heads itself `MINK-S FROM £19,995.00`. Under the settled rule the
+UK importer decides what a thing costs, so that is the price recorded — and it is the
+only price published anywhere. Neither the catalogue nor the dealer's pages carry one.
+
+Its `/specification/` page is **not** used. It looks like a spec sheet but is a single
+generic block for "MINK CAMPER" rather than anything per-model, and its
+`From £15,995.00 OTR` matches none of the three actual prices. Only the per-model pages
+are read.
+
 ## The factory site is corroboration, not a source
 
 `minkcampers.com/mink-s`, `/mink-x` and `/mink-e` publish clean labelled blocks that
@@ -101,8 +113,15 @@ __all__ = [
     "specification_page",
 ]
 
+#: Markup between the two headings that carry the model name and its price.
+_TAGS = re.compile(r"<[^>]+>")
+
 BASE_URL = "https://www.rivermotorhomes.co.uk"
 MODELS_INDEX_URL = f"{BASE_URL}/mink-campers/"
+
+#: Mink Campers UK, the importer's own brand site, which is the only place a price is
+#: published. Its model pages share the dealer's slugs, so one is derived from the other.
+UK_SITE_URL = "https://mink-campers.co.uk"
 
 #: Byte-for-byte the export's `manufacturer`. **Not** id 168's `Mink Camppers EHF`, which
 #: carries no rows: the export settles which of the two is real, as it did for Weinsberg.
@@ -115,8 +134,9 @@ VEHICLE_CLASS = VehicleClass.CARAVAN
 #: FMLV files all four under one range, with the model a bare letter.
 FMLV_RANGE = "Campers"
 
-#: Three on the distributor's site. FMLV also holds a `Z`, which appears in no source —
-#: see the module docstring's sibling note in `docs/adapters/mink.md`.
+#: Three on both UK sites. FMLV also holds a `Z`, which has no page anywhere: the UK
+#: brand site lists `MINK-Z` in its navigation but links it to `#`, and every candidate
+#: URL 404s on both sites. See `docs/adapters/mink.md`.
 EXPECTED_LAYOUTS = 3
 
 #: The dimensioned drawing on the catalogue's specification page, which is precise where
@@ -149,6 +169,13 @@ _COLUMN = re.compile(
     r"Overall height\s+(?P<height>\d+)\s*mm\s*\n"
     r"Overall width\s+(?P<width>\d+)\s*mm\s*\n"
     r"Cabin width\s+(?P<cabin_width>\d+)\s*mm",
+)
+
+#: `MINK-S FROM £19,995.00` at the head of a UK model page. Anchored on the model name
+#: so the figure cannot be picked up from a finance example or an accessory elsewhere on
+#: the page, and the pence are discarded.
+_UK_PRICE = re.compile(
+    r"MINK-(?P<model>[A-Z0-9]+)\s+FROM\s+£\s?(?P<pounds>[\d,]+)", re.IGNORECASE
 )
 
 #: `MINK-S`, `MINK-X`, `MINK-E` as they appear beneath the columns, in column order.
@@ -190,6 +217,20 @@ def find_catalogue_url(page_html: str) -> str | None:
     return match.group(1) if match else None
 
 
+def parse_uk_price(page_html: str) -> tuple[str, int] | None:
+    """`(model, pounds)` from a UK model page's headline, or `None`.
+
+    The headline reads `MINK-S FROM £19,995.00`, and the model is taken from the same
+    match so a page cannot contribute a price to the wrong caravan.
+    """
+    # The two sit in separate headings — `<h1>MINK-S</h1><h1>FROM £19,995.00</h1>` — so
+    # the markup between them has to go before they can be matched as one phrase.
+    match = _UK_PRICE.search(_TAGS.sub(" ", page_html))
+    if match is None:
+        return None
+    return match["model"].upper(), int(match["pounds"].replace(",", ""))
+
+
 def specification_page(pages: list[str]) -> str | None:
     """The one catalogue page carrying the specification columns."""
     for text in pages:
@@ -208,6 +249,8 @@ class MinkCaravan:
     table_height_mm: int
     table_length_mm: int
     table_width_mm: int
+    #: On-the-road, from the UK brand site. `None` where that site has no page.
+    rrp_pounds: int | None = None
 
     @property
     def label(self) -> str:
@@ -297,7 +340,12 @@ def _reconciles(product: MinkCaravan) -> tuple[bool, str]:
 
 
 def build_extracted(
-    product: MinkCaravan, *, drawing: dict[str, int], source_url: str, basis: str
+    product: MinkCaravan,
+    *,
+    drawing: dict[str, int],
+    source_url: str,
+    basis: str,
+    price_url: str | None = None,
 ) -> ExtractedCaravan:
     """One model as a `Caravan` plus the provenance a reviewer sees beside it."""
     caravan = Caravan(
@@ -307,6 +355,7 @@ def build_extracted(
         model=product.model,
         mtplm_kilograms=product.mtplm_kilograms,
         mro_kilograms=product.mro_kilograms,
+        rrp_pounds=product.rrp_pounds,
         personal_effects_payload_kilograms=product.derived_payload_kilograms,
         shipping_length_mm=drawing.get("shipping_length_mm"),
         # FMLV holds the same figure for both, which is right for a teardrop: the body
@@ -382,6 +431,20 @@ def build_extracted(
             f"same measurement to {product.table_width_mm}mm",
         )
 
+    if product.rrp_pounds is not None:
+        provenance["rrp_pounds"] = Provenance(
+            source_url=price_url or source_url,
+            snippet=(
+                f"{product.label} — the page heads itself 'MINK-{product.model} FROM "
+                f"£{product.rrp_pounds:,}.00' on Mink Campers UK, the importer's own "
+                f"brand "
+                f"site and the ONLY place a price is published — neither the catalogue nor "
+                f"the dealer's pages carry one. On the road. NOT the "
+                f"£15,995 'From ... OTR' on that site's /specification/ page, which is one "
+                f"generic figure for 'MINK CAMPER' and matches no actual model"
+            ),
+        )
+
     return ExtractedCaravan(caravan=caravan, provenance=provenance)
 
 
@@ -439,6 +502,35 @@ def collect(
             f"models in both are collected"
         )
 
+    # The price lives only on the UK brand site, whose model pages share the dealer's
+    # slugs. Fetched per model rather than from one index because each page heads itself
+    # with its own figure.
+    prices: dict[str, tuple[int, str]] = {}
+    for path, model in pages:
+        price_url = f"{UK_SITE_URL}{path[len('/mink-campers'):]}"
+        result = http.fetch(price_url)
+        if result.status_code != 200:
+            on_progress(
+                f"no UK price page for {model} ({price_url} returned "
+                f"{result.status_code}) — no price proposed for it"
+            )
+            continue
+        found = parse_uk_price(
+            result.file_path.read_text(encoding="utf-8", errors="replace")
+        )
+        if found is None:
+            on_progress(f"no headline price on {price_url} — none proposed for {model}")
+            continue
+        priced_model, pounds = found
+        if priced_model != model:
+            on_progress(
+                f"REFUSING THE PRICE on {price_url}: its headline names MINK-"
+                f"{priced_model} where this is {model}, so it would price the wrong "
+                f"caravan"
+            )
+            continue
+        prices[model] = (pounds, price_url)
+
     extracted: list[ExtractedCaravan] = []
     for product in models:
         if product.model not in listed:
@@ -451,14 +543,22 @@ def collect(
         if not reconciles:
             on_progress(f"dropping {product.label} — {basis}")
             continue
+        priced = prices.get(product.model)
+        if priced is not None:
+            product.rrp_pounds = priced[0]
         extracted.append(
             build_extracted(
-                product, drawing=drawing, source_url=catalogue_url, basis=basis
+                product,
+                drawing=drawing,
+                source_url=catalogue_url,
+                basis=basis,
+                price_url=priced[1] if priced else None,
             )
         )
         on_progress(
             f"read {product.label}: MTPLM {product.mtplm_kilograms}kg, MRO "
-            f"{product.mro_kilograms}kg, payload {product.derived_payload_kilograms}kg"
+            f"{product.mro_kilograms}kg, payload {product.derived_payload_kilograms}kg, "
+            + (f"GBP {product.rrp_pounds:,} OTR" if product.rrp_pounds else "no price")
         )
 
     on_progress(
@@ -475,12 +575,19 @@ def collect(
         "the best available reading and they stand."
     )
     on_progress(
-        "NOT PUBLISHED, so left alone: PRICE (no pound sign appears anywhere on the "
-        "distributor's site, though FMLV holds GBP 16,995-21,995), BERTHS, and the awning "
-        "length. BODY TYPE is also not proposed: 'micro' appears ZERO times in every "
-        "source — they are called a 'lightweight caravan' — so the naming half of the "
-        "micro test fails even though 750kg passes the weight half easily. FMLV holds "
-        "type_micro on all four and emitting nothing leaves it standing."
+        "THE PRICE COMES FROM MINK CAMPERS UK, the importer's own brand site, which is "
+        "the only place one is published — neither the catalogue nor the dealer's pages "
+        "carry a price at all. Each model page heads itself 'MINK-S FROM GBP19,995.00', "
+        "on the road. That site's /specification/ page is NOT used: it looks like a spec "
+        "sheet but states one generic block for 'MINK CAMPER' and a 'From GBP15,995 OTR' "
+        "that matches none of the three real prices."
+    )
+    on_progress(
+        "NOT PUBLISHED, so left alone: BERTHS and the awning length. BODY TYPE is also "
+        "not proposed: 'micro' appears ZERO times in every source — they are called a "
+        "'lightweight caravan' — so the naming half of the micro test fails even though "
+        "750kg passes the weight half easily. FMLV holds type_micro on all four and "
+        "emitting nothing leaves it standing."
     )
     if len(extracted) != EXPECTED_LAYOUTS:
         on_progress(
