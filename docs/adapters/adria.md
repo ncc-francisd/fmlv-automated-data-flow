@@ -261,3 +261,152 @@ they differ correctly.
 **No sheet names a microwave anywhere**, and these sheets itemise every fitting a
 configuration has, so the absence is recorded with that reasoning and
 `findings.SILENCE_MEANS` supplies the recommendation.
+
+---
+
+# Adria caravans (survey, 2026-09-21)
+
+A second product area for the same manufacturer row, the way `swift_caravan.py` sits
+beside `swift.py`. `fmlv_manufacturer` stays **`Adria Mobil`** and the NCC supplier name
+stays **`Adria Caravans & Motorhomes`** — both as already registered, and both spelt
+slightly differently from how they were described in the request ("Adria Mobile", "and").
+
+- Source: <https://www.adria.co.uk/caravans>
+- Four ranges, as the requester said: **Alpina, Adora, Altea, Action**
+- FMLV holds **11 live caravan rows**, also as the requester said
+
+## The machinery is already built
+
+The caravan pages work exactly like the motorhome ones, which is the main finding: the
+same Laravel+Livewire range page, the same scroll-triggered `/livewire/update` call, the
+same per-configuration PDF at `configure.adria-mobil.com/gb/25-26/<product id>/pdf`.
+Verified on all four ranges — each returns one Livewire response and every product id
+builds a PDF URL that fetches 200.
+
+So `parse_livewire_products`, `technical_data_pdf_url`, `pdf_title` and
+`pdf_describes_layout` are all reusable unchanged. What cannot be reused is the field
+mapping, for the reasons below.
+
+## The roster: 10 configurations against 11 live rows
+
+| range | on the site | in FMLV (live) |
+|---|---|---|
+| Alpina | 623 HT RIO GRANDE, 623 UC MISSISSIPPI, **623 UL COLORADO** | …RIO GRANDE, …MISSISSIPPI, **623 UC COLORADO** |
+| Adora | 612 DL SEINE, 623 DP TIBER | …SEINE, …TIBER, **623 DT ISONZO**, **623 DT SAVA** |
+| Altea | 612 DL TYNE, 622 DK AVON, 622 DP DART | the same three |
+| Action | **391 LH**, **Action Sports 391 LH** | **361 LT** |
+
+**`623 UL COLORADO` is `623 UC COLORADO` renamed**, and the evidence is the mass, not the
+name: mass in running order **1837 kg on both**, total length **8260 mm on both**. Per the
+rename rule that is the test that counts.
+
+So the expected shape is **8 matched, 2 new, 3 disappeared** — the disappearances being
+Adora ISONZO, Adora SAVA and Action 361 LT.
+
+## FMLV records the *minimum* permissible mass
+
+The single most important finding, and it explains five apparent disagreements. Every PDF
+states two:
+
+```
+Maximum technical permissable laden mass (MTPLM) ( kg ) 1800
+Minimal technically permissible laden mass (MTPLM-min, kg) 1650
+```
+
+| layout | MTPLM | MTPLM-min | FMLV |
+|---|---|---|---|
+| Altea Tyne / Avon / Dart | 1800 | **1650** | **1650** |
+| Adora Tiber | 1900 | **1800** | **1800** |
+| Alpina Mississippi | 2000 | **1950** | **1950** |
+| Alpina Rio Grande | 2000 | 2000 | 2000 |
+
+**Read `MTPLM-min`.** Reading `MTPLM` would propose a heavier mass on five of eight
+products and silently record an uprated chassis as the base vehicle.
+
+`Mass in running order` is already published as `MIRO-min`, and agrees with FMLV on six of
+eight. The two that differ — Adora Seine 1641 against 1612, Tiber 1637 against 1622 — are
+genuine model-year movement, and FMLV's payload follows its own MRO exactly.
+
+**Alpina Colorado is the exception**: it states `MTPLM 2500` and **no `MTPLM-min` line at
+all**, where FMLV holds 2000. Every other product publishes both. Proposing 2500 would
+take a maximum where the convention is the minimum, so nothing should be proposed for its
+permissible mass until Adria publishes the pair.
+
+## Traps
+
+**Length is the total including the tow bar, not the body length.** The PDF states
+`Total length (including tow bar) (mm) 8190`, `Body length (mm) 6890` and
+`Internal length (mm) 6193`, and FMLV's `shipping_length_mm` is the first of the three.
+The motorhome adapter's own spec reader takes the **body** length, so running it unchanged
+over a caravan PDF puts 6890 where 8190 belongs — and it looks entirely plausible.
+
+**Height disagrees on every single product, by exactly the same amount.** PDF 2600 against
+FMLV 2750 on Alpina and Adora; PDF 2580 against FMLV 2730 on Altea. **+150 mm, eight times
+out of eight.** A uniform offset across two ranges is a definitional difference — FMLV is
+measuring to something the PDF's "total height" excludes — not eight independent errors.
+Nothing should be proposed for height without the requester settling what FMLV's figure
+includes.
+
+**The payload is the arithmetic, and the PDF's own figure is not it.** `Max loading weight
+(kg) with All Inclusive Pack weight deducted` reads 161 on the Rio Grande where FMLV holds
+215, because it subtracts a 48.2 kg option pack. FMLV's figure is `MTPLM-min − MRO`, which
+matches on all seven comparable products. This is the same trap as Knaus, Weinsberg, T@B
+and Frankia, and it makes Adria the **second** documented exception to the caravan payload
+rule in `docs/adapters/README.md`, after T@B.
+
+**Trim labels are unreliable — use the layout label.** Altea's `622 DK AVON` carries the
+trim `Altea 622 DP Dart`, copied from its sibling; `612 DL TYNE` carries `Altea 612DL Tyne`
+with no space. The layout label matches FMLV's model exactly on all eight matched products,
+so the model name comes from there and `model_includes_trim` is `False`.
+
+The one place the trim does carry information is **Action**, where two configurations share
+the layout `391 LH GB` and are told apart only by `Action 391 LH` against
+`Action Sports 391 LH`.
+
+**Action is announced but unspecced.** Both its PDFs have a `B. Dimensions and weights`
+section containing nothing but the option-pack weight, followed by `CZ. Adria Vehicle
+Information TBA`. No length, width, height, MIRO or MTPLM. They cannot be collected as
+products yet, and FMLV's Action 361 LT disappears with nothing to replace it.
+
+**The layout label carries a market suffix**: `391 LH GB`. FMLV's own archived Action row
+is `391 PT`, so the suffix is Adria's market code and not part of the model name.
+
+## The self-check
+
+Unchanged from the motorhome adapter, and it matters just as much here because the PDF URL
+is *constructed* from an id: the document's own title must name the layout it was fetched
+for (`ALPINA 623 HT RIO GRANDE`), and the mass in running order must be below the
+permissible mass. Both held on all eight readable products.
+
+## Fetches per run
+
+Fourteen: four range pages through the browser, plus ten PDFs.
+
+## First caravan run — #111, 2026-09-21
+
+8 scraped against 11 baseline: **8 matched, 0 new, 3 disappeared**, 37 proposals and 106
+fields verified unchanged. The three disappearances are Action 361 LT, Adora 623 DT
+ISONZO and Adora 623 DT SAVA.
+
+Every matched product proposes its height (−150 mm) and a year bump. Beyond that the two
+Adoras have moved on the model year — mass in running order 1612 → 1641 and 1622 → 1637,
+with the payload following — and their awning perimeter drops 870 mm on both. That figure
+was checked rather than assumed: Adria publish `985/626` and `990/632` where FMLV holds
+1072 and 1077, and the same field matches FMLV exactly on all three Alteas and the Rio
+Grande, so the parse is right and the change is real.
+
+The Altea widths move 2299 → 2296 and the Adora Seine 2299 → 2300: a 3 mm rounding
+difference, trivial but it will appear in the queue.
+
+### Two cases the live run exposed
+
+**The Alpina Colorado was dropped on the first attempt**, because it publishes a maximum
+permissible mass and no minimum — alone among the ten. That reported a live FMLV row as
+disappeared when the caravan is plainly on the site under a new code, which is the same
+false-disappearance shape as Frankia's Mercedes Final Editions. It is now collected with
+its mass and payload simply not proposed, and it matches through the rename.
+
+**Both Action configurations share one layout label**, `391 LH GB`, and are told apart
+only by their trims. They drop on the TBA check before that matters, but the collision
+would otherwise file two caravans under one FMLV identity, so `collect` refuses a
+duplicate `(range, model)` and says why.

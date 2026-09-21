@@ -138,12 +138,13 @@ def test_asking_for_an_unwritten_product_area_returns_none_not_the_other_one() -
 
     A lookup that fell back to the manufacturer's only adapter would run a *motorhome*
     scraper for a caravan run and file the results against the caravan export. Asserted
-    against Adria, who build both but have only the motorhome adapter written — Bailey
-    and Swift can no longer make the point, each having gained a caravan adapter of its
-    own, and this assertion moves to the next brand on the list every time one lands.
+    against Dethleffs, who build both but have only the motorhome adapter written —
+    Bailey, Swift and now Adria can no longer make the point, each having gained a
+    caravan adapter of its own, and this assertion moves to the next brand on the list
+    every time one lands.
     """
-    assert adapters.adapter_for("Adria Mobil", VehicleClass.MOTORHOME) is not None
-    assert adapters.adapter_for("Adria Mobil", VehicleClass.CARAVAN) is None
+    assert adapters.adapter_for("Dethleffs", VehicleClass.MOTORHOME) is not None
+    assert adapters.adapter_for("Dethleffs", VehicleClass.CARAVAN) is None
 
 
 @pytest.mark.parametrize("name", ADAPTER_NAMES)
