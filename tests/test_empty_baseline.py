@@ -12,6 +12,7 @@ No network here.
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from pathlib import Path
 
@@ -70,11 +71,22 @@ def test_it_lands_where_the_manufacturer_s_exports_go(tmp_path: Path) -> None:
 
 
 def test_a_real_export_supersedes_it(tmp_path: Path) -> None:
-    """`latest_export` takes the newest file, so nothing has to be deleted afterwards."""
-    empty_baseline(manufacturer=_manufacturer(), data_root=tmp_path, today=date(2026, 9, 16))
-    directory = tmp_path / "exports" / "278_Trigano"
-    real = directory / "2026-10-01_Trigano_motorhome-campervans.xlsx"
-    real.write_bytes((directory / "2026-09-16_Trigano_motorhome-campervans.xlsx").read_bytes())
+    """`latest_export` takes the newest file, so nothing has to be deleted afterwards.
+
+    **It sorts on the modification time, not the date in the filename**, so the two are
+    written a clear hour apart. Writing them back to back made this test flaky: the
+    placeholder and the export it is meant to supersede landed within the same filesystem
+    timestamp tick, `max` returned whichever it saw first, and the run failed perhaps one
+    time in fifty. Real exports arrive days apart, so the race is the test's alone.
+    """
+    empty = empty_baseline(
+        manufacturer=_manufacturer(), data_root=tmp_path, today=date(2026, 9, 16)
+    )
+    real = empty.with_name("2026-10-01_Trigano_motorhome-campervans.xlsx")
+    real.write_bytes(empty.read_bytes())
+
+    placeholder_written = empty.stat().st_mtime
+    os.utime(real, (placeholder_written + 3600, placeholder_written + 3600))
 
     chosen = latest_export(root=tmp_path, manufacturer_id=278, manufacturer_name="Trigano")
 
