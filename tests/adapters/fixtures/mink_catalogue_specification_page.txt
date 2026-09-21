@@ -1,0 +1,43 @@
+2080 mm4116 mm
+1511 mm
+1829 mm
+2811 mm
+Gross weight 750 kg
+Net weight 520 kg
+Overall length 4120 mm
+Cabin length 2810 mm
+Overall height 1850 mm
+Overall width 2100 mm
+Cabin width 1510 mm
+Ground clearance 320 mm
+Wheels 17 x 8.5
+Tyres 225/55R17
+Tow ball height 500 mm
+Coupling point 75 kg
+Gross weight 750 kg
+Net weight 530 kg
+Overall length 4120 mm
+Cabin length 2810 mm
+Overall height 1880 mm
+Overall width 2100 mm
+Cabin width 1510 mm
+Ground clearance 350 mm
+Wheels 17 x 8.5
+Tyres 245/65R17
+Tow ball height 530 mm
+Coupling point 75 kg
+Gross weight 750 kg
+Net weight 510 kg
+Overall length 4120 mm
+Cabin length 2810 mm
+Overall height 1850 mm
+Overall width 2100 mm
+Cabin width 1510 mm
+Ground clearance 320 mm
+Wheels 17 x 8.5
+Tyres 225/55R17
+Tow ball height 500 mm
+Coupling point 75 kg
+MINK-S
+DIMENSIONS
+MINK-X MINK-E
