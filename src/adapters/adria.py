@@ -251,17 +251,26 @@ def parse_livewire_products(response_body: bytes) -> list[LivewireProduct]:
 def technical_data_pdf_url(product: LivewireProduct) -> str | None:
     """The direct, unauthenticated PDF URL for one configuration's technical data.
 
-    Derived from `configuratorURL` (e.g. `.../gb/25-26?link=1&...`) rather than a
-    hardcoded market/period, so it tracks whatever season/market the site is currently
-    serving.
+    **Every part of it comes from `configuratorURL`** (e.g.
+    `https://configure.adria-mobil.com/gb/25-26?link=1&...`) — the host as well as the
+    market and period — so it tracks whatever season, market *and brand* the site is
+    currently serving.
+
+    The host used to be hardcoded to `configure.adria-mobil.com`, which was right for
+    every Adria range and wrong for the sub-brand: SUN LIVING's configurator is at
+    `configure.sun-living.com`, so all ten of its PDFs returned 404 and one layout looked
+    like a model with no technical data at all. It has a full document.
     """
     if not product.configurator_url:
         return None
-    path_parts = [p for p in urlparse(product.configurator_url).path.split("/") if p]
-    if len(path_parts) < 2:
+    parsed = urlparse(product.configurator_url)
+    path_parts = [p for p in parsed.path.split("/") if p]
+    if len(path_parts) < 2 or not parsed.netloc:
         return None
     market, period = path_parts[0], path_parts[1]
-    return f"https://configure.adria-mobil.com/{market}/{period}/{product.product_id}/pdf"
+    return (
+        f"{parsed.scheme}://{parsed.netloc}/{market}/{period}/{product.product_id}/pdf"
+    )
 
 
 # --------------------------------------------------------------------------- #
