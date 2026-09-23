@@ -215,21 +215,66 @@ since 2026-09-19.
 That makes this a **pipeline gap rather than a Carthago quirk** — Carthago is simply the
 brand that makes it impossible to ignore, at 42% of its line-up instead of 3% of Frankia's.
 
-## The decision this needs
+## How it was resolved
 
-Two ways out, and it is the requester's call:
+The requester chose the pipeline change on 23 September 2026: *"if the base vehicle is
+different then it is a different vehicle … we are not getting lots of new models when
+they are not really new models."* The chassis now joins product identity in
+`_dedupe_baseline`, `diff.matching`, `store.products` and the `product` table's unique key.
+All 53 rows survive the baseline, and Frankia's Noctra Cruiser pair stopped being dropped
+at the same time.
 
-**A. Put the chassis in the model name** — `T 143 KB-LE lightweight 3.5 t Fiat`. Contained
-to Carthago, no code change. But it needs 44 FMLV rows re-uploaded with new model names, it
-invents a convention no other manufacturer uses, and because the public card already appends
-the base vehicle it would render *"… 3.5 t Fiat Fiat"*.
+He drew the neighbouring line in the same breath, and it is in
+`docs/adapters/README.md`: **a trim or option package is not a different product** unless
+it carries a name of its own. Carthago's `lightweight 3.5 t` and `comfort 4.2 t` are named,
+are different homologated weight classes, and FMLV already holds them separately — so
+they stay as they are.
 
-**B. Make the base vehicle part of a product's identity** — in `_dedupe_baseline`, the
-matcher, `upsert_seen` and the unique constraint. It fixes Frankia at the same time, needs
-no data editing and keeps the display clean, but it is a schema migration on shared
-infrastructure that every manufacturer's matching runs through.
+## What the build settled
 
-**Recommendation: B**, because the data already says the base vehicle is part of the
-identity — FMLV populates it, distinguishes 22 pairs by it alone, and shows it on the card —
-and because A leaves the Frankia row still being dropped. It is the larger change and the
-one that needs agreeing before it is written.
+### Identity comes from the page it was found on
+
+Titles are `C1-tourer T 143 KB-LE lightweight 3.5 t` and the series is stripped off the
+front. But **one title drops its layout letter** — the T 148 KB-LE H is headed
+`C1-tourer 148 KB-LE H comfort 4.2 t` — so `RANGES` carries the letter per range page
+and `identity_for` restores it. FMLV holds the `T`.
+
+The chassis comes from the JSON where a range has one and from the URL otherwise:
+**eight C2-tourer permalinks end `-2` and never name it**, which on this manufacturer is
+half a product's identity.
+
+### A page with no technical table is still a product
+
+The T 148 KB-LE H pages publish nothing at all — no weights, no dimensions, no price.
+Dropping them was the obvious thing and was wrong: their FMLV rows went unclaimed, and the
+matcher handed 8899 and 8904 to two unmatched **C2-tourer** products and proposed renaming
+a C1-tourer into one. They are now collected on their identity alone, which claims the row,
+proposes no field and leaves FMLV's figures standing as no-op rows.
+
+### Three Fiat chic c-lines really have gone
+
+`I 5.0 QB`, `I 5.0 QB L` and `I 6.2 XL QB` are listed on the site **only as Mercedes**.
+FMLV holds a Fiat of each. Those three disappearance notices are genuine — Carthago have
+withdrawn the Fiat chassis on those layouts — and are the one case here where
+deactivating is the right answer.
+
+## First run — #127, 2026-09-23
+
+76 collected against 53 baseline: **48 changed, 2 unchanged, 26 new, 3 disappeared**, 689
+proposals, **371 fields verified unchanged** and 76 habitation findings.
+
+The two unchanged are the T 148 KB-LE H pair, which propose nothing because their pages
+publish nothing. The 26 new are almost all C2-tourer: FMLV held four of that range, all
+Mercedes, where the site sells 26 across both chassis.
+
+Four model names are corrected rather than renamed — FMLV writes the C2-tourer's weight
+class as `4.2t` and `3.5t` where every other range and the site itself write `4.2 t`.
+
+Every product proposes a new price, a new mass in running order and a seat count; the seat
+figure is Carthago's own *"maximum number of seats with 3-point safety belt"*, which is the
+settled rule in their words.
+
+## Fetches per run
+
+**85** — nine range pages for the roster, then one per product. Easily the largest of any
+adapter here; the sweep takes about two minutes.

@@ -396,6 +396,34 @@ three.
 The general rule, and it applies to every field the pipeline can derive: **emitting
 nothing means holding no value, not hiding one.**
 
+### What makes two vehicles two products
+
+Settled by the requester on 23 September 2026, when Carthago forced the question.
+
+**A different base vehicle is a different product.** One layout sold on a Fiat and on a
+Mercedes has two prices, two masses, two lengths and two FMLV rows, and the chassis is part
+of a product's identity everywhere the pipeline handles it — `_dedupe_baseline`,
+`diff.matching`, `store.products` and the `product` table's unique key. The requester:
+*"it is becoming more common that there are two models, one say Fiat and one say Mercedes
+with the same model number … if the base vehicle is different then it is a different
+vehicle"*.
+
+**A different trim or option package is not.** *"I'm not sure that is a different model. I
+think that's the same model. Otherwise we would have to accommodate every combination of
+extra as a different model."* An inclusive pack, a comfort bundle or a set of options
+bought together does not make a second product, however much it moves the price — record
+the base vehicle, which is the settled rule anyway. Sun Living's all-inclusive pack and
+Campod's chassis dropdown are the worked examples.
+
+**Unless the package carries a name of its own.** *"The only exception would be if that
+extra package comes with a different name to it, like Special or Anniversary version —
+then it's got a different name, it's a different model."* A named edition is a product; an
+unnamed bundle is an option.
+
+Carthago sits on the right side of that line twice over: its `lightweight 3.5 t` and
+`comfort 4.2 t` are named, are different weight classes with different homologated masses,
+and FMLV already holds them as separate models.
+
 **Two brands are documented exceptions, and the exception is decided by the brand's own
 baseline, not by an adapter's preference.**
 
