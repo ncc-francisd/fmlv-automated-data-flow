@@ -161,11 +161,75 @@ vehicles even though no page states a model year in words.
 for the specification. Easily the largest of any adapter so far; Frankia is ten and Wildax
 eight. Worth knowing before the first run.
 
-## Still needed before a build
+## The baseline, and the thing it exposed
 
-**There is no FMLV export for id 54.** Nothing here has been checked against what FMLV
-actually holds: not the range/model split, not the live count, not the naming of the trim
-and chassis suffixes. The public site shows the display name as
-`Carthago C1-tourer T 143 KB-LE lightweight 3.5 t Fiat`, but whether that is range
-`C1-tourer T` + model `143 KB-LE lightweight 3.5 t Fiat`, or range `C1-tourer` + model
-`T 143 KB-LE ...`, only the export says.
+FMLV holds **53 live rows, every one already 2027** — so the requester's bump has been done
+and the year needs no proposing.
+
+### The model does *not* carry the chassis. A separate column does.
+
+This corrects the survey above. FMLV splits a Carthago like this:
+
+| `manufacturer_range` | `model` | `base_vehicle_manufacturer` |
+|---|---|---|
+| `C1-tourer` | `T 143 KB-LE lightweight 3.5 t` | `Fiat` |
+| `C1-tourer` | `T 143 KB-LE lightweight 3.5 t` | `Mercedes` |
+
+The public card reads *"Carthago C1-tourer T 143 KB-LE lightweight 3.5 t Fiat"* because the
+site appends the base vehicle to the display — not because the model contains it. **No
+manufacturer anywhere in FMLV puts a chassis name in a model**; checked across all 41
+exports, there is not one.
+
+Note also that FMLV's ranges are not the site's. The site sells `C1-tourer T` and
+`C1-tourer EDITION+`; FMLV has range `C1-tourer` with the `T` pushed into the model. Its
+`chic c-line` range holds both the A-class `I` models and the semi-integrated `T 4.9 LE`.
+And FMLV spells Iveco `IVECO`.
+
+### 22 of the 53 rows are invisible to the pipeline
+
+**`(manufacturer_range, model)` is the product's identity everywhere** — `_dedupe_baseline`,
+`diff.matching`, `store.products.upsert_seen`, and a
+`UNIQUE (manufacturer_id, vehicle_class, manufacturer_range, model)` constraint in the
+database. The base vehicle appears in none of them.
+
+So Carthago's 53 live rows collapse to **31 distinct keys**, and `_dedupe_baseline` discards
+**22 products** before matching starts — no disappearance notice, because a discarded
+duplicate never reaches the diff:
+
+```
+discarded 6303 (Fiat) in favour of 6315 (Mercedes)  ->  chic c-line / I 4.9 LE
+discarded 6304 (Fiat) in favour of 6316 (Mercedes)  ->  chic c-line / I 4.9 LE L
+... 22 in total
+```
+
+An adapter that emits all 76 would then propose those 22 as new, giving FMLV a second copy
+of each.
+
+### Frankia already has this, and is already losing a row
+
+`Noctra / Cruiser 7.6 L` exists twice — **8888 Mercedes** (MRO 3788) and **8889 Fiat** (MRO
+3837), same price. `frankia.py` declares one `_Layout` for it and emits one product, so on
+every run one of the pair is discarded and the survivor takes the match. One row, silently,
+since 2026-09-19.
+
+That makes this a **pipeline gap rather than a Carthago quirk** — Carthago is simply the
+brand that makes it impossible to ignore, at 42% of its line-up instead of 3% of Frankia's.
+
+## The decision this needs
+
+Two ways out, and it is the requester's call:
+
+**A. Put the chassis in the model name** — `T 143 KB-LE lightweight 3.5 t Fiat`. Contained
+to Carthago, no code change. But it needs 44 FMLV rows re-uploaded with new model names, it
+invents a convention no other manufacturer uses, and because the public card already appends
+the base vehicle it would render *"… 3.5 t Fiat Fiat"*.
+
+**B. Make the base vehicle part of a product's identity** — in `_dedupe_baseline`, the
+matcher, `upsert_seen` and the unique constraint. It fixes Frankia at the same time, needs
+no data editing and keeps the display clean, but it is a schema migration on shared
+infrastructure that every manufacturer's matching runs through.
+
+**Recommendation: B**, because the data already says the base vehicle is part of the
+identity — FMLV populates it, distinguishes 22 pairs by it alone, and shows it on the card —
+and because A leaves the Frankia row still being dropped. It is the larger change and the
+one that needs agreeing before it is written.
