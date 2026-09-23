@@ -179,14 +179,109 @@ publishing, and **2027 appears nowhere on the site**. The requester expects this
 over. `_is_current_model_year` keeps the current calendar year and the next, so 2026 is in
 scope now and the adapter needs no change when 2027 lands — only the figures will move.
 
-## Still needed before a build
+## The baseline, once it arrived
 
-**There is no FMLV export for id 16.** `data/exports/` has 41 manufacturers and Wildax is
-not among them, so nothing here has been checked against what FMLV actually holds: not the
-model names, not the range names, not the live count. Everything above is the source side
-only.
+FMLV holds **15 live rows**, all 2026. Against the 18 on the site that is **15 matched, 3
+new and nothing disappearing** — the three new being `Aurora Leisure`, `Aurora Leisure XL`
+and `Equinox 4x4`.
+
+Twelve of the fifteen match on mass **to the kilogram**, which is the strongest evidence the
+parse is right. Better still, two rows show FMLV already works the way the settled rule
+does: it holds **310** for the Altair RL where WildAx print 306, and **487** for the Aurora
+XL where WildAx print 485. Both are `MTPLM − MRO`.
+
+Seats match on all fifteen. Berths disagree in two places: FMLV holds 3/3/4/4 across the
+four Constellations where the site says **2** on all of them (they are `Lounge Conversion`
+— one front lounge making up into a double), and holds the Altair RL's berths and belts as
+2 and 2, which are exactly the **RS**'s figures where the site gives the RL 3 and 4.
+
+### Naming is preserved, not tidied
+
+FMLV shouts `AURORA`, `SOLARIS`, `PULSAR`, `EUROPA` and `EQUINOX` and title-cases
+`Europa`, `Constellation`, `Altair`, `Meteor` and `Equinox` as *ranges*, inconsistently.
+The roster carries FMLV's own strings rather than the site's, because re-casing 15 live
+rows is churn nobody asked for. The three new models take the site's title case, there
+being no existing row whose casing to keep.
+
+`SOLARIS XL` is its own **range** in FMLV, where every other XL is a model inside its base
+range. Preserved as held.
+
+## What the build settled
+
+### A panel that contradicts itself proposes no mass at all
+
+The first run proposed `442 → 438` on the Constellation 3 XL — WildAx's 3496 typo
+overwriting FMLV's correct 3500. Withholding the *provenance* was not enough, because the
+pipeline derives payload from whatever MTPLM and MRO a product carries; the **values** have
+to be cleared. They now are, and the three failing models raise no-op "in-scope field not
+found this run" rows that preserve all nine figures.
+
+### Two wrong figures the self-check cannot see
+
+Both are copied cells that are copied *consistently*, so the payload arithmetic agrees with
+itself and is wrong:
+
+| | site | FMLV | how it shows |
+|---|---|---|---|
+| **Solaris XL** MRO | 3040 | **3134** | the same mass as the 6m, 370mm shorter |
+| **Europa** length | 6360 | **5990** | the same length as the Europa XL |
+
+`suspect_copied_figures` narrates both. It reports **same mass across different lengths**,
+and **an XL no longer than the model it extends** — and deliberately not "same length,
+different mass", which the first run threw as two false positives. The Altair RS and RL are
+one 6840mm van with two interiors, and the two Equinoxes one 5980mm van with two
+drivetrains. That is the Globecar lesson: a range shares wheelbases, so length alone proves
+nothing.
+
+### Dimensions are cm-precision and FMLV's are mm
+
+Proposed anyway, with the published string quoted verbatim, because the alternative leaves
+FMLV's **2005** for the Fiats and **2004** for the MAN standing against the site's `2.05 m`
+and `2.04 m` — 45 mm and 36 mm out, and unmistakably a decimal point lost on entry.
+
+The cost is real and worth stating: the Ford pair's width goes **2059 → 2050** and their
+length **5981 → 5980**, which are downgrades of a finer figure. Those four are worth
+rejecting.
+
+### Habitation is stated, and two positions are refused
+
+`Rear Side` is both rear and side, and `KitchenLocation` and `BathroomLayout` each make
+those exclusive — so the Pulsar and all four Constellations get no kitchen and no washroom
+location. The two Equinoxes name `Elevating Roof` as a second sleeping area, which is
+neither front nor rear, so their `sleeping_area` is unset. All narrated; a gap blocks the
+upload until a person looks, which is the point.
+
+### The Meteor takes the 165's price
+
+The cheapest Meteor is a 130 at £72,495 and the base-vehicle rule would pick it, but FMLV
+holds the model as `165`. The requester chose the 165's **£73,995** on 23 September 2026
+rather than file a 130's price under a 165's name.
+
+## First run — #123, 2026-09-23
+
+18 collected against 15 baseline: **15 changed, 3 new, 0 disappeared**, 113 proposals, 136
+fields verified unchanged and 21 habitation findings.
+
+Of the proposals, **15 are year bumps** — eligibility flags, not forced changes; WildAx
+publish 2026 throughout and 2027 appears nowhere, so they should be left unticked — and
+**9 are the no-op rows** protecting the three typo'd models' masses.
+
+The substantive changes:
+
+| | proposed |
+|---|---|
+| every model | price, all 18 |
+| 16 of 18 | width 2005 → 2050 (Fiat) or 2004 → 2040 (MAN) |
+| Constellation ×4 | berths 3/3/4/4 → 2 |
+| Altair RL | berths 2 → 3, seats 2 → 4 |
+| Equinox | MRO 3108 → 3006, payload 392 → 494 |
+| Solaris XL | MRO 3134 → 3040 *(narrated as suspect)* |
+| Europa | length 5990 → 6360 *(narrated as suspect)* |
+| Meteor, Equinox | width 2059 → 2050, length 5981 → 5980 *(precision loss)* |
+
+Prices move on all 18 and not all one way: the Fiat models drop by £2,005–£5,500, while
+both Altairs and the Meteor **rise** by £1,500–£2,500.
 
 ## Fetches per run
 
-Eight — one per range page. The price list rides along inside each of them, so it costs
-nothing extra, and it can be read from the first page fetched and reused.
+Eight — one per range page. The price list rides along inside the first.
