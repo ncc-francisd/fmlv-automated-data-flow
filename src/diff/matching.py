@@ -295,6 +295,25 @@ class MatchResult:
     method: str | None  # "exact" | "fuzzy" | None
 
 
+def _chassis_rank(left: Product, right: Product) -> int:
+    """`0` when the two name the same base vehicle, `1` when they disagree.
+
+    Sorts *within* an equal similarity score, so a scraped Fiat claims the baseline Fiat
+    and leaves the Mercedes for the scraped Mercedes. Without it the greedy assignment
+    pairs them in whatever order they were listed, and the first Carthago run would have
+    written each chassis's masses and price onto the other one's row.
+
+    **Unknown on either side ranks as agreement**, which keeps this from ever demoting a
+    manufacturer that publishes no chassis, or a caravan, which has none. It only ever
+    separates two candidates that both state one and state different ones.
+    """
+    left_make = getattr(left, "base_vehicle_manufacturer", None)
+    right_make = getattr(right, "base_vehicle_manufacturer", None)
+    if not left_make or not right_make:
+        return 0
+    return 0 if left_make.strip().casefold() == right_make.strip().casefold() else 1
+
+
 def match_products(
     scraped: Iterable[ExtractedProduct],
     baseline: Iterable[Product],
@@ -310,30 +329,50 @@ def match_products(
     threshold-only lookup — it stops two similarly-named scraped products both
     claiming the same baseline row.
 
-    Equal scores are broken by `_tie_break`: an export routinely holds the same layout
-    more than once, and the live row is the one an update belongs on.
+    Equal scores are broken first by the **base vehicle** and then by `_tie_break`. The
+    chassis comes first because a manufacturer selling one layout on a Fiat and a Mercedes
+    gives both the same name, and FMLV holds them as two rows distinguished by that column
+    alone — so the scraped Fiat has to claim the baseline Fiat. `_tie_break` then handles
+    the older problem: an export routinely holds the same layout more than once, and the
+    live row is the one an update belongs on.
     """
     scraped_list = list(scraped)
     baseline_list = list(baseline)
 
-    candidates: list[tuple[float, tuple[int, int], int, int]] = []
+    candidates: list[tuple[float, int, tuple[int, int], int, int]] = []
     for s_idx, extracted in enumerate(scraped_list):
         for b_idx, baseline_motorhome in enumerate(baseline_list):
             score = token_similarity(
                 extracted.product, baseline_motorhome, renames=renames
             )
             if score > 0:
-                candidates.append((score, _tie_break(baseline_motorhome), s_idx, b_idx))
+                candidates.append(
+                    (
+                        score,
+                        _chassis_rank(extracted.product, baseline_motorhome),
+                        _tie_break(baseline_motorhome),
+                        s_idx,
+                        b_idx,
+                    )
+                )
 
-    # Best score first, then the tie-break, then insertion order (scraped-index then
-    # baseline-index ascending) so results are deterministic run to run.
+    # Best score first; then the chassis, so two products sharing a name go to the
+    # baseline rows built on the same base vehicle; then the tie-break, then insertion
+    # order (scraped-index then baseline-index ascending) so results are deterministic
+    # run to run.
     candidates.sort(
-        key=lambda candidate: (-candidate[0], candidate[1], candidate[2], candidate[3])
+        key=lambda candidate: (
+            -candidate[0],
+            candidate[1],
+            candidate[2],
+            candidate[3],
+            candidate[4],
+        )
     )
 
     matched_scraped: dict[int, tuple[int, float]] = {}
     used_baseline: set[int] = set()
-    for score, _tie, s_idx, b_idx in candidates:
+    for score, _chassis, _tie, s_idx, b_idx in candidates:
         if score < threshold:
             break
         if s_idx in matched_scraped or b_idx in used_baseline:

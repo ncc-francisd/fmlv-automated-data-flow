@@ -12,8 +12,9 @@ first created needs its own `ALTER TABLE`, applied idempotently by checking
 `PRAGMA table_info` first (SQLite has no `ADD COLUMN IF NOT EXISTS`).
 
 Constraints need more than that — SQLite can't alter a CHECK or UNIQUE clause at all, so
-changing one means rebuilding the table. `_migrate_decision_undo_action` and
-`_migrate_product_vehicle_class_unique_key` are those rebuilds, and both matter because
+changing one means rebuilding the table. `_migrate_decision_undo_action`,
+`_migrate_product_vehicle_class_unique_key` and
+`_migrate_product_base_vehicle_unique_key` are those rebuilds, and they matter because
 real review history already exists on the deployed VM.
 """
 
@@ -30,6 +31,9 @@ _ADDED_COLUMNS = [
     ("run", "range_label", "TEXT"),
     ("run", "vehicle_class", "TEXT NOT NULL DEFAULT 'motorhome'"),
     ("product", "vehicle_class", "TEXT NOT NULL DEFAULT 'motorhome'"),
+    # Part of a product's identity, not a field of it: one layout on a Fiat and the
+    # same layout on a Mercedes are two vehicles with two review histories.
+    ("product", "base_vehicle_manufacturer", "TEXT NOT NULL DEFAULT ''"),
     # Marks a row that is a pointer for the reviewer rather than a proposal — the
     # floorplan handed over for a field only a drawing can answer. The review page
     # lifts the first one to the product header.
@@ -166,6 +170,66 @@ def _migrate_product_vehicle_class_unique_key(connection: sqlite3.Connection) ->
     )
 
 
+def _migrate_product_base_vehicle_unique_key(connection: sqlite3.Connection) -> None:
+    """Widen `product`'s unique key to include `base_vehicle_manufacturer`.
+
+    The same rebuild as `_migrate_product_vehicle_class_unique_key`, and for the same
+    reason it cannot be an `ALTER TABLE`: SQLite has no way to change a UNIQUE clause.
+
+    **Why the key needed widening.** A product was identified by its range and model, and
+    a growing number of manufacturers sell one layout on two chassis under one name.
+    Carthago makes it unmissable — 22 of its 53 live rows share a range and model with a
+    sibling on the other base vehicle — but Frankia already had it, on
+    `Noctra / Cruiser 7.6 L`, and had been quietly dropping one of that pair on every run.
+    The requester settled it on 23 September 2026: *"if the base vehicle is different then
+    it's a different vehicle"*.
+
+    Existing rows take `''`, the unknown chassis, and the first run after this fills them
+    in — `upsert_seen` finds them by `fmlv_product_id` before it ever looks at the name.
+
+    **`''` and not `NULL`, deliberately.** NULL is not equal to NULL in a SQLite unique
+    index, so a nullable column would have quietly *loosened* the key for every
+    manufacturer that publishes no chassis: two products with one name would stop
+    colliding and `ProductIdentityConflict` would stop firing on the case Chausson hit.
+    An empty string compares equal to itself, so nothing changes except that a real,
+    differing chassis now separates two rows.
+    """
+    row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'product'"
+    ).fetchone()
+    if row is None or "base_vehicle_manufacturer)" in row["sql"]:
+        return
+
+    connection.executescript(
+        """
+        CREATE TABLE product_new (
+            id INTEGER PRIMARY KEY,
+            manufacturer_id INTEGER NOT NULL,
+            fmlv_product_id INTEGER,
+            manufacturer_range TEXT,
+            model TEXT,
+            first_seen_run_id INTEGER REFERENCES run (id),
+            last_seen_run_id INTEGER REFERENCES run (id),
+            vehicle_class TEXT NOT NULL DEFAULT 'motorhome',
+            base_vehicle_manufacturer TEXT NOT NULL DEFAULT '',
+            UNIQUE (manufacturer_id, vehicle_class, manufacturer_range, model,
+                    base_vehicle_manufacturer)
+        );
+        INSERT INTO product_new
+            (id, manufacturer_id, fmlv_product_id, manufacturer_range, model,
+             first_seen_run_id, last_seen_run_id, vehicle_class,
+             base_vehicle_manufacturer)
+        SELECT id, manufacturer_id, fmlv_product_id, manufacturer_range, model,
+               first_seen_run_id, last_seen_run_id, vehicle_class,
+               COALESCE(base_vehicle_manufacturer, '')
+        FROM product;
+        DROP TABLE product;
+        ALTER TABLE product_new RENAME TO product;
+        CREATE INDEX IF NOT EXISTS idx_product_fmlv_id ON product (fmlv_product_id);
+        """
+    )
+
+
 def connect(db_path: Path | str) -> sqlite3.Connection:
     """Open the run store, creating the schema if it doesn't exist yet."""
     path = Path(db_path)
@@ -180,6 +244,12 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
     _migrate_decision_undo_action(connection)
     _migrate_decision_blank_action(connection)
     _migrate_product_vehicle_class_unique_key(connection)
+    # **Again**, because a constraint rebuild recreates its table from a CREATE TABLE
+    # frozen at the time that migration was written, and so silently drops every column
+    # added to the table since. Cheap and idempotent; without it the base-vehicle rebuild
+    # below fails on a database old enough to still need the vehicle_class one.
+    _apply_column_migrations(connection)
+    _migrate_product_base_vehicle_unique_key(connection)
     connection.commit()
     connection.execute("PRAGMA foreign_keys = ON")
     return connection

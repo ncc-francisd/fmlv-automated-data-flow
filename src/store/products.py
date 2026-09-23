@@ -35,6 +35,13 @@ class Product:
     #: Which FMLV product area this product belongs to. Part of its identity, not a
     #: label: the same range/model name in the other area is a different vehicle.
     vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLASS
+    #: The chassis, and **part of the identity for the same reason** — a growing number of
+    #: manufacturers sell one layout on a Fiat and on a Mercedes under one name, and those
+    #: are two vehicles with two prices, two masses and two review histories.
+    #:
+    #: `''` when unknown, never `None`: a caravan has no base vehicle, a manufacturer may
+    #: publish none, and NULL would not compare equal to itself in the unique key.
+    base_vehicle_manufacturer: str = ""
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> Product:
@@ -47,6 +54,7 @@ class Product:
             first_seen_run_id=row["first_seen_run_id"],
             last_seen_run_id=row["last_seen_run_id"],
             vehicle_class=VehicleClass(row["vehicle_class"]),
+            base_vehicle_manufacturer=row["base_vehicle_manufacturer"] or "",
         )
 
 
@@ -106,6 +114,7 @@ def _absorb_clash(
     model: str | None,
     run_id: int,
     vehicle_class: VehicleClass,
+    base_vehicle_manufacturer: str | None,
 ) -> None:
     """Clear the way for `keeping` to take a name another local row already holds.
 
@@ -135,13 +144,21 @@ def _absorb_clash(
       row keeps its `fmlv_product_id`, which is how it is found, and its name is marked as
       superseded so the constraint is satisfied and the history stays readable.
     """
+    base_vehicle_manufacturer = base_vehicle_manufacturer or ""
     clash = connection.execute(
         """
         SELECT * FROM product
         WHERE manufacturer_id = ? AND vehicle_class = ? AND manufacturer_range IS ?
-              AND model IS ? AND id != ?
+              AND model IS ? AND base_vehicle_manufacturer IS ? AND id != ?
         """,
-        (manufacturer_id, VehicleClass(vehicle_class).value, manufacturer_range, model, keeping),
+        (
+            manufacturer_id,
+            VehicleClass(vehicle_class).value,
+            manufacturer_range,
+            model,
+            base_vehicle_manufacturer,
+            keeping,
+        ),
     ).fetchone()
     if clash is None:
         return
@@ -149,11 +166,14 @@ def _absorb_clash(
     survivor = connection.execute("SELECT * FROM product WHERE id = ?", (keeping,)).fetchone()
     if clash["fmlv_product_id"] is not None:
         if clash["last_seen_run_id"] == run_id:
+            chassis = (
+                f" on a {base_vehicle_manufacturer}" if base_vehicle_manufacturer else ""
+            )
             msg = (
                 f"FMLV products {survivor['fmlv_product_id']} and {clash['fmlv_product_id']} "
-                f"are both named {manufacturer_range!r} {model!r} in this run. Two live "
-                f"products cannot share a name — archive or rename one of them in FMLV, then "
-                f"run again."
+                f"are both named {manufacturer_range!r} {model!r}{chassis} in this run. Two "
+                f"live products cannot share a name — archive or rename one of them in FMLV, "
+                f"then run again."
             )
             raise ProductIdentityConflict(msg)
         connection.execute(
@@ -179,6 +199,7 @@ def upsert_seen(
     model: str | None,
     run_id: int,
     vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLASS,
+    base_vehicle_manufacturer: str | None = None,
 ) -> Product:
     """Record that one product was seen in `run_id`.
 
@@ -188,6 +209,12 @@ def upsert_seen(
     `manufacturer_range`/`model`, so a rename is picked up rather than orphaning the
     old name — rather than inserting a duplicate. Otherwise a new row is inserted.
 
+    **The fallback is also scoped to `base_vehicle_manufacturer`**, because a product with
+    no FMLV id yet is found by its name alone, and one layout sold on two chassis carries
+    one name. Without it Carthago's Fiat and Mercedes builds of a layout are one row.
+    Rows stored before that column existed hold `NULL` and are found by `fmlv_product_id`
+    first, so they are filled in rather than duplicated.
+
     Both lookups are scoped to `vehicle_class`. The `fmlv_product_id` one does not strictly
     need it — FMLV mints those across both exports from one sequence, and Bailey's
     motorhome and caravan ids don't overlap — but the range/model fallback does: that is
@@ -195,6 +222,8 @@ def upsert_seen(
     would otherwise be matched to it and inherit its history.
     """
     class_value = VehicleClass(vehicle_class).value
+    # `''` is the unknown chassis everywhere below — see `Product.base_vehicle_manufacturer`.
+    base_vehicle_manufacturer = base_vehicle_manufacturer or ""
     existing = None
     if fmlv_product_id is not None:
         existing = connection.execute(
@@ -209,9 +238,15 @@ def upsert_seen(
             """
             SELECT * FROM product
             WHERE manufacturer_id = ? AND vehicle_class = ? AND manufacturer_range IS ?
-                  AND model IS ?
+                  AND model IS ? AND base_vehicle_manufacturer IS ?
             """,
-            (manufacturer_id, class_value, manufacturer_range, model),
+            (
+                manufacturer_id,
+                class_value,
+                manufacturer_range,
+                model,
+                base_vehicle_manufacturer,
+            ),
         ).fetchone()
 
     if existing is not None:
@@ -223,14 +258,23 @@ def upsert_seen(
             model=model,
             run_id=run_id,
             vehicle_class=vehicle_class,
+            base_vehicle_manufacturer=base_vehicle_manufacturer,
         )
         connection.execute(
             """
             UPDATE product
-            SET fmlv_product_id = ?, manufacturer_range = ?, model = ?, last_seen_run_id = ?
+            SET fmlv_product_id = ?, manufacturer_range = ?, model = ?,
+                base_vehicle_manufacturer = ?, last_seen_run_id = ?
             WHERE id = ?
             """,
-            (fmlv_product_id, manufacturer_range, model, run_id, existing["id"]),
+            (
+                fmlv_product_id,
+                manufacturer_range,
+                model,
+                base_vehicle_manufacturer,
+                run_id,
+                existing["id"],
+            ),
         )
         connection.commit()
         return get_product(connection, existing["id"])
@@ -239,8 +283,9 @@ def upsert_seen(
         """
         INSERT INTO product
             (manufacturer_id, fmlv_product_id, manufacturer_range, model,
-             first_seen_run_id, last_seen_run_id, vehicle_class)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+             first_seen_run_id, last_seen_run_id, vehicle_class,
+             base_vehicle_manufacturer)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             manufacturer_id,
@@ -250,6 +295,7 @@ def upsert_seen(
             run_id,
             run_id,
             class_value,
+            base_vehicle_manufacturer,
         ),
     )
     connection.commit()

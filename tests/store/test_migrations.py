@@ -155,7 +155,8 @@ def test_connect_widens_the_product_unique_key(legacy_db: Path) -> None:
     finally:
         connection.close()
 
-    assert "UNIQUE (manufacturer_id, vehicle_class, manufacturer_range, model)" in sql
+    assert "vehicle_class, manufacturer_range, model," in sql
+    assert "base_vehicle_manufacturer)" in sql
 
 
 def test_the_product_rebuild_keeps_every_child_row(legacy_db: Path) -> None:
@@ -218,7 +219,8 @@ def test_migrating_twice_changes_nothing(legacy_db: Path) -> None:
     finally:
         connection.close()
 
-    assert "UNIQUE (manufacturer_id, vehicle_class, manufacturer_range, model)" in sql
+    assert "vehicle_class, manufacturer_range, model," in sql
+    assert "base_vehicle_manufacturer)" in sql
     assert (products, changes) == (2, 1)
     assert not violations
 

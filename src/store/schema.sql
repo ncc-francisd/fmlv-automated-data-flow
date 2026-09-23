@@ -54,7 +54,17 @@ CREATE TABLE IF NOT EXISTS product (
     -- without this a brand that did would silently merge two different vehicles into one
     -- product row and mix their review histories.
     vehicle_class TEXT NOT NULL DEFAULT 'motorhome',
-    UNIQUE (manufacturer_id, vehicle_class, manufacturer_range, model)
+    -- In the unique key because a growing number of manufacturers sell one layout on two
+    -- chassis under one name. Carthago is the extreme case: 22 of its 53 live rows share
+    -- a range and model with a sibling on the other base vehicle, and FMLV distinguishes
+    -- them by this column alone. Without it here those two vehicles are one product row
+    -- with one review history, and the run proposes each as new every time.
+    -- '' rather than NULL for unknown: NULL is not equal to NULL in a unique index,
+    -- so a nullable column would stop two chassis-less products with one name from
+    -- colliding at all, which is the check that catches an FMLV duplicate.
+    base_vehicle_manufacturer TEXT NOT NULL DEFAULT '',
+    UNIQUE (manufacturer_id, vehicle_class, manufacturer_range, model,
+            base_vehicle_manufacturer)
 );
 
 CREATE INDEX IF NOT EXISTS idx_product_fmlv_id ON product (fmlv_product_id);

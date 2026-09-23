@@ -714,6 +714,9 @@ def persist_diff(
                 model=diff.baseline.model,
                 run_id=run_id,
                 vehicle_class=vehicle_class,
+                base_vehicle_manufacturer=getattr(
+                    diff.baseline, "base_vehicle_manufacturer", None
+                ),
             )
             record_disappearance_notice(
                 connection, run_id=run_id, product_id=product.id, note=DISAPPEARANCE_NOTE
@@ -730,6 +733,12 @@ def persist_diff(
             model=diff.extracted.product.model,
             run_id=run_id,
             vehicle_class=vehicle_class,
+            # The scraped chassis, not the baseline's. A matched product is found by its
+            # `fmlv_product_id` before the name is consulted at all, so this only decides
+            # where a genuinely new product lands.
+            base_vehicle_manufacturer=getattr(
+                diff.extracted.product, "base_vehicle_manufacturer", None
+            ),
         )
 
         findings_recorded += _record_findings(

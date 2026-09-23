@@ -345,10 +345,15 @@ def _dedupe_baseline(
     *,
     on_discard: Callable[[Product, Product], None] | None = None,
 ) -> list[Motorhome]:
-    """Collapse baseline rows sharing a `(manufacturer_range, model)` to the newest.
+    """Collapse baseline rows sharing a `(range, model, base vehicle)` to the newest.
 
     See the module docstring's third bullet for why this exists — a real Swift export
     had two non-archived rows both named "Escape 674" under different `product_id`s.
+
+    **The base vehicle is part of the key**, because one layout sold on a Fiat and on a
+    Mercedes is two vehicles under one name and collapsing them loses one. Carthago has 22
+    such pairs in 53 live rows; Frankia has one, on `Noctra / Cruiser 7.6 L`, and had been
+    losing it silently on every run. The requester settled it on 23 September 2026.
     Ties (equal or both-`None` `year`) keep whichever row was seen first, which is
     arbitrary but stable. Rows with no `manufacturer_range` or no `model` can't be
     compared this way and are passed through untouched rather than being collapsed
@@ -368,14 +373,18 @@ def _dedupe_baseline(
     The collapse is still right — see the module docstring — but it must be *visible*,
     since the fix is a rename on the FMLV side and nobody can make it without being told.
     """
-    groups: dict[tuple[str, str], list[Motorhome]] = defaultdict(list)
+    groups: dict[tuple[str, str, str | None], list[Motorhome]] = defaultdict(list)
     passthrough: list[Motorhome] = []
-    order: list[tuple[str, str]] = []
+    order: list[tuple[str, str, str | None]] = []
     for motorhome in motorhomes:
         if not motorhome.manufacturer_range or not motorhome.model:
             passthrough.append(motorhome)
             continue
-        key = (motorhome.manufacturer_range, motorhome.model)
+        key = (
+            motorhome.manufacturer_range,
+            motorhome.model,
+            getattr(motorhome, 'base_vehicle_manufacturer', None),
+        )
         if key not in groups:
             order.append(key)
         groups[key].append(motorhome)

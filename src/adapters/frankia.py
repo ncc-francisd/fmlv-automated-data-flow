@@ -720,13 +720,19 @@ def collect(
     )
     if ROSTER_WITHOUT_A_PAGE:
         on_progress(
-            "THREE DISAPPEARANCE NOTICES THIS RUN ARE FALSE — DO NOT DEACTIVATE: "
+            "DISAPPEARANCE NOTICES THIS RUN THAT ARE FALSE — DO NOT DEACTIVATE: "
             + "; ".join(f"{fmlv} is MY2027's {roster}" for roster, fmlv in ROSTER_WITHOUT_A_PAGE)
             + ". All three ARE in the 2027 roster, but only the three Fiat Final "
             "Editions have a page of their own and no Mercedes counterpart exists on the "
             "site, so this adapter can read no figures for them and they fall out as "
-            "unmatched. They are continuing models. FMLV's own figures stand, and the "
-            "rows should be left live until Frankia publishes their pages."
+            "unmatched. ALSO Noctra / Cruiser 7.6 L on the FIAT: Frankia sell that layout "
+            "on both a Mercedes and a Fiat, the page states the two side by side, and FMLV "
+            "rightly holds both (8888 Mercedes, 8889 Fiat) — but this adapter reads only "
+            "the first column, so the Fiat falls out unmatched. Until 23 September 2026 it "
+            "was discarded from the baseline in silence, because the base vehicle was not "
+            "yet part of a product's identity; it is visible now, which is better, but it "
+            "is still a live vehicle. All of these are continuing models. FMLV's own "
+            "figures stand, and the rows should be left live."
         )
     on_progress(
         "MASS IN RUNNING ORDER AND PAYLOAD ARE NOT PROPOSED, deliberately. NO published "
