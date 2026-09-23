@@ -378,6 +378,24 @@ and says which in the snippet. It stands down in three cases:
 * **caravans** — `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the
   personal-effects half of a split, and one published figure may be the total. Deriving it would be wrong.
 
+### To withhold a mass, clear the value — not just its provenance
+
+Because that derivation reads **the masses the product carries**, not the fields the
+adapter chose to provenance, an adapter that wants to propose nothing has to leave
+`mtplm_kilograms` and `mro_kilograms` unset. Recording them and omitting their provenance
+still yields a payload proposal, sourced to the pipeline rather than to the adapter.
+
+`wildax.py` is the worked example, 23 September 2026. Its self-check is the published
+payload against MTPLM minus MRO, and three of eighteen models fail it — one of the three
+figures is a typo and nothing on the page says which. Withholding the provenance alone
+still proposed `442 → 438` on the Constellation 3 XL, off the back of a `3496` MTPLM
+that should read 3500, overwriting a figure FMLV already had right. Clearing the values
+raises the no-op "in-scope field not found this run" row instead, which preserves all
+three.
+
+The general rule, and it applies to every field the pipeline can derive: **emitting
+nothing means holding no value, not hiding one.**
+
 **Two brands are documented exceptions, and the exception is decided by the brand's own
 baseline, not by an adapter's preference.**
 
