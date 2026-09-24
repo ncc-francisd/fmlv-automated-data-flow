@@ -240,3 +240,75 @@ def test_a_row_stored_before_the_column_existed_is_filled_in(connection) -> None
 
     assert connection.execute("SELECT COUNT(*) FROM product").fetchone()[0] == before
     assert filled.base_vehicle_manufacturer == "Fiat"
+
+
+# --- the trapdoor: a model that CHANGES chassis is still the same model ----------------
+#
+# The requester's check, 24 September 2026: *"it's quite common for manufacturers to keep
+# the same model but change the base vehicle. I don't want that to appear as a new model
+# when it's literally the same model. The only circumstance where we need to use the base
+# as a differentiator is when there are actually two models live, one with one base and
+# one with the other."*
+#
+# That is the behaviour these four lock in. The chassis **disambiguates between
+# candidates**; it never gates a match, so with one live product a changed chassis is a
+# field change on the row FMLV already has.
+
+
+def test_a_model_that_changes_chassis_is_matched_not_new() -> None:
+    """One live product, rebased from Fiat to Mercedes. It must match its own row."""
+    results = match_products(
+        [_extracted("Cruiser 7.6 L", "Mercedes")],
+        [_motorhome("Cruiser 7.6 L", "Fiat", product_id=8889)],
+    )
+
+    assert results[0].baseline is not None, "a rebased model must not come through as new"
+    assert results[0].baseline.product_id == 8889
+    assert results[0].score == 1.0
+    assert results[0].method == "exact"
+
+
+def test_a_rebased_model_keeps_its_row_in_the_store(connection) -> None:
+    """And the store updates that row rather than inserting beside it — the lookup finds
+    it by `fmlv_product_id` before the name or the chassis is ever consulted."""
+    before = _seen(connection, model="Cruiser 7.6 L", base="Fiat", fmlv_id=8889)
+
+    after = _seen(connection, model="Cruiser 7.6 L", base="Mercedes", fmlv_id=8889)
+
+    assert after.id == before.id
+    assert after.base_vehicle_manufacturer == "Mercedes"
+    assert connection.execute("SELECT COUNT(*) FROM product").fetchone()[0] == 1
+
+
+def test_a_rebased_model_is_not_reported_as_disappeared() -> None:
+    """The other half of the same worry: the Fiat row must not fall out unmatched and be
+    proposed for deactivation."""
+    results = match_products(
+        [_extracted("Cruiser 7.6 L", "Mercedes")],
+        [_motorhome("Cruiser 7.6 L", "Fiat", product_id=8889)],
+    )
+
+    claimed = {r.baseline.product_id for r in results if r.baseline is not None}
+
+    assert claimed == {8889}
+
+
+def test_the_chassis_only_decides_when_there_really_are_two() -> None:
+    """The contrast, side by side. With one baseline row a Mercedes claims the Fiat's row;
+    with two, each claims its own and neither is new."""
+    one = match_products(
+        [_extracted("Cruiser 7.6 L", "Mercedes")],
+        [_motorhome("Cruiser 7.6 L", "Fiat", product_id=8889)],
+    )
+    two = match_products(
+        [_extracted("Cruiser 7.6 L", "Mercedes"), _extracted("Cruiser 7.6 L", "Fiat")],
+        [
+            _motorhome("Cruiser 7.6 L", "Fiat", product_id=8889),
+            _motorhome("Cruiser 7.6 L", "Mercedes", product_id=8888),
+        ],
+    )
+
+    assert [r.baseline.product_id for r in one] == [8889]
+    assert {
+        r.extracted.product.base_vehicle_manufacturer: r.baseline.product_id for r in two
+    } == {"Mercedes": 8888, "Fiat": 8889}
