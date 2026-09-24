@@ -394,6 +394,17 @@ def parse_price(lines: list[str]) -> int | None:
 
 #: Carthago state the body style outright, so nothing is derived from a height. The
 #: coachbuilts are all low profile — confirmed by the requester, 23 September 2026.
+#:
+#: **Do not be talked out of this by the page titles.** The C1-tourer T's own `<title>`
+#: reads "Carthago C1-tourer T | A-Class motorhome", which is wrong — its sibling the
+#: Edition+ T says "Coachbuilt motorhome" and the technical table says `Coachbuilt` on
+#: all 20 `T` products and `A class` on all 54 `I` products, without exception. `T` is
+#: Teilintegriert and `I` is Integriert; the letter is the body type.
+#:
+#: The site's own navigation settles it, and the requester checked it there on
+#: 24 September 2026: **A-Class motorhomes** lists the six `I` ranges and **Coachbuilt
+#: motorhomes** lists the three `T` ranges. FMLV had 18 `T` rows as A-class and 2 as
+#: coach-built, so the correction also makes it self-consistent.
 _BODY_TYPES: tuple[tuple[str, BodyType], ...] = (
     ("a class", BodyType.A_CLASS),
     ("a-class", BodyType.A_CLASS),
