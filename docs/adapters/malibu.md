@@ -148,10 +148,46 @@ there is no currency question to settle.
 The requester expects 2027. Not yet confirmed on the site — worth checking the image asset
 names for an `MJ2027` marker as Carthago's carried.
 
-## Still needed before a build
+## What the build settled
 
-1. **There is no FMLV export for id 64**, so no model name, range name or live count has
-   been checked against what FMLV holds.
-2. **The van roster is incomplete** — three of the five van ranges use a slug shape not yet
-   identified.
-3. ~~The seat-belt ruling~~ — settled 25 September 2026, see above.
+**The range comes from the product's own name, not the page it was found on.** All four
+motorhome range pages list the same 28 products, so the page proves nothing. Only two are
+Edition + and Malibu say so in their names: `Edition + I 490 RB-LE` and
+`Edition + T 490 RB-LE`. Nothing else carries it, on any page.
+
+**FMLV groups them differently** — `I450`, `I470 K`, `I480 K` and `I490` under
+`A-Class Edition +`, and the matching `T` layouts under `Coachbuilt Edition +`, sixteen
+rows in all. Nothing on the site today supports that, so `range_for` follows the site and
+twelve rows are proposed as moving to their base range. That function is the one place to
+change if the existing grouping is to be kept instead.
+
+**Two pages have a table that slipped a row.** The Coachbuilt Edition + T 490 pages print
+`1050 x 1140` under `Technically permissible gross vehicle weight (kg)` — a rear-garage
+door opening. Dropping them would have made two live rows look discontinued, so the
+product is kept and only that mass withheld; everything else on those pages reads
+normally. `_mass` refuses anything shaped like a dimension or outside 1500–8000 kg, and
+the self-check now also refuses a gross weight below the mass in running order, which is
+the test the first pass lacked.
+
+**Malibu publish no berth count for any van** — not in the vehicle-data table and not on
+the range card, which gives only sitting places and whether a pop-up roof is optional. So
+nothing is proposed and FMLV's figures stand. Every motorhome does state them.
+
+**Two false disappearances are named in the run**: `Genius 641 LE performance 4x4`, which
+has a section page but no product page, and nothing else.
+
+## First run — #131, 2026-09-25
+
+47 collected against 42 baseline: **31 changed, 16 new, 11 disappeared**, 473 proposals,
+**205 fields verified unchanged** and 44 habitation findings.
+
+The **11 disappearances are all expected**: the ten `Van Charming` rows, which are option
+packages rather than vehicles and which the requester ruled should be deactivated, and the
+Genius 4x4.
+
+The 16 new are the comfort or lightweight half of each pair FMLV holds singly, plus the
+`I460`, `I500`, `T460` and `T500` layouts it does not have at all.
+
+## Fetches per run
+
+**57** — ten range pages and 47 products.
