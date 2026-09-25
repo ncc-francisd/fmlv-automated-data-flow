@@ -122,6 +122,8 @@ __all__ = [
     "lap_belt_warning",
     "hero_berths",
     "model_name",
+    "normalised_title",
+    "price_for",
     "range_for",
     "parse_technical_data",
     "roster_from",
@@ -457,22 +459,77 @@ def parse_running_order(value: str | None) -> tuple[int | None, tuple[int, int] 
 _PRICE_VALUE = re.compile(r"^(\d[\d.]*)$")
 
 
-def prices_from(lines: list[str]) -> dict[str, int]:
-    """`{model title: pounds}` for every product card on a range page."""
-    found: dict[str, int] = {}
+#: A card's dimension line: `L 717,5 x W 217** x H 297 cm`, and `B` for width on the vans.
+#: The length is what separates two cards that share a title.
+_CARD_LENGTH = re.compile(r"^L\s*([\d.,]+)\s*[x×]", re.IGNORECASE)
+
+
+#: Malibu quote the variant letter with **curly** quotes on a range card and **straight**
+#: ones in the product page's title - `“K”` against `"K"` - so the two never
+#: match as written. Both sides are normalised before the price is looked up.
+_QUOTES = str.maketrans("", "", '"“”‘’')
+
+
+#: Malibu also mix dashes: the First Class card reads `first class – two rooms` with an
+#: en dash where its product page uses a hyphen.
+_DASHES = str.maketrans("–—", "--")
+
+
+def normalised_title(title: str) -> str:
+    """A title with its quotes removed, its dashes levelled and its spacing collapsed.
+
+    Both of those differ between a range card and the product page it links, and either
+    one alone is enough to lose the price.
+    """
+    plain = title.translate(_QUOTES).translate(_DASHES)
+    return re.sub(r"\s+", " ", plain).strip()
+
+
+def prices_from(lines: list[str]) -> dict[tuple[str, int | None], int]:
+    """`{(model title, length in mm): pounds}` for every product card on a range page.
+
+    **Keyed on the length as well as the title, because titles collide.** Malibu print the
+    Fiat and the Mercedes build of a layout under one name — two cards both headed
+    `Malibu I 470 RB-LE "K" lightweight 3.5 t`, one 717.5 cm long at GBP97,300 and one 728
+    cm at GBP110,390. Keyed on the title alone the second is discarded, and three products
+    came through with no price at all while two others were given their sibling's.
+
+    The length is the join: the card prints it in centimetres and the product page states
+    the same figure in millimetres.
+    """
+    found: dict[tuple[str, int | None], int] = {}
     title: str | None = None
+    length_mm: int | None = None
     for i, line in enumerate(lines):
         if line.lower().startswith("malibu ") and len(line) < 70:
-            title = line
+            title, length_mm = line, None
+        elif title and (match := _CARD_LENGTH.match(line)):
+            length_mm = round(float(match.group(1).replace(",", ".")) * 10)
         elif (
             title
             and _PRICE_VALUE.match(line)
             and i + 1 < len(lines)
             and lines[i + 1].upper() == "GBP"
         ):
-            found.setdefault(title, int(line.replace(".", "")))
-            title = None
+            found.setdefault(
+                (normalised_title(title), length_mm), int(line.replace(".", ""))
+            )
+            title, length_mm = None, None
     return found
+
+
+def price_for(
+    prices: dict[tuple[str, int | None], int], title: str, length_mm: int | None
+) -> int | None:
+    """This product's price, matched on its title and its own length.
+
+    Falls back to the title alone when only one card carries it, which is most of them.
+    """
+    key = normalised_title(title)
+    if (key, length_mm) in prices:
+        return prices[(key, length_mm)]
+    same_title = [value for (name, _), value in prices.items() if name == key]
+    return same_title[0] if len(same_title) == 1 else None
 
 
 #: The range hero's berth figure, which is the only place a van states one. `up to 4`
@@ -489,12 +546,13 @@ def hero_berths(lines: list[str]) -> tuple[int | None, str | None]:
     a bare `2` / `Lengthways single beds` on the Genius.
 
     **`up to 4` is not four berths.** Those pages also say `Optional: Pop-up roof
-    family-for-4`, so the fourth and third berths need an option bought — and the settled
-    rule is that a berth range takes the lower figure, which these pages never state. So an
-    upper bound returns `None` and is narrated; only a definite figure is recorded.
+    family-for-4`, so the third and fourth berths need an option bought — and the
+    settled rule is that a berth range takes the lower figure, which these pages never
+    state. So an upper bound returns `None` and is narrated; only a definite figure is
+    recorded.
 
-    FMLV holds 2 for every van and the Genius, and a high-top rather than an elevating-roof
-    body, which is the same reading arrived at independently.
+    FMLV holds 2 for every van and the Genius, with a high-top rather than an
+    elevating-roof body, which is the same reading arrived at independently.
     """
     for i, line in enumerate(lines):
         if not re.search(r"sleeping berth|lengthways single beds", line, re.IGNORECASE):
@@ -745,7 +803,7 @@ def collect(
 ) -> list[ExtractedMotorhome]:
     """Every Malibu the UK site publishes: 39 motorhomes and 9 vans."""
     roster: list[tuple[_Range, str]] = []
-    prices: dict[str, int] = {}
+    prices: dict[tuple[str, int | None], int] = {}
     heroes: dict[str, tuple[int | None, str | None]] = {}
     claimed: set[str] = set()
 
@@ -811,7 +869,11 @@ def collect(
             url=url,
             model=model,
             chassis=chassis_from(link) or chassis_from(fields.get("base_vehicle")),
-            rrp_pounds=prices.get(_TITLE_TAIL.sub('', htmllib.unescape(title)).strip()),
+            rrp_pounds=price_for(
+                prices,
+                _TITLE_TAIL.sub('', htmllib.unescape(title)).strip(),
+                _number(fields.get('length')),
+            ),
             hero_berths=heroes.get(range_for(title, config).fmlv_range, (None, None))[0],
             fields=fields,
             lines=lines,

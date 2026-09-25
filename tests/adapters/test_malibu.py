@@ -26,6 +26,8 @@ from src.adapters.malibu import (
     model_name,
     parse_running_order,
     parse_technical_data,
+    normalised_title,
+    price_for,
     prices_from,
     range_for,
     roster_from,
@@ -293,33 +295,54 @@ def test_a_page_that_really_names_a_lap_belt_does() -> None:
 # --- prices -------------------------------------------------------------------------------
 
 
-def test_prices_are_read_from_the_range_card() -> None:
-    """`ab` / `92.170` / `GBP` across three runs of text — a dot for thousands and the
-    currency as a word, so searching for a pound sign finds only the range's headline."""
+def test_prices_are_keyed_on_length_because_titles_collide() -> None:
+    """**Malibu print the Fiat and the Mercedes build of a layout under one name.** Two
+    cards both headed `I 470 RB-LE "K" lightweight 3.5 t`, one 717.5 cm at GBP97,300 and
+    one 728 cm at GBP110,390. Keyed on the title alone the second is discarded, and three
+    products came through with no price while two were given their sibling's."""
     page = (FIXTURES / "malibu_a_class_range.html").read_text(encoding="utf-8")
 
     found = prices_from(visible_lines(page))
 
-    assert found["Malibu I 430 KB-LE lightweight 3.5 t"] == 92_170
-    assert found["Malibu I 430 KB-LE comfort 4.2 t"] == 101_480
+    i470 = {
+        length: value
+        for (name, length), value in found.items()
+        if "470" in name and "lightweight" in name
+    }
+    assert i470 == {7175: 97_300, 7280: 110_390}
 
 
-# --- the range hero, which is where a van's berth figure lives ---------------------------
+def test_a_card_and_its_product_page_quote_and_dash_differently() -> None:
+    """The cards use curly quotes and an en dash; the product titles use straight quotes
+    and a hyphen. Either difference alone loses the price."""
+    assert normalised_title('Malibu I 470 RB-LE “K” lightweight') == (
+        normalised_title('Malibu I 470 RB-LE "K" lightweight')
+    )
+    assert normalised_title("Van first class – two rooms") == (
+        normalised_title("Van first class - two rooms")
+    )
 
 
-def test_an_upper_bound_is_not_a_berth_count() -> None:
-    """`up to 4` on every van range, beside `Optional: Pop-up roof family-for-4`. The
-    settled rule takes the lower figure of a range, and these pages never state it."""
-    berths, raw = hero_berths(["up to 4", "sleeping berths"])
+def test_the_right_price_reaches_the_right_chassis() -> None:
+    page = (FIXTURES / "malibu_a_class_range.html").read_text(encoding="utf-8")
+    prices = prices_from(visible_lines(page))
+    title = 'Malibu I 470 RB-LE "K" lightweight 3.5 t'
 
-    assert berths is None
-    assert raw == "up to 4"
-
-
-def test_a_definite_hero_figure_is_recorded() -> None:
-    """The Genius states a bare `2` and mentions no pop-up roof anywhere."""
-    assert hero_berths(["2", "Lengthways single beds"]) == (2, "2")
+    assert price_for(prices, title, 7175) == 97_300
+    assert price_for(prices, title, 7280) == 110_390
 
 
-def test_a_page_with_no_hero_figure_yields_nothing() -> None:
-    assert hero_berths(["Gross vehicle weight", "from 3.5 t"]) == (None, None)
+def test_a_title_carried_once_needs_no_length() -> None:
+    """The vans carry a name once each, so a product whose length could not be read still
+    finds its price. Every motorhome name is a chassis pair, so none falls back."""
+    assert price_for({("Malibu Van compact 540 DB", 5410): 59_100}, "Malibu Van compact 540 DB", None) == 59_100
+
+
+def test_a_shared_title_with_no_length_finds_nothing() -> None:
+    """Better none than the wrong chassis's price."""
+    prices = {
+        ("Malibu I 470 lightweight", 7175): 97_300,
+        ("Malibu I 470 lightweight", 7280): 110_390,
+    }
+
+    assert price_for(prices, "Malibu I 470 lightweight", None) is None
