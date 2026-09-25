@@ -104,19 +104,27 @@ Malibu **name the tolerance in the label**, where Carthago left it to be inferre
 0.95 = 2862 and × 1.05 = 3164, to the kilogram. Same per-product verification, no second
 document needed.
 
-## The one real problem: the seat label counts two kinds of belt
+## The seat label names two kinds of belt and means one
 
 ```
 Max. number of seats with 3-point / 2-point safety belt while driving
 ```
 
-**Carthago's equivalent says three-point only.** Malibu's lumps three-point and two-point
-into one figure, and the settled rule is that only a three-point belt is a travel seat — a
-lap belt is not, however neatly it reconciles.
+**Carthago's equivalent says three-point only**, and the settled rule is that a lap belt is
+not a travel seat. So the worry was that Malibu's figure quietly includes one.
 
-So the published number may overstate FMLV's seat count, and nothing else on the page
-separates them. This needs the requester's ruling before the field is proposed; recording it
-blind would be the lap-belt mistake the rule exists to prevent.
+It does not. Across all 19 A-Class products the label is **identical and the value is
+always 4**, and **no page mentions a two-point belt, a lap belt, or any belt at all**
+outside that one line. It is boilerplate covering the range, not a statement about a
+vehicle — and Carthago, same group and same chassis, states three-point-only and also says
+4 on comparable models.
+
+The requester ruled on 25 September 2026: *"on the website, which we normally take as our
+aim to reflect, it says four, so perhaps we follow that."* **Record the published figure.**
+
+**The assumption is made self-checking rather than left silent.** If any page ever names a
+two-point or lap belt, the adapter narrates it instead of counting it, because the day that
+appears is the day this reading stops being safe.
 
 ## Smaller traps, all real
 
@@ -146,4 +154,4 @@ names for an `MJ2027` marker as Carthago's carried.
    been checked against what FMLV holds.
 2. **The van roster is incomplete** — three of the five van ranges use a slug shape not yet
    identified.
-3. **The seat-belt ruling** above.
+3. ~~The seat-belt ruling~~ — settled 25 September 2026, see above.
