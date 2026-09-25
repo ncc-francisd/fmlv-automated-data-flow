@@ -233,3 +233,43 @@ word either way.
   URLs have not yet been extracted.
 * **Habitation.** Not yet examined. The pages carry an `Essential Habitation` section, which
   is promising, but it has not been read.
+
+
+## The LXV line, and four products the roster could not see
+
+Reported by the requester on 25 September 2026: a mailshot announced the **Broadway EL
+LXV**, its page carried a full specification, and FMLV had never been offered it.
+
+Auto-Sleepers had launched their LXV line in **URL segments of its own** —
+`/motorhomes/lxv/` and `/campervans/lxv-campervans/` — where `_MODEL_URL` listed only
+`fiat`, `fiat-active` and `mercedes`. Four products were invisible:
+
+| | |
+|---|---|
+| `/motorhomes/lxv/broadway-el-lxv` | Broadway / EL LXV |
+| `/motorhomes/lxv/broadway-ib-lxv` | Broadway / IB LXV |
+| `/campervans/lxv-campervans/warwick-xl-lxv` | Warwick / XL LXV |
+| `/campervans/lxv-campervans/kingham-lxv` | Kingham / LXV |
+
+**LXV is a trim line, not a chassis.** All four pages state `Fiat Ducato Series 2 chassis`
+in their own specification, so both segments map to `Fiat`. The existing range rule needed
+no change: splitting the heading on its first word gives exactly what FMLV holds.
+
+`lxv-campervans` is tried before `lxv` in the alternation, as `fiat-active` is before
+`fiat`. The two collection landing pages — `/motorhomes/lxv` and
+`/campervans/lxv-campervans` — have no third segment and so are not products.
+
+### Nothing failed, which is the point
+
+The sitemap is the roster, and this adapter trusted it while reading only part of it. There
+was no error, no dropped-product warning and no count to compare against; the roster was
+quietly four short for weeks.
+
+`unknown_segments` closes that: any `/<body>/<segment>/<slug>` URL under a segment the
+roster does not know is now **named in the run**, with what to do about it. A sitemap is
+only a complete roster if you read all of it.
+
+### First run with the line — #138, 2026-09-25
+
+23 collected against 19 baseline: **17 changed, 6 new, 2 disappeared.** The six new are the
+four LXV products, `Broadway EK TB LP` and `Symbol Duo`.

@@ -111,8 +111,15 @@ def test_the_roster_is_deduplicated() -> None:
 
 
 def test_every_body_type_and_base_vehicle_pair_is_covered() -> None:
-    assert len(DEFAULT_RANGES) == 5
-    assert {key.split("/")[1] for key in ALL_KEYS} == {"fiat", "fiat-active", "mercedes"}
+    """Seven since 25 September 2026: the LXV line arrived under two segments of its own."""
+    assert len(DEFAULT_RANGES) == 7
+    assert {key.split("/")[1] for key in ALL_KEYS} == {
+        "fiat",
+        "fiat-active",
+        "lxv",
+        "lxv-campervans",
+        "mercedes",
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -364,3 +371,73 @@ def test_the_width_provenance_names_the_figure_not_taken() -> None:
 
 def test_the_adapter_is_registered_under_its_fmlv_name() -> None:
     assert adapter_for("Auto-Sleepers Limited") is auto_sleepers
+
+
+# --- the LXV line, which the roster could not see ---------------------------------------
+#
+# Reported by the requester on 25 September 2026: a mailshot announced the Broadway EL LXV,
+# its page carried a full specification, and the adapter had never offered it. Auto-Sleepers
+# had launched the line under URL segments of its own.
+
+_LXV_SITEMAP = """<urlset>
+<url><loc>https://auto-sleepers.com/motorhomes/fiat/broadway-el</loc></url>
+<url><loc>https://auto-sleepers.com/motorhomes/lxv</loc></url>
+<url><loc>https://auto-sleepers.com/motorhomes/lxv/broadway-el-lxv</loc></url>
+<url><loc>https://auto-sleepers.com/motorhomes/lxv/broadway-ib-lxv</loc></url>
+<url><loc>https://auto-sleepers.com/campervans/lxv-campervans</loc></url>
+<url><loc>https://auto-sleepers.com/campervans/lxv-campervans/kingham-lxv</loc></url>
+<url><loc>https://auto-sleepers.com/campervans/lxv-campervans/warwick-xl-lxv</loc></url>
+<url><loc>https://auto-sleepers.com/discover/reviews/the-broadway-el-lxv</loc></url>
+</urlset>"""
+
+_ALL_RANGES = [key for key, _label in auto_sleepers.DEFAULT_RANGES]
+
+
+def test_the_lxv_line_is_in_the_roster() -> None:
+    """Four products lived under `/motorhomes/lxv/` and `/campervans/lxv-campervans/`,
+    which the pattern did not list, so they were never collected."""
+    urls = auto_sleepers.find_model_urls(_LXV_SITEMAP, _ALL_RANGES)
+
+    assert sorted(u.rsplit("/", 1)[-1] for u in urls) == [
+        "broadway-el",
+        "broadway-el-lxv",
+        "broadway-ib-lxv",
+        "kingham-lxv",
+        "warwick-xl-lxv",
+    ]
+
+
+def test_a_collection_landing_page_is_not_a_product() -> None:
+    """`/motorhomes/lxv` and `/campervans/lxv-campervans` introduce the line; they have no
+    slug, so the pattern's third segment excludes them."""
+    urls = auto_sleepers.find_model_urls(_LXV_SITEMAP, _ALL_RANGES)
+
+    assert not [u for u in urls if u.rsplit("/", 1)[-1] in {"lxv", "lxv-campervans"}]
+
+
+def test_lxv_is_a_trim_line_not_a_chassis() -> None:
+    """All four pages state `Fiat Ducato Series 2 chassis` in their own specification."""
+    assert auto_sleepers._BASE_VEHICLES["lxv"] == "Fiat"
+    assert auto_sleepers._BASE_VEHICLES["lxv-campervans"] == "Fiat"
+
+
+def test_the_longer_segment_wins_the_alternation() -> None:
+    """`lxv-campervans` must be tried before `lxv`, as `fiat-active` is before `fiat`."""
+    urls = auto_sleepers.find_model_urls(_LXV_SITEMAP, _ALL_RANGES)
+
+    assert "https://auto-sleepers.com/campervans/lxv-campervans/kingham-lxv" in urls
+
+
+def test_an_unknown_segment_is_reported_rather_than_skipped() -> None:
+    """**The check the adapter lacked.** Nothing failed while the LXV line was missing —
+    the roster was quietly four short and stayed that way until a mailshot gave it away."""
+    missed = auto_sleepers.unknown_segments(
+        _LXV_SITEMAP, ["motorhomes/fiat", "campervans/fiat"]
+    )
+
+    assert set(missed) == {"motorhomes/lxv", "campervans/lxv-campervans"}
+    assert len(missed["motorhomes/lxv"]) == 2
+
+
+def test_a_segment_already_collected_is_not_reported() -> None:
+    assert "motorhomes/fiat" not in auto_sleepers.unknown_segments(_LXV_SITEMAP, _ALL_RANGES)

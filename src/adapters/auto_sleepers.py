@@ -56,11 +56,24 @@ DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("campervans/mercedes", "Mercedes campervans"),
     ("motorhomes/fiat", "Fiat motorhomes"),
     ("motorhomes/mercedes", "Mercedes motorhomes"),
+    # Added 25 September 2026. Auto-Sleepers launched the LXV line under URL segments of
+    # its own and four products - Broadway EL LXV, Broadway IB LXV, Warwick XL LXV and
+    # Kingham LXV - were invisible to the roster until this was here. See `unknown_segments`.
+    ("motorhomes/lxv", "LXV motorhomes"),
+    ("campervans/lxv-campervans", "LXV campervans"),
 )
 
 #: Base vehicle by URL segment. `fiat-active` is still a Fiat; `Active` is Auto-Sleepers'
 #: own sub-brand, and FMLV holds it as the *range* rather than as part of the base vehicle.
-_BASE_VEHICLES = {"fiat": "Fiat", "fiat-active": "Fiat", "mercedes": "Mercedes"}
+_BASE_VEHICLES = {
+    "fiat": "Fiat",
+    "fiat-active": "Fiat",
+    # LXV is Auto-Sleepers' luxury line, not a chassis. All four LXV pages state
+    # `Fiat Ducato Series 2 chassis` in their own specification.
+    "lxv": "Fiat",
+    "lxv-campervans": "Fiat",
+    "mercedes": "Mercedes",
+}
 
 #: The one range name that is not in the page heading.
 #:
@@ -86,7 +99,9 @@ HIGH_TOP_ABOVE_MM = 2300
 _MODEL_URL = re.compile(
     re.escape(BASE_URL)
     + r"/(?P<body>campervans|motorhomes)"
-    + r"/(?P<base>fiat-active|fiat|mercedes)"
+    # `lxv-campervans` before `lxv`, and `fiat-active` before `fiat`: the alternation
+    # is ordered longest-first so the shorter name cannot claim the longer one's URL.
+    + r"/(?P<base>fiat-active|fiat|lxv-campervans|lxv|mercedes)"
     # The lookahead, not `$`: this same pattern is run over the whole sitemap with
     # `finditer`, where every URL is followed by `</loc>` rather than by end-of-string.
     # Anchoring on `$` matched nothing and the first run collected zero products.
@@ -117,6 +132,36 @@ def find_model_urls(sitemap_xml: str, ranges: Iterable[str]) -> list[str]:
         if url not in urls:
             urls.append(url)
     return urls
+
+
+#: Any `/<body>/<segment>/<slug>` URL, whatever the segment. `find_model_urls` only
+#: collects the segments it knows; this finds the ones it does not.
+_ANY_MODEL_URL = re.compile(
+    re.escape(BASE_URL)
+    + r"/(?P<body>campervans|motorhomes)/(?P<base>[a-z0-9-]+)/(?P<slug>[a-z0-9-]+)/?(?=<|\s|$)"
+)
+
+
+def unknown_segments(sitemap_xml: str, ranges: Iterable[str]) -> dict[str, list[str]]:
+    """`{body/segment: [urls]}` for product URLs under a segment the roster does not know.
+
+    **This is the check the adapter lacked, and it cost four products.** Auto-Sleepers
+    launched their LXV line in its own URL segments - `/motorhomes/lxv/` and
+    `/campervans/lxv-campervans/` - and because `_MODEL_URL` listed the segments it knew,
+    Broadway EL LXV, Broadway IB LXV, Warwick XL LXV and Kingham LXV were simply not seen.
+    Nothing failed; the roster was quietly four short, and stayed that way until the
+    requester noticed a mailshot for a model FMLV had never been offered.
+
+    A sitemap that is the roster is only a complete roster if you read all of it.
+    """
+    wanted = {key.lower() for key in ranges}
+    found: dict[str, list[str]] = {}
+    for match in _ANY_MODEL_URL.finditer(sitemap_xml):
+        key = f"{match.group('body')}/{match.group('base')}"
+        if key in wanted:
+            continue
+        found.setdefault(key, []).append(match.group(0).rstrip("/"))
+    return found
 
 
 # --- Reading one page ------------------------------------------------------------------
@@ -472,11 +517,21 @@ def collect(
         message = f"{SITEMAP_URL} returned {sitemap.status_code}; it is the roster"
         raise RuntimeError(message)
 
-    urls = find_model_urls(
-        sitemap.file_path.read_text(encoding="utf-8", errors="replace"),
-        (key for key, _label in ranges),
-    )
+    sitemap_xml = sitemap.file_path.read_text(encoding="utf-8", errors="replace")
+    urls = find_model_urls(sitemap_xml, (key for key, _label in ranges))
     on_progress(f"{len(urls)} model page(s) in the sitemap")
+
+    # **Read all of the sitemap, not only the parts already known.** The LXV line shipped
+    # in URL segments of its own and four products went unseen for weeks, with nothing
+    # failing and no count to compare against.
+    for segment, missed in sorted(unknown_segments(sitemap_xml, (k for k, _ in ranges)).items()):
+        on_progress(
+            f"PRODUCTS UNDER AN UNKNOWN URL SEGMENT: the sitemap lists {len(missed)} "
+            f"page(s) under '{segment}', which this adapter does not collect - "
+            f"{', '.join(u.rsplit('/', 1)[-1] for u in missed)}. If these are vehicles, "
+            f"add the segment to DEFAULT_RANGES and _BASE_VEHICLES; they are invisible "
+            f"until you do"
+        )
 
     results: list[ExtractedMotorhome] = []
     for url in urls:
