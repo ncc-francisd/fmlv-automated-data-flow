@@ -396,6 +396,30 @@ three.
 The general rule, and it applies to every field the pipeline can derive: **emitting
 nothing means holding no value, not hiding one.**
 
+### A filtered roster needs a check on what the filter threw away
+
+Where the roster comes from a source you **narrow** — a sitemap filtered to known URL
+shapes, an index filtered to known paths — the filter is a silent failure waiting to
+happen. Nothing errors, nothing is dropped with a warning, and the run simply collects
+fewer products than exist while looking entirely healthy.
+
+`auto_sleepers.py` cost four products this way, 25 September 2026. Its sitemap **is** the
+roster, complete and accurate, and the adapter matched
+`/<body>/<fiat|fiat-active|mercedes>/<slug>`. Auto-Sleepers launched their LXV line under
+`/motorhomes/lxv/` and `/campervans/lxv-campervans/`, and Broadway EL LXV, Broadway IB LXV,
+Warwick XL LXV and Kingham LXV were never seen. It went unnoticed for weeks and was found
+by a mailshot, not by a run.
+
+So an adapter that filters a roster **reports what its filter excluded**, in the shape the
+excluded thing would have taken. `auto_sleepers.unknown_segments` is the worked example:
+every `/<body>/<segment>/<slug>` URL under a segment the roster does not know is named in
+the run, with what to do about it.
+
+This is the same instinct as the product-count check that `docs/adapters/README.md` asks
+for in stage 1.5 — know the number you expect — but it applies where no published count
+exists. Where one does, assert it: Carthago's nine range pages state their own `Floor
+plans` counts, and Malibu's A-Class page claims `19 layouts`.
+
 ### What makes two vehicles two products
 
 Settled by the requester on 23 September 2026, when Carthago forced the question.
