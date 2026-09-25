@@ -15,6 +15,7 @@ import pytest
 from src.adapters import malibu
 from src.adapters.malibu import (
     EXPECTED_PRODUCTS,
+    hero_berths,
     RANGES,
     MalibuProduct,
     _mass,
@@ -43,7 +44,9 @@ def _range(name: str):
     return next(r for r in RANGES if r.fmlv_range == name)
 
 
-def _product(fixture: str, range_name: str, chassis: str | None = "Fiat") -> MalibuProduct:
+def _product(
+    fixture: str, range_name: str, chassis: str | None = "Fiat", hero: int | None = None
+) -> MalibuProduct:
     lines = _lines(fixture)
     config = _range(range_name)
     return MalibuProduct(
@@ -52,6 +55,7 @@ def _product(fixture: str, range_name: str, chassis: str | None = "Fiat") -> Mal
         model=model_name(lines[0], config),
         chassis=chassis,
         rrp_pounds=None,
+        hero_berths=hero,
         fields=parse_technical_data(lines),
         lines=lines,
     )
@@ -220,6 +224,7 @@ def test_a_gross_weight_below_the_running_order_is_refused() -> None:
         model=product.model,
         chassis=product.chassis,
         rrp_pounds=None,
+        hero_berths=None,
         fields={**product.fields, "mtplm": "2000"},
         lines=product.lines,
     )
@@ -233,9 +238,10 @@ def test_a_gross_weight_below_the_running_order_is_refused() -> None:
 # --- vans and the Genius -----------------------------------------------------------------
 
 
-def test_a_van_publishes_no_berth_count() -> None:
-    """Malibu state sleeping places for every motorhome and for no van — not in the table
-    and not on the range card, which lists only sitting places."""
+def test_a_van_states_no_berth_count_of_its_own() -> None:
+    """A van's vehicle-data table has no sleeping-places row at all. Its range hero says
+    `up to 4`, which is an upper bound needing the optional pop-up roof, so nothing is
+    recorded and FMLV's 2 stands."""
     van = _product("van_compact_540", "Van Compact")
 
     assert van.model == "540 DB"
@@ -296,3 +302,24 @@ def test_prices_are_read_from_the_range_card() -> None:
 
     assert found["Malibu I 430 KB-LE lightweight 3.5 t"] == 92_170
     assert found["Malibu I 430 KB-LE comfort 4.2 t"] == 101_480
+
+
+# --- the range hero, which is where a van's berth figure lives ---------------------------
+
+
+def test_an_upper_bound_is_not_a_berth_count() -> None:
+    """`up to 4` on every van range, beside `Optional: Pop-up roof family-for-4`. The
+    settled rule takes the lower figure of a range, and these pages never state it."""
+    berths, raw = hero_berths(["up to 4", "sleeping berths"])
+
+    assert berths is None
+    assert raw == "up to 4"
+
+
+def test_a_definite_hero_figure_is_recorded() -> None:
+    """The Genius states a bare `2` and mentions no pop-up roof anywhere."""
+    assert hero_berths(["2", "Lengthways single beds"]) == (2, "2")
+
+
+def test_a_page_with_no_hero_figure_yields_nothing() -> None:
+    assert hero_berths(["Gross vehicle weight", "from 3.5 t"]) == (None, None)

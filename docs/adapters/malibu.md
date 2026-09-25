@@ -169,9 +169,14 @@ normally. `_mass` refuses anything shaped like a dimension or outside 1500–800
 the self-check now also refuses a gross weight below the mass in running order, which is
 the test the first pass lacked.
 
-**Malibu publish no berth count for any van** — not in the vehicle-data table and not on
-the range card, which gives only sitting places and whether a pop-up roof is optional. So
-nothing is proposed and FMLV's figures stand. Every motorhome does state them.
+**A van states no berth count of its own**, but the range hero does: `up to 4` /
+`sleeping berths`, beside `Optional: Pop-up roof family-for-4` on the same page. **That is
+not four berths** — the third and fourth need an option bought, and the settled rule takes
+the lower figure of a range, which these pages never state. So nothing is proposed and
+FMLV's 2 stands, which is also the reading its high-top body type implies.
+
+The Genius is the exception and states a bare `2`, with no pop-up roof mentioned anywhere,
+so that one is recorded. Every motorhome states its berths in the table as usual.
 
 **Two false disappearances are named in the run**: `Genius 641 LE performance 4x4`, which
 has a section page but no product page, and nothing else.

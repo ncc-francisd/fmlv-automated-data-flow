@@ -120,6 +120,7 @@ __all__ = [
     "MalibuProduct",
     "collect",
     "lap_belt_warning",
+    "hero_berths",
     "model_name",
     "range_for",
     "parse_technical_data",
@@ -474,6 +475,38 @@ def prices_from(lines: list[str]) -> dict[str, int]:
     return found
 
 
+#: The range hero's berth figure, which is the only place a van states one. `up to 4`
+#: means four *with the optional pop-up roof*; a bare `2` is the vehicle as built.
+_UPPER_BOUND = re.compile(r"^up to\s+(\d+)$", re.IGNORECASE)
+_DEFINITE = re.compile(r"^(\d+)$")
+
+
+def hero_berths(lines: list[str]) -> tuple[int | None, str | None]:
+    """`(berths, raw)` from a range page's hero strip.
+
+    Malibu publish no sleeping places in a van's vehicle-data table and none on its card,
+    but the range hero carries one: `up to 4` / `sleeping berths` on every van range, and
+    a bare `2` / `Lengthways single beds` on the Genius.
+
+    **`up to 4` is not four berths.** Those pages also say `Optional: Pop-up roof
+    family-for-4`, so the fourth and third berths need an option bought — and the settled
+    rule is that a berth range takes the lower figure, which these pages never state. So an
+    upper bound returns `None` and is narrated; only a definite figure is recorded.
+
+    FMLV holds 2 for every van and the Genius, and a high-top rather than an elevating-roof
+    body, which is the same reading arrived at independently.
+    """
+    for i, line in enumerate(lines):
+        if not re.search(r"sleeping berth|lengthways single beds", line, re.IGNORECASE):
+            continue
+        for candidate in (lines[i - 1] if i else "", lines[i + 1] if i + 1 < len(lines) else ""):
+            if _UPPER_BOUND.match(candidate.strip()):
+                return None, candidate.strip()
+            if _DEFINITE.match(candidate.strip()):
+                return int(candidate.strip()), candidate.strip()
+    return None, None
+
+
 _LAP_BELT = re.compile(r"2-point|two-point|lap belt", re.IGNORECASE)
 
 
@@ -503,6 +536,8 @@ class MalibuProduct:
     model: str
     chassis: str | None
     rrp_pounds: int | None
+    #: From the range hero, where a van states its only berth figure.
+    hero_berths: int | None
     fields: dict[str, str]
     lines: list[str]
 
@@ -540,7 +575,11 @@ class MalibuProduct:
         standard = self.fields.get("berths")
         if standard:
             return _number(standard)
-        return _number(self.fields.get("berths_combined"))
+        combined = self.fields.get("berths_combined")
+        if combined:
+            return _number(combined)
+        # Vans state none in their table; the range hero is the only place they do.
+        return self.hero_berths
 
     @property
     def travel_seats(self) -> int | None:
@@ -707,6 +746,7 @@ def collect(
     """Every Malibu the UK site publishes: 39 motorhomes and 9 vans."""
     roster: list[tuple[_Range, str]] = []
     prices: dict[str, int] = {}
+    heroes: dict[str, tuple[int | None, str | None]] = {}
     claimed: set[str] = set()
 
     for config in RANGES:
@@ -718,7 +758,9 @@ def collect(
             on_progress(f"COULD NOT FETCH {url} ({type(error).__name__}) — its products are lost")
             continue
 
-        prices.update(prices_from(visible_lines(page)))
+        page_lines = visible_lines(page)
+        prices.update(prices_from(page_lines))
+        heroes[config.fmlv_range] = hero_berths(page_lines)
         # **Every motorhome page lists every motorhome product.** The four range pages are
         # filtered views of one catalogue, not separate sets, so a product cannot be
         # assigned to a range by the page it was found on. It is assigned by its own name
@@ -770,6 +812,7 @@ def collect(
             model=model,
             chassis=chassis_from(link) or chassis_from(fields.get("base_vehicle")),
             rrp_pounds=prices.get(_TITLE_TAIL.sub('', htmllib.unescape(title)).strip()),
+            hero_berths=heroes.get(range_for(title, config).fmlv_range, (None, None))[0],
             fields=fields,
             lines=lines,
         )
@@ -812,10 +855,13 @@ def collect(
 
     if no_berths:
         on_progress(
-            f"NO BERTH COUNT PUBLISHED for {', '.join(no_berths)}. Malibu state sleeping "
-            f"places for every motorhome but for no van — not in the vehicle-data "
-            f"table and not on the range card, which lists only sitting places and whether "
-            f"a pop-up roof is optional. Nothing is proposed and FMLV's own figures stand"
+            f"BERTHS NOT PROPOSED for {', '.join(no_berths)}. A van states none in its "
+            f"vehicle-data table; its range hero says `up to 4` sleeping berths, and the "
+            f"same page says `Optional: Pop-up roof family-for-4` — so four needs an "
+            f"option bought, and the lower figure those pages never state is what the "
+            f"settled rule asks for. FMLV holds 2 for every van, with a high-top rather "
+            f"than an elevating-roof body, which is the same reading. Nothing is proposed "
+            f"and those figures stand"
         )
 
     if unpriced:
