@@ -69,7 +69,9 @@ def test_the_adapter_declares_itself_a_caravan_adapter() -> None:
 
 
 def test_the_index_lists_every_current_model() -> None:
-    assert len(bailey_caravan.find_model_urls(fixture(INDEX))) == 23
+    """24 since 27 September 2026: Bailey split Unicorn into Grande (4), Deluxe (4) and
+    Lite (3), and dropped Alicanto Grande Deluxe from the current-models index."""
+    assert len(bailey_caravan.find_model_urls(fixture(INDEX))) == 24
 
 
 def test_the_index_can_be_narrowed_to_one_range() -> None:
@@ -375,3 +377,20 @@ def test_the_identity_fields_are_set_for_the_fmlv_join() -> None:
     assert extracted.caravan.manufacturer == "Bailey"
     assert extracted.caravan.manufacturer_display_name == "Bailey"
     assert extracted.caravan.key == "Bailey Unicorn Deluxe Cabrera"
+
+
+def test_the_unicorn_range_is_now_three() -> None:
+    """Bailey announced eleven Unicorns. They are not one range: Grande, Deluxe and Lite.
+    A full run reads the whole index, so the split cost nothing - but `--range` needs all
+    three listed, and `Seville` moved from Deluxe to Lite rather than being new."""
+    index = fixture(INDEX)
+
+    assert len(bailey_caravan.find_model_urls(index, "unicorn-grande")) == 4
+    assert len(bailey_caravan.find_model_urls(index, "unicorn-deluxe")) == 4
+    assert len(bailey_caravan.find_model_urls(index, "unicorn-lite")) == 3
+
+
+def test_alicanto_has_left_the_current_models_index() -> None:
+    """Its range page still answers 200, but Bailey no longer list it as current, and the
+    index is what `current-caravan-models` means."""
+    assert not bailey_caravan.find_model_urls(fixture(INDEX), "alicanto-grande-deluxe")

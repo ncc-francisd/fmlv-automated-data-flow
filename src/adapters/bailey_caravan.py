@@ -103,12 +103,18 @@ MODELS_INDEX_PATH = "current-caravan-models"
 
 #: (range path segment, label) for `--range`. The label is what a reviewer picks; the real
 #: `manufacturer_range` is read from each page's own `Range` field.
+#: Only used by `--range`; a full run reads the whole index and needs no list, which is
+#: why the Unicorn split below cost nothing. Updated 27 September 2026: Bailey divided
+#: Unicorn into **Grande**, **Deluxe** and **Lite**, and dropped Alicanto Grande Deluxe
+#: from the current-models index (its range page still answers 200, but Bailey no longer
+#: list it as current).
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
-    ("alicanto-grande-deluxe", "Alicanto Grande Deluxe"),
     ("discovery", "Discovery"),
     ("pegasus-black-edition", "Pegasus Black Edition"),
     ("phoenix-black-edition", "Phoenix Black Edition"),
     ("unicorn-deluxe", "Unicorn Deluxe"),
+    ("unicorn-grande", "Unicorn Grande"),
+    ("unicorn-lite", "Unicorn Lite"),
 )
 
 #: A range whose literal `Range` field abbreviates the real name — see the module
