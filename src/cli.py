@@ -340,6 +340,35 @@ def baseline_scope(
     return lambda motorhome: bool(hook(motorhome, labels))
 
 
+def _refuse_empty_scrape(
+    *, scraped: Sequence[Any], baseline: Sequence[Any], name: str
+) -> None:
+    """Raise when the adapter found nothing and FMLV holds something.
+
+    **A scrape that found nothing has broken, not emptied.** Without this the diff compares
+    zero against the baseline and proposes every product the manufacturer has for
+    deactivation — the whole brand, in one run, from a review screen that looks entirely
+    ordinary. Adria's site restructure on 29 September 2026 would have done exactly that to
+    forty-odd products; both adapters returned zero and said so, but their warnings would
+    have scrolled past above an otherwise normal-looking diff.
+
+    A manufacturer really withdrawing its entire range is imaginable, but it is a human
+    decision and not one to infer from an empty list.
+
+    An **empty baseline** is a different thing and passes: a brand FMLV holds nothing for
+    yet is a legitimate first run.
+    """
+    if scraped or not baseline:
+        return
+    message = (
+        f"the adapter found NO products while FMLV holds {len(baseline)}. That is a broken "
+        f"scrape, not an empty range — the site has almost certainly changed. Refusing to "
+        f"compare, because the comparison would propose deactivating every {name} product. "
+        f"Check the warnings above for what the adapter could not read."
+    )
+    raise RuntimeError(message)
+
+
 def _dedupe_baseline(
     motorhomes: Iterable[Motorhome],
     *,
@@ -575,6 +604,12 @@ def execute_run(
             on_progress(
                 f"Scraped {len(scraped)} product(s) "
                 f"(website sweep took {time.monotonic() - scrape_started:.1f}s)"
+            )
+
+            _refuse_empty_scrape(
+                scraped=scraped,
+                baseline=baseline,
+                name=manufacturer.fmlv_manufacturer,
             )
 
             diff_started = time.monotonic()
