@@ -310,11 +310,14 @@ def _reconciles(product: AdriaCaravan, text: str) -> tuple[bool, str]:
     failure to defend against is a whole spec sheet belonging to the wrong caravan —
     plausible, internally consistent and invisible downstream. Hence the title check.
     """
-    if product.figures.technical_data_is_tba:
-        return False, (
-            "its technical data reads TBA: the PDF's 'Dimensions and weights' section "
-            "states no length, width, height or mass at all. Announced, not yet specified"
-        )
+    # **A TBA product is collected, not dropped.** Its PDF states no length, width, height
+    # or mass — only a name, its berths and its axle count — but that is enough to put the
+    # layout into FMLV, and the requester chose on 29 September 2026 to publish it and fill
+    # the figures in on a later run: *"we can publish without the weights for now."*
+    #
+    # Nothing is invented: every field the PDF does not state is simply not proposed, so
+    # FMLV keeps whatever it holds. Dropping it instead made a live, announced caravan look
+    # like a withdrawal.
 
     describes = pdf_describes_layout(text, product.product.layout_label)
     if describes is False:
@@ -327,6 +330,15 @@ def _reconciles(product: AdriaCaravan, text: str) -> tuple[bool, str]:
     mtplm = product.figures.get("mtplm_kilograms")
     mro = product.figures.get("mro_kilograms")
     if mro is None:
+        # A TBA layout states no mass because Adria have not published one yet, which is
+        # not the same fault as a mass the parser could not find. It is collected on its
+        # name, berths and axle count; nothing else is proposed.
+        if product.figures.technical_data_is_tba:
+            return True, (
+                "announced but not yet specified: the PDF names the layout and gives its "
+                "berths, and states no dimension or mass at all. Collected so the model "
+                "reaches FMLV; its figures follow when Adria publish them"
+            )
         return False, "its PDF states no mass in running order"
 
     # **A missing MTPLM-min does not drop the caravan.** The Alpina Colorado publishes a
@@ -564,8 +576,6 @@ def collect(
                 )
                 reconciles, reason = _reconciles(caravan, text)
                 if not reconciles:
-                    if caravan.figures.technical_data_is_tba:
-                        tba.append(f"{live.trim_label or caravan.model}")
                     on_progress(f"{prefix} — DROPPED: {reason}")
                     continue
 
@@ -579,6 +589,8 @@ def collect(
                     )
                     continue
                 seen_models[key] = label
+                if caravan.figures.technical_data_is_tba:
+                    tba.append(caravan.model or live.layout_label or "?")
 
                 fitted, _not_fitted = fitted_equipment(text)
                 results.append(build_extracted(caravan, basis=reason, fitted=fitted))
@@ -591,11 +603,13 @@ def collect(
 
     if tba:
         on_progress(
-            f"ANNOUNCED BUT NOT YET SPECIFIED, so not collected: {', '.join(tba)}. Their "
-            f"PDFs carry a 'Dimensions and weights' section holding nothing but an option "
-            f"pack weight, followed by 'Adria Vehicle Information: TBA'. If FMLV's own "
-            f"Action layout disappears this run, this is why — the range has moved on and "
-            f"its replacement has no published figures yet, so it is not a withdrawal."
+            f"ANNOUNCED BUT NOT YET SPECIFIED, and collected anyway: {', '.join(tba)}. "
+            f"Their PDFs carry a 'Dimensions and weights' section holding nothing but an "
+            f"option pack weight, followed by 'Adria Vehicle Information: TBA', so they "
+            f"state a name, their berths and their axle count and nothing else. NO "
+            f"dimension or mass is proposed for them and FMLV's own figures stand. The "
+            f"requester chose this on 29 September 2026 — publish the layout now, run "
+            f"again when Adria fill the section in."
         )
     on_progress(
         "HEIGHT IS PROPOSED THOUGH IT DISAGREES WITH FMLV EVERYWHERE, by about 150mm on "

@@ -183,9 +183,15 @@ def test_a_missing_minimum_mass_does_not_drop_the_caravan(colorado: str) -> None
     assert "NO PERMISSIBLE MASS PROPOSED" in reason
 
 
-def test_an_unspecified_layout_is_dropped(action: str) -> None:
-    """Both Action configurations are announced but have no figures at all: their
-    `Dimensions and weights` section holds only an option-pack weight."""
+def test_an_unspecified_layout_is_collected_not_dropped(action: str) -> None:
+    """**The requester's call, 29 September 2026**: *"we can publish without the weights
+    for now"*. Adria announce a layout before publishing its figures — the PDF names it
+    and gives its berths, and its `Dimensions and weights` section holds only an
+    option-pack weight. Dropping it made a live, announced caravan look like a withdrawal.
+
+    Nothing is invented: a field the PDF does not state is simply not proposed, so FMLV
+    keeps what it holds and a later run fills the figures in.
+    """
     figures = parse_caravan_pdf(action)
 
     assert figures.technical_data_is_tba is True
@@ -195,11 +201,9 @@ def test_an_unspecified_layout_is_dropped(action: str) -> None:
         config=RANGES[3], product=_livewire("action")[0], figures=figures, pdf_url="x"
     )
     ok, reason = _reconciles(product, action)
-    assert ok is False
-    assert "TBA" in reason
 
-
-# --- naming -------------------------------------------------------------------------
+    assert ok is True
+    assert "announced but not yet specified" in reason.lower()
 
 
 def test_the_model_comes_from_the_layout_not_the_trim() -> None:
