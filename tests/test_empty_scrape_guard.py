@@ -29,3 +29,14 @@ def test_an_empty_baseline_is_not_the_same_thing() -> None:
 
 def test_a_scrape_that_found_something_passes() -> None:
     cli._refuse_empty_scrape(scraped=[object()], baseline=[object()], name="Adria Mobil")
+
+
+def test_a_range_scoped_run_may_still_come_back_empty() -> None:
+    """The pipeline has always allowed this, and its blast radius is one range the
+    operator named rather than the whole brand."""
+    cli._refuse_empty_scrape(
+        scraped=[],
+        baseline=[object()],
+        name="Adria Mobil",
+        whole_manufacturer=False,
+    )

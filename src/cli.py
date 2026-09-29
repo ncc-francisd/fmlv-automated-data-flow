@@ -341,7 +341,11 @@ def baseline_scope(
 
 
 def _refuse_empty_scrape(
-    *, scraped: Sequence[Any], baseline: Sequence[Any], name: str
+    *,
+    scraped: Sequence[Any],
+    baseline: Sequence[Any],
+    name: str,
+    whole_manufacturer: bool = True,
 ) -> None:
     """Raise when the adapter found nothing and FMLV holds something.
 
@@ -357,8 +361,12 @@ def _refuse_empty_scrape(
 
     An **empty baseline** is a different thing and passes: a brand FMLV holds nothing for
     yet is a legitimate first run.
+
+    So is a **range-scoped run**, which the pipeline has always allowed to come back empty
+    and report that range's rows as missing. Its blast radius is one range the operator
+    named, not the whole brand, and it is a deliberate way to check a single range.
     """
-    if scraped or not baseline:
+    if scraped or not baseline or not whole_manufacturer:
         return
     message = (
         f"the adapter found NO products while FMLV holds {len(baseline)}. That is a broken "
@@ -610,6 +618,7 @@ def execute_run(
                 scraped=scraped,
                 baseline=baseline,
                 name=manufacturer.fmlv_manufacturer,
+                whole_manufacturer=in_scope is None,
             )
 
             diff_started = time.monotonic()
