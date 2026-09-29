@@ -284,25 +284,6 @@ def test_sixty_year_page_yields_its_single_layout() -> None:
     assert products[0].layout_label == "670 SL"
 
 
-def test_sixty_year_product_is_named_the_way_fmlv_names_it() -> None:
-    # FMLV product 8195: manufacturer_range "Matrix", model "670 SL 60Y". The site's own
-    # trim label for this configuration is "60 years RHD" and must not reach the model.
-    products = parse_livewire_products(SIXTY_YEAR_LIVEWIRE_RESPONSE.read_bytes())
-    specs = parse_technical_data_pdf(SIXTY_YEAR_PDF_TEXT.read_text(encoding="utf-8"))
-
-    extracted = _build_extracted_motorhome(
-        products[0],
-        range_config("60y/matrix", "Matrix 60Y"),
-        "https://www.adria.co.uk/60y/matrix",
-        "https://configure.adria-mobil.com/gb/25-26/x/pdf",
-        specs,
-        "Fiat",
-        {},
-    )
-
-    assert extracted.motorhome.manufacturer_range == "Matrix"
-    assert extracted.motorhome.model == "670 SL 60Y"
-
 
 def test_an_ordinary_range_still_names_its_products_by_layout_and_trim() -> None:
     body = LIVEWIRE_RESPONSE.read_bytes()
@@ -332,13 +313,6 @@ def test_sixty_year_sheet_confirms_its_own_identity() -> None:
     assert pdf_describes_layout(text, "670 SL") is True
 
 
-def test_range_selectors_are_unique_so_a_range_flag_is_unambiguous() -> None:
-    # `--range Matrix` and `--range "Matrix 60Y"` must select different pages, which is
-    # the whole reason RangeConfig separates `label` from `fmlv_range`.
-    labels = [label for _path, label in DEFAULT_RANGES]
-    assert len(labels) == len(set(labels))
-    assert {"Matrix", "Matrix 60Y", "Coral 60Y", "TWIN 60Y"} <= set(labels)
-
 
 def test_default_ranges_stays_the_two_element_shape_the_cli_reads() -> None:
     assert all(len(entry) == 2 for entry in DEFAULT_RANGES)
@@ -351,13 +325,6 @@ def _baseline_row(manufacturer_range: str, model: str) -> Motorhome:
     )
 
 
-def test_a_sixty_year_run_sees_the_sixty_year_baseline_row() -> None:
-    # FMLV product 8195. Without this it has no baseline, is classified NEW_PRODUCT,
-    # and uploading would duplicate a product the NCC already holds.
-    row = _baseline_row("Matrix", "670 SL 60Y")
-
-    assert baseline_in_scope(row, {"Matrix 60Y"}) is True
-
 
 def test_a_sixty_year_run_does_not_pull_in_the_ordinary_range() -> None:
     row = _baseline_row("Matrix", "Supreme 670 DC")
@@ -365,23 +332,6 @@ def test_a_sixty_year_run_does_not_pull_in_the_ordinary_range() -> None:
     assert baseline_in_scope(row, {"Matrix 60Y"}) is False
 
 
-def test_an_ordinary_range_run_does_not_pull_in_the_sixty_year_row() -> None:
-    # A baseline row a narrowed run pulls in but never sweeps is reported as
-    # DISAPPEARED — so being too generous here invents a disappearance notice for a
-    # product that is very much still on sale.
-    ordinary = _baseline_row("Matrix", "Supreme 670 DC")
-    sixty_year = _baseline_row("Matrix", "670 SL 60Y")
-
-    assert baseline_in_scope(ordinary, {"Matrix"}) is True
-    assert baseline_in_scope(sixty_year, {"Matrix"}) is False
-
-
-def test_baseline_scope_covers_every_selector_in_a_multi_range_run() -> None:
-    labels = {"Matrix 60Y", "Coral 60Y", "TWIN 60Y"}
-
-    assert baseline_in_scope(_baseline_row("TWIN", "640 SGX 60Y"), labels) is True
-    assert baseline_in_scope(_baseline_row("Coral", "670 DL 60Y"), labels) is True
-    assert baseline_in_scope(_baseline_row("Supersonic", "780 DC"), labels) is False
 
 
 def test_an_unknown_range_pair_falls_back_to_the_label_as_the_fmlv_range() -> None:
@@ -473,3 +423,34 @@ def test_the_beds_differ_per_layout_because_one_sheet_is_one_vehicle() -> None:
 def test_no_sheet_names_a_microwave() -> None:
     for name in (MATRIX_670DC, SUPERSONIC_780DC, MATRIX_670SL):
         assert "microwave" not in _findings(name)
+
+
+# --- the rebuilt site, 29 September 2026 ------------------------------------------------
+
+
+def test_the_ranges_are_the_ones_the_rebuilt_site_publishes() -> None:
+    """Adria rebuilt adria.co.uk in September 2026. Campervans moved from `/campervans/`
+    to `/vans/`, and `compact-max`, `twin-sports`, `twin-supreme` and the `/60y/` pages
+    all went — the last three of those now return 404."""
+    paths = [config.path for config in adria.RANGES]
+
+    assert paths == [
+        "motorhomes/supersonic",
+        "motorhomes/sonic",
+        "motorhomes/matrix",
+        "motorhomes/coral",
+        "motorhomes/compact",
+        "vans/supertwin",
+        "vans/twin",
+    ]
+
+
+def test_no_range_path_still_points_at_campervans() -> None:
+    """The section was renamed, and a stale path yields nothing rather than failing."""
+    assert not [c for c in adria.RANGES if c.path.startswith("campervans/")]
+
+
+def test_range_selectors_are_unique_so_a_range_flag_is_unambiguous() -> None:
+    selectors = [config.path for config in adria.RANGES]
+
+    assert len(selectors) == len(set(selectors))

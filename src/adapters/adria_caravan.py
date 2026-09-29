@@ -85,6 +85,7 @@ from .adria import (
     LivewireProduct,
     RangeConfig,
     fitted_equipment,
+    parse_dom_products,
     parse_livewire_products,
     pdf_describes_layout,
     pdf_title,
@@ -519,19 +520,25 @@ def collect(
         config = range_config(range_path, range_label)
         range_url = f"{BASE_URL}/{config.path}"
         on_progress(f"[{config.label}] loading range page...")
-        _page, captured = browser.fetch_with_capture(
+        # **The roster is read from the rendered page**, as on the motorhome side. Adria
+        # rebuilt the site in September 2026 and the layout selector no longer fires
+        # `/livewire/update` on scroll; the configurations are in the markup regardless.
+        page_result, _captured = browser.fetch_with_capture(
             range_url, capture_url_contains=_LIVEWIRE_UPDATE_MARKER, scroll=True
         )
-        if not captured:
+        products = parse_dom_products(
+            page_result.file_path.read_text(encoding="utf-8", errors="replace")
+        )
+        if not products:
             on_progress(
-                f"[{config.label}] WARNING: the range page made no "
-                f"{_LIVEWIRE_UPDATE_MARKER} call, so it yielded no configurations — the "
-                f"layout selector may have moved, or never scrolled into view"
+                f"[{config.label}] WARNING: the range page rendered no configurations — "
+                f"no `setProductId` button was found, so the layout selector has moved "
+                f"again. Its products cannot be collected this run"
             )
-
-        for response in captured:
-            products = parse_livewire_products(response.file_path.read_bytes())
+        else:
             on_progress(f"[{config.label}] {len(products)} configuration(s) found")
+
+        if True:
             for index, live in enumerate(products, start=1):
                 label = " / ".join(
                     part for part in (live.layout_label, live.trim_label) if part

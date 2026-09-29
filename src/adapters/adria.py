@@ -25,6 +25,7 @@ fetched for, and its two masses have to imply a positive payload. See `collect`.
 
 from __future__ import annotations
 
+import html
 import json
 import re
 from collections.abc import Callable, Iterable
@@ -75,35 +76,23 @@ class RangeConfig:
 #: hardcoding them, so a new range doesn't need a code change to be picked up. Note
 #: that would *not* have found the three 60Y pages below, which are listed in neither
 #: index — `docs/adapters/README.md`'s "no single menu is a complete roster" again.
+#: The seven ranges the rebuilt site publishes, checked against FMLV's own rows on
+#: 29 September 2026. **Campervans moved from `/campervans/` to `/vans/`**, and the
+#: `compact-max`, `twin-sports`, `twin-supreme` and `/60y/` pages are gone.
+#:
+#: FMLV also holds `Matrix Supreme` and `TWIN Max`, two 2026-only ranges with no page of
+#: their own. They are not collected, so they will show as disappeared until someone
+#: confirms whether they have been folded into Matrix and TWIN or withdrawn.
 RANGES: tuple[RangeConfig, ...] = (
     RangeConfig("motorhomes/supersonic", "Supersonic", "Supersonic"),
     RangeConfig("motorhomes/sonic", "Sonic", "Sonic"),
     RangeConfig("motorhomes/matrix", "Matrix", "Matrix"),
     RangeConfig("motorhomes/coral", "Coral", "Coral"),
-    RangeConfig("motorhomes/compact-max", "Compact Max", "Compact Max"),
     RangeConfig("motorhomes/compact", "Compact", "Compact"),
-    RangeConfig("campervans/supertwin", "Supertwin", "Supertwin"),
-    RangeConfig("campervans/twin-sports", "Twin Sports", "Twin Sports"),
-    RangeConfig("campervans/twin-supreme", "Twin Supreme", "Twin Supreme"),
-    # Adria's 60th-anniversary editions, one layout each, on their own `/60y/` pages.
-    # They are in no menu and no sitemap entry found, and none of the three appears in
-    # its ordinary range's own Livewire payload (checked 2026-08-20: `/motorhomes/matrix`
-    # returns seven configurations, none of them the 60Y), so sweeping these pages adds
-    # products rather than duplicating any.
-    #
-    # `fmlv_range`/`model_suffix` are taken from the real FMLV rows, not from the site:
-    # product 8195 is range `Matrix`, model `670 SL 60Y`. `model_includes_trim=False`
-    # because the JSON's trim label is useless here — it is a different shape on each of
-    # the three pages (`60 years RHD`, `Coral 60Y 670 DL`, `Twin 60Y 640 SGX`), and on
-    # two of them it merely repeats the layout code. The layout code plus `60Y` is what
-    # FMLV holds, and it is also exactly what each PDF titles itself (`MATRIX 670 SL 60Y`).
-    RangeConfig("60y/matrix", "Matrix 60Y", "Matrix", model_suffix="60Y", model_includes_trim=False),
-    RangeConfig("60y/coral", "Coral 60Y", "Coral", model_suffix="60Y", model_includes_trim=False),
-    RangeConfig("60y/twin", "TWIN 60Y", "TWIN", model_suffix="60Y", model_includes_trim=False),
+    RangeConfig("vans/supertwin", "Supertwin", "Supertwin"),
+    RangeConfig("vans/twin", "TWIN", "TWIN"),
 )
 
-#: `(path, label)` pairs, the shape `cli.resolve_ranges` reads with `getattr` and the
-#: `Adapter` protocol documents. Derived from `RANGES` so the two can never drift.
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = tuple(
     (config.path, config.label) for config in RANGES
 )
@@ -245,6 +234,71 @@ def parse_livewire_products(response_body: bytes) -> list[LivewireProduct]:
                     configurator_url=node.get("configuratorURL"),
                 )
             )
+    return products
+
+
+#: One configuration, as the rebuilt range page renders it. The layout selector marks up
+#: each "More information" button with everything needed:
+#:
+#: ```html
+#: wire:click="setProductId('100351-2627-wnnb-79400b010-14')"
+#: data-gtm-type="MB 600 SPB"          <- the layout
+#: data-gtm-value="Supreme RHD AWD"    <- the trim
+#: ```
+#:
+#: The same three fields the Livewire JSON used to carry, in the page itself.
+#: `setProductId('...')` renders with a literal apostrophe in the live DOM and with
+#: `&#039;` in a saved snapshot, so both are accepted.
+_QUOTE = r"(?:'|&#0?39;)"
+_DOM_PRODUCT = re.compile(
+    r'wire:click="setProductId\(' + _QUOTE + r"(?P<id>[^'&]+)" + _QUOTE + r'\)"'
+    r"(?P<rest>(?:(?!wire:click).){0,600}?)"
+    r'data-gtm-type="(?P<layout>[^"]*)"\s*data-gtm-value="(?P<trim>[^"]*)"',
+    re.S,
+)
+
+#: The configurator link the page carries, e.g. `https://configure.adria-mobil.com/gb/26-27`.
+#: **Read, never hardcoded**: it is where the market and the period come from, and the
+#: period moved from `25-26` to `26-27` when the 2027 range landed. It is also the host,
+#: which is what lets SUN LIVING share this code.
+_CONFIGURATOR_BASE = re.compile(
+    r"https://configure\.[a-z0-9.\-]+/[a-z]{2}/\d{2}-\d{2}"
+)
+
+
+def parse_dom_products(page_html: str) -> list[LivewireProduct]:
+    """Every configuration the rendered range page offers.
+
+    Replaces `parse_livewire_products` as the roster source. Adria rebuilt the site in
+    September 2026: the layout selector no longer fires `/livewire/update` when it scrolls
+    into view, so the capture came back empty and **both adapters collected nothing** -
+    which, before the empty-scrape guard, would have proposed deactivating the whole brand.
+
+    Price, berths and seats are not in this markup and are not needed: the technical PDF
+    states berths and seats, and the price is not read from the roster either way.
+    """
+    base = _CONFIGURATOR_BASE.search(page_html)
+    configurator_url = base.group(0) if base else None
+
+    products: list[LivewireProduct] = []
+    seen: set[str] = set()
+    for match in _DOM_PRODUCT.finditer(page_html):
+        product_id = html.unescape(match.group("id")).strip()
+        if not product_id or product_id in seen:
+            continue
+        seen.add(product_id)
+        products.append(
+            LivewireProduct(
+                layout_label=html.unescape(match.group("layout")).strip() or None,
+                trim_label=html.unescape(match.group("trim")).strip() or None,
+                product_id=product_id,
+                price_pounds=None,
+                price_string=None,
+                berths=None,
+                seats=None,
+                configurator_url=configurator_url,
+            )
+        )
     return products
 
 
@@ -634,23 +688,39 @@ def collect(
     placed to settle. Both figures go into the provenance snippet instead.
     """
     results: list[ExtractedMotorhome] = []
+    on_progress(
+        "RANGES FMLV HOLDS THAT THIS SITE NO LONGER PUBLISHES: the three 60Y anniversary "
+        "editions (Coral 670 DL 60Y, Matrix 670 SL 60Y, TWIN 640 SGX 60Y) had pages under "
+        "/60y/ which now return 404, and `Matrix Supreme` and `TWIN Max` have no page of "
+        "their own. Adria rebuilt the site in September 2026. Those rows will fall out "
+        "unmatched — check whether they are withdrawn or folded into Matrix and TWIN "
+        "before deactivating any of them"
+    )
+
 
     for range_path, range_label in ranges:
         config = range_config(range_path, range_label)
         range_url = f"{BASE_URL}/{config.path}"
         on_progress(f"[{config.label}] loading range page...")
-        _page_result, captured = browser.fetch_with_capture(
+        # **The roster is read from the rendered page**, not from a captured AJAX call.
+        # Adria rebuilt the site in September 2026 and the layout selector no longer fires
+        # `/livewire/update` when it scrolls into view — it calls `setProductId(...)` only
+        # when a person clicks. The configurations are in the markup either way.
+        page_result, _captured = browser.fetch_with_capture(
             range_url, capture_url_contains=_LIVEWIRE_UPDATE_MARKER, scroll=True
         )
-        if not captured:
+        products = parse_dom_products(
+            page_result.file_path.read_text(encoding="utf-8", errors="replace")
+        )
+        if not products:
             on_progress(
-                f"[{config.label}] WARNING: the range page made no {_LIVEWIRE_UPDATE_MARKER} "
-                f"call, so it yielded no configurations — the layout-selector component "
-                f"may have moved, or never scrolled into view"
+                f"[{config.label}] WARNING: the range page rendered no configurations — "
+                f"no `setProductId` button was found, so the layout selector has moved "
+                f"again. Its products cannot be collected this run"
             )
-        for response in captured:
-            products = parse_livewire_products(response.file_path.read_bytes())
+        else:
             on_progress(f"[{config.label}] {len(products)} configuration(s) found")
+        if True:
             for index, product in enumerate(products, start=1):
                 label = " / ".join(
                     part for part in (product.layout_label, product.trim_label) if part
