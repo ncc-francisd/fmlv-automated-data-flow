@@ -454,3 +454,27 @@ def test_range_selectors_are_unique_so_a_range_flag_is_unambiguous() -> None:
     selectors = [config.path for config in adria.RANGES]
 
     assert len(selectors) == len(set(selectors))
+
+
+def test_a_market_link_is_preferred_over_a_language_one() -> None:
+    """**Four caravans looked unpublished because of this.** The Adora and Action range
+    pages carry two sets of configurator links, four saying `/en/` and four `/gb/`, and
+    every `en` PDF 404s. `en` is a language fallback; `gb` is the UK market, and this is
+    the UK site."""
+    page = (
+        '<a href="https://configure.adria-mobil.com/en/26-27">x</a>'
+        '<a href="https://configure.adria-mobil.com/gb/26-27">y</a>'
+    )
+
+    assert adria._configurator_base(page) == "https://configure.adria-mobil.com/gb/26-27"
+
+
+def test_a_page_offering_only_a_language_still_uses_it() -> None:
+    """Better a market that might work than none at all."""
+    page = '<a href="https://configure.adria-mobil.com/en/26-27">x</a>'
+
+    assert adria._configurator_base(page) == "https://configure.adria-mobil.com/en/26-27"
+
+
+def test_a_page_with_no_configurator_link_yields_nothing() -> None:
+    assert adria._configurator_base("<p>no links here</p>") is None

@@ -266,6 +266,23 @@ _CONFIGURATOR_BASE = re.compile(
 )
 
 
+def _configurator_base(page_html: str) -> str | None:
+    """The configurator link to build PDF URLs from, **preferring a market over a language**.
+
+    The Adora and Action range pages carry two sets of links, four saying `/en/` and four
+    saying `/gb/`, and the `en` ones 404 for every product. `en` is a language fallback;
+    `gb` is the UK market, and this is the UK site. Taking whichever appeared first made
+    four caravans look like models Adria had not published technical data for.
+
+    A page offering only `en` still uses it — better a market that might work than none.
+    """
+    links = _CONFIGURATOR_BASE.findall(page_html)
+    if not links:
+        return None
+    markets = [link for link in links if "/en/" not in link]
+    return (markets or links)[0]
+
+
 def parse_dom_products(page_html: str) -> list[LivewireProduct]:
     """Every configuration the rendered range page offers.
 
@@ -277,8 +294,7 @@ def parse_dom_products(page_html: str) -> list[LivewireProduct]:
     Price, berths and seats are not in this markup and are not needed: the technical PDF
     states berths and seats, and the price is not read from the roster either way.
     """
-    base = _CONFIGURATOR_BASE.search(page_html)
-    configurator_url = base.group(0) if base else None
+    configurator_url = _configurator_base(page_html)
 
     products: list[LivewireProduct] = []
     seen: set[str] = set()
