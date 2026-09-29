@@ -483,6 +483,11 @@ def cross_source_disagreements(
     one rather than an arithmetic one: two independently maintained descriptions of the
     same configuration, one of which the adapter reached by constructing a URL.
     """
+    # **Dormant since Adria rebuilt the site, 29 September 2026.** The second source was
+    # the Livewire payload, which the range pages no longer serve; `parse_dom_products`
+    # leaves `berths` and `seats` unset, so `json_value` is always None and nothing is
+    # ever reported. Kept rather than deleted because the check is sound and the figures
+    # may come back — but it is not currently defending anything.
     disagreements: dict[str, tuple[int, int]] = {}
     for field_name, json_value in (
         ("berths", product.berths),

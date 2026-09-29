@@ -164,6 +164,11 @@ _SPEC_PATTERNS: dict[str, re.Pattern[str]] = {
     "overall_width_mm": re.compile(r"Total width \(mm\)\s+(\d+)"),
     "height_mm": re.compile(r"Total height \(mm\)\s+(\d+)"),
     "headroom_mm": re.compile(r"Internal height \(mm\)\s+(\d+)"),
+    # **Berths used to come from the Livewire payload**, which the rebuilt site no longer
+    # serves. The PDF states them three times over; this is the one that reads
+    # label-then-value, in `F. Interior Equipment`. The summary panel puts the number
+    # *before* its label (`4 nr. of berths`), which is why that one is not used.
+    "berths": re.compile(r"Number of berths\s+(\d+)"),
     "mro_kilograms": re.compile(r"Mass in running order \(MIRO-min, kg\)\s+(\d+)"),
     "mtplm_kilograms": re.compile(
         r"Minimal technically permissible laden mass \(MTPLM-min, kg\)\s+(\d+)"
@@ -393,7 +398,7 @@ def build_extracted(
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
         manufacturer_range=product.config.fmlv_range,
         model=product.model,
-        berths=product.product.berths,
+        berths=product.product.berths or product.figures.get("berths"),
         rrp_pounds=product.product.price_pounds,
         mtplm_kilograms=mtplm,
         mro_kilograms=figures.get("mro_kilograms"),
@@ -437,8 +442,13 @@ def build_extracted(
         f"accept with the range, they are one name",
     )
 
-    if product.product.berths is not None:
-        record("berths", f"{product.product.berths} berths, from the layout selector")
+    berths = product.product.berths or product.figures.get("berths")
+    if berths is not None:
+        record(
+            "berths",
+            f"{berths} berths, from the PDF's `Number of berths` row — the layout selector "
+            f"stopped carrying it when Adria rebuilt the site",
+        )
     if product.product.price_pounds is not None:
         record(
             "rrp_pounds",

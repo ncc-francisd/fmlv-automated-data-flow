@@ -291,3 +291,22 @@ def test_a_pdf_for_another_caravan_is_rejected(rio_grande: str, tyne: str) -> No
 
     product.figures = parse_caravan_pdf(tyne)
     assert _reconciles(product, tyne)[0] is True
+
+
+def test_berths_come_from_the_pdf_now(rio_grande: str) -> None:
+    """**They used to come from the Livewire payload**, which the rebuilt site no longer
+    serves, so every caravan came through with no berth count at all — the requester spotted
+    it on the Alpina 623 UC, whose own page says four.
+
+    The PDF states them three times over. This reads the `F. Interior Equipment` row, which
+    is the one written label-then-value; the summary panel puts the number *before* its
+    label (`4 nr. of berths`).
+    """
+    assert parse_caravan_pdf(rio_grande).get("berths") == 4
+
+
+def test_the_summary_panels_reversed_label_is_not_read() -> None:
+    """`4 nr. of berths` would give the wrong answer to a label-then-value pattern."""
+    text = "mass in running order (miro-min, kg) 4 nr. of berths Number of berths 6"
+
+    assert parse_caravan_pdf(text).get("berths") == 6
