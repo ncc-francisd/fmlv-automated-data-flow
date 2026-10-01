@@ -197,6 +197,37 @@ Ran the adapter live against the Matrix range (7 configurations) and compared to
   behaviour DESIGN.md §6.4 asks for (surface everything, no threshold) — not treated as
   a bug and not silently reconciled.
 
+## The price comes from a supplied list, 1 October 2026
+
+**Adria publish no price anywhere a run can reach.** The rebuilt range pages dropped the
+`priceString` the Livewire payload used to carry, and the UK Download Centre
+(`/downloads`) offers no price list of its own — it links eleven *other* markets' download
+centres. The list reaches the importer by email, so it is a constant in the adapter, the
+same position as `joa.py`. See `PRICES_NOT_ON_THE_SITE` and `PRICE_LIST_SOURCE`.
+
+**35 rows, 35 products, one apiece** — the 2027 list carries 39, of which the last four
+are SUN LIVING's and belong to that adapter. That exact tally is the check that nothing
+was mis-keyed; a key the site does not use would show up as both an unpriced product and
+an unused row.
+
+Keyed on `(fmlv_range, layout_label, trim_label)` — the site's strings, not the list's,
+because the two disagree in two places and the site is what the rest of the product is
+read from:
+
+| the price list says | the site says | settled by |
+|---|---|---|
+| `Twin Select 640 SGX` | `640 SGX` / `Standard RHD` | the PDF is titled `TWIN SELECT 640 SGX` |
+| `Twin Supreme 640 SGX` | `640 SGX` / `SunRoofXL RHD` | the PDF is titled `TWIN SUPREME 640 SGX` |
+| `Supertwin 700SFX PT` | `MB 700 SGX` / `Supreme PTR RHD AWD` | no `SFX` exists anywhere |
+
+The TWIN trims are confirmed twice over: the `Supreme PTR` 640s are 4250 kg in both the
+list and their PDFs, where every other Twin is 3500 kg. **`700SFX` is a typo for `700SGX`**
+— the Supertwin range is four vans, the other three line up exactly, and no `SFX` layout
+appears on the site, in any PDF or in FMLV. Worth raising with Adria.
+
+An unlisted configuration is priced at **nothing** — never 0, never blank — so FMLV's own
+figure stands rather than being wiped.
+
 ## Known gaps / follow-ups
 
 - **Range list is hardcoded** (`RANGES` in `adria.py`), read off the site nav by hand

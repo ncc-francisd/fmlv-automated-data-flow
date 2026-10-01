@@ -249,9 +249,16 @@ def parse_livewire_products(response_body: bytes) -> list[LivewireProduct]:
 #: The same three fields the Livewire JSON used to carry, in the page itself.
 #: `setProductId('...')` renders with a literal apostrophe in the live DOM and with
 #: `&#039;` in a saved snapshot, so both are accepted.
+#:
+#: **`wire:click` takes Livewire modifiers and they are not ours to predict.** On
+#: 1 October 2026 Adria changed every button from `wire:click` to `wire:click.prevent`,
+#: and because the attribute name was matched literally, *both* adapters went to zero
+#: products overnight — caravans as well as motorhomes, since they share this parser.
+#: `.prevent`, `.stop`, `.self` and chains of them are all ordinary Livewire, so any
+#: run of `.modifier` is accepted rather than the one spelling seen on the day.
 _QUOTE = r"(?:'|&#0?39;)"
 _DOM_PRODUCT = re.compile(
-    r'wire:click="setProductId\(' + _QUOTE + r"(?P<id>[^'&]+)" + _QUOTE + r'\)"'
+    r'wire:click(?:\.[a-z]+)*="setProductId\(' + _QUOTE + r"(?P<id>[^'&]+)" + _QUOTE + r'\)"'
     r"(?P<rest>(?:(?!wire:click).){0,600}?)"
     r'data-gtm-type="(?P<layout>[^"]*)"\s*data-gtm-value="(?P<trim>[^"]*)"',
     re.S,
@@ -453,6 +460,90 @@ def parse_base_vehicle_manufacturer(text: str) -> str | None:
 # --------------------------------------------------------------------------- #
 
 
+#: The UK price list, keyed `(fmlv_range, layout_label, trim_label)` — the three strings
+#: the range page itself carries, so a product is priced from what the site calls it.
+#:
+#: **Adria do not publish this.** The UK Download Centre links other markets' download
+#: centres and offers no price list of its own, and the configurations stopped carrying a
+#: price when the site was rebuilt in September 2026. The list is sent to the importer, so
+#: no run can rediscover it — the same position as `joa.py`. When a new one arrives,
+#: replace this table and move `PRICE_LIST_SOURCE` on.
+#:
+#: **Two places where the price list and the website disagree**, both resolved against the
+#: technical PDFs rather than by preferring one document:
+#:
+#: * TWIN's trims. The price list sells `Select`, `Supreme` and `Supreme PTR`; the site
+#:   labels the same eight vans `Standard RHD`, `SunRoofXL RHD` and `Supreme PTR RHD`. The
+#:   PDFs are titled `TWIN SELECT 640 SGX` for `Standard RHD` and `TWIN SUPREME 640 SGX`
+#:   for `SunRoofXL RHD`, and the masses agree too — 4250 kg on exactly the two `Supreme
+#:   PTR` 640s the price list puts at 4250 kg, 3500 kg on the rest.
+#: * `Supertwin 700SFX PT` is a typo for `700 SGX`. No `SFX` layout exists on the site, in
+#:   the PDFs or in FMLV; the Supertwin range is four vans and the other three line up
+#:   exactly. Priced as the `MB 700 SGX` PTR, and worth raising with Adria.
+PRICES_NOT_ON_THE_SITE: dict[tuple[str, str, str], int] = {
+    # Supersonic
+    ("Supersonic", "780 DC", "Standard RHD"): 165499,
+    ("Supersonic", "780 DL", "Standard RHD"): 165499,
+    ("Supersonic", "780 SL", "Standard RHD"): 165499,
+    ("Supersonic", "890 LC", "Standard RHD"): 181499,
+    ("Supersonic", "890 LL", "Standard RHD"): 181499,
+    # Sonic
+    ("Sonic", "700 DC", "Supreme Alde RHD"): 125999,
+    ("Sonic", "700 DL", "Supreme Alde RHD"): 125999,
+    # Matrix
+    ("Matrix", "670 DC", "Select RHD"): 89999,
+    ("Matrix", "670 DC", "Supreme Alde RHD"): 97999,
+    ("Matrix", "670 DL", "Supreme Alde RHD"): 97999,
+    ("Matrix", "670 SL", "Supreme Alde RHD"): 97999,
+    ("Matrix", "MB 670 DC", "Supreme Alde RHD"): 117999,
+    ("Matrix", "MB 670 DL", "Supreme Alde RHD"): 117999,
+    ("Matrix", "MB 670 SL", "Supreme Alde RHD"): 117999,
+    # Coral
+    ("Coral", "670 DL", "Select RHD"): 89999,
+    ("Coral", "670 DC", "Supreme Alde RHD"): 95999,
+    ("Coral", "670 DL", "Supreme Alde RHD"): 95999,
+    ("Coral", "670 SL", "Supreme Alde RHD"): 95999,
+    ("Coral", "MB 670 DC", "Supreme Alde RHD"): 116999,
+    ("Coral", "MB 670 DL", "Supreme Alde RHD"): 116999,
+    ("Coral", "MB 670 SL", "Supreme Alde RHD"): 116999,
+    # Compact
+    ("Compact", "DL", "Select RHD"): 82999,
+    ("Compact", "DL", "Supreme RHD"): 82999,
+    # Supertwin
+    ("Supertwin", "MB 600 SPB", "Supreme RHD AWD"): 129999,
+    ("Supertwin", "MB 600 SPB", "Supreme PTR RHD AWD"): 134999,
+    ("Supertwin", "MB 700 SGX", "Supreme RHD AWD"): 134999,
+    ("Supertwin", "MB 700 SGX", "Supreme PTR RHD AWD"): 139999,
+    # TWIN. `Standard RHD` is the price list's `Select`, `SunRoofXL RHD` its `Supreme`.
+    ("TWIN", "640 SLB", "Standard RHD"): 78999,
+    ("TWIN", "640 SGX", "Standard RHD"): 78999,
+    ("TWIN", "600 SPB", "SunRoofXL RHD"): 76499,
+    ("TWIN", "640 SGX", "SunRoofXL RHD"): 78499,
+    ("TWIN", "640 SLB", "SunRoofXL RHD"): 77499,
+    ("TWIN", "600 SPB", "Supreme PTR RHD"): 80499,
+    ("TWIN", "640 SGX", "Supreme PTR RHD"): 89999,
+    ("TWIN", "640 SLB", "Supreme PTR RHD"): 88999,
+}
+
+#: Named in every price provenance, so a reviewer can see which list a figure came from
+#: without opening the adapter.
+PRICE_LIST_SOURCE = "the 2027 Adria UK motorhome price list, supplied 1 October 2026"
+
+
+def price_for(product: LivewireProduct, config: RangeConfig) -> int | None:
+    """This configuration's price from the supplied list, or `None` if it is not on it.
+
+    `None` means **emit nothing**, never zero and never a blank: an unpriced product
+    keeps whatever FMLV already holds rather than having it wiped. See
+    `docs/adapters/README.md`.
+    """
+    if not product.layout_label or not product.trim_label:
+        return None
+    return PRICES_NOT_ON_THE_SITE.get(
+        (config.fmlv_range, product.layout_label.strip(), product.trim_label.strip())
+    )
+
+
 def _model_name(product: LivewireProduct, config: RangeConfig) -> str | None:
     """The model as FMLV writes it: layout code, the trim where it means something, suffix.
 
@@ -578,7 +669,7 @@ def _build_extracted_motorhome(
         base_vehicle_manufacturer=base_vehicle_manufacturer,
         berths=spec("berths") or product.berths,
         mh_passenger_seats_inc_driver=spec("mh_passenger_seats_inc_driver") or product.seats,
-        rrp_pounds=product.price_pounds,
+        rrp_pounds=product.price_pounds or price_for(product, config),
         mro_kilograms=mro,
         mtplm_kilograms=mtplm,
         mh_payload_kilograms=(mtplm - mro) if mro is not None and mtplm is not None else None,
@@ -609,6 +700,14 @@ def _build_extracted_motorhome(
         provenance["rrp_pounds"] = Provenance(
             source_url=range_url,
             snippet=f"{product.layout_label} / {product.trim_label}: {product.price_string}",
+        )
+    elif motorhome.rrp_pounds is not None:
+        provenance["rrp_pounds"] = Provenance(
+            source_url=range_url,
+            snippet=(
+                f"{config.fmlv_range} {product.layout_label} / {product.trim_label}: "
+                f"GBP{motorhome.rrp_pounds:,} from {PRICE_LIST_SOURCE}"
+            ),
         )
     for field_name, match in pdf_specs.items():
         snippet = match.snippet

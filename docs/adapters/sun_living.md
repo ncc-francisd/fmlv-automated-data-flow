@@ -9,6 +9,29 @@ machinery**: the same Laravel+Livewire range pages, the same scroll-triggered
 - `fmlv_manufacturer`: `SUN LIVING` — capitals in both, as the requester said, and only
   one candidate row in the full list, so no ambiguity to resolve.
 
+## The site was down on 1 October 2026 — do not run this adapter yet
+
+Every range page (`/motorhomes/a-series`, `/c-series`, `/s-series`,
+`/campervans/v-series`) returned a 6.6 KB page titled **`Server Error`**, and the
+`/livewire/update` call the roster depends on did not fire. Nothing is wrong with the
+adapter: it collects zero, and the empty-scrape guard refuses the run, which is the
+correct behaviour.
+
+Adria rebuilt `adria.co.uk` in late September 2026 and this site runs the same machinery,
+so it is most likely mid-rebuild. **When it returns, check the roster before trusting it**
+— Adria's rebuild moved campervans from `/campervans/` to `/vans/`, dropped the price from
+the payload, and replaced the Livewire roster call with `setProductId` markup in the page.
+Expect some or all of the same here, in which case this adapter moves to
+`adria.parse_dom_products` as the motorhome and caravan ones already have.
+
+**Four SUN LIVING prices are waiting.** Adria's 2027 UK motorhome price list carries
+`V Series 65GX` GBP65,499, `V Series 65GX PTR` GBP73,499, `C Series 70DL` GBP67,499 and
+`S Series 75SL` GBP73,499 — the last two being exactly the configurations this site
+published no price for (GBP0.00 and nothing at all). They are deliberately **not** wired
+in yet: the key would be `(fmlv_range, layout_label, trim_label)` and the rebuilt site's
+labels cannot be read while it is down, so keying them now would be guesswork. See
+`adria.PRICES_NOT_ON_THE_SITE` for the pattern to follow.
+
 ## The one change needed to `adria.py`
 
 `technical_data_pdf_url` derives the market and period from each product's

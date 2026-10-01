@@ -478,3 +478,79 @@ def test_a_page_offering_only_a_language_still_uses_it() -> None:
 
 def test_a_page_with_no_configurator_link_yields_nothing() -> None:
     assert adria._configurator_base("<p>no links here</p>") is None
+
+
+# --- the roster, read from the rendered page ------------------------------------------
+
+
+def test_the_layout_selector_yields_every_configuration() -> None:
+    cards = (FIXTURES / "adria_supersonic_layout_selector.html").read_text(encoding="utf-8")
+
+    got = adria.parse_dom_products(cards)
+
+    assert len(got) == 5
+    assert [p.layout_label for p in got] == ["780 DC", "780 DL", "780 SL", "890 LC", "890 LL"]
+    assert {p.trim_label for p in got} == {"Standard RHD"}
+    assert all(p.configurator_url == "https://configure.adria-mobil.com/gb/26-27" for p in got)
+
+
+def test_a_livewire_modifier_does_not_empty_the_roster() -> None:
+    """**The trap this exists for.** On 1 October 2026 Adria changed every button from
+    `wire:click` to `wire:click.prevent`. The attribute name was matched literally, so
+    both adapters went to zero products overnight — caravans share this parser — and a
+    run could only fail on the empty-scrape guard. Modifiers are ordinary Livewire."""
+    button = (
+        'wire:click{mod}="setProductId(\'100351-2627-cpel-b6200w032-14\')"'
+        ' data-gtm-type="780 DC" data-gtm-value="Standard RHD"'
+    )
+
+    for modifier in ("", ".prevent", ".stop", ".prevent.stop", ".self"):
+        got = adria.parse_dom_products(button.format(mod=modifier))
+        assert len(got) == 1, f"{modifier!r} emptied the roster"
+        assert got[0].layout_label == "780 DC"
+
+
+def test_either_apostrophe_spelling_is_read() -> None:
+    """A live DOM writes a literal apostrophe; a saved snapshot writes `&#039;`."""
+    for quote in ("'", "&#039;"):
+        markup = (
+            f'wire:click.prevent="setProductId({quote}abc-1{quote})"'
+            ' data-gtm-type="670 DC" data-gtm-value="Select RHD"'
+        )
+        got = adria.parse_dom_products(markup)
+        assert len(got) == 1 and got[0].product_id == "abc-1"
+
+
+# --- the supplied price list ----------------------------------------------------------
+
+
+def test_the_price_list_covers_the_whole_published_range() -> None:
+    """35 configurations on the site, 35 rows on the 2027 list, one apiece. The other
+    four rows on Adria's list are SUN LIVING's and belong to that adapter."""
+    assert len(adria.PRICES_NOT_ON_THE_SITE) == 35
+    assert {key[0] for key in adria.PRICES_NOT_ON_THE_SITE} == {
+        config.fmlv_range for config in adria.RANGES
+    }
+
+
+def test_the_price_is_keyed_on_what_the_site_calls_the_van_not_the_price_list() -> None:
+    """TWIN's price list sells `Select`/`Supreme`; the site labels the same vans
+    `Standard RHD`/`SunRoofXL RHD`. The PDFs are titled `TWIN SELECT 640 SGX` for the
+    first and `TWIN SUPREME 640 SGX` for the second, so the site's label is the key."""
+    twin = {key[2] for key in adria.PRICES_NOT_ON_THE_SITE if key[0] == "TWIN"}
+
+    assert twin == {"Standard RHD", "SunRoofXL RHD", "Supreme PTR RHD"}
+    assert adria.PRICES_NOT_ON_THE_SITE[("TWIN", "640 SGX", "Standard RHD")] == 78999
+    assert adria.PRICES_NOT_ON_THE_SITE[("TWIN", "640 SGX", "SunRoofXL RHD")] == 78499
+
+
+def test_an_unlisted_configuration_is_priced_at_nothing_not_zero() -> None:
+    """Emitting a 0 or a blank would wipe the figure FMLV already holds."""
+    config = next(c for c in adria.RANGES if c.fmlv_range == "TWIN")
+    unknown = adria.LivewireProduct(
+        layout_label="999 ZZ", trim_label="Standard RHD", product_id="x",
+        price_pounds=None, price_string=None, berths=None, seats=None,
+        configurator_url=None,
+    )
+
+    assert adria.price_for(unknown, config) is None

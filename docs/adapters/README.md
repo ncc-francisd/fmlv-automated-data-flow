@@ -1304,6 +1304,32 @@ overview cards against six collected families is what exposed the gap. **An abse
 explain is a gap in the search, not a fact about the manufacturer** — do not write it up as a
 discontinued range until a second source agrees.
 
+### The roster parser is the one that must have a fixture test
+
+**Anchor a roster on the page's meaning, not on a framework's spelling — and pin it with
+real captured markup.** Rule from Adria, 1 October 2026.
+
+Adria's layout selector marks each button `wire:click="setProductId('...')"`. On 1 October
+they changed it to `wire:click.prevent="..."`. `.prevent` is an ordinary Livewire modifier
+and changes nothing about what the button means, but the attribute name was matched
+literally, so **both** Adria adapters — motorhomes and caravans share the parser — went
+from 35 and 8 products to zero overnight.
+
+Two lessons, and the second is the one that cost the time:
+
+- **Framework attributes take modifiers.** Livewire has `.prevent`, `.stop`, `.self`,
+  `.debounce`, and they chain. Alpine, HTMX and Stimulus all do the same. Match
+  `wire:click(?:\.[a-z]+)*=` rather than the one spelling that was on the page the day
+  the adapter was written.
+- **A roster parser with no fixture test is the most expensive gap in an adapter.** Every
+  other parse failure loses one field on one product and a reviewer sees it. A roster
+  failure loses the whole brand and looks exactly like a manufacturer closing down.
+  `parse_dom_products` had no test at all, so nothing failed until a live run did.
+
+The empty-scrape guard caught the consequence, which is what it is for — but it only ever
+reports that a run collected nothing, never why. Capture the real markup as a fixture when
+the adapter is written, and assert the product count against it.
+
 ### A product can be filed outside the range that sells it
 
 **Scope a roster by what the card says, not by where the link points.** Rule from Carthago,
