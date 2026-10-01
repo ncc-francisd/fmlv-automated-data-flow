@@ -2,7 +2,8 @@
 
 **NCC id 11**, `fmlv_manufacturer` **`Jerba Campervans`**, display name **`Jerba`**, supplier
 name the same as the manufacturer name. Campervans only. North Berwick, employee-owned,
-converts three base vehicles. **No adapter written yet — this is the stage 1 survey.**
+converts three base vehicles. **Adapter written 1 October 2026** — `src/adapters/jerba.py`,
+14 products, 11 fetches a run.
 
 ## The site publishes almost nothing a run can use
 
@@ -210,3 +211,41 @@ rows. Length follows wheelbase (5050 short / 5450 long on the panel vans, 5986 m
 6836 long on the Crafter), so a length that does not match its stated wheelbase is a parse
 error. That is the check to build on, and it should be said plainly that this adapter has
 nothing as strong as the arithmetic self-checks elsewhere in this project.
+
+## What the build settled
+
+**Range and model.** `manufacturer_range` is the base-vehicle platform — `VW T7`,
+`Ford Transit Custom`, `VW Crafter` — and `model` is the layout name. The platform is the
+only thing separating the five panel-van layouts in a range filter, since each is sold on
+both. **This is a choice, not a reading**: FMLV's own five rows have not been exported yet,
+so if they file these differently, change `JerbaProduct.platform` in `PRODUCTS` and nothing
+else moves.
+
+**What a run actually does.** Eleven fetches, one per distinct model page, contributing no
+figures — the site has none. They exist to confirm each product still has a page. A page
+that stops resolving is narrated as a warning and **the product is still collected**,
+because the price list is the more recent document and a missing page is not a withdrawal.
+That is the Carthago lesson: a gap in one source should not deactivate a vehicle that is
+plainly on sale.
+
+**The first live run**, 1 October 2026: all eleven pages resolved, 14 products built, the
+Taransay roof disagreement reported, and no mass emitted on any product.
+
+| | |
+|---|---|
+| products | 14 |
+| priced | 12 — both Juras have none |
+| with a length | 13 — the MWB Harris has none |
+| masses emitted | **0**, by design |
+| body types | 4 elevating-roof campervans, 10 high tops |
+
+**Body type, derived not guessed.** The four elevating-roof panel vans sit at 2068 mm and
+do not reach the 2300 mm threshold, so they are `type_campervan_elevating_roof`. The Jura
+(2488 mm) and all four Crafters (2590 mm) clear it and are `type_campervan_high_top`. The
+Crafters' **optional** ATEC elevating roof is deliberately ignored — an optional rising
+roof never changes what the vehicle is, the same call `joa.py` makes about its pop-up.
+
+**The seat count is proposed with a warning attached.** The brochure's `BELTED TRAVEL
+SEATS` row says 4 or 5 but never says the belts are three-point, and only three-point belts
+count. The figure is proposed with the uncertainty written into its provenance, so the
+reviewer decides rather than it passing as settled.
