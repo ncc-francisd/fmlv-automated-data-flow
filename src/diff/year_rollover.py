@@ -9,14 +9,21 @@ one of two ways:
    flag will call, one product at a time.
 2. **Per product, at review time** (Phase 6's UI — not built yet), where a change was
    actually detected during the window manufacturers typically publish next year's
-   models (June-September). `in_rollover_window` is a plausibility signal for that
-   window, surfaced on `ProductDiff.year_rollover_eligible` (`classify.py`) for the
-   review app to render as a checkbox — it never forces a bump by itself.
+   models. `in_rollover_window` is a plausibility signal for that window, surfaced on
+   `ProductDiff.year_rollover_eligible` (`classify.py`) for the review app to render as
+   a checkbox — it never forces a bump by itself.
 
 Deliberately not the same window as DESIGN.md §8's "August-September is peak season"
 note — that one is about how *often to run the pipeline*; this one is about how
-*plausible a detected change is a model-year rollover*, which the user set slightly
-wider (June-September) as encoded in `ROLLOVER_WINDOW`.
+*plausible a detected change is a model-year rollover*.
+
+**The window runs to the end of the calendar year, 1 June to 31 December**, widened from
+30 September on 1 October 2026. Two reasons. Manufacturers were still landing next year's
+range well past September — Carthago and Adria were both publishing 2027 vehicles that
+week — so a 30 September cut-off asserted something about the trade that is not true. And
+31 December is where the window has to stop anyway: `can_bump_year` only ever offers to
+turn *this calendar year's* model into next year's, so on 1 January a 2026 product stops
+being bumpable by either route, window or no window.
 """
 
 from __future__ import annotations
@@ -26,8 +33,9 @@ from datetime import date
 from ..product_model.model import Motorhome
 
 #: (month, day) start/end, inclusive, of the window in which a detected change is
-#: plausibly a model-year rollover rather than an ordinary in-season correction.
-ROLLOVER_WINDOW: tuple[tuple[int, int], tuple[int, int]] = ((6, 1), (9, 30))
+#: plausibly a model-year rollover rather than an ordinary in-season correction. Ends with
+#: the calendar year, which is also where `can_bump_year` stops — see the module docstring.
+ROLLOVER_WINDOW: tuple[tuple[int, int], tuple[int, int]] = ((6, 1), (12, 31))
 
 
 def in_rollover_window(today: date | None = None) -> bool:

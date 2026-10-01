@@ -1107,7 +1107,7 @@ than asserted over. Note the qualification this puts on the section above: new p
 behave correctly only for a field the adapter *attempted*. Set-but-unregistered is a third
 case, and it is silent in both directions.
 
-### Model year rolls over gradually, July to early September
+### Model year rolls over gradually, July to the end of the year
 
 The transition varies by brand and is driven by the show calendar: next year's models
 appear at the **Caravan Salon in Düsseldorf in early September** and at the **NEC in
@@ -1119,6 +1119,17 @@ Three qualifications: trust what the manufacturer actually publishes; expect two
 years to be live at once during the window; and **re-check at the end of September**, when
 revisions often arrive. Morelo and Sunlight had both moved to MY2027 by 6 August 2026
 while Auto-Trail was still publishing "2026 SEASON" — the whole spread in one snapshot.
+
+**The tail is longer than "early September" suggests.** On 1 October 2026 both Carthago
+and Adria were still publishing 2027 vehicles, so `year_rollover.ROLLOVER_WINDOW` was
+widened that day from 1 June–30 September to **1 June–31 December**. It ends with the
+calendar year because that is where `can_bump_year` ends: a bump only ever turns *this*
+calendar year's model into next year's, so on 1 January a 2026 product stops being
+offered one at all. The window only governs whether the review app *offers* a year bump
+on a product that changed; `year` is never advanced without a person asking.
+
+In practice the year is set by hand in the export before upload, so treat the offer as a
+convenience rather than the mechanism.
 
 ### A "non-core" brand's UK site is a deliberate subset, not a partial rendering
 

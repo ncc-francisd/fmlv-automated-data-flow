@@ -38,13 +38,27 @@ def test_in_rollover_window_true_in_july() -> None:
 
 def test_in_rollover_window_true_on_boundaries() -> None:
     assert in_rollover_window(date(2026, 6, 1)) is True
-    assert in_rollover_window(date(2026, 9, 30)) is True
+    assert in_rollover_window(date(2026, 12, 31)) is True
+
+
+def test_in_rollover_window_runs_past_the_autumn_shows() -> None:
+    """Widened from 30 September on 1 October 2026, when Carthago and Adria were both
+    still publishing 2027 vehicles. October is squarely rollover season."""
+    assert in_rollover_window(date(2026, 10, 1)) is True
+    assert in_rollover_window(date(2026, 11, 20)) is True
 
 
 def test_in_rollover_window_false_outside_the_window() -> None:
     assert in_rollover_window(date(2026, 5, 31)) is False
-    assert in_rollover_window(date(2026, 10, 1)) is False
     assert in_rollover_window(date(2026, 1, 15)) is False
+
+
+def test_the_window_stops_where_can_bump_year_does() -> None:
+    """On 1 January a 2026 product is no longer bumpable by either route, so there is
+    nothing for a wider window to offer."""
+    assert in_rollover_window(date(2026, 12, 31)) is True
+    assert can_bump_year(2026, today=date(2026, 12, 31)) is True
+    assert can_bump_year(2026, today=date(2027, 1, 1)) is False
 
 
 def test_can_bump_year_true_when_the_year_is_the_current_year() -> None:
