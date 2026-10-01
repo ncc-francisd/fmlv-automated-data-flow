@@ -11,13 +11,13 @@ Surveyed 2026-09-23. **Motorhomes only** — six A-class ranges and three semi-i
 A German manufacturer (Carthago Reisemobilbau GmbH, Aulendorf), but **`/en/` is a genuine
 UK price list**, not a translation of the German one. See below — that took proving.
 
-## The roster: nine ranges, 76 products
+## The roster: nine ranges, 79 products
 
 | family | range | products |
 |---|---|---|
 | A-class | `c1-tourer-edition` | 2 |
 | A-class | `c2-tourer` | **26** |
-| A-class | `chic-c-line` | 9 |
+| A-class | `chic-c-line` | **12** |
 | A-class | `chic-e-line` | 10 |
 | A-class | `chic-s-plus` | 3 |
 | A-class | `liner-for-two` | 4 |
@@ -25,9 +25,19 @@ UK price list**, not a translation of the German one. See below — that took pr
 | semi-integrated | `c1-tourer-t` | 18 |
 | semi-integrated | `chic-c-line-t` | 2 |
 
-**76**, and this is the manufacturer's own claim: each range's overview card states a
-`Floor plans` count, and those nine counts add to exactly 76. That is the number to assert
-in the tests.
+**79.** Carthago's own claim is 76 — each range's overview card states a `Floor plans`
+count, and those nine add to 76. They agree with the pages on eight ranges and are wrong on
+the ninth: the chic c-line card says 9 where the page renders 12.
+
+**The three it misses are real products, and the adapter missed them too until 1 October
+2026.** The Fiat I 5.0 QB, I 5.0 QB L and I 6.2 XL QB are filed at `/en/wohnmobile/<slug>/`
+rather than under their range, so a roster scoped to the range directory collected their
+Mercedes siblings and not them. All three carry a price, a technical table naming
+`Fiat Ducato`, and a card in the grid. The run proposed deactivating three motorhomes
+Carthago still sell, which is how it was caught — see "A product can be filed outside the
+range that sells it" in the README.
+
+79 is the number to assert in the tests.
 
 ## A product is a layout × trim × weight class × chassis
 
@@ -57,8 +67,14 @@ Eight of the nine ranges server-render a card per product, each carrying:
 - `data-compare-brand-icon="fiat-icon"` / `"mb-icon"` — the chassis;
 - a `Find vehicle` link whose query string states `fahrzeug_baureihe` (the range) and
   `fahrzeug_modell` (the model) explicitly, so the identity need not be parsed out of prose;
-- a `Technical data` link to the product's own page, whose slug ends in the chassis
-  (`...-lightweight-3-5-t-2-fiat-ducato`, `...-mercedes-benz`).
+- a `Technical data` link to the product's own page, whose slug *usually* ends in the
+  chassis (`...-lightweight-3-5-t-2-fiat-ducato`, `...-mercedes-benz`) — three chic c-line
+  Fiats end `-3` and name none;
+- a compare checkbox carrying `data-compare-brand-icon`, which is `fiat-icon`, `mb-icon` or
+  `iveco-icon` on every card without exception. **This is what the roster is anchored on**:
+  it scopes the card to the grid whatever path its link takes, and it names the base vehicle
+  where the slug does not. Checked against the slug on all 50 cards that state both: 50
+  agree, 0 disagree.
 
 **`c2-tourer` alone uses a different component**, `wp-block-carthago-grundrissberater`, whose
 entire dataset sits inline in `<script type="application/json" class="cgrb__data">`. It has
@@ -157,7 +173,7 @@ vehicles even though no page states a model year in words.
 
 ## Fetches per run
 
-**85** — nine range pages for the roster, the chassis and the price, then 76 product pages
+**88** — nine range pages for the roster, the chassis and the price, then 79 product pages
 for the specification. Easily the largest of any adapter so far; Frankia is ten and Wildax
 eight. Worth knowing before the first run.
 

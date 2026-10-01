@@ -1293,6 +1293,43 @@ overview cards against six collected families is what exposed the gap. **An abse
 explain is a gap in the search, not a fact about the manufacturer** — do not write it up as a
 discontinued range until a second source agrees.
 
+### A product can be filed outside the range that sells it
+
+**Scope a roster by what the card says, not by where the link points.** Rule from Carthago,
+1 October 2026.
+
+Twelve model cards sit on the chic c-line range page. Nine link to
+`/en/motorhomes/a-class-motorhomes/chic-c-line/<slug>/`. The other three — the Fiat I 5.0 QB,
+I 5.0 QB L and I 6.2 XL QB — link to `/en/wohnmobile/<slug>/`, outside any range. They are not
+drafts or strays: each has a price, a technical table, and a Mercedes sibling collected
+happily from the same grid. A reader anchored on the range path collected the nine and
+proposed deactivating the three.
+
+Two things follow:
+
+- **Anchor on the part of the card that every card has.** Carthago's compare checkbox carries
+  `data-compare-brand-icon`, which both scopes the card to the grid and names the base
+  vehicle. The three stray permalinks end `-3` and name no chassis, so a URL-derived identity
+  would have lost them twice over.
+- **The manufacturer's own count can be built on the same mistake.** Carthago's `Floor plans`
+  figure says 9 for chic c-line against the 12 the page renders — their counter walks the
+  range directory too. A published count is a check worth having, but when it disagrees with
+  what the page renders, find out which is wrong before trusting either. Here the page was
+  right and the count was stale.
+
+### A proposed deactivation is a claim about the manufacturer, and gets checked like one
+
+An implausible number of *new* products means a rename (see "Deciding whether it *is* a
+rename"). The mirror holds: **a product proposed for deactivation is a claim that the
+manufacturer has stopped selling it**, and the cheapest way to be wrong about a range is to
+silently not look at part of it. Before reporting deactivations, open the manufacturer's page
+for each one. If it is still on sale, the roster is short — which is a bug in the adapter, not
+news about the range.
+
+This is the same rule as "a filtered roster must report what it filtered out", arriving from
+the other end: the Carthago filter reported nothing because, as far as it could tell, there
+was nothing to report.
+
 ### One manufacturer, several brands
 
 **`fmlv_manufacturer` is not unique**, and neither is it meant to be: it names the *legal*

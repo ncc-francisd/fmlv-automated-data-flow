@@ -119,9 +119,12 @@ BASE_URL = "https://www.carthago.com"
 MANUFACTURER = "Carthago"
 MANUFACTURER_DISPLAY_NAME = "Carthago"
 
-#: Carthago's own claim: each range overview card states a `Floor plans` count, and the
-#: nine add to exactly this.
-EXPECTED_PRODUCTS = 76
+#: What the nine range pages publish. Carthago's own `Floor plans` counts agree on eight
+#: of them and add to 76 — they say 9 for chic c-line, which offers 12. The three they
+#: miss are the Fiat I 5.0 QB, I 5.0 QB L and I 6.2 XL QB, filed under `/en/wohnmobile/`
+#: instead of under their range. **Their counter is wrong, not the page**: each of the
+#: three has a card, a price, and a technical table naming `Fiat Ducato`.
+EXPECTED_PRODUCTS = 79
 
 
 @dataclass(frozen=True)
@@ -176,10 +179,46 @@ def visible_lines(page_html: str) -> list[str]:
 
 # --- the roster -----------------------------------------------------------------------
 
-_CARD_LINK = re.compile(
-    r'href="(https://www\.carthago\.com/en/motorhomes/[^"]*?/)\?cgrb_return'
+#: One model card: the base vehicle it states, and the `Technical data` link it offers.
+#:
+#: **Anchored on the compare checkbox, not on the link.** Two things made the older
+#: link-only reader lose products. A card's permalink sits under its range,
+#: `/en/motorhomes/a-class-motorhomes/chic-c-line/<slug>/`, *except* for three chic c-line
+#: Fiats filed at the top level as `/en/wohnmobile/<slug>/` — and those same three end
+#: `-3` and name no chassis, exactly as the C2-tourer's permalinks do. The checkbox is on
+#: every card and spells the base vehicle out, so it answers both at once.
+#:
+#: Carthago's own `Floor plans` counter is built the same way the old reader was: it says
+#: 9 for chic c-line where the page offers 12.
+_CARD = re.compile(
+    r'data-compare-brand-icon="(?P<icon>[a-z-]+)"'
+    r"(?:(?!data-compare-brand-icon).)*?"
+    r'href="(?P<url>https://www\.carthago\.com/en/(?:motorhomes|wohnmobile)/[^"]*?/)'
+    r"\?cgrb_return",
+    re.S,
 )
+
+#: The brand icon class, as the compare checkbox spells it. FMLV shouts `IVECO`.
+_BRAND_ICONS = {"fiat-icon": "Fiat", "mb-icon": "Mercedes", "iveco-icon": "IVECO"}
+
 _BLOB = re.compile(r'<script[^>]*class="cgrb__data"[^>]*>(.*?)</script>', re.S | re.I)
+
+
+def _belongs_to(link: str, config: _Range) -> bool:
+    """Is this card's product one of `config`'s, by its slug?
+
+    Scoping used to be the range directory in the path, which the `/en/wohnmobile/` links
+    do not have. The slug still carries it — but `chic-c-line` must not swallow a
+    `chic-c-line-t` product, so a longer range slug wins.
+    """
+    tail = link.rstrip("/").rsplit("/", 1)[-1]
+    if not tail.startswith(f"{config.slug}-"):
+        return False
+    return not any(
+        tail.startswith(f"{other.slug}-")
+        for other in RANGES
+        if other.slug != config.slug and other.slug.startswith(config.slug)
+    )
 
 
 def roster_from(page_html: str, config: _Range) -> list[tuple[str, str | None]]:
@@ -188,10 +227,10 @@ def roster_from(page_html: str, config: _Range) -> list[tuple[str, str | None]]:
     The JSON blob is preferred where it exists because it is the component's own data, and
     because **it names the chassis where the URL does not**: eight C2-tourer permalinks end
     `-2` and say nothing about the base vehicle, which on this manufacturer is half a
-    product's identity. The card ranges all spell it in the URL.
+    product's identity. On a card range the card itself states it.
 
     **A range that yields nothing is a template change, not an empty range** — `collect`
-    says so rather than quietly collecting 50 products instead of 76.
+    says so rather than quietly collecting 50 products instead of 79.
     """
     blob = _BLOB.search(page_html)
     if blob is not None:
@@ -204,12 +243,13 @@ def roster_from(page_html: str, config: _Range) -> list[tuple[str, str | None]]:
         if found:
             return sorted(found.items())
 
-    links = {
-        htmllib.unescape(link)
-        for link in _CARD_LINK.findall(page_html)
-        if f"/{config.slug}/" in link
-    }
-    return sorted((link, chassis_from_url(link)) for link in links)
+    cards: dict[str, str | None] = {}
+    for match in _CARD.finditer(page_html):
+        link = htmllib.unescape(match.group("url"))
+        if not _belongs_to(link, config):
+            continue
+        cards[link] = _BRAND_ICONS.get(match.group("icon")) or chassis_from_url(link)
+    return sorted(cards.items())
 
 
 # --- identity -------------------------------------------------------------------------
@@ -643,7 +683,7 @@ def collect(
 ) -> list[ExtractedMotorhome]:
     """Every Carthago the UK site publishes.
 
-    **85 fetches** — nine range pages for the roster, then one per product. Easily the
+    **88 fetches** — nine range pages for the roster, then one per product. Easily the
     largest of any adapter here, and worth knowing before a run.
     """
     roster: list[tuple[_Range, str, str | None]] = []

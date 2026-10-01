@@ -80,10 +80,11 @@ def test_the_manufacturer_is_the_ncc_lists_spelling() -> None:
     assert carthago.MANUFACTURER_DISPLAY_NAME == "Carthago"
 
 
-def test_nine_ranges_and_carthagos_own_product_count() -> None:
-    """Each range overview card states a `Floor plans` count and the nine add to 76."""
+def test_nine_ranges_and_what_they_publish() -> None:
+    """Carthago's own `Floor plans` counts add to 76, but chic c-line publishes 12 where
+    its card claims 9 — so the nine pages offer 79."""
     assert len(RANGES) == 9
-    assert EXPECTED_PRODUCTS == 76
+    assert EXPECTED_PRODUCTS == 79
 
 
 def test_fmlv_files_the_semi_integrated_under_the_plain_range() -> None:
@@ -125,6 +126,46 @@ def test_a_card_rendered_range_reads_its_links() -> None:
 
     assert len(got) == 18
     assert {chassis for _url, chassis in got} == {"Fiat", "Mercedes"}
+
+
+def test_a_range_keeps_the_products_filed_outside_it() -> None:
+    """**The trap this exists for.** Three chic c-line Fiats are filed at the top level as
+    `/en/wohnmobile/<slug>/`, not under their range. A reader anchored on the range path
+    collects the nine Mercedes and misses them — and because all three have FMLV rows, the
+    run proposes deactivating three motorhomes Carthago still sell."""
+    cards = (FIXTURES / "carthago_chic_c_line_cards.html").read_text(encoding="utf-8")
+
+    got = dict(roster_from(cards, _range("chic-c-line")))
+
+    assert len(got) == 12
+    outside = [url for url in got if "/wohnmobile/" in url]
+    assert len(outside) == 3
+    assert all(got[url] == "Fiat" for url in outside)
+
+
+def test_the_card_names_a_chassis_the_url_does_not() -> None:
+    """Those same three permalinks end `-3` and say nothing about the base vehicle. The
+    compare checkbox on their card does, so identity survives the filing quirk."""
+    cards = (FIXTURES / "carthago_chic_c_line_cards.html").read_text(encoding="utf-8")
+
+    got = dict(roster_from(cards, _range("chic-c-line")))
+    silent = [url for url in got if chassis_from_url(url) is None]
+
+    assert silent, "expected some permalinks not to name their chassis"
+    assert all(got[url] is not None for url in silent)
+
+
+def test_a_range_does_not_swallow_a_longer_ranges_product() -> None:
+    """Scoping moved from the range directory to the slug, and `chic c-line` shares the
+    front of its slug with `chic c-line T`."""
+    card = (
+        '<input data-compare-brand-icon="fiat-icon">'
+        '<a href="https://www.carthago.com/en/motorhomes/semi-integrated-motorhomes'
+        '/chic-c-line-t/chic-c-line-t-4-9-le-3-2-fiat-ducato/?cgrb_return=x">'
+    )
+
+    assert roster_from(card, _range("chic-c-line")) == []
+    assert len(roster_from(card, _range("chic-c-line-t"))) == 1
 
 
 def test_the_chassis_is_read_from_the_url() -> None:
