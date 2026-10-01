@@ -544,12 +544,65 @@ def price_for(product: LivewireProduct, config: RangeConfig) -> int | None:
     )
 
 
-def _model_name(product: LivewireProduct, config: RangeConfig) -> str | None:
-    """The model as FMLV writes it: layout code, the trim where it means something, suffix.
+#: What FMLV calls the pop-top roof the site sells as `PTR` and the price list as `PT`.
+#: FMLV already holds `MB 600 SPB PopTop` and `MB 700 SGX PopTop`.
+_POP_TOP = "PopTop"
 
-    The trim is part of the identity for an ordinary range, where one layout is sold in
-    several trims that differ in price and weight (`670 DC` in `Supreme Alde RHD`), but
-    not for a one-layout special edition — see `RANGES`.
+
+def _model_from_pdf_title(
+    title: str | None, product: LivewireProduct, config: RangeConfig
+) -> str | None:
+    """The model as **Adria's own spec sheet** names it, which is how FMLV writes it.
+
+    The title is `TWIN SUPREME 640 SLB` — series, trim, layout — so stripping the series
+    off the front and the layout off the back leaves the trim, and the three go back
+    together in FMLV's order. Against the live baseline this names 31 of 35 products
+    *exactly*, where the trim-label scheme below named none of them.
+
+    **Why not the trim label.** When Adria rebuilt the site the layout selector's trims
+    drifted away from both the price list and FMLV: the van FMLV holds as `Select 640 SGX`
+    is labelled `Standard RHD`, and `Supreme 640 SGX` is labelled `SunRoofXL RHD`. Built
+    from those, `640 SGX Standard RHD` scored 0.50 against `Supreme 640 SGX`, `Sports 640
+    SGX` and `640 SGX 60Y` alike — a three-way tie on the threshold, with the row it
+    actually belongs to not even in reach. The spec sheet has no such drift because it is
+    the homologation document.
+
+    **The one thing the title does not carry is the pop-top**, which both PTR variants of
+    a layout share a title with, so that comes from the trim label.
+
+    Returns `None` when the title is missing or does not have the shape expected, and the
+    caller falls back to `_model_name`.
+    """
+    if not title or not product.layout_label:
+        return None
+
+    series = config.fmlv_range.upper()
+    rest = title.strip()
+    if not rest.upper().startswith(series):
+        return None
+    rest = rest[len(series) :].strip()
+
+    layout = product.layout_label.strip()
+    if not rest.upper().endswith(layout.upper()):
+        return None
+    trim = rest[: len(rest) - len(layout)].strip()
+
+    # The layout code keeps the site's own casing (`MB 600 SPB`); only the trim words are
+    # title-cased, because the sheet shouts everything.
+    parts = [word.capitalize() for word in trim.split()]
+    parts.append(layout)
+    if "PTR" in (product.trim_label or "").upper().split():
+        parts.append(_POP_TOP)
+    parts.append(config.model_suffix)
+    return " ".join(part for part in parts if part) or None
+
+
+def _model_name(product: LivewireProduct, config: RangeConfig) -> str | None:
+    """The model from the range page alone: layout code, trim, suffix.
+
+    **The fallback**, used only when the spec sheet does not name the vehicle — see
+    `_model_from_pdf_title`, which is the route that runs. Kept because a product whose
+    PDF failed is still worth collecting, and a name close to FMLV's beats none.
     """
     parts = [product.layout_label]
     if config.model_includes_trim:
@@ -645,6 +698,7 @@ def _build_extracted_motorhome(
     disagreements: dict[str, tuple[int, int]],
     equipment: tuple[str, ...] = (),
     inclusive_pack: tuple[str, ...] = (),
+    spec_sheet_title: str | None = None,
 ) -> ExtractedMotorhome:
     """One configuration as a `Motorhome`, plus the provenance beside each field.
 
@@ -665,7 +719,10 @@ def _build_extracted_motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
         manufacturer_range=config.fmlv_range,
-        model=_model_name(product, config),
+        model=(
+            _model_from_pdf_title(spec_sheet_title, product, config)
+            or _model_name(product, config)
+        ),
         base_vehicle_manufacturer=base_vehicle_manufacturer,
         berths=spec("berths") or product.berths,
         mh_passenger_seats_inc_driver=spec("mh_passenger_seats_inc_driver") or product.seats,
@@ -906,6 +963,7 @@ def collect(
                         parse_base_vehicle_manufacturer(pdf_text),
                         disagreements,
                         *fitted_equipment(pdf_text),
+                        spec_sheet_title=pdf_title(pdf_text),
                     )
                 )
 

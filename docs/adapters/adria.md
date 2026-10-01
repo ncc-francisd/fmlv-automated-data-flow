@@ -197,6 +197,47 @@ Ran the adapter live against the Matrix range (7 configurations) and compared to
   behaviour DESIGN.md §6.4 asks for (surface everything, no threshold) — not treated as
   a bug and not silently reconciled.
 
+## The model is named from the spec sheet, not the layout selector
+
+**Adria's own PDF title is FMLV's vocabulary.** `TWIN SUPREME 640 SLB` is series, trim,
+layout; strip the series off the front and the layout off the back and the three go back
+together as `Supreme 640 SLB`, which is what FMLV holds. Across the 35 published
+configurations this names **31 exactly**, and every one of the 35 matches an existing FMLV
+row — no new products, no disappearances outside the ranges Adria have genuinely dropped.
+
+**Why not the trim label, which is what the adapter used until 1 October 2026.** The
+rebuild drifted the selector's trims away from both FMLV and the price list:
+
+| FMLV holds | the selector says | the spec sheet says |
+|---|---|---|
+| `Select 640 SGX` | `Standard RHD` | `TWIN SELECT 640 SGX` |
+| `Supreme 640 SGX` | `SunRoofXL RHD` | `TWIN SUPREME 640 SGX` |
+| `MB 600 SPB PopTop` | `Supreme PTR RHD AWD` | `SUPERTWIN MB 600 SPB` |
+
+Built from the selector, `640 SGX Standard RHD` scored **0.50 against `Supreme 640 SGX`,
+`Sports 640 SGX` and `640 SGX 60Y` alike** — a three-way tie sitting exactly on the
+threshold, with `Select 640 SGX`, the row it belongs to, at 0.40 and out of reach. Twelve
+of the 35 were in that state. The spec sheet does not drift because it is the
+homologation document.
+
+**The one thing the sheet does not carry is the pop-top.** Both PTR variants of a layout
+share a title, so `PopTop` is appended from the trim label, spelt as FMLV already spells
+it on `MB 600 SPB PopTop`.
+
+**The fallback is the old scheme**, for a product whose PDF failed — a name close to
+FMLV's beats none.
+
+## Two things in FMLV that this run will not fix
+
+* **Matrix 7212 and 8929 are the same vehicle twice**, and both have the name in the wrong
+  column: range `Matrix Supreme`, model `MB 670 DC`, where every sibling is range `Matrix`,
+  model `Supreme MB 670 DC`. 7212 matches and 8929 is reported as disappeared.
+* **The three TWIN `Sports` rows match the new `Supreme PTR` vans at exactly 0.50** —
+  `Sports 600 SPB` to `Supreme 600 SPB PopTop`, and the same for the 640 SGX and 640 SLB.
+  Same three layouts, same position at the top of the range, prices within 3%. Against it:
+  FMLV holds 3500 kg for all three Sports where the new sheets say 4250 kg on the two 640s.
+  A rename, or three retirements and three new vans — the reviewer decides.
+
 ## The price comes from a supplied list, 1 October 2026
 
 **Adria publish no price anywhere a run can reach.** The rebuilt range pages dropped the

@@ -554,3 +554,69 @@ def test_an_unlisted_configuration_is_priced_at_nothing_not_zero() -> None:
     )
 
     assert adria.price_for(unknown, config) is None
+
+
+# --- the model name comes from the spec sheet -----------------------------------------
+
+
+def _conf(layout, trim):
+    return adria.LivewireProduct(
+        layout_label=layout, trim_label=trim, product_id="x", price_pounds=None,
+        price_string=None, berths=None, seats=None, configurator_url=None,
+    )
+
+
+def test_the_model_is_named_as_the_spec_sheet_names_it() -> None:
+    """`TWIN SUPREME 640 SLB` is series, trim, layout; FMLV holds `Supreme 640 SLB`."""
+    twin = next(c for c in adria.RANGES if c.fmlv_range == "TWIN")
+
+    got = adria._model_from_pdf_title("TWIN SUPREME 640 SLB", _conf("640 SLB", "SunRoofXL RHD"), twin)
+
+    assert got == "Supreme 640 SLB"
+
+
+def test_a_range_with_no_trim_keeps_the_layout_alone() -> None:
+    supersonic = next(c for c in adria.RANGES if c.fmlv_range == "Supersonic")
+
+    got = adria._model_from_pdf_title(
+        "SUPERSONIC 780 DC", _conf("780 DC", "Standard RHD"), supersonic
+    )
+
+    assert got == "780 DC"
+
+
+def test_the_layout_code_keeps_its_own_casing() -> None:
+    """The sheet shouts everything; only the trim words are title-cased, so `MB 600 SPB`
+    survives rather than becoming `Mb 600 Spb`."""
+    supertwin = next(c for c in adria.RANGES if c.fmlv_range == "Supertwin")
+
+    got = adria._model_from_pdf_title(
+        "SUPERTWIN MB 600 SPB", _conf("MB 600 SPB", "Supreme RHD AWD"), supertwin
+    )
+
+    assert got == "MB 600 SPB"
+
+
+def test_the_pop_top_comes_from_the_trim_because_the_sheet_omits_it() -> None:
+    """Both PTR variants of a layout share one spec sheet and one title, so the only
+    thing separating them is the trim label. FMLV spells it `PopTop`."""
+    supertwin = next(c for c in adria.RANGES if c.fmlv_range == "Supertwin")
+    title = "SUPERTWIN MB 700 SGX"
+
+    plain = adria._model_from_pdf_title(title, _conf("MB 700 SGX", "Supreme RHD AWD"), supertwin)
+    popped = adria._model_from_pdf_title(
+        title, _conf("MB 700 SGX", "Supreme PTR RHD AWD"), supertwin
+    )
+
+    assert plain == "MB 700 SGX"
+    assert popped == "MB 700 SGX PopTop"
+
+
+def test_a_missing_or_odd_title_falls_back_to_the_range_page() -> None:
+    """A product whose PDF failed is still worth collecting."""
+    twin = next(c for c in adria.RANGES if c.fmlv_range == "TWIN")
+    product = _conf("640 SLB", "SunRoofXL RHD")
+
+    assert adria._model_from_pdf_title(None, product, twin) is None
+    assert adria._model_from_pdf_title("SOMETHING ELSE 999 ZZ", product, twin) is None
+    assert adria._model_name(product, twin) == "640 SLB SunRoofXL RHD"
