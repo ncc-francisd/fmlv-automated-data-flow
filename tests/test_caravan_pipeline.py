@@ -13,6 +13,7 @@ fails when it is not — `data/exports` is gitignored.
 from __future__ import annotations
 
 import csv
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -159,7 +160,12 @@ def test_a_caravan_run_produces_a_caravan_upload_csv(tmp_path: Path) -> None:
             connection,
             run_id=run.id,
             manufacturer_id=28,
-            diffs=diff_products(scraped_fixtures(), baseline),
+            # Pinned inside `year_rollover.ROLLOVER_WINDOW` (1 June - 30 September),
+            # because the fourth product below is on the upload only by that route. Left
+            # on the real today, this test passed all summer and broke on 1 October.
+            diffs=diff_products(
+                scraped_fixtures(), baseline, today=date(2026, 8, 15)
+            ),
             vehicle_class=VehicleClass.CARAVAN,
         )
         store.finish_run(connection, run.id)
@@ -315,8 +321,6 @@ def test_an_unchanged_caravan_is_still_offered_a_model_year_bump() -> None:
     new season and therefore never offered a bump, leaving its year quietly stale. The
     rollover route is product-area-agnostic, and this pins that it stays so.
     """
-    from datetime import date
-
     diffs = diff_products(scraped_fixtures(), live_baseline(), today=date(2026, 8, 15))
     cabrera = next(d for d in diffs if d.key == "Bailey Unicorn Deluxe Cabrera")
 
@@ -326,8 +330,6 @@ def test_an_unchanged_caravan_is_still_offered_a_model_year_bump() -> None:
 
 @requires_real_export
 def test_outside_the_rollover_window_an_unchanged_caravan_contributes_nothing() -> None:
-    from datetime import date
-
     diffs = diff_products(scraped_fixtures(), live_baseline(), today=date(2026, 2, 1))
     cabrera = next(d for d in diffs if d.key == "Bailey Unicorn Deluxe Cabrera")
 
