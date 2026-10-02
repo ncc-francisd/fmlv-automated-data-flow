@@ -168,6 +168,24 @@ def _is_code_fragment(token: str) -> bool:
     return (len(token) == 1 and token.isalpha()) or token[0].isdigit()
 
 
+#: A short all-letter token that **opens** a model code, as in Carado's `CV 640`.
+#: Deliberately only ever joined to digits that *follow* it, which is what keeps Adria's
+#: `670 DC` two tokens: there `DC` follows the digits, and gluing it would be the mistake
+#: `_is_code_fragment` already guards against. Two letters or three, so `PRO` cannot
+#: swallow a number but `CV` and `MWB` can open one.
+_CODE_PREFIX_LETTERS = 3
+
+
+def _opens_a_code(token: str, following: str | None) -> bool:
+    """True for `cv` in `CV 640` — a short letter run with digits immediately after."""
+    return (
+        following is not None
+        and token.isalpha()
+        and 2 <= len(token) <= _CODE_PREFIX_LETTERS
+        and following[0].isdigit()
+    )
+
+
 def _tokenize(text: str | None) -> frozenset[str]:
     """Word-bag of `text`, with adjacent model-code fragments joined into one token.
 
@@ -175,6 +193,12 @@ def _tokenize(text: str | None) -> frozenset[str]:
     and `V60` — and `V 67 S` and `V 67S` — all yield the same token. A run is only
     joined when it carries a digit somewhere: `A Class` stays two tokens, since `A` on
     its own would otherwise swallow the word after it.
+
+    **A short letter run opens a code too, where digits follow it.** FMLV holds Carado's
+    van as `CV 640` where the site writes `CV640`, and with `cv` and `640` left apart the
+    two share no layout code at all, so `_jaccard` scored them **zero** and a van still on
+    sale was reported missing from the site. See `_opens_a_code` for why this only ever
+    looks forwards.
     """
     if not text:
         return frozenset()
@@ -191,11 +215,14 @@ def _tokenize(text: str | None) -> frozenset[str]:
             tokens.extend(match.group() for match in run)
         run.clear()
 
-    for match in matches:
+    for index, match in enumerate(matches):
         adjacent = bool(run) and bool(
             _WHITESPACE_ONLY.match(lowered, run[-1].end(), match.start())
         )
-        if not _is_code_fragment(match.group()):
+        following = matches[index + 1].group() if index + 1 < len(matches) else None
+        if not _is_code_fragment(match.group()) and not _opens_a_code(
+            match.group(), following
+        ):
             flush()
             tokens.append(match.group())
             continue

@@ -1360,6 +1360,32 @@ The general rule: **a value that is correct in the adapter is not yet correct in
 Everything between — the CSV encoding, the spreadsheet a human opens, the upload parser —
 can still change it, and only the first of those is ours to control.
 
+### A space inside a layout code is not a different vehicle
+
+**`CV 640` and `CV640` are the same van, and the matcher now knows it.** Rule from Carado,
+2 October 2026.
+
+FMLV's rows are typed by hand, so a layout code can carry an internal space that the
+manufacturer's own site does not — and the spacing is not even consistent within one
+brand: Carado's `CV540` matched perfectly while `CV 640` and `CV 541 PRO` did not match at
+all. Not *weakly*: `_jaccard` zeroes any pair whose layout codes disagree completely, and
+`cv` + `640` shares nothing with `cv640`, so the score was **0.00**.
+
+The consequence is the worst kind. A van on sale at GBP53,090, on the range page, collected
+correctly by the adapter, was reported as **missing from the site** and offered up for
+deactivation. The requester checked it against the site and found it there, which is the
+only reason it was caught.
+
+`matching._tokenize` already joined `V 60` into `v60`; it now also joins a **two- or
+three-letter run to digits that follow it**. The direction matters and is the whole care
+in the rule: joining forwards fixes `CV 640`, while joining backwards would destroy
+Adria's `670 DC` and `670 DL` by making each a single token. `A Class`, `MWB Harris` and
+`Campervan 640` are all left alone.
+
+**The general point: a disappearance notice is a claim about the manufacturer, and the
+cheapest explanations are ours.** Before believing one, check the product on the
+manufacturer's site — and if it is there, suspect the name before the roster.
+
 ### A manufacturer's spreadsheet may describe the vehicle with options fitted
 
 **A specification sent for data entry is not automatically the standard vehicle.** Rule

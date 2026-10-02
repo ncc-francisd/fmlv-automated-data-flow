@@ -169,3 +169,46 @@ def test_newest_year_wins_between_two_live_duplicates() -> None:
     results = match_products([scraped], [older, newer])
 
     assert results[0].baseline is newer
+
+
+def test_a_layout_code_matches_whether_or_not_it_is_spaced() -> None:
+    """**The trap this exists for.** FMLV holds Carado's van as `CV 640` where the site
+    writes `CV640`. With `cv` and `640` left as separate tokens the two shared no layout
+    code at all, so `_jaccard` zeroed the pair and Carado's run 175 reported a van still
+    on sale at GBP53,090 as missing from the site. Two more went the same way."""
+    from src.diff.matching import DEFAULT_THRESHOLD, token_similarity
+    from src.product_model.model import Motorhome
+
+    def product(manufacturer_range: str, model: str) -> Motorhome:
+        return Motorhome(
+            manufacturer="Carado", manufacturer_range=manufacturer_range, model=model
+        )
+
+    assert (
+        token_similarity(product("Campervan", "CV640"), product("Campervan", "CV 640"))
+        == 1.0
+    )
+    assert (
+        token_similarity(
+            product("Campervan PRO", "CV541"), product("Campervan PRO", "CV 541 PRO")
+        )
+        >= DEFAULT_THRESHOLD
+    )
+
+
+def test_a_multi_letter_run_after_the_digits_is_still_left_alone() -> None:
+    """The reason `_is_code_fragment` excluded multi-letter runs in the first place:
+    joining `670` to `DC` would make Adria's `670 DC` and `670 DL` one token each and
+    lose the layout entirely. The prefix rule only ever looks forwards."""
+    from src.diff.matching import _tokenize
+
+    assert _tokenize("670 DC") == frozenset({"670", "dc"})
+    assert _tokenize("A Class") == frozenset({"a", "class"})
+    assert _tokenize("MWB Harris") == frozenset({"mwb", "harris"})
+
+
+def test_a_long_word_never_swallows_a_number() -> None:
+    """`PRO` is three letters and could open a code; `Campervan` cannot."""
+    from src.diff.matching import _tokenize
+
+    assert _tokenize("Campervan 640") == frozenset({"campervan", "640"})

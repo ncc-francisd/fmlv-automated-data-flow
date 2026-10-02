@@ -150,8 +150,15 @@ def test_a_layout_with_no_berth_count_keeps_its_bare_code() -> None:
 
 
 def test_the_berth_is_joined_with_no_separator() -> None:
-    """`SL 2` against `SL 4` scores exactly 0.500 — the matching threshold itself — and
-    `SL (2 berth)` scores 0.600. Only the joined form is safely distinct."""
+    """`SL (2 berth)` scores 0.600 against `SL (4 berth)` — above the matching threshold,
+    so the bracketed form is not safely distinct and the adapter emits `SL2`.
+
+    **The spaced form is safe now and was not when this was written.** `SL 2` against
+    `SL 4` scored exactly 0.500, the threshold itself. `matching._tokenize` learned on
+    2 October 2026 to join a short letter run to the digits that follow it — for Carado's
+    `CV 640` against `CV640` — and that joins these two as well, so they now score as far
+    apart as the explicitly joined form does. The adapter still emits the joined form: it
+    is what FMLV holds, and it does not rely on the matcher to be careful."""
     from src.diff.matching import DEFAULT_THRESHOLD, token_similarity  # noqa: PLC0415
     from src.product_model.model import Motorhome  # noqa: PLC0415
 
@@ -163,7 +170,10 @@ def test_the_berth_is_joined_with_no_separator() -> None:
 
     assert _identity("1500 SL (2 berth)", "1500") == ("SL2", "SL")
     assert pair("SL2", "SL4") < DEFAULT_THRESHOLD
-    assert pair("SL 2", "SL 4") >= DEFAULT_THRESHOLD
+    assert pair("SL 2", "SL 4") < DEFAULT_THRESHOLD
+    assert pair("SL 2", "SL 4") == pair("SL2", "SL4")
+    # The bracketed form is the one that is genuinely too close to tell apart.
+    assert pair("SL (2 berth)", "SL (4 berth)") >= DEFAULT_THRESHOLD
 
 
 def test_a_layout_from_another_range_is_not_claimed() -> None:
