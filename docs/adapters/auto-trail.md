@@ -460,3 +460,75 @@ while a wrong drawing is read as fact.
 to find the specification PDF, but only until the first page that had it. This is new
 traffic, and it buys the only source Auto-Trail has for the five positional fields — the
 documents settle none of them.
+
+## The Adventure Coachbuilt range — 2 October 2026
+
+**Auto-Trail's new 2027 coachbuilt range, which has no range page.** It is announced on a
+news post, specified in a spreadsheet sent to the NCC, and priced in the 2027 price list
+PDF — but `motorhomes-range-sitemap.xml` lists six ranges and Adventure is not one of
+them, so the ordinary roster cannot reach it. Four models: 64, 74, 76 and 76G, on the
+Peugeot Boxer, all `coach_built_over_cab_bed`.
+
+**The range label is ours.** Auto-Trail call it simply "Adventure" — in the news post and
+in the spreadsheet — but they already sell an *Adventure campervan* range, and FMLV files
+both under one manufacturer, so a range filter would mix a two-model campervan range with
+a four-model coachbuilt one. The suffix copies the shape Auto-Trail themselves use for the
+same problem: they publish `/motorhomes-range/expedition-coachbuilt/` beside a campervan
+`Expedition`. The requester ruled on it, reasoning that F-Line, Excel and Imala are just as
+coachbuilt and carry no suffix *because they have no campervan twin*.
+
+**It retires itself.** `_adventure_range_is_published` checks both plausible range URLs
+every run; the day either resolves, the four built-in products are not emitted and the run
+says so, because keeping them would propose each Adventure twice. The label should then be
+taken from Auto-Trail's own page.
+
+### Where each figure comes from
+
+| field | source | refreshes itself |
+|---|---|---|
+| price, length, gross weight, chassis | the 2027 price list PDF | **yes** |
+| MRO, width, height | the NCC spreadsheet | no |
+| berths, belted seats | Auto-Trail's news post | no |
+| payload | derived, `MTPLM - MRO` | — |
+
+**The 2027 price list is machine-readable.** The 2026 one was a rasterised image that
+yielded no text at all, which is why `_MANUALLY_SOURCED_MTPLM_KG` exists and why
+`parse_prices` reads the website cards. Only the Adventure range has been moved onto the
+document so far, because it is the only range with no card to read. Worth revisiting for
+the other nine.
+
+**The parse is scoped to the Adventure page.** Every range in the price list prints rows of
+the same shape, so an unscoped read also returns the campervan Expedition's 54, 66, 67 and
+68. None collides with an Adventure model today, which is exactly why it would go
+unnoticed until one did.
+
+### The spreadsheet describes the vehicle with options fitted
+
+**This is the lesson worth keeping.** The requester's note, 2 October 2026: the
+spreadsheets Auto-Trail send "are thinking about options and not the standard". Three
+figures were wrong for FMLV's purposes, and all three were caught by a second Auto-Trail
+document:
+
+| | spreadsheet | recorded | settled by |
+|---|---|---|---|
+| berths | 4 / **6 / 6 / 6** | **4** on all four | the news post: "every Adventure model sleeps four people" |
+| belted seats | 4 | 4 | the same sentence: "four seatbelts as standard, with the option to upgrade" |
+| length | **7288mm on all four** | 64 = **6370mm** | the price list: the 64 is 6.37m, and the news post says "two lengths" |
+
+The price list confirms the mechanism on the belts by selling six of them as a GBP995
+option requiring the 3,650kg GVW upgrade. The length disagreement is caught by the adapter
+itself rather than hardcoded: `adventure_products` compares the two documents and takes the
+price list where they differ by more than `_ADVENTURE_LENGTH_TOLERANCE_MM`, narrating it.
+
+### The price
+
+The price list prints ex works excluding VAT, the VAT, and ex works including VAT. FMLV
+holds the **on-the-road** price, which is what the website's "Price from" card shows — and
+that card sits **exactly GBP635 above** the price list's including-VAT figure, verified
+across 25 models in the nine ranges that have one. The price list's own stated government
+charges are GBP455, so GBP180 of that is Auto-Trail's and is explained nowhere in the
+document.
+
+So the Adventures are recorded at GBP69,135 (64) and GBP71,635 (74, 76, 76G). **That is an
+extrapolation**, used only because this range has no card, and the first run after
+Auto-Trail publish the range pages replaces it with the published figure.

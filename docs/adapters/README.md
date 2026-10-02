@@ -1330,6 +1330,33 @@ The empty-scrape guard caught the consequence, which is what it is for — but i
 reports that a run collected nothing, never why. Capture the real markup as a fixture when
 the adapter is written, and assert the product count against it.
 
+### A manufacturer's spreadsheet may describe the vehicle with options fitted
+
+**A specification sent for data entry is not automatically the standard vehicle.** Rule
+from Auto-Trail, 2 October 2026, and the requester's own words: the spreadsheets they send
+"are thinking about options and not the standard".
+
+Three of the new Adventure range's figures were wrong for FMLV in that exact way, and all
+three were settled by *another document from the same manufacturer*:
+
+- **Berths** said 4 / 6 / 6 / 6 where Auto-Trail's news post says "every Adventure model
+  sleeps four people and comes with four seatbelts as standard, **with the option to
+  upgrade**" — and their price list sells the sixth and seventh belts as a GBP995 option
+  requiring a gross-weight upgrade. The standard figure is 4.
+- **Length** repeated one model's figure down every row, where the price list gives two
+  distinct lengths and the news post says the range comes "in two lengths".
+
+Two things follow. **Cross-check a supplied spreadsheet against anything the manufacturer
+published themselves** — a price list, a news post, a brochure — before trusting it; it is
+the only check available when there is no arithmetic one. And where the two disagree,
+**prefer the published document and narrate the disagreement** rather than silently
+correcting one: `auto_trail.adventure_products` compares the lengths every run and reports
+the gap, so a reviewer sees that a figure was overridden and why.
+
+This is the same shape as the berth-range rule — "sleeps 2-4" means record 2 — arriving by
+a different route. The question is always *what does the vehicle have before anyone pays
+for anything*.
+
 ### A product can be filed outside the range that sells it
 
 **Scope a roster by what the card says, not by where the link points.** Rule from Carthago,

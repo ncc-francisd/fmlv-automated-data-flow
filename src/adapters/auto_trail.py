@@ -83,6 +83,232 @@ DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("campervans-range/v-line-sport", "V-Line Sport"),
 )
 
+#: Auto-Trail's new 2027 coachbuilt range, which **has no range page yet**. It is
+#: announced on a news post, specified in a spreadsheet sent to the NCC, and priced in the
+#: 2027 price list PDF — but `motorhomes-range-sitemap.xml` lists six ranges and Adventure
+#: is not one of them, so the ordinary roster cannot reach it. See `adventure_products`.
+#:
+#: **The label is ours, not Auto-Trail's.** They call it simply "Adventure", in the news
+#: post and in the spreadsheet. But they already sell an *Adventure campervan* range, and
+#: FMLV files both under one manufacturer, so a range filter would mix a two-model
+#: campervan range with a four-model coachbuilt one. The suffix follows Auto-Trail's own
+#: shape for the same problem — they publish `/motorhomes-range/expedition-coachbuilt/`
+#: beside a campervan `Expedition` for exactly this reason. The requester ruled on
+#: 2 October 2026 that Adventure gets the same treatment.
+#:
+#: **Switch to Auto-Trail's own name the moment they publish a range page** — see
+#: `_adventure_range_is_published`, which stops this code the day that happens.
+ADVENTURE_RANGE_LABEL = "Adventure Coachbuilt"
+
+#: What the website's "Price from" card adds to the price list's ex-works-including-VAT
+#: figure. **Verified across 25 models** on 2 October 2026: every card in the nine ranges
+#: that have one sits exactly this far above its price-list row (one is a pound out, from
+#: rounding). The price list's own stated government on-the-road charges are GBP455, so
+#: GBP180 of this is Auto-Trail's and is not explained in the document.
+#:
+#: Used **only** for the Adventure range, which has no card to read. The other nine ranges
+#: read the real figure off the page and never come near this. The first run after
+#: Auto-Trail publish the Adventure cards replaces these with the published price.
+_ON_THE_ROAD_UPLIFT_POUNDS = 635
+
+#: How far the spreadsheet's length may sit from the price list's before the price list
+#: wins. The price list prints metres to 2dp, so a 7288mm vehicle reads as `7.29m` and the
+#: two agree to within 2mm; a disagreement of any real size means one of them is wrong.
+_ADVENTURE_LENGTH_TOLERANCE_MM = 60
+
+
+@dataclass(frozen=True)
+class _AdventureSpec:
+    """One Adventure, from the specification spreadsheet Auto-Trail sent the NCC.
+
+    **Three of its figures are deliberately not the spreadsheet's**, because the
+    spreadsheet describes the range *with options fitted* and FMLV records the standard
+    vehicle. Auto-Trail's own news post settles all three: "every Adventure model sleeps
+    four people and comes with four seatbelts as standard, with the option to upgrade".
+    The spreadsheet says 6 berths on three of the four; the price list confirms the
+    mechanism by selling six belts as a GBP995 option needing a 3,650kg GVW upgrade.
+    The requester ruled on 2 October 2026 to record the standard figures.
+    """
+
+    model: str
+    #: Standard berths. 4 on all four — not the spreadsheet's 4/6/6/6.
+    berths: int
+    #: Standard three-point belts, including the driver. 4 on all four.
+    mh_passenger_seats_inc_driver: int
+    mro_kilograms: int
+    mh_width_mm: int
+    mh_height_mm: int
+    #: The spreadsheet's length, **checked against the price list** and overridden where
+    #: they disagree — see `adventure_products`. The 64's is wrong there: the spreadsheet
+    #: repeats 7288mm down all four rows where the price list gives the 64 as 6.37m, and
+    #: the news post says the range comes "in two lengths".
+    spreadsheet_length_mm: int
+
+
+ADVENTURE_SPECS: tuple[_AdventureSpec, ...] = (
+    _AdventureSpec("64", 4, 4, 2880, 2353, 3041, 7288),
+    _AdventureSpec("74", 4, 4, 3000, 2353, 3041, 7288),
+    _AdventureSpec("76", 4, 4, 3030, 2353, 3041, 7288),
+    _AdventureSpec("76G", 4, 4, 3000, 2353, 3041, 7288),
+)
+
+#: The spreadsheet, named in every Adventure provenance so a reviewer can see which
+#: document a figure came from. Move both on when a new one arrives.
+_ADVENTURE_SPEC_SOURCE = "the Adventure specification spreadsheet Auto-Trail sent the NCC"
+_ADVENTURE_SPEC_READ_ON = "2 October 2026"
+
+#: One row of the price list's `ADVENTURE PRICE LIST` page:
+#:
+#:     64* Peugeot Boxer 140bhp (manual) 3,500/3,650kg 6.37m (20'9")  £57,083.00 £11,417.00 £68,500.00
+#:
+#: The three prices are ex works excluding VAT, the VAT, and ex works including VAT; the
+#: last is the one that matters. The asterisk on the 64 footnotes a gearbox it cannot have.
+_ADVENTURE_PRICE_ROW = re.compile(
+    r"^(?P<model>\d{2}G?)\*?\s+"
+    r"(?P<chassis>Peugeot|Fiat|Ford)\b[^\n]*?\s+"
+    r"(?P<gvw>[\d,]+(?:\s*/\s*[\d,]+)*)\s*kg\s+"
+    r"(?P<length_m>\d+\.\d+)\s*m[^£\n]*"
+    r"£[\d,]+\.\d{2}\s+£[\d,]+\.\d{2}\s+£(?P<incl_vat>[\d,]+)\.\d{2}",
+    re.M,
+)
+
+
+@dataclass(frozen=True)
+class AdventurePriceRow:
+    """One Adventure as Auto-Trail's own 2027 price list states it."""
+
+    model: str
+    base_vehicle_manufacturer: str | None
+    #: Every gross vehicle weight offered. FMLV records the **base** one, so the lowest.
+    gross_weights_kg: tuple[int, ...]
+    length_mm: int
+    #: Ex works including VAT. Not what FMLV holds — see `_ON_THE_ROAD_UPLIFT_POUNDS`.
+    ex_works_incl_vat_pounds: int
+
+    @property
+    def mtplm_kilograms(self) -> int:
+        return min(self.gross_weights_kg)
+
+    @property
+    def on_the_road_pounds(self) -> int:
+        return self.ex_works_incl_vat_pounds + _ON_THE_ROAD_UPLIFT_POUNDS
+
+
+#: The Adventure page of the price list, from its heading to the next range's. **The row
+#: pattern must be scoped to it**: every range in the document prints rows of the same
+#: shape, so an unscoped read also returns the campervan Expedition's `54`, `66`, `67` and
+#: `68`. None of those collides with an Adventure model today, which is exactly why it
+#: would go unnoticed until one did.
+_ADVENTURE_SECTION = re.compile(
+    r"ADVENTURE\s+PRICE\s+LIST(?P<body>.*?)(?=[A-Z][A-Z /&-]{2,}\s+PRICE\s+LIST|\Z)",
+    re.S,
+)
+
+
+def adventure_price_list_section(text: str) -> str:
+    """Just the `ADVENTURE PRICE LIST` page, or `""` if the document has none."""
+    match = _ADVENTURE_SECTION.search(text)
+    return match.group("body") if match else ""
+
+
+def parse_adventure_price_list(text: str) -> dict[str, AdventurePriceRow]:
+    """Every Adventure the 2027 price list prices, keyed by model.
+
+    **The 2027 price list is machine-readable; the 2026 one was a rasterised image** that
+    yielded no text at all, which is why `_MANUALLY_SOURCED_MTPLM_KG` exists and why
+    `parse_prices` reads the website cards instead. Nothing else has been moved onto this
+    document yet — only the Adventure range, which has no card to read.
+    """
+    rows: dict[str, AdventurePriceRow] = {}
+    for match in _ADVENTURE_PRICE_ROW.finditer(adventure_price_list_section(text)):
+        weights = tuple(
+            int(part.strip().replace(",", ""))
+            for part in match.group("gvw").split("/")
+            if part.strip()
+        )
+        if not weights:
+            continue
+        rows[match.group("model")] = AdventurePriceRow(
+            model=match.group("model"),
+            base_vehicle_manufacturer=fmlv_base_vehicle(match.group("chassis")),
+            gross_weights_kg=weights,
+            length_mm=round(float(match.group("length_m")) * 1000),
+            ex_works_incl_vat_pounds=int(match.group("incl_vat").replace(",", "")),
+        )
+    return rows
+
+
+def adventure_products(
+    price_list_text: str,
+    on_progress: Callable[[str], None] = lambda message: None,
+) -> list[AutoTrailProduct]:
+    """The four Adventures, joining the price list to the specification spreadsheet.
+
+    The price list gives price, length, gross weight and base vehicle and **refreshes
+    itself every run**; the spreadsheet gives the masses, dimensions, berths and belts and
+    does not. Where the two state the same thing, the price list wins and the
+    disagreement is narrated — that is the only self-check this range has, and it earns
+    its place immediately on the 64's length.
+    """
+    priced = parse_adventure_price_list(price_list_text)
+    if not priced:
+        on_progress(
+            f"[{ADVENTURE_RANGE_LABEL}] WARNING: the 2027 price list published no "
+            f"ADVENTURE rows this run. Either the document has been reissued in a shape "
+            f"this cannot read, or the range has been withdrawn. No Adventure is collected"
+        )
+        return []
+
+    products: list[AutoTrailProduct] = []
+    for spec in ADVENTURE_SPECS:
+        row = priced.get(spec.model)
+        if row is None:
+            on_progress(
+                f"[{ADVENTURE_RANGE_LABEL}] WARNING: {spec.model} is not in the 2027 "
+                f"price list, so it has no price, length or gross weight. Collected from "
+                f"{_ADVENTURE_SPEC_SOURCE} alone"
+            )
+
+        length_mm = spec.spreadsheet_length_mm
+        warnings: list[str] = []
+        if row is not None:
+            gap = abs(row.length_mm - spec.spreadsheet_length_mm)
+            if gap > _ADVENTURE_LENGTH_TOLERANCE_MM:
+                warnings.append(
+                    f"the spreadsheet says {spec.spreadsheet_length_mm}mm but the 2027 "
+                    f"price list says {row.length_mm}mm, {gap}mm apart. The price list is "
+                    f"recorded: it is Auto-Trail's own published document, and their news "
+                    f"post says the range comes in two lengths where the spreadsheet "
+                    f"repeats one figure down every row"
+                )
+                length_mm = row.length_mm
+
+        products.append(
+            AutoTrailProduct(
+                range_label=ADVENTURE_RANGE_LABEL,
+                model=spec.model,
+                berths=spec.berths,
+                mh_passenger_seats_inc_driver=spec.mh_passenger_seats_inc_driver,
+                mh_length_mm=length_mm,
+                mh_width_mm=spec.mh_width_mm,
+                mh_height_mm=spec.mh_height_mm,
+                mtplm_kilograms=row.mtplm_kilograms if row else None,
+                mro_kilograms=spec.mro_kilograms,
+                body_type=BodyType.COACH_BUILT_OVER_CAB_BED,
+                base_vehicle_manufacturer=(
+                    row.base_vehicle_manufacturer if row else fmlv_base_vehicle("Peugeot")
+                ),
+                rrp_pounds=row.on_the_road_pounds if row else None,
+                parse_warnings=tuple(warnings),
+                source_description=(
+                    f"{_ADVENTURE_SPEC_SOURCE} (read {_ADVENTURE_SPEC_READ_ON}) joined to "
+                    f"Auto-Trail's 2027 price list"
+                ),
+            )
+        )
+    return products
+
+
 #: A model page linked from a range page. Slugs are not derivable from model names — the
 #: F-Line F67 lives at `/motorhomes/f67/` and the campervan Expedition 54 at
 #: `/campervans/54-2/` — so links are read, never constructed.
@@ -370,6 +596,10 @@ class AutoTrailProduct:
     stated_max_berths: int | None = None
     #: Rows that exist in the document but could not be read, for `collect` to narrate.
     parse_warnings: tuple[str, ...] = ()
+    #: What to call the document in the provenance a reviewer reads. Every range but one
+    #: comes from a per-range technical specification PDF; the Adventure range has no such
+    #: document and must not claim one — see `ADVENTURE_SPECS`.
+    source_description: str = "Technical Specification"
     #: This model's own block of the specification document, line by line. Auto-Trail
     #: state the fridge, the heating, the microwave and the beds in ordinary rows of the
     #: same table the figures come from — "150Ltr fridge with integrated freezer
@@ -833,7 +1063,9 @@ def _build_extracted_motorhome(
     # wording rather than the parsed number — a reviewer seeing `4` needs to know the
     # document said `4-6`, which one integer cannot tell them.
     snippets = {
-        "berths": ("Sleeps", product.sleeps_published),
+        # `sleeps_published` is the document's own wording where there is a document; the
+        # Adventure range has none, so it falls back to the figure itself.
+        "berths": ("Sleeps", product.sleeps_published or product.berths),
         "mh_passenger_seats_inc_driver": ("Seatbelts (inc. driver)", product.mh_passenger_seats_inc_driver),
         "mh_length_mm": ("Length", product.mh_length_mm),
         "mh_width_mm": ("Width (excl. door mirrors)", product.mh_width_mm),
@@ -845,7 +1077,7 @@ def _build_extracted_motorhome(
     provenance = {
         field: Provenance(
             source_url=spec_url,
-            snippet=f"{product.label} — Technical Specification, {row}: {value}",
+            snippet=f"{product.label} — {product.source_description}, {row}: {value}",
         )
         for field, (row, value) in snippets.items()
         if value is not None
@@ -992,6 +1224,74 @@ def _spec_pdf_for_range(
     return None
 
 
+#: Where the price list is linked. Both pages carry it; `/downloads/` is checked first
+#: because it is the one that also lists the owners' manuals, so it is the page most
+#: likely to survive a navigation change.
+_PRICE_LIST_PAGES = ("/downloads/", "/price-list/")
+
+#: The current price list PDF, whose name carries the model year.
+_PRICE_LIST_HREF = re.compile(
+    r'["\'](?P<url>https?://[^"\']+price-list-(?P<year>\d{4})[^"\']*\.pdf)["\']',
+    re.I,
+)
+
+
+def _price_list_pdf_url(http: Fetcher, on_progress: Callable[[str], None]) -> str | None:
+    """The newest price list PDF Auto-Trail link, or `None` if neither page offers one."""
+    found: dict[int, str] = {}
+    for page_path in _PRICE_LIST_PAGES:
+        try:
+            html = http.fetch(f"{BASE_URL}{page_path}").file_path.read_text(
+                encoding="utf-8", errors="replace"
+            )
+        except Exception as error:  # noqa: BLE001
+            on_progress(f"[{ADVENTURE_RANGE_LABEL}] {page_path} did not fetch ({type(error).__name__})")
+            continue
+        for match in _PRICE_LIST_HREF.finditer(unescape(html)):
+            found[int(match.group("year"))] = match.group("url")
+    if not found:
+        on_progress(
+            f"[{ADVENTURE_RANGE_LABEL}] WARNING: no price list PDF is linked from "
+            f"{' or '.join(_PRICE_LIST_PAGES)}, so the Adventure range cannot be priced "
+            f"or measured this run"
+        )
+        return None
+    return found[max(found)]
+
+
+#: A range page that exists but is the theme's 404. Auto-Trail serve those with **HTTP
+#: 200**, so the status code proves nothing and the title has to be read — the same trap
+#: `docs/adapters/README.md` records.
+_NOT_FOUND_TITLE = re.compile(r"<title[^>]*>[^<]*not found[^<]*</title>", re.I)
+
+
+def _adventure_range_is_published(http: Fetcher, on_progress: Callable[[str], None]) -> bool:
+    """Has Auto-Trail given the Adventure motorhomes a range page yet?
+
+    **The retirement switch.** While this is false the four Adventures come from the price
+    list and the spreadsheet. The day it goes true they are on the site like every other
+    range, and keeping them here as well would propose each of them twice — so `collect`
+    stops emitting them and says so loudly.
+    """
+    for path in ("motorhomes-range/adventure", "motorhomes-range/adventure-coachbuilt"):
+        url = f"{BASE_URL}/{path}/"
+        try:
+            html = http.fetch(url).file_path.read_text(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            continue
+        if _NOT_FOUND_TITLE.search(html):
+            continue
+        on_progress(
+            f"[{ADVENTURE_RANGE_LABEL}] {url} now resolves, so Auto-Trail have published "
+            f"the Adventure motorhomes. The four built into this adapter are NOT emitted "
+            f"this run, to avoid proposing each of them twice. ADD THE RANGE TO "
+            f"DEFAULT_RANGES and delete ADVENTURE_SPECS — and take the range label from "
+            f"the page rather than keeping {ADVENTURE_RANGE_LABEL!r}, which is ours"
+        )
+        return True
+    return False
+
+
 def collect(
     http: Fetcher,
     browser: object,  # noqa: ARG001 — Auto-Trail needs no JS; see the module docstring
@@ -1106,6 +1406,42 @@ def collect(
                     floorplan_url=floorplan_for(product.model, label, plans),
                 )
             )
+
+    # The Adventure range has no range page, so the loop above cannot reach it. It is
+    # collected from Auto-Trail's own 2027 price list joined to the specification
+    # spreadsheet — see `adventure_products` — and retires itself the day they publish it.
+    if not _adventure_range_is_published(http, on_progress):
+        price_list_url = _price_list_pdf_url(http, on_progress)
+        if price_list_url is not None:
+            on_progress(
+                f"[{ADVENTURE_RANGE_LABEL}] reading {price_list_url.rsplit('/', 1)[-1]}"
+            )
+            try:
+                price_list_text = extract_text(http.fetch(price_list_url).file_path).text
+            except Exception as error:  # noqa: BLE001
+                price_list_text = ""
+                on_progress(
+                    f"[{ADVENTURE_RANGE_LABEL}] WARNING: the price list could not be read "
+                    f"({type(error).__name__}), so no Adventure is collected this run"
+                )
+            for product in adventure_products(price_list_text, on_progress):
+                for warning in product.parse_warnings:
+                    on_progress(f"[{ADVENTURE_RANGE_LABEL}] {product.model} — {warning}")
+                on_progress(
+                    f"[{ADVENTURE_RANGE_LABEL}] {product.model} — berths and belted seats "
+                    f"are the STANDARD figures ({product.berths} and "
+                    f"{product.mh_passenger_seats_inc_driver}), from Auto-Trail's news "
+                    f"post. {_ADVENTURE_SPEC_SOURCE} states the optioned figures instead; "
+                    f"read on {_ADVENTURE_SPEC_READ_ON}"
+                )
+                results.append(
+                    _build_extracted_motorhome(
+                        product,
+                        price_list_url,
+                        f"{BASE_URL}/price-list/",
+                        floorplan_url=None,
+                    )
+                )
 
     on_progress(f"{len(results)} product(s) collected")
     return results
