@@ -194,18 +194,31 @@ class RunTotals:
         return self.collected - self.new
 
 
+#: A product this run stamped but did not actually find. `changes.persist_diff` calls
+#: `upsert_seen` for a `DISAPPEARED` product as well, because the disappearance notice
+#: needs a product row to hang off — so `last_seen_run_id` alone over-counts the roster by
+#: exactly the number of disappearances. Carado's run 175 read 33 products and reported
+#: 39, which is 33 and the 6 it could not find.
+_NOT_ACTUALLY_FOUND = (
+    "id IN (SELECT product_id FROM disappearance_notice WHERE run_id = ?)"
+)
+
+
 def run_totals(connection: sqlite3.Connection, run_id: int) -> RunTotals:
     """`RunTotals` for one run.
 
-    `last_seen_run_id` is stamped on every product a run reads, and `first_seen_run_id`
-    only on the run that introduced it, so both counts fall out of the product table
-    without the run needing to record them.
+    `last_seen_run_id` is stamped on every product a run touched and `first_seen_run_id`
+    only by the run that introduced it, so both counts fall out of the product table
+    without the run needing to record anything — **less the disappearances**, which are
+    stamped too and were never found. See `_NOT_ACTUALLY_FOUND`.
     """
     collected = connection.execute(
-        "SELECT COUNT(*) FROM product WHERE last_seen_run_id = ?", (run_id,)
+        f"SELECT COUNT(*) FROM product WHERE last_seen_run_id = ? AND NOT {_NOT_ACTUALLY_FOUND}",
+        (run_id, run_id),
     ).fetchone()[0]
     new = connection.execute(
-        "SELECT COUNT(*) FROM product WHERE first_seen_run_id = ?", (run_id,)
+        f"SELECT COUNT(*) FROM product WHERE first_seen_run_id = ? AND NOT {_NOT_ACTUALLY_FOUND}",
+        (run_id, run_id),
     ).fetchone()[0]
     disappeared = connection.execute(
         "SELECT COUNT(*) FROM disappearance_notice WHERE run_id = ?", (run_id,)

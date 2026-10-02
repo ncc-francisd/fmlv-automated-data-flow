@@ -7,6 +7,7 @@ no way to tell from it whether Carado's 33 products had all arrived.
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 from src import store
 
@@ -99,3 +100,31 @@ def test_products_from_another_run_are_not_counted(tmp_path) -> None:
     assert store.run_totals(connection, mine).collected == 1
     assert store.run_totals(connection, theirs).collected == 1
     connection.close()
+
+
+def test_a_product_the_run_could_not_find_is_not_counted_as_collected() -> None:
+    """**The trap this exists for.** `persist_diff` calls `upsert_seen` for a DISAPPEARED
+    product too, because the notice needs a product row to hang off — so counting
+    `last_seen_run_id` alone over-states the roster by exactly the disappearances. Carado's
+    run 175 read 33 products and the page said 39, which was 33 plus the 6 it had lost."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as folder:
+        connection = store.connect(Path(folder) / "runs.db")
+        run_id = _run(connection)
+        for model in ("V132", "V337", "V347"):
+            _product(connection, run_id, model)
+        gone = connection.execute(
+            "SELECT id FROM product WHERE model = 'V347'"
+        ).fetchone()[0]
+        store.record_disappearance_notice(
+            connection, run_id=run_id, product_id=gone, note="not on the site"
+        )
+        connection.commit()
+
+        totals = store.run_totals(connection, run_id)
+
+        assert totals.collected == 2, "the one it could not find is not collected"
+        assert totals.new == 2
+        assert totals.disappeared == 1
+        connection.close()
