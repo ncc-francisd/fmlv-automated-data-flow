@@ -303,7 +303,7 @@ def test_generate_upload_writes_a_csv_in_fmlv_column_order_and_carries_product_i
     # parse the file correctly if those two rows are genuinely empty, so the file
     # starts with two rows each holding a single `-` — `read_csv` alone can't parse
     # that layout, only the FMLV site is meant to.
-    lines = csv_path.read_text(encoding="utf-8").splitlines()
+    lines = csv_path.read_text(encoding="utf-8-sig").splitlines()
     assert lines[0] == "-"
     assert lines[1] == "-"
     assert lines[2].startswith("product_id,")
@@ -575,12 +575,14 @@ def test_a_readable_copy_is_written_beside_the_upload(tmp_path: Path) -> None:
     assert readable_path.name == "run1_upload-readable.csv"
     assert readable_path.exists()
 
+    bom = b"\xef\xbb\xbf"
     upload = path.read_bytes()
     readable = readable_path.read_bytes()
-    assert upload.startswith(b"-\r\n-\r\nproduct_id,")
-    assert readable.startswith(b"product_id,")
+    # Both carry the mark; only the upload carries the two `-` rows above the header.
+    assert upload.startswith(bom + b"-\r\n-\r\nproduct_id,")
+    assert readable.startswith(bom + b"product_id,")
     # Same rows, so the two differ only by those two lines.
-    assert readable == upload[len(b"-\r\n-\r\n") :]
+    assert readable == bom + upload[len(bom + b"-\r\n-\r\n") :]
     # Validation still runs and still reports — writing a readable copy changes nothing
     # about what the upload says. A bare `Motorhome` is missing required fields, so there
     # is something to report here.

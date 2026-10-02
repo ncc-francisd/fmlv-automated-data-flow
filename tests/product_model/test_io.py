@@ -138,7 +138,7 @@ def test_write_csv_preserves_column_order(adria_result: io.ReadResult, tmp_path:
     out_path = tmp_path / "order.csv"
     io.write_csv(adria_result.motorhomes, out_path)
 
-    header = out_path.read_text(encoding="utf-8").splitlines()[0].split(",")
+    header = out_path.read_text(encoding="utf-8-sig").splitlines()[0].split(",")
     assert header == list(schema.COLUMNS)
 
 
@@ -153,7 +153,9 @@ def test_the_leading_dash_rows_end_the_same_way_as_every_other_row(tmp_path: Pat
     io.write_csv([Motorhome(manufacturer="Rimor", model="66 Plus")], path, leading_blank_rows=2)
 
     raw = path.read_bytes()
-    assert raw.startswith(b"-\r\n-\r\n")
+    # The byte-order mark comes first, so Excel reads the file as UTF-8 and an accented
+    # base vehicle survives the round trip — see `tests/output/test_upload_encoding.py`.
+    assert raw.startswith(b"\xef\xbb\xbf-\r\n-\r\n")
     assert raw.count(b"\n") == raw.count(b"\r\n"), "no bare LF anywhere in an upload CSV"
 
 
@@ -163,5 +165,5 @@ def test_a_plain_csv_still_has_no_dash_rows(tmp_path: Path) -> None:
     io.write_csv([Motorhome(manufacturer="Rimor", model="66 Plus")], path)
 
     raw = path.read_bytes()
-    assert not raw.startswith(b"-")
+    assert not raw.removeprefix(b"\xef\xbb\xbf").startswith(b"-")
     assert raw.count(b"\n") == raw.count(b"\r\n")

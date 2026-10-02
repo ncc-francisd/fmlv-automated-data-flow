@@ -296,10 +296,16 @@ def write_csv(
 
     `leading_blank_rows` behaves as `io.write_csv`'s does — the FMLV upload site wants the
     header on row 3, so the real upload path passes 2.
+
+    **Written UTF-8 with a byte-order mark.** Without one, Excel on a UK Windows machine
+    opens a `.csv` as Windows-1252, so `Citroën` shows as `CitroÃ«n`; save from there and
+    the damage is real, and an upload carrying it creates a *second* base vehicle
+    manufacturer in FMLV that no filter will ever join back up. The mark is three bytes
+    Excel uses to recognise UTF-8, and `read_csv` below already skips it (`utf-8-sig`).
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as handle:
+    with path.open("w", newline="", encoding="utf-8-sig") as handle:
         writer = csv.DictWriter(handle, fieldnames=caravan_schema.COLUMNS)
         for _ in range(leading_blank_rows):
             # Through the csv writer, so these rows end CRLF like the rest — see

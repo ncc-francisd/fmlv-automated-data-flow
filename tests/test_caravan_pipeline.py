@@ -196,7 +196,7 @@ def test_a_caravan_run_produces_a_caravan_upload_csv(tmp_path: Path) -> None:
     # route (DESIGN.md §6.9) reaches caravans as well as motorhomes.
     assert len(result.motorhomes) == 4
 
-    lines = result.path.read_text(encoding="utf-8").splitlines()
+    lines = result.path.read_text(encoding="utf-8-sig").splitlines()
     assert lines[:2] == ["-", "-"]  # FMLV wants the header on row 3
     header = next(csv.reader([lines[2]]))
     assert tuple(header) == caravan_schema.COLUMNS
@@ -241,7 +241,7 @@ def test_the_upload_row_carries_the_caravan_only_columns(tmp_path: Path) -> None
     finally:
         connection.close()
 
-    lines = result.path.read_text(encoding="utf-8").splitlines()
+    lines = result.path.read_text(encoding="utf-8-sig").splitlines()
     rows = {r["model"]: r for r in csv.DictReader(lines[2:])}
     messina = rows["Messina"]
 

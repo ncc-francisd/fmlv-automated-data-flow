@@ -769,8 +769,9 @@ def test_generate_upload_writes_a_timestamped_csv_from_reviewed_decisions(
     assert all(path.name.startswith(f"run{summary.run.id}_") for path in written)
     upload = next(path for path in written if not path.name.endswith("-readable.csv"))
     readable = next(path for path in written if path.name.endswith("-readable.csv"))
-    assert upload.read_bytes().startswith(b"-\r\n-\r\n")
-    assert readable.read_bytes().startswith(b"product_id,")
+    bom = b"\xef\xbb\xbf"
+    assert upload.read_bytes().startswith(bom + b"-\r\n-\r\n")
+    assert readable.read_bytes().startswith(bom + b"product_id,")
 
 
 def test_generate_upload_refuses_a_run_that_has_not_succeeded(

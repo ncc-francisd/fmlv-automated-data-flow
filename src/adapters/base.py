@@ -77,6 +77,34 @@ _FMLV_BASE_VEHICLE_MAKES: dict[str, str] = {
 }
 
 
+#: The signature of a UTF-8 string that has been read as Windows-1252: the first byte of
+#: a two-byte character becomes `Ã` or `Â`. Neither appears in any real base-vehicle make,
+#: so finding one is proof of the damage rather than a guess at it.
+_MOJIBAKE = ("Ã", "Â")
+
+
+def repair_mojibake(value: str) -> str:
+    """`CitroÃ«n` -> `Citroën`, where the damage reverses cleanly; otherwise unchanged.
+
+    **Why an adapter needs this.** A manufacturer's own page can be served with the wrong
+    charset, and a spreadsheet that has been round-tripped through Excel on a Windows
+    machine carries the damage in its cells. Either way the value reaches us already
+    broken, and recording it would create a second base vehicle manufacturer in FMLV that
+    no filter joins back to the first — the trap the requester hit on Carado,
+    2 October 2026.
+
+    Only reversed where it round-trips exactly, so a make that genuinely contains one of
+    these letters is left alone rather than mangled the other way.
+    """
+    if not any(marker in value for marker in _MOJIBAKE):
+        return value
+    try:
+        repaired = value.encode("cp1252").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return value
+    return repaired
+
+
 def fmlv_base_vehicle(make: str | None) -> str | None:
     """One base-vehicle make as FMLV spells it, whatever spelling the source used.
 
@@ -98,7 +126,7 @@ def fmlv_base_vehicle(make: str | None) -> str | None:
     """
     if make is None:
         return None
-    cleaned = " ".join(make.split())
+    cleaned = " ".join(repair_mojibake(make).split())
     if not cleaned:
         return None
     return _FMLV_BASE_VEHICLE_MAKES.get(cleaned.lower(), cleaned)

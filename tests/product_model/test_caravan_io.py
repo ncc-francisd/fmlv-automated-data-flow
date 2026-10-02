@@ -193,7 +193,7 @@ def test_write_csv_writes_the_schema_header_in_order(tmp_path: Path) -> None:
     path = tmp_path / "upload.csv"
     caravan_io.write_csv([Caravan(manufacturer="Bailey", model="Cabrera")], path)
 
-    with path.open(newline="", encoding="utf-8") as handle:
+    with path.open(newline="", encoding="utf-8-sig") as handle:
         header = next(csv.reader(handle))
 
     assert tuple(header) == caravan_schema.COLUMNS
@@ -205,7 +205,7 @@ def test_write_csv_can_offset_the_header_for_the_upload_site(tmp_path: Path) -> 
         [Caravan(manufacturer="Bailey", model="Cabrera")], path, leading_blank_rows=2
     )
 
-    lines = path.read_text(encoding="utf-8").splitlines()
+    lines = path.read_text(encoding="utf-8-sig").splitlines()
     assert lines[:2] == ["-", "-"]
     assert lines[2].startswith("product_id,")
 

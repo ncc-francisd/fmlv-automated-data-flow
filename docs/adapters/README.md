@@ -1330,6 +1330,36 @@ The empty-scrape guard caught the consequence, which is what it is for — but i
 reports that a run collected nothing, never why. Capture the real markup as a fixture when
 the adapter is written, and assert the product count against it.
 
+### An accent that survives the adapter can still die in Excel
+
+**The upload CSV is written UTF-8 *with* a byte-order mark**, and that is not cosmetic.
+Rule from Carado, 2 October 2026.
+
+`Citroën` is two bytes in UTF-8. Open a `.csv` with no byte-order mark in Excel on a UK
+Windows machine and it is read as Windows-1252, so those two bytes become two letters and
+the cell says `CitroÃ«n`. Save from there and the damage is in the data; upload it and
+**FMLV gains a second base vehicle manufacturer that no filter will ever join back to the
+first**. The adapter did nothing wrong — `fmlv_base_vehicle` had already produced the
+right string — and nothing in the pipeline could see it happen.
+
+Three defences, all of them now in place:
+
+- **`product_model/io.py` and `caravan_io.py` write `utf-8-sig`.** The mark is three bytes
+  Excel uses to recognise UTF-8; `read_csv` already skipped it, so nothing downstream
+  changed. A test pins the exact bytes of the first row, because this is the kind of thing
+  a later tidy-up removes without knowing why it was there.
+- **`base.repair_mojibake` reverses the damage** where it reverses cleanly, and
+  `fmlv_base_vehicle` runs every make through it. A manufacturer's own page can be served
+  with the wrong charset, and a spreadsheet round-tripped through Excel carries the damage
+  in its cells, so the value can arrive broken from outside us too.
+- **`Ã` and `Â` are the tell.** Neither appears in any real base-vehicle make, so finding
+  one is proof rather than a guess. Worth grepping an export for if a brand suddenly grows
+  an extra chassis.
+
+The general rule: **a value that is correct in the adapter is not yet correct in FMLV.**
+Everything between — the CSV encoding, the spreadsheet a human opens, the upload parser —
+can still change it, and only the first of those is ours to control.
+
 ### A manufacturer's spreadsheet may describe the vehicle with options fitted
 
 **A specification sent for data entry is not automatically the standard vehicle.** Rule
