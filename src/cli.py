@@ -55,7 +55,7 @@ import time
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -837,6 +837,80 @@ def _fetch_export_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _show_baseline_command(args: argparse.Namespace) -> int:
+    """`fmlv show-baseline <manufacturer>`: the rows a run here would diff against.
+
+    **Added because a stale baseline is invisible.** A run that matched against an export
+    taken hours earlier looks exactly like a run that matched against the current one, and
+    reports products as missing from the manufacturer's site that FMLV no longer holds. The
+    only way to tell them apart was to take an export by hand and compare it by eye, which
+    took four rounds on Carado.
+
+    Prints the file, when it was written, and every row that survives the same filters
+    `execute_run` applies — so what this prints is what a run would see, not an
+    approximation of it. `--refresh` downloads first, exactly as a triggered run does.
+    """
+    data_root: Path = args.data_dir
+    config_root: Path = args.config_dir
+
+    registry_file = args.registry or paths.registry_path(root=config_root)
+    if not registry_file.exists():
+        msg = f"manufacturer registry not found at {registry_file}"
+        raise CommandError(msg)
+
+    registry = loader.load(registry_file)
+    manufacturer = find_manufacturer(registry.manufacturers, args.manufacturer)
+    vehicle_class = VehicleClass(args.vehicle_class)
+
+    if args.refresh:
+        export_path = fetch_export(
+            manufacturer=manufacturer,
+            data_root=data_root,
+            on_progress=_print_with_timestamp,
+            vehicle_class=vehicle_class,
+        )
+    else:
+        export_path = latest_export(
+            root=data_root,
+            manufacturer_id=manufacturer.manufacturer_id,
+            manufacturer_name=manufacturer.fmlv_manufacturer,
+            vehicle_class=vehicle_class,
+        )
+
+    written = datetime.fromtimestamp(export_path.stat().st_mtime, tz=UTC)
+    print(f"export      {export_path}")
+    print(f"written     {written.isoformat()}")
+    print(f"refreshed   {'yes, just now' if args.refresh else 'no — whatever was on disk'}")
+
+    rows = list(read_baseline(export_path, vehicle_class))
+    theirs = [r for r in rows if r.manufacturer == manufacturer.fmlv_manufacturer]
+    others = [r for r in rows if r.manufacturer != manufacturer.fmlv_manufacturer]
+    live = [r for r in theirs if not r.archived]
+    in_scope = [r for r in live if _is_current_model_year(r.year)]
+
+    print(f"\nrows in the file              {len(rows)}")
+    if others:
+        # The NCC export filters by supplier name as a substring, so a product whose
+        # *model* starts with the supplier's name arrives in their export. Carado's
+        # carried two copies of Bodans' `Caradon XL`.
+        names = sorted({str(r.manufacturer) for r in others})
+        print(f"  not {manufacturer.fmlv_manufacturer}, dropped      {len(others)}  {names}")
+    print(f"  archived, dropped           {len(theirs) - len(live)}")
+    print(f"  wrong model year, dropped   {len(live) - len(in_scope)}")
+    print(f"BASELINE A RUN WOULD USE      {len(in_scope)}\n")
+
+    header = f"{'id':>7}  {'year':>4}  {'range':<28} {'model':<22} {'base vehicle'}"
+    print(header)
+    print("-" * len(header))
+    for row in sorted(in_scope, key=lambda r: (r.manufacturer_range or "", r.model or "")):
+        print(
+            f"{row.product_id or '':>7}  {row.year or '':>4}  "
+            f"{(row.manufacturer_range or ''):<28} {(row.model or ''):<22} "
+            f"{row.base_vehicle_manufacturer or ''}"
+        )
+    return 0
+
+
 def empty_baseline(
     *,
     manufacturer: Manufacturer,
@@ -1105,6 +1179,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="run non-headless, for debugging against the real site",
     )
     fetch_export_parser.set_defaults(handler=_fetch_export_command)
+
+    show_baseline_parser = subparsers.add_parser(
+        "show-baseline",
+        help="print the baseline rows a run on this machine would diff against",
+    )
+    show_baseline_parser.add_argument(
+        "manufacturer",
+        help="registry name, display name or manufacturer_id — e.g. 'Carado', 92",
+    )
+    show_baseline_parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="download a fresh export first, exactly as a triggered run does",
+    )
+    show_baseline_parser.add_argument(
+        "--vehicle-class",
+        choices=[c.value for c in VehicleClass],
+        default=DEFAULT_VEHICLE_CLASS.value,
+        help=f"which product area (default: {DEFAULT_VEHICLE_CLASS.value})",
+    )
+    show_baseline_parser.add_argument(
+        "--data-dir", type=Path, default=paths.DATA_DIR, help="root for exports"
+    )
+    show_baseline_parser.add_argument(
+        "--config-dir", type=Path, default=paths.CONFIG_DIR, help="root for the registry"
+    )
+    show_baseline_parser.add_argument(
+        "--registry", type=Path, default=None, help="manufacturer registry CSV"
+    )
+    show_baseline_parser.set_defaults(handler=_show_baseline_command)
 
     empty_baseline_parser = subparsers.add_parser(
         "empty-baseline",
