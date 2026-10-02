@@ -59,6 +59,8 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+import csv
+
 import openpyxl
 
 from . import paths, store
@@ -837,6 +839,62 @@ def _fetch_export_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def raw_export_rows(path: Path) -> tuple[list[str], list[tuple[object, ...]]]:
+    """The export's own header and rows, **unmapped** — every column, as written.
+
+    `read_baseline` parses against the product schema, so a column the schema does not
+    name is silently dropped. That is exactly the wrong behaviour when the question is
+    "which column marks this product deactivated", because the answer is by definition a
+    column nobody has modelled yet.
+
+    The FMLV export carries two banner rows above the header, so the header is found by
+    looking for `product_id` rather than assumed to be first.
+    """
+    # `EXPORT_SUFFIXES` allows either, and a CSV export reaches this the same way.
+    if path.suffix.lower() == ".csv":
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            rows = [tuple(row) for row in csv.reader(handle)]
+    else:
+        workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        try:
+            rows = [tuple(row) for row in workbook.active.iter_rows(values_only=True)]
+        finally:
+            workbook.close()
+
+    for index, row in enumerate(rows):
+        if any(str(cell).strip() == "product_id" for cell in row if cell is not None):
+            header = [str(cell).strip() if cell is not None else "" for cell in row]
+            return header, rows[index + 1 :]
+    msg = f"no header row containing 'product_id' in {path}"
+    raise CommandError(msg)
+
+
+def _show_columns(export_path: Path, product_id: int) -> int:
+    """Print every column of one product's row, skipping the ones it leaves empty."""
+    header, rows = raw_export_rows(export_path)
+    try:
+        id_column = header.index("product_id")
+    except ValueError as exc:  # pragma: no cover - raw_export_rows already checked
+        msg = f"no product_id column in {export_path}"
+        raise CommandError(msg) from exc
+
+    matches = [row for row in rows if str(row[id_column]).strip() == str(product_id)]
+    if not matches:
+        print(f"no row with product_id {product_id} in {export_path}")
+        return 1
+
+    print(f"{len(matches)} row(s) with product_id {product_id} in {export_path.name}\n")
+    for number, row in enumerate(matches, 1):
+        if len(matches) > 1:
+            print(f"--- row {number} of {len(matches)} ---")
+        for name, value in zip(header, row, strict=False):
+            if value is None or str(value).strip() == "":
+                continue
+            print(f"   {name:<34} {value!r}")
+        print()
+    return 0
+
+
 def _show_baseline_command(args: argparse.Namespace) -> int:
     """`fmlv show-baseline <manufacturer>`: the rows a run here would diff against.
 
@@ -876,6 +934,9 @@ def _show_baseline_command(args: argparse.Namespace) -> int:
             manufacturer_name=manufacturer.fmlv_manufacturer,
             vehicle_class=vehicle_class,
         )
+
+    if args.columns is not None:
+        return _show_columns(export_path, args.columns)
 
     written = datetime.fromtimestamp(export_path.stat().st_mtime, tz=UTC)
     print(f"export      {export_path}")
@@ -1203,6 +1264,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--refresh",
         action="store_true",
         help="download a fresh export first, exactly as a triggered run does",
+    )
+    show_baseline_parser.add_argument(
+        "--columns",
+        type=int,
+        metavar="PRODUCT_ID",
+        help=(
+            "print every column of that product's row as the export writes it, including "
+            "columns the product schema does not model"
+        ),
     )
     show_baseline_parser.add_argument(
         "--vehicle-class",

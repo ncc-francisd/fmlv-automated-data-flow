@@ -102,3 +102,34 @@ def test_an_unknown_manufacturer_is_an_error_not_a_traceback(tmp_path, capsys) -
     err = capsys.readouterr().err
     assert "Traceback" not in err
     assert "Carado" in err
+
+
+def test_columns_prints_a_row_the_schema_would_discard(tmp_path, capsys) -> None:
+    """**The point of `--columns`.** The state being hunted is by definition in a column
+    nobody has modelled — `archived` said No and `latest_model_id` was empty on all 36
+    Carado rows — so reading through the product schema would throw the answer away."""
+    from src.cli import raw_export_rows
+
+    export = tmp_path / "exports" / "92_Carado" / "2026-10-02_Carado_motorhome-campervans.csv"
+    export.parent.mkdir(parents=True, exist_ok=True)
+    export.write_text(
+        "-\n-\nproduct_id,model,archived,some_column_we_do_not_model\n"
+        "7718,T447,No,retired\n",
+        encoding="utf-8",
+    )
+
+    header, rows = raw_export_rows(export)
+
+    assert "some_column_we_do_not_model" in header
+    assert rows[0][header.index("some_column_we_do_not_model")] == "retired"
+
+
+def test_columns_reports_a_product_id_that_is_not_there(tmp_path, capsys) -> None:
+    _carado_export(tmp_path)
+
+    exit_code = main(
+        ["show-baseline", "Carado", "--data-dir", str(tmp_path), "--columns", "1"]
+    )
+
+    assert exit_code == 1
+    assert "no row with product_id 1" in capsys.readouterr().out
