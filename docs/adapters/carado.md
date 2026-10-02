@@ -315,3 +315,50 @@ pages are stale, alongside the price, the missing equipment lists and the Citro�
 
 23 layout pages plus one roster page, all plain HTML, no JavaScript and no PDF — 24 fetches
 for a full sweep.
+
+## The site moved under us — 2 October 2026
+
+A run on the deployed VM failed with `ConnectError: [Errno 11001] getaddrinfo failed`.
+Three separate things had changed, and the error named only the first.
+
+**1. The sitemap links the bare domain.** Every other URL this adapter uses carries `www.`
+The VM resolved `www.carado.com` for the roster and the sitemap index, then failed to
+resolve `carado.com` for the sub-sitemaps. Both names resolve from most networks, which is
+why it had never shown up. `on_canonical_host` now moves every roster URL onto `www.`, so
+nothing depends on a second name resolving.
+
+**2. Every layout page was renamed, and the sitemap kept the old names.** It lists
+`/alcoves/_a132-pro`; the page is `/alcoves/a132`. The underscore form **404s on both
+hosts** — it is not a redirect, it is stale. The old roster took the sitemap on the
+reasoning that *a stated roster beats a crawl of the index pages*. That reasoning is now
+inverted: the sitemap is stale and the range index pages are current, so the roster comes
+from the index pages and `parse_sitemap_model_urls` is now `parse_model_urls`.
+
+The slug class still admits an underscore. The underscore was never the real problem and a
+URL shape Carado do use should not be rejected by the pattern.
+
+**3. A campervan page describes its whole family.** `/camper-van/cv600`,
+`/cv600-pro-fiat` and `/cv600-pro-plus-fiat` each yield the same three vehicles, and the
+range index links all three pages, so the first working run produced **49 products for 33
+vehicles**. Products are now deduplicated on `(range, model, base vehicle)`.
+
+**The base vehicle has to be in that key**: `t135` and `t135-citroen` are the same layout
+on two chassis, and since base vehicle became part of product identity those are two
+products, not one.
+
+### The count reconciles
+
+| | |
+|---|---|
+| Carado's model-comparison roster | **29** vehicles across 5 ranges |
+| Citroën variants of a Fiat layout (T135, T328, T447, T448) | **+4** |
+| Collected | **33** |
+
+So 33 is right and 29 is also right — they count different things, and the difference is
+exactly the four chassis variants FMLV holds separately.
+
+### Base vehicles now seen
+
+`Fiat`, `Citroën`, `Peugeot`, `Ford` and `VW` — five, where this adapter once saw one.
+`Citroën` keeps its diaeresis through `fmlv_base_vehicle`, and see the encoding rule in
+[`README.md`](README.md) for what happens to it after the CSV is written.

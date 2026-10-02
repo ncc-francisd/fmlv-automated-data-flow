@@ -603,35 +603,62 @@ def test_no_drawing_means_no_pointer(vehicles: dict[str, CaradoVehicle]) -> None
 
 
 # --------------------------------------------------------------------------- #
-# The sitemap
+# The roster, read from the range index pages
 # --------------------------------------------------------------------------- #
 
 
-def test_only_layout_pages_are_taken_from_the_sitemap() -> None:
-    """The index pages and the editorial paths are not layouts, and `semi-integrated-ford`
-    links to four T-models that live under `/semi-integrated/` — so a crawl of the index
-    pages could double-count them where the sitemap cannot."""
+def test_only_layout_pages_are_taken_from_a_range_index() -> None:
+    """A range index links its own layouts, its siblings' index pages, and editorial
+    paths. Only the layouts are products."""
     document = """
-    <loc>https://carado.com/gb/en/motorhomes/semi-integrated/t447</loc>
-    <loc>https://carado.com/gb/en/motorhomes/camper-van/cv640</loc>
-    <loc>https://carado.com/gb/en/motorhomes/semi-integrated</loc>
-    <loc>https://carado.com/gb/en/motorhomes</loc>
-    <loc>https://carado.com/gb/en/magazine/advice/something</loc>
-    <loc>https://carado.com/de/de/motorhomes/semi-integrated/t447</loc>
+    <a href="https://carado.com/gb/en/motorhomes/semi-integrated/t447">T447</a>
+    <a href="https://carado.com/gb/en/motorhomes/camper-van/cv640">CV640</a>
+    <a href="https://carado.com/gb/en/motorhomes/semi-integrated">Semi-integrated</a>
+    <a href="https://carado.com/gb/en/motorhomes">Motorhomes</a>
+    <a href="https://carado.com/gb/en/magazine/advice/something">Advice</a>
+    <a href="https://carado.com/de/de/motorhomes/semi-integrated/t447">T447 (DE)</a>
     """
 
-    assert carado.parse_sitemap_model_urls(document) == [
-        "https://carado.com/gb/en/motorhomes/camper-van/cv640",
-        "https://carado.com/gb/en/motorhomes/semi-integrated/t447",
+    assert carado.parse_model_urls(document) == [
+        "https://www.carado.com/gb/en/motorhomes/camper-van/cv640",
+        "https://www.carado.com/gb/en/motorhomes/semi-integrated/t447",
     ]
 
 
-def test_the_same_layout_listed_twice_is_collected_once() -> None:
-    """The sitemaps are concatenated, so a URL in both must not become two products."""
-    one = "<loc>https://carado.com/gb/en/motorhomes/van/v337</loc>"
+def test_the_same_layout_linked_twice_is_collected_once() -> None:
+    """`semi-integrated-ford` links four T-models that live under `/semi-integrated/`, so
+    the same URL reaches the roster from two index pages."""
+    one = '<a href="https://carado.com/gb/en/motorhomes/van/v337">V337</a>'
 
-    assert carado.parse_sitemap_model_urls(one, one) == [
-        "https://carado.com/gb/en/motorhomes/van/v337"
+    assert carado.parse_model_urls(one, one) == [
+        "https://www.carado.com/gb/en/motorhomes/van/v337"
+    ]
+
+
+def test_every_roster_url_is_moved_onto_the_canonical_host() -> None:
+    """**The trap this exists for.** Carado link the bare domain while the rest of the
+    adapter uses `www.`. Both resolve from most networks but not from all: the deployed VM
+    returned `getaddrinfo failed` for the bare host alone on 2 October 2026, having
+    fetched the roster on `www.` moments before."""
+    assert (
+        carado.on_canonical_host("https://carado.com/gb/en/motorhomes/van/v337")
+        == "https://www.carado.com/gb/en/motorhomes/van/v337"
+    )
+    assert (
+        carado.on_canonical_host("https://www.carado.com/gb/en/motorhomes/van/v337")
+        == "https://www.carado.com/gb/en/motorhomes/van/v337"
+    )
+    assert carado.on_canonical_host("https://example.com/x") == "https://example.com/x"
+
+
+def test_a_slug_may_begin_with_an_underscore() -> None:
+    """Carado's own sitemap lists `/alcoves/_a132-pro`. Those 404 — the sitemap went stale
+    when the pages were renamed, which is why the roster comes from the index pages — but
+    the slug class should not be the thing that rejects a URL shape they do use."""
+    document = '<a href="https://carado.com/gb/en/motorhomes/alcoves/_a132-pro">A132</a>'
+
+    assert carado.parse_model_urls(document) == [
+        "https://www.carado.com/gb/en/motorhomes/alcoves/_a132-pro"
     ]
 
 

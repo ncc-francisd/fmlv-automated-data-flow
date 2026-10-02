@@ -136,11 +136,37 @@ _ROSTER_ITEM = re.compile(
 
 #: A layout page, `/gb/en/motorhomes/<body style>/<slug>`. Anchored so the index pages
 #: themselves (`/gb/en/motorhomes/alcoves`) and the deeper editorial paths are excluded.
+#: **The slug may begin with an underscore.** Carado renamed every layout page some time
+#: before 2 October 2026 — `/integrated/i338` became `/integrated/_i338` — and a slug class
+#: of `[a-z0-9-]+` matched none of them, so the run found zero layout pages and raised. The
+#: class now admits the underscore; the rest of the shape is unchanged, so the range index
+#: pages (`/gb/en/motorhomes/alcoves`) and the deeper editorial paths are still excluded.
 _MODEL_URL = re.compile(
-    r"^https://(?:www\.)?carado\.com/gb/en/motorhomes/(?P<style>[a-z0-9-]+)/(?P<slug>[a-z0-9-]+)/?$"
+    r"^https://(?:www\.)?carado\.com/gb/en/motorhomes/(?P<style>[a-z0-9-]+)/(?P<slug>[a-z0-9_-]+)/?$"
 )
 
 _SITEMAP_LOC = re.compile(r"<loc>([^<]+)</loc>")
+
+#: An absolute link out of a range index page. Carado write them on the bare domain.
+_HREF = re.compile(r'href="(https://(?:www\.)?carado\.com/[^"]+)"')
+
+#: The bare domain, as the sitemap index writes its entries.
+_BARE_HOST = "https://carado.com/"
+
+
+def on_canonical_host(url: str) -> str:
+    """`https://carado.com/x` -> `https://www.carado.com/x`.
+
+    **The sitemap index links the bare domain while every other URL here carries `www.`.**
+    Both resolve from most networks, but not from all of them: the deployed VM returned
+    `getaddrinfo failed` on 2 October 2026 for the bare host alone, having fetched the
+    roster and the sitemap index on `www.` moments earlier. Nothing about the page differs,
+    so there is no reason to depend on a second name resolving — every sitemap URL is
+    moved onto the host the rest of the adapter already uses.
+    """
+    if url.startswith(_BARE_HOST):
+        return f"https://www.carado.com/{url[len(_BARE_HOST):]}"
+    return url
 
 
 def _text(markup: str) -> str:
@@ -229,17 +255,23 @@ def parse_roster(page_html: str) -> list[RosterEntry]:
     return entries
 
 
-def parse_sitemap_model_urls(*documents: str) -> list[str]:
-    """Every layout-page URL in the sitemaps, deduplicated and sorted.
+def parse_model_urls(*documents: str) -> list[str]:
+    """Every layout-page URL in these documents, on the canonical host, deduplicated.
 
-    A stated roster beats a heuristic, so the sitemap decides which pages exist rather
-    than a crawl of the index pages — and `semi-integrated-ford`, which links to four
-    T-models that live under `/semi-integrated/`, cannot introduce duplicates this way.
+    Reads the **range index pages**. It used to read the sitemap, on the reasoning that a
+    stated roster beats a crawl — but on 2 October 2026 that stopped being true: Carado
+    renamed every layout page and the sitemap kept the old names with an underscore
+    prefix, so `/alcoves/_a132-pro` is listed and 404s while `/alcoves/a132` is linked
+    from the range index and answers 200. **The sitemap is stale and the index pages are
+    current**, which is the opposite of the assumption the old roster rested on.
+
+    Deduplication still protects against `semi-integrated-ford`, which links four T-models
+    that live under `/semi-integrated/`.
     """
     found = {
-        url
+        on_canonical_host(url)
         for document in documents
-        for url in _SITEMAP_LOC.findall(document)
+        for url in _HREF.findall(document)
         if _MODEL_URL.match(url)
     }
     return sorted(found)
@@ -841,28 +873,41 @@ def collect(
         f"{len({entry.range_headline for entry in roster})} range(s)"
     )
 
-    on_progress(f"fetching the sitemap index {SITEMAP_URL} ...")
-    index = http.fetch(SITEMAP_URL)
-    if index.status_code != 200:
-        msg = f"sitemap index {SITEMAP_URL} returned {index.status_code}"
-        raise RuntimeError(msg)
-    index_xml = index.file_path.read_text(encoding="utf-8", errors="replace")
-    documents = [index_xml]
-    for url in [u for u in _SITEMAP_LOC.findall(index_xml) if u.endswith(".xml")]:
-        page = http.fetch(url)
-        if page.status_code == 200:
-            documents.append(page.file_path.read_text(encoding="utf-8", errors="replace"))
+    # The roster is the links on each range index page. **Not the sitemap**, which went
+    # stale when Carado renamed every layout page — see `parse_model_urls`.
+    documents: list[str] = []
+    for path, label in ranges:
+        index_url = f"{BASE_URL}/gb/en/motorhomes/{path}"
+        on_progress(f"fetching the {label} index {index_url} ...")
+        index = http.fetch(index_url)
+        if index.status_code != 200:
+            on_progress(
+                f"[{label}] WARNING: {index_url} returned {index.status_code}, so none of "
+                f"its layouts can be collected this run"
+            )
+            continue
+        documents.append(index.file_path.read_text(encoding="utf-8", errors="replace"))
 
-    model_urls = parse_sitemap_model_urls(*documents)
+    model_urls = parse_model_urls(*documents)
     if not model_urls:
-        msg = "no layout pages found in the sitemap"
+        msg = (
+            "no layout pages linked from any range index. Carado have changed the index "
+            "template or the URL shape; the roster cannot be built"
+        )
         raise RuntimeError(msg)
 
     wanted = {path for path, _label in ranges}
-    on_progress(f"{len(model_urls)} layout page(s) in the sitemap")
+    on_progress(f"{len(model_urls)} layout page(s) linked from the range indexes")
 
     results: list[ExtractedMotorhome] = []
     seen: set[str] = set()
+    #: One entry per vehicle actually built, keyed on everything that makes it a product.
+    #: **A campervan page describes its whole family**, so `/camper-van/cv600`,
+    #: `/cv600-pro-fiat` and `/cv600-pro-plus-fiat` each yield the same three vehicles and
+    #: the range index links all three pages. Without this the run produced 49 products
+    #: for 33 vehicles. Keyed on the base vehicle too, because `t135` and `t135-citroen`
+    #: are the same layout on two chassis and those *are* two products.
+    collected: set[tuple[str | None, str | None, str | None]] = set()
     for url in model_urls:
         match = _MODEL_URL.match(url)
         assert match is not None
@@ -890,10 +935,20 @@ def collect(
                     f"no range and no price"
                 )
                 continue
+            extracted = build_extracted(vehicle, entry)
+            product = extracted.motorhome
+            key = (
+                product.manufacturer_range,
+                product.model,
+                product.base_vehicle_manufacturer,
+            )
+            seen.add(vehicle.name)
+            if key in collected:
+                continue
             if vehicle.floorplan_path is None:
                 on_progress(f"[{vehicle.name}] no floorplan found on the page")
-            results.append(build_extracted(vehicle, entry))
-            seen.add(vehicle.name)
+            collected.add(key)
+            results.append(extracted)
         on_progress(f"[{style}] {url.rsplit('/', 1)[-1]}: {len(vehicles)} vehicle(s)")
 
     # A stated roster beats a heuristic: a vehicle the roster page lists and no layout page
