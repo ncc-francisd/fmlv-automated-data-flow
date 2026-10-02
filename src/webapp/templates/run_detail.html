@@ -48,6 +48,13 @@
     {% endif %}
   </div>
 
+  <p class="run-totals">
+    <strong>{{ totals.collected }}</strong> product{{ "" if totals.collected == 1 else "s" }}
+    collected{% if totals.new %} · <strong>{{ totals.new }}</strong> new{% endif %}
+    {%- if totals.disappeared %} · <strong>{{ totals.disappeared }}</strong> not found
+    {%- endif %}
+  </p>
+
   <h2>Pending ({{ pending|length }})</h2>
   {% if not pending %}
     <p class="muted">Nothing waiting on a decision.</p>

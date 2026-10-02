@@ -31,7 +31,17 @@ from .products import (
     list_products,
     upsert_seen,
 )
-from .runs import Run, fail_run, finish_run, get_run, list_run_manufacturers, list_runs, start_run
+from .runs import (
+    Run,
+    RunTotals,
+    fail_run,
+    finish_run,
+    get_run,
+    list_run_manufacturers,
+    list_runs,
+    run_totals,
+    start_run,
+)
 
 __all__ = [
     "ChangeQueueEntry",

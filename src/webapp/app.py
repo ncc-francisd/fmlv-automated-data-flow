@@ -778,6 +778,10 @@ def create_app(
                 "pending": pending,
                 "decided": decided,
                 "disappearance_notices": disappearance_notices,
+                # How many products the run actually read, which the change queue cannot
+                # say: a product found entirely unchanged raises no row at all. These are
+                # the numbers to sanity-check a roster against before accepting anything.
+                "totals": store.run_totals(connection, run_id),
                 # So a field with no row is not ambiguous: it either matched, or the
                 # adapter never reached it. See `store.verified_fields_by_product`.
                 "verified_fields": store.verified_fields_by_product(connection, run_id),

@@ -171,3 +171,43 @@ def list_run_manufacturers(connection: sqlite3.Connection) -> list[tuple[int, st
         "SELECT DISTINCT manufacturer_id, fmlv_manufacturer FROM run ORDER BY fmlv_manufacturer"
     ).fetchall()
     return [(row["manufacturer_id"], row["fmlv_manufacturer"]) for row in rows]
+
+
+@dataclass(frozen=True)
+class RunTotals:
+    """What a run found, as counts — the numbers a reviewer sanity-checks before accepting.
+
+    **Not derivable from the change queue**, which is why these exist. A product the run
+    read and found entirely unchanged raises no proposed change at all, so counting the
+    queue undercounts the roster; on a quiet run it would report nothing collected.
+    """
+
+    #: Products this run read off the manufacturer's site.
+    collected: int
+    #: Of those, the ones no earlier run had seen.
+    new: int
+    #: Baseline products the run did not find. See `disappearance_notice`.
+    disappeared: int
+
+    @property
+    def unchanged(self) -> int:
+        return self.collected - self.new
+
+
+def run_totals(connection: sqlite3.Connection, run_id: int) -> RunTotals:
+    """`RunTotals` for one run.
+
+    `last_seen_run_id` is stamped on every product a run reads, and `first_seen_run_id`
+    only on the run that introduced it, so both counts fall out of the product table
+    without the run needing to record them.
+    """
+    collected = connection.execute(
+        "SELECT COUNT(*) FROM product WHERE last_seen_run_id = ?", (run_id,)
+    ).fetchone()[0]
+    new = connection.execute(
+        "SELECT COUNT(*) FROM product WHERE first_seen_run_id = ?", (run_id,)
+    ).fetchone()[0]
+    disappeared = connection.execute(
+        "SELECT COUNT(*) FROM disappearance_notice WHERE run_id = ?", (run_id,)
+    ).fetchone()[0]
+    return RunTotals(collected=collected, new=new, disappeared=disappeared)
