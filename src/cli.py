@@ -897,16 +897,27 @@ def _show_baseline_command(args: argparse.Namespace) -> int:
         print(f"  not {manufacturer.fmlv_manufacturer}, dropped      {len(others)}  {names}")
     print(f"  archived, dropped           {len(theirs) - len(live)}")
     print(f"  wrong model year, dropped   {len(live) - len(in_scope)}")
-    print(f"BASELINE A RUN WOULD USE      {len(in_scope)}\n")
+    print(f"BASELINE A RUN WOULD USE      {len(in_scope)}")
 
-    header = f"{'id':>7}  {'year':>4}  {'range':<28} {'model':<22} {'base vehicle'}"
+    # `latest_model_id` is read off the export and has never been used for anything. If
+    # FMLV sets it on a product that a newer one replaces, it is the missing signal for
+    # "retired but not archived" — the state that had Carado reporting six 2026 products
+    # as missing from a site that only publishes the 2027 range.
+    superseded = [r for r in in_scope if r.latest_model_id]
+    print(f"  of those, naming a later model {len(superseded)}\n")
+
+    header = (
+        f"{'id':>7}  {'year':>4}  {'range':<28} {'model':<22} "
+        f"{'base vehicle':<14} {'later model'}"
+    )
     print(header)
     print("-" * len(header))
     for row in sorted(in_scope, key=lambda r: (r.manufacturer_range or "", r.model or "")):
         print(
             f"{row.product_id or '':>7}  {row.year or '':>4}  "
             f"{(row.manufacturer_range or ''):<28} {(row.model or ''):<22} "
-            f"{row.base_vehicle_manufacturer or ''}"
+            f"{(row.base_vehicle_manufacturer or ''):<14} "
+            f"{row.latest_model_id or ''}"
         )
     return 0
 
