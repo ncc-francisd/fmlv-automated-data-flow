@@ -95,11 +95,17 @@ class JerbaProduct:
     as nothing** rather than as a blank — see `_build_extracted`.
     """
 
-    #: What FMLV holds in `manufacturer_range`. The base-vehicle platform, because the
-    #: five panel-van layouts are sold on both the T7 and the Transit Custom and the
-    #: platform is the only thing that separates them in a range filter.
-    platform: str
-    #: The layout name, which is what FMLV holds in `model`.
+    #: The layout name, which is what FMLV holds in **`manufacturer_range`**.
+    #:
+    #: **Not the base vehicle, which is the natural guess and is wrong.** FMLV files these
+    #: the other way up: range `Tiree`, model `T7`. Built the obvious way round — range
+    #: `VW T7`, model `Tiree` — not one of the five existing products matched, and a run
+    #: would have added fourteen new ones beside them. Confirmed against the export,
+    #: 5 October 2026.
+    layout: str
+    #: The base vehicle as FMLV writes it in **`model`**: `T7`, `Transit Custom`,
+    #: `Crafter`. Not the make — that is `base_vehicle`, which FMLV holds separately as
+    #: `VW` or `Ford`.
     model: str
     #: The make, routed through `fmlv_base_vehicle`. `VW` for the T7 and the Crafter.
     base_vehicle: str
@@ -122,7 +128,7 @@ class JerbaProduct:
 
     @property
     def label(self) -> str:
-        return f"{self.platform} {self.model}"
+        return f"{self.layout} {self.model}"
 
     @property
     def url(self) -> str:
@@ -145,7 +151,7 @@ _CRAFTER_HEIGHT_MM = 2590
 PRODUCTS: tuple[JerbaProduct, ...] = (
     # --- VW T7 -------------------------------------------------------------------------
     JerbaProduct(
-        platform="VW T7", model="Tiree", base_vehicle="VW",
+        layout="Tiree", model="T7", base_vehicle="VW",
         page="/tiree-swb-campervan-layout/",
         brochure_roof="front elevating", price_list_roof="front elevating",
         wheelbase="short", length_mm=5050,
@@ -153,7 +159,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
         berths=2, belted_travel_seats=5, price_pounds=71000,
     ),
     JerbaProduct(
-        platform="VW T7", model="Cromarty", base_vehicle="VW",
+        layout="Cromarty", model="T7", base_vehicle="VW",
         page="/cromarty-lwb-campervan-layout",
         brochure_roof="front elevating", price_list_roof="front elevating",
         wheelbase="long", length_mm=5450,
@@ -161,7 +167,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
         berths=2, belted_travel_seats=5, price_pounds=74000,
     ),
     JerbaProduct(
-        platform="VW T7", model="Sanna", base_vehicle="VW",
+        layout="Sanna", model="T7", base_vehicle="VW",
         page="/sanna-lwb-campervan-layout",
         brochure_roof="rear elevating", price_list_roof="rear elevating",
         wheelbase="long", length_mm=5450,
@@ -170,7 +176,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
     ),
     # The one product the two documents describe differently — see `document_disagreements`.
     JerbaProduct(
-        platform="VW T7", model="Taransay", base_vehicle="VW",
+        layout="Taransay", model="T7", base_vehicle="VW",
         page="/taransay-campervan/",
         brochure_roof="rear elevating", price_list_roof="front elevating",
         wheelbase="short", length_mm=5050,
@@ -178,7 +184,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
         berths=2, belted_travel_seats=4, price_pounds=73000,
     ),
     JerbaProduct(
-        platform="VW T7", model="Jura", base_vehicle="VW",
+        layout="Jura", model="T7", base_vehicle="VW",
         page="/jura-campervan/",
         brochure_roof="fixed high top", price_list_roof=None,
         wheelbase="long", length_mm=5450,
@@ -187,7 +193,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
     ),
     # --- Ford Transit Custom -----------------------------------------------------------
     JerbaProduct(
-        platform="Ford Transit Custom", model="Tiree", base_vehicle="Ford",
+        layout="Tiree", model="Transit Custom", base_vehicle="Ford",
         page="/tiree-swb-campervan-layout/",
         brochure_roof="front elevating", price_list_roof="front elevating",
         wheelbase="short", length_mm=5050,
@@ -195,7 +201,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
         berths=2, belted_travel_seats=5, price_pounds=69000,
     ),
     JerbaProduct(
-        platform="Ford Transit Custom", model="Cromarty", base_vehicle="Ford",
+        layout="Cromarty", model="Transit Custom", base_vehicle="Ford",
         page="/cromarty-lwb-campervan-layout",
         brochure_roof="front elevating", price_list_roof="front elevating",
         wheelbase="long", length_mm=5450,
@@ -203,7 +209,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
         berths=2, belted_travel_seats=5, price_pounds=72000,
     ),
     JerbaProduct(
-        platform="Ford Transit Custom", model="Sanna", base_vehicle="Ford",
+        layout="Sanna", model="Transit Custom", base_vehicle="Ford",
         page="/sanna-lwb-campervan-layout",
         brochure_roof="rear elevating", price_list_roof="rear elevating",
         wheelbase="long", length_mm=5450,
@@ -211,7 +217,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
         berths=2, belted_travel_seats=4, price_pounds=73000,
     ),
     JerbaProduct(
-        platform="Ford Transit Custom", model="Taransay", base_vehicle="Ford",
+        layout="Taransay", model="Transit Custom", base_vehicle="Ford",
         page="/taransay-campervan/",
         brochure_roof="rear elevating", price_list_roof="rear elevating",
         wheelbase="short", length_mm=5050,
@@ -219,7 +225,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
         berths=2, belted_travel_seats=4, price_pounds=71000,
     ),
     JerbaProduct(
-        platform="Ford Transit Custom", model="Jura", base_vehicle="Ford",
+        layout="Jura", model="Transit Custom", base_vehicle="Ford",
         page="/jura-campervan/",
         brochure_roof="fixed high top", price_list_roof=None,
         wheelbase="long", length_mm=5450,
@@ -228,7 +234,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
     ),
     # --- VW Crafter --------------------------------------------------------------------
     JerbaProduct(
-        platform="VW Crafter", model="Mull", base_vehicle="VW",
+        layout="Mull", model="Crafter", base_vehicle="VW",
         page="/mull-crafter-layout/",
         brochure_roof="fixed high roof", price_list_roof="fixed high roof",
         wheelbase="medium", length_mm=5986,
@@ -236,7 +242,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
         berths=2, belted_travel_seats=4, price_pounds=85500,
     ),
     JerbaProduct(
-        platform="VW Crafter", model="Barra", base_vehicle="VW",
+        layout="Barra", model="Crafter", base_vehicle="VW",
         page="/barra-campervan-layout/",
         brochure_roof="fixed high roof", price_list_roof="fixed high roof",
         wheelbase="medium", length_mm=5986,
@@ -244,7 +250,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
         berths=2, belted_travel_seats=5, price_pounds=77500,
     ),
     JerbaProduct(
-        platform="VW Crafter", model="Harris", base_vehicle="VW",
+        layout="Harris", model="Crafter", base_vehicle="VW",
         page="/harris-campervan-layout/",
         brochure_roof="fixed high roof", price_list_roof="fixed high roof",
         wheelbase="long", length_mm=6836,
@@ -254,7 +260,7 @@ PRODUCTS: tuple[JerbaProduct, ...] = (
     # Priced but never drawn. Length is deliberately `None`: the other mediums are 5986 mm
     # but nobody has published this one's, and an inferred dimension is not a figure.
     JerbaProduct(
-        platform="VW Crafter", model="Harris MWB", base_vehicle="VW",
+        layout="Harris MWB", model="Crafter", base_vehicle="VW",
         page="/harris-campervan-layout/",
         brochure_roof=None, price_list_roof="fixed high roof",
         wheelbase="medium", length_mm=None,
@@ -326,17 +332,17 @@ def document_disagreements() -> list[str]:
                 f"its own drawing"
             )
 
-    by_model = {(p.platform, p.model): p for p in PRODUCTS}
-    for (platform, model), vw in by_model.items():
-        if platform != "VW T7":
+    by_layout = {(p.layout, p.model): p for p in PRODUCTS}
+    for (layout, model), vw in by_layout.items():
+        if model != "T7":
             continue
-        ford = by_model.get(("Ford Transit Custom", model))
+        ford = by_layout.get((layout, "Transit Custom"))
         if ford is None or vw.price_pounds is None or ford.price_pounds is None:
             continue
         step = vw.price_pounds - ford.price_pounds
         if step != 2000:
             found.append(
-                f"{model}: the VW T7 is GBP{step:,} above the Ford Transit Custom, where "
+                f"{layout}: the VW T7 is GBP{step:,} above the Ford Transit Custom, where "
                 f"every other shared layout is GBP2,000 apart. One of the two prices has "
                 f"been misread or the lists have moved apart"
             )
@@ -355,7 +361,7 @@ def _build_extracted(product: JerbaProduct) -> ExtractedMotorhome:
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
-        manufacturer_range=product.platform,
+        manufacturer_range=product.layout,
         model=product.model,
         base_vehicle_manufacturer=fmlv_base_vehicle(product.base_vehicle),
         berths=product.berths,
@@ -376,9 +382,26 @@ def _build_extracted(product: JerbaProduct) -> ExtractedMotorhome:
     def record(field_name: str, snippet: str) -> None:
         provenance[field_name] = Provenance(source_url=product.url, snippet=snippet)
 
+    # **The two identity fields are recorded deliberately.** `compare_fields` only looks
+    # at fields the adapter gives provenance for, so without these a wrong name in FMLV can
+    # never be corrected by a run — which is exactly the state the Mull was in, filed as
+    # `Mull / Mull` where every sibling carries the base vehicle in the model.
+    record(
+        "manufacturer_range",
+        f"the layout name as {PRICE_LIST_SOURCE} and the model page both give it. FMLV "
+        f"files these by layout, not by base vehicle: range {product.layout!r}, model "
+        f"{product.model!r}",
+    )
+    record(
+        "model",
+        f"{product.model!r}, the base vehicle. FMLV holds the marque separately in "
+        f"base_vehicle_manufacturer ({product.base_vehicle!r}), so this column carries the "
+        f"range designation rather than the make",
+    )
     record(
         "base_vehicle_manufacturer",
-        f"{product.platform}, {product.wheelbase} wheel base, from {PRICE_LIST_SOURCE}",
+        f"{product.layout} on the {product.model}, {product.wheelbase} wheel base, from "
+        f"{PRICE_LIST_SOURCE}",
     )
     if product.price_pounds is not None:
         record(

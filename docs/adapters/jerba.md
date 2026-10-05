@@ -214,12 +214,34 @@ nothing as strong as the arithmetic self-checks elsewhere in this project.
 
 ## What the build settled
 
-**Range and model.** `manufacturer_range` is the base-vehicle platform — `VW T7`,
-`Ford Transit Custom`, `VW Crafter` — and `model` is the layout name. The platform is the
-only thing separating the five panel-van layouts in a range filter, since each is sold on
-both. **This is a choice, not a reading**: FMLV's own five rows have not been exported yet,
-so if they file these differently, change `JerbaProduct.platform` in `PRODUCTS` and nothing
-else moves.
+**Range and model — the other way up from the obvious guess.** FMLV files these by
+**layout**: range `Tiree`, model `T7`. Not range `VW T7`, model `Tiree`, which is what this
+adapter shipped with and which matched **none** of the five existing products — a run would
+have added all fourteen as new ones beside them. Corrected 5 October 2026 against the
+export:
+
+| id | range | model | base vehicle |
+|---|---|---|---|
+| 8280 | Tiree | T7 | VW |
+| 3992 | Tiree | Transit Custom | Ford |
+| 8281 | Cromarty | Transit Custom | Ford |
+| 3990 | Sanna | Transit Custom | Ford |
+| 7959 | Mull | **Mull** | VW |
+
+The marque lives separately in `base_vehicle_manufacturer` (`VW` or `Ford`), so `model`
+carries the range designation rather than the make.
+
+**`Mull / Mull` is a slip** — every sibling carries the base vehicle there. The adapter
+emits `Mull / Crafter`, which still matches at 0.50 and proposes the correction. The
+requester agreed on 5 October 2026.
+
+**The two Crafter Harrises** would otherwise be one product, both `Harris / Crafter`, so
+the medium-wheelbase one takes the range `Harris MWB`. FMLV holds neither yet, so this is
+ours to choose.
+
+**`manufacturer_range` and `model` carry provenance deliberately.** `compare_fields` only
+examines fields the adapter records provenance for, so without it a wrong name in FMLV can
+never be corrected by a run — which is exactly the state the Mull was in.
 
 **What a run actually does.** Eleven fetches, one per distinct model page, contributing no
 figures — the site has none. They exist to confirm each product still has a page. A page

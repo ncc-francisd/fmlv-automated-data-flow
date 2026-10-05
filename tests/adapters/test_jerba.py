@@ -21,8 +21,9 @@ from src.product_model.enums import BodyType
 from src.vehicle_class import VehicleClass
 
 
-def _product(platform: str, model: str) -> jerba.JerbaProduct:
-    return next(p for p in PRODUCTS if p.platform == platform and p.model == model)
+def _product(layout: str, model: str) -> jerba.JerbaProduct:
+    """Keyed as FMLV files them: the layout is the range, the base vehicle is the model."""
+    return next(p for p in PRODUCTS if p.layout == layout and p.model == model)
 
 
 # --- registry -------------------------------------------------------------------------
@@ -45,10 +46,10 @@ def test_the_adapter_is_wired_in() -> None:
 
 def test_fourteen_products_across_three_base_vehicles() -> None:
     assert len(PRODUCTS) == EXPECTED_PRODUCTS == 14
-    by_platform: dict[str, int] = {}
+    by_model: dict[str, int] = {}
     for product in PRODUCTS:
-        by_platform[product.platform] = by_platform.get(product.platform, 0) + 1
-    assert by_platform == {"VW T7": 5, "Ford Transit Custom": 5, "VW Crafter": 4}
+        by_model[product.model] = by_model.get(product.model, 0) + 1
+    assert by_model == {"T7": 5, "Transit Custom": 5, "Crafter": 4}
 
 
 def test_the_roster_is_the_union_of_two_incomplete_documents() -> None:
@@ -59,8 +60,8 @@ def test_the_roster_is_the_union_of_two_incomplete_documents() -> None:
     drawn_only = [p for p in PRODUCTS if p.brochure_roof and not p.price_list_roof]
     priced_only = [p for p in PRODUCTS if p.price_list_roof and not p.brochure_roof]
 
-    assert {p.model for p in drawn_only} == {"Jura"}
-    assert {p.model for p in priced_only} == {"Harris MWB"}
+    assert {p.layout for p in drawn_only} == {"Jura"}
+    assert {p.layout for p in priced_only} == {"Harris MWB"}
 
 
 def test_every_product_names_a_base_vehicle_fmlv_spells_that_way() -> None:
@@ -71,10 +72,11 @@ def test_every_product_names_a_base_vehicle_fmlv_spells_that_way() -> None:
 def test_the_same_layout_on_two_base_vehicles_is_two_products() -> None:
     """Five names are sold on both panel vans at different prices, and base vehicle is
     part of product identity, so each pair is two vehicles rather than one."""
-    tiree = [p for p in PRODUCTS if p.model == "Tiree"]
+    tiree = [p for p in PRODUCTS if p.layout == "Tiree"]
 
     assert len(tiree) == 2
     assert {p.base_vehicle for p in tiree} == {"VW", "Ford"}
+    assert {p.model for p in tiree} == {"T7", "Transit Custom"}
     assert tiree[0].price_pounds != tiree[1].price_pounds
 
 
@@ -83,21 +85,21 @@ def test_the_same_layout_on_two_base_vehicles_is_two_products() -> None:
 
 def test_berths_take_the_lower_figure_of_a_range() -> None:
     """`Sleeps 2 / 4` is 2 and `Sleeps 4 / 6` is 4 — the extra berths need options."""
-    assert _product("VW T7", "Tiree").berths == 2
-    assert _product("VW Crafter", "Harris").berths == 4
+    assert _product("Tiree", "T7").berths == 2
+    assert _product("Harris", "Crafter").berths == 4
 
 
 def test_the_width_recorded_excludes_the_mirrors() -> None:
     """The brochure prints both; FMLV holds the body width. 2062 against 2276 on the panel
     vans, 2040 against 2427 on the Crafter."""
-    assert _product("VW T7", "Tiree").width_mm == 2062
-    assert _product("VW Crafter", "Mull").width_mm == 2040
+    assert _product("Tiree", "T7").width_mm == 2062
+    assert _product("Mull", "Crafter").width_mm == 2040
 
 
 def test_an_unpublished_figure_is_none_rather_than_a_guess() -> None:
     """The MWB Harris has no layout column. Its length is *probably* 5986mm like the other
     mediums, but an inference is not a published figure and FMLV's own value should stand."""
-    harris_mwb = _product("VW Crafter", "Harris MWB")
+    harris_mwb = _product("Harris MWB", "Crafter")
 
     assert harris_mwb.length_mm is None
     assert harris_mwb.berths is None
@@ -106,7 +108,7 @@ def test_an_unpublished_figure_is_none_rather_than_a_guess() -> None:
 
 
 def test_the_jura_is_collected_without_a_price_never_with_an_invented_one() -> None:
-    juras = [p for p in PRODUCTS if p.model == "Jura"]
+    juras = [p for p in PRODUCTS if p.layout == "Jura"]
 
     assert len(juras) == 2
     assert all(p.price_pounds is None for p in juras)
@@ -116,22 +118,22 @@ def test_the_jura_is_collected_without_a_price_never_with_an_invented_one() -> N
 
 
 def test_an_elevating_roof_below_the_threshold_is_not_a_high_top() -> None:
-    got, reason = body_type_for(_product("VW T7", "Tiree"))
+    got, reason = body_type_for(_product("Tiree", "T7"))
 
     assert got is BodyType.CAMPERVAN_ELEVATING_ROOF
     assert "2300mm" in reason
 
 
 def test_a_fixed_high_roof_over_the_threshold_is_a_high_top() -> None:
-    assert body_type_for(_product("VW T7", "Jura"))[0] is BodyType.CAMPERVAN_HIGH_TOP
-    assert body_type_for(_product("VW Crafter", "Mull"))[0] is BodyType.CAMPERVAN_HIGH_TOP
+    assert body_type_for(_product("Jura", "T7"))[0] is BodyType.CAMPERVAN_HIGH_TOP
+    assert body_type_for(_product("Mull", "Crafter"))[0] is BodyType.CAMPERVAN_HIGH_TOP
 
 
 def test_the_optional_elevating_roof_does_not_change_what_a_crafter_is() -> None:
     """Every Crafter offers an optional ATEC elevating roof. An optional rising roof never
     changes what the vehicle is, so it stays a plain high top."""
     for model in ("Mull", "Barra", "Harris"):
-        assert body_type_for(_product("VW Crafter", model))[0] is BodyType.CAMPERVAN_HIGH_TOP
+        assert body_type_for(_product(model, "Crafter"))[0] is BodyType.CAMPERVAN_HIGH_TOP
 
 
 def test_the_threshold_is_the_shared_one() -> None:
@@ -139,7 +141,7 @@ def test_the_threshold_is_the_shared_one() -> None:
 
 
 def test_a_roof_nobody_describes_derives_nothing() -> None:
-    nameless = replace(_product("VW T7", "Tiree"), brochure_roof=None, price_list_roof=None)
+    nameless = replace(_product("Tiree", "T7"), brochure_roof=None, price_list_roof=None)
 
     got, reason = body_type_for(nameless)
 
@@ -166,7 +168,7 @@ def test_a_price_that_breaks_the_two_thousand_step_is_reported(monkeypatch) -> N
     """Every VW T7 is exactly GBP2,000 above its Ford twin. A misread price, or a layout
     matched to the wrong row, would almost certainly break that."""
     broken = tuple(
-        replace(p, price_pounds=99999) if (p.platform == "VW T7" and p.model == "Sanna") else p
+        replace(p, price_pounds=99999) if (p.layout == "Sanna" and p.model == "T7") else p
         for p in PRODUCTS
     )
     monkeypatch.setattr(jerba, "PRODUCTS", broken)
@@ -196,8 +198,8 @@ def test_no_mass_is_ever_emitted() -> None:
 
 def test_a_field_with_no_figure_gets_no_provenance() -> None:
     """A field with no provenance is a field the pipeline proposes nothing for."""
-    jura = jerba._build_extracted(_product("VW T7", "Jura"))
-    harris_mwb = jerba._build_extracted(_product("VW Crafter", "Harris MWB"))
+    jura = jerba._build_extracted(_product("Jura", "T7"))
+    harris_mwb = jerba._build_extracted(_product("Harris MWB", "Crafter"))
 
     assert "rrp_pounds" not in jura.provenance
     assert "berths" in jura.provenance
@@ -209,15 +211,28 @@ def test_a_field_with_no_figure_gets_no_provenance() -> None:
 def test_the_seat_provenance_warns_that_the_belts_are_unconfirmed() -> None:
     """Only three-point belts count. The brochure says "BELTED TRAVEL SEATS" without
     saying what kind, so the reviewer is told that rather than it passing as settled."""
-    tiree = jerba._build_extracted(_product("VW T7", "Tiree"))
+    tiree = jerba._build_extracted(_product("Tiree", "T7"))
 
     snippet = tiree.provenance["mh_passenger_seats_inc_driver"].snippet
     assert "three-point" in snippet
 
 
-def test_the_range_and_model_are_the_platform_and_the_layout() -> None:
-    tiree = jerba._build_extracted(_product("Ford Transit Custom", "Tiree")).motorhome
+def test_the_range_is_the_layout_and_the_model_is_the_base_vehicle() -> None:
+    """**The trap this exists for.** The natural guess is range `Ford Transit Custom`,
+    model `Tiree`. FMLV files it the other way up, and built the obvious way round not one
+    of the five existing products matched — all fourteen would have arrived as new
+    products beside them. Confirmed against the export, 5 October 2026."""
+    tiree = jerba._build_extracted(_product("Tiree", "Transit Custom")).motorhome
 
-    assert tiree.manufacturer_range == "Ford Transit Custom"
-    assert tiree.model == "Tiree"
+    assert tiree.manufacturer_range == "Tiree"
+    assert tiree.model == "Transit Custom"
     assert tiree.base_vehicle_manufacturer == "Ford"
+
+
+def test_the_two_crafter_harrises_are_told_apart_by_range() -> None:
+    """Both are a `Harris` on a `Crafter`, so without separate ranges they would be one
+    product. FMLV's own rows have no second Harris yet, so this is ours to choose."""
+    harrises = [p for p in PRODUCTS if p.layout.startswith("Harris")]
+
+    assert {p.layout for p in harrises} == {"Harris", "Harris MWB"}
+    assert {p.model for p in harrises} == {"Crafter"}
