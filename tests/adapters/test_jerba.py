@@ -236,3 +236,37 @@ def test_the_two_crafter_harrises_are_told_apart_by_range() -> None:
 
     assert {p.layout for p in harrises} == {"Harris", "Harris MWB"}
     assert {p.model for p in harrises} == {"Crafter"}
+
+
+def test_a_disagreement_that_changes_nothing_says_so(monkeypatch) -> None:
+    """**The point of this wording.** Front against rear is a real disagreement between
+    Jerba's two documents, but FMLV has one elevating-roof body type and no field anywhere
+    records which end a roof lifts — so there is nothing to get right. Saying "one of them
+    is wrong, ask Jerba" sent the requester off to draft an email he then had to drop."""
+    found = [m for m in document_disagreements() if "Taransay" in m]
+
+    assert len(found) == 1
+    assert "nothing recorded changes" in found[0]
+    assert "not actionable" in found[0]
+
+
+def test_a_disagreement_that_does_change_the_body_type_still_demands_an_answer(
+    monkeypatch,
+) -> None:
+    """The check keeps earning its place: fixed against elevating is the same shape of
+    disagreement and it decides the body type, so that one has to be asked."""
+    from dataclasses import replace
+
+    broken = tuple(
+        replace(p, price_list_roof="fixed high top")
+        if p.layout == "Sanna" and p.model == "T7"
+        else p
+        for p in PRODUCTS
+    )
+    monkeypatch.setattr(jerba, "PRODUCTS", broken)
+
+    found = [m for m in document_disagreements() if "Sanna" in m]
+
+    assert len(found) == 1
+    assert "different body types" in found[0]
+    assert "it matters" in found[0]

@@ -44,7 +44,7 @@ adapter is not the thing that should guess which.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from ..fetch.http import Fetcher
@@ -320,17 +320,37 @@ def document_disagreements() -> list[str]:
 
     for product in PRODUCTS:
         if (
-            product.brochure_roof is not None
-            and product.price_list_roof is not None
-            and product.brochure_roof != product.price_list_roof
+            product.brochure_roof is None
+            or product.price_list_roof is None
+            or product.brochure_roof == product.price_list_roof
         ):
+            continue
+        both_ways = {
+            body_type_for(replace(product, brochure_roof=roof, price_list_roof=roof))[0]
+            for roof in (product.brochure_roof, product.price_list_roof)
+        }
+        if len(both_ways) == 1:
+            # **Says so rather than leaving it to be re-investigated.** Front against rear
+            # is a real disagreement between Jerba's own two documents, but FMLV has one
+            # elevating-roof body type and no field anywhere records which end the roof
+            # lifts — so there is nothing to get right or wrong. The requester made the
+            # point on 5 October 2026 and dropped it from his email to Jerba.
             found.append(
                 f"{product.label}: the layout brochure calls it a "
-                f"{product.brochure_roof} roof, the price list a "
-                f"{product.price_list_roof} one. One of the two documents is wrong — ask "
-                f"Jerba. The body type is derived from the brochure, which agrees with "
-                f"its own drawing"
+                f"{product.brochure_roof} roof and the price list a "
+                f"{product.price_list_roof} one — but **nothing recorded changes**, since "
+                f"both derive {next(iter(both_ways)).value} and no FMLV field says which "
+                f"end a roof lifts. Noted, not actionable"
             )
+            continue
+        found.append(
+            f"{product.label}: the layout brochure calls it a "
+            f"{product.brochure_roof} roof, the price list a "
+            f"{product.price_list_roof} one, **and the two give different body types** "
+            f"({', '.join(sorted(b.value if b else '-' for b in both_ways))}). One of the "
+            f"documents is wrong and it matters — ask Jerba. The brochure is recorded, "
+            f"since it agrees with its own drawing"
+        )
 
     by_layout = {(p.layout, p.model): p for p in PRODUCTS}
     for (layout, model), vw in by_layout.items():
