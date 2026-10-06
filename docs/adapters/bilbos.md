@@ -110,15 +110,7 @@ equipment, which would be 181 kg if it matched Celex. Worth putting to Steve.
 1. **Are all four belted seats three-point?** Steve says "4 belted seats" without saying
    which. [`README.md`](README.md) counts three-point belts only, so a lap belt in the
    four would change the figure.
-2. **Does "not available at the moment" mean out of stock, not orderable, or not in the
-   2027 line-up?** Only the last would retire anything. Put to Steve on 6 October 2026,
-   because availability comes and goes and FMLV should list what the line-up *will* be —
-   a model that is coming belongs on the site before it arrives. If the LWB, the high top
-   and Space are coming to the T7, each needs its own MTPLM, MIRO and price before its row
-   can move over; until then those rows keep their T6.1 figures.
-3. **Space LWB** is on the website but archived in FMLV as `5501`. If it continues, it
-   should come back.
-4. **What is the LWB's MTPLM?** The handbook gives the LWB its length (`5.304 m`, which
+2. **What is the LWB's MTPLM?** The handbook gives the LWB its length (`5.304 m`, which
    FMLV already holds), the same width and height, and `LWB versions ... weigh 70kg more
    than the SWB version` — so MIRO is derivable at 2545 (Celex) and 2530 (Nexa/Nexa+).
    **The payload is not**, because the only MTPLM printed is the SWB T30's 3025 and FMLV's
@@ -126,6 +118,33 @@ equipment, which would be 181 kg if it matched Celex. Worth putting to Steve.
    completed, and the 2032 mm width cannot safely be carried across to them either: every
    SWB row FMLV holds has a length of 4904 mm, which is the **T6.1**, so the LWB rows may
    describe the older van rather than the T7.
+
+## Settled: the 2027 line-up is three products
+
+Asked on 6 October 2026 whether "not available at the moment" meant out of stock, not
+orderable, or not in the 2027 line-up — the distinction that decides whether anything
+retires — Steve Ayles answered the same day:
+
+> *"At the moment for VW factory order new models it is the 3 SWB T7, Celex, Nexa & Nexa+
+> for 2027 other variants will follow later. The website is currently being updated and
+> although you cannot factory order new T6.1 any more we still convert pre owned base
+> vehicles and sell used campers."*
+
+**The T6.1 is finished as a new product.** What survives of it is converting a customer's
+own pre-owned van and selling used campers, and neither is in scope — the requester ruled
+out both the used stock and the convert-your-own service at the survey.
+
+So **2027 is the three SWB T7 models**, and the eight T6.1 rows have no new product behind
+them. More variants are coming, but Bilbo's cannot say which or when, so there is nothing
+to list: a row needs a name and figures, and "other variants will follow later" supplies
+neither. The three go up and the rest are left at 2026 to fall out of scope on 1 January.
+
+**Nothing is archived.** See [`README.md`](README.md) — a product that stops being sold
+stays findable.
+
+The website still showed five models across nine wheelbase combinations when this was
+written. Steve says it is being updated; until it is, **the site is not evidence of the
+current range** and the 2027 line-up is this email.
 
 ## What FMLV holds, and what was issued
 
@@ -137,15 +156,15 @@ all archived) and a current block of 13, of which **eight are live**.
 | **5489** | CELEX / SWB - Elevating Roof | **updated** |
 | **5493** | NEXA / SWB - Elevating Roof | **updated** |
 | **5496** | NEXA+ / SWB - Elevating Roof | **updated** |
-| 5491 | CELEX / LWB Elevating roof | T6.1; no T7 LWB yet |
-| 5495 | NEXA / LWB Elevating roof | T6.1; no T7 LWB yet |
-| 5498 | NEXA+ / LWB Elevating roof | T6.1; no T7 LWB yet |
-| 5492 | KOMBA / LWB Elevating roof | T6.1, and Komba is LWB only |
-| 5499 | NEXA / SPACE - SWB - Elevating Roof | T6.1; Space is not yet on the T7 |
+| 5491 | CELEX / LWB Elevating roof | T6.1 only — no longer factory orderable |
+| 5495 | NEXA / LWB Elevating roof | T6.1 only — no longer factory orderable |
+| 5498 | NEXA+ / LWB Elevating roof | T6.1 only — no longer factory orderable |
+| 5492 | KOMBA / LWB Elevating roof | T6.1 only — no longer factory orderable |
+| 5499 | NEXA / SPACE - SWB - Elevating Roof | T6.1 only — no longer factory orderable |
 
-Those eight rows are the **T6.1** range and they are correct for it — they match the
-website's five models across their wheelbases almost exactly. The three SWB rows are the
-only ones Steve's T7 documents cover.
+Those eight rows are the **T6.1** range and were correct for it — they match the
+website's five models across their wheelbases almost exactly. Only the three SWB rows
+carry a 2027 product; see above.
 
 **The T7 figures go over the existing rows — they do not become new products.** FMLV's
 SWB rows are `4904 mm` long, which is the T6.1, and the T7 is `5050`, so the instinct is to
