@@ -16,12 +16,14 @@ from src.adapters.adria_caravan import (
     EXPECTED_LAYOUTS,
     RANGES,
     RENAMED_MODELS,
+    SUB_RANGES,
     AdriaCaravan,
     _reconciles,
     body_type_for,
     model_name,
     parse_caravan_pdf,
     range_config,
+    sub_range_for,
 )
 from src.product_model.enums import CaravanBodyType
 from src.vehicle_class import VehicleClass
@@ -81,6 +83,52 @@ def test_the_four_caravan_ranges() -> None:
 def test_no_caravan_range_takes_its_model_from_the_trim() -> None:
     """The opposite of the motorhome ranges, and for a reason — see the trim test."""
     assert all(config.model_includes_trim is False for config in RANGES)
+
+
+# --- the one place a trim is allowed to matter ----------------------------------------
+
+
+def _trimmed(trim: str) -> adria.LivewireProduct:
+    return adria.LivewireProduct(
+        layout_label="391 LH GB", trim_label=trim, product_id="1", price_pounds=None,
+        price_string=None, berths=2, seats=None, configurator_url=None,
+    )
+
+
+def test_the_action_sports_is_its_own_range_not_a_dropped_duplicate() -> None:
+    """**The trap this exists for.** Adria sell two Action caravans on one layout, and
+    both configurations carry the layout label `391 LH GB`. The collision guard dropped
+    the second every run, so the Sports never reached FMLV at all — it looked like a model
+    we had missed, when in fact the adapter saw it and discarded it on purpose."""
+    action = range_config("caravans/action", "Action")
+
+    assert sub_range_for(action, _trimmed("SportsTC")) == "Action Sports"
+    assert sub_range_for(action, _trimmed("Truma Combi Silver")) == "Action"
+
+
+def test_the_collision_guard_still_holds_everywhere_else() -> None:
+    """**This must stay narrow.** Adria's trims are wrong often enough that the guard is
+    right in general — the Altea 622 DK Avon carries its sibling's `Altea 622 DP Dart`.
+    Only the Action has corroboration outside the trim label: Adria's own price list
+    names and prices the two separately."""
+    altea = range_config("caravans/altea", "Altea")
+
+    assert sub_range_for(altea, _trimmed("SportsTC")) == "Altea"
+    assert list(SUB_RANGES) == [("Action", "sports")]
+
+
+def test_the_resolved_range_is_what_reaches_fmlv() -> None:
+    """The sub-range has to beat `config.fmlv_range` everywhere it is read, or the row is
+    built under one name and de-duplicated under another."""
+    sports = AdriaCaravan(
+        config=range_config("caravans/action", "Action"),
+        product=_trimmed("SportsTC"),
+        figures=parse_caravan_pdf(""),
+        pdf_url="https://example.invalid/x.pdf",
+    )
+
+    assert sports.fmlv_range == "Action Sports"
+    assert sports.label.startswith("Action Sports ")
 
 
 def test_an_unknown_range_selector_still_works() -> None:

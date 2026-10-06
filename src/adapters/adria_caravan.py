@@ -127,6 +127,36 @@ DEFAULT_RANGES: tuple[tuple[str, str], ...] = tuple(
 
 _RANGE_BY_LABEL: dict[str, RangeConfig] = {config.label: config for config in RANGES}
 
+#: A trim that makes a configuration **its own range**, not a duplicate of its sibling.
+#:
+#: Adria's trim labels are unreliable and `model_includes_trim=False` everywhere because
+#: of it — the Altea 622 DK Avon carries its sibling's `Altea 622 DP Dart`. So two
+#: configurations sharing a layout label normally collide and the second is dropped,
+#: which is right: inventing an identity from a wrong trim is worse than losing a row.
+#:
+#: **The Action is the one place the trim is corroborated.** Adria's own UK price list of
+#: October 2026 prices `Action 391 LH` at GBP28,995 and `Action Sports 391 LH` at
+#: GBP30,495 — two names, two prices — and the range page gives the Sports its own
+#: section and interior. The site's trim labels are `Truma Combi Silver` and `SportsTC`,
+#: so the `sports` token separates them and the price list says they are separate.
+#:
+#: Keyed on the range's own label and a lower-cased token of the trim. Add an entry only
+#: with evidence outside the trim label; without it, the collision guard is the right
+#: answer and should keep dropping the row.
+SUB_RANGES: dict[tuple[str, str], str] = {
+    ("Action", "sports"): "Action Sports",
+}
+
+
+def sub_range_for(config: RangeConfig, product: LivewireProduct) -> str:
+    """`config`'s FMLV range, unless this configuration's trim names a sub-range."""
+    trim = (product.trim_label or "").lower()
+    for (range_label, token), fmlv_range in SUB_RANGES.items():
+        if config.label == range_label and token in trim:
+            return fmlv_range
+    return config.fmlv_range
+
+
 #: Ten configurations across the four ranges, against FMLV's eleven live rows.
 EXPECTED_LAYOUTS = 10
 
@@ -295,8 +325,13 @@ class AdriaCaravan:
         return model_name(self.product)
 
     @property
+    def fmlv_range(self) -> str:
+        """The range, **after a sub-range trim has been honoured** — see `SUB_RANGES`."""
+        return sub_range_for(self.config, self.product)
+
+    @property
     def label(self) -> str:
-        return f"{self.config.fmlv_range} {self.model or self.product.product_id}"
+        return f"{self.fmlv_range} {self.model or self.product.product_id}"
 
     @property
     def derived_payload_kilograms(self) -> int | None:
@@ -396,7 +431,7 @@ def build_extracted(
     caravan = Caravan(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
-        manufacturer_range=product.config.fmlv_range,
+        manufacturer_range=product.fmlv_range,
         model=product.model,
         berths=product.product.berths or product.figures.get("berths"),
         rrp_pounds=product.product.price_pounds,
@@ -423,7 +458,7 @@ def build_extracted(
             source_url=product.pdf_url, snippet=f"{product.label} — {snippet}"
         )
 
-    renamed = RENAMED_MODELS.get((product.config.fmlv_range, product.model or ""))
+    renamed = RENAMED_MODELS.get((product.fmlv_range, product.model or ""))
     moved = (
         f'; FMLV holds this layout as "{renamed[1]}" and Adria have changed the code, '
         f"which the identical mass in running order and total length confirm is the same "
@@ -433,7 +468,7 @@ def build_extracted(
     )
     record(
         "manufacturer_range",
-        f'range "{product.config.fmlv_range}" from the /caravans index — accept with the '
+        f'range "{product.fmlv_range}" from the /caravans index — accept with the '
         f"model, they are one name",
     )
     record(
@@ -589,7 +624,7 @@ def collect(
                     on_progress(f"{prefix} — DROPPED: {reason}")
                     continue
 
-                key = (config.fmlv_range, caravan.model or "")
+                key = (caravan.fmlv_range, caravan.model or "")
                 if key in seen_models:
                     on_progress(
                         f"{prefix} — DROPPED: its layout label gives the model "
