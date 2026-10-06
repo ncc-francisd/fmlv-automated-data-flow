@@ -110,11 +110,14 @@ equipment, which would be 181 kg if it matched Celex. Worth putting to Steve.
 1. **Are all four belted seats three-point?** Steve says "4 belted seats" without saying
    which. [`README.md`](README.md) counts three-point belts only, so a lap belt in the
    four would change the figure.
-2. **Can a T6.1 still be ordered new?** The site says yes — *"a brand new T6.1
-   Volkswagen"* — but its footer reads © 2025. The answer decides whether the eight T6.1
-   rows stay live beside the T7 or give way to it.
-3. **LWB and high top** are "not available at the moment" — so any FMLV row for one has no
-   current product behind it.
+2. **Does "not available at the moment" mean out of stock, not orderable, or not in the
+   2027 line-up?** Only the last would retire anything. Put to Steve on 6 October 2026,
+   because availability comes and goes and FMLV should list what the line-up *will* be —
+   a model that is coming belongs on the site before it arrives. If the LWB, the high top
+   and Space are coming to the T7, each needs its own MTPLM, MIRO and price before its row
+   can move over; until then those rows keep their T6.1 figures.
+3. **Space LWB** is on the website but archived in FMLV as `5501`. If it continues, it
+   should come back.
 4. **What is the LWB's MTPLM?** The handbook gives the LWB its length (`5.304 m`, which
    FMLV already holds), the same width and height, and `LWB versions ... weigh 70kg more
    than the SWB version` — so MIRO is derivable at 2545 (Celex) and 2530 (Nexa/Nexa+).
@@ -144,12 +147,22 @@ Those eight rows are the **T6.1** range and they are correct for it — they mat
 website's five models across their wheelbases almost exactly. The three SWB rows are the
 only ones Steve's T7 documents cover.
 
-**Which raises the question the figures cannot answer.** FMLV's SWB rows are `4904 mm`
-long, which is the T6.1; the T7 is `5050`. Writing the T7 figures into them replaces a
-product Bilbo's still advertise with a different one, rather than recording the new van
-alongside it. The alternative is to add the three T7 models as **new products** and leave
-the T6.1 rows alone. That is a decision for the requester — it turns on whether a T6.1 can
-still be ordered new, which the site implies and the changeover makes doubtful.
+**The T7 figures go over the existing rows — they do not become new products.** FMLV's
+SWB rows are `4904 mm` long, which is the T6.1, and the T7 is `5050`, so the instinct is to
+add the T7 beside the T6.1 rather than over it. **The schema settles it against that.**
+The only base-vehicle column is `base_vehicle_manufacturer`, which holds `VW` for both
+vans; there is no column for the base vehicle's *model*. And Bilbo's rows name the
+conversion and the wheelbase — `CELEX / SWB - Elevating Roof` — not the van. Added as new
+products the T7 rows would be **character-for-character identical** to the T6.1 ones: a
+1.000 match to the matcher, and two indistinguishable rows to anyone filtering FMLV.
+
+So an FMLV row here is "the Celex, short wheelbase, elevating roof", and it carries
+whichever Transporter is current underneath. A changeover moves the product onto a new
+base vehicle; it does not create a second product. **Update in place.**
+
+The stock list showing a T7 and a T6.1 together is not evidence against this — a forecourt
+carries the outgoing model throughout a changeover. It says nothing about what can be
+ordered new.
 
 | | held | issued |
 |---|---|---|
