@@ -94,3 +94,37 @@ equipment, which would be 181 kg if it matched Celex. Worth putting to Steve.
 2. **Komba and Space**, still on the site but not in the range or the price list.
 3. **LWB and high top** are "not available at the moment" — so any FMLV row for one has no
    current product behind it.
+
+## What FMLV holds, and what was issued
+
+The export of 5 October 2026 carries **26 rows**: a superseded block of 13 (`1174`–`1186`,
+all archived) and a current block of 13, of which **eight are live**.
+
+| product_id | range / model | |
+|---|---|---|
+| **5489** | CELEX / SWB - Elevating Roof | **updated** |
+| **5493** | NEXA / SWB - Elevating Roof | **updated** |
+| **5496** | NEXA+ / SWB - Elevating Roof | **updated** |
+| 5491 | CELEX / LWB Elevating roof | LWB not available |
+| 5495 | NEXA / LWB Elevating roof | LWB not available |
+| 5498 | NEXA+ / LWB Elevating roof | LWB not available |
+| 5492 | KOMBA / LWB Elevating roof | not in the range, and LWB |
+| 5499 | NEXA / SPACE - SWB - Elevating Roof | not in the range |
+
+The three SWB rows are the only ones Steve's documents cover. The other five have no
+current product behind them — a question for the requester, and **not** an archiving one.
+
+The figures FMLV held were the **T6.1** Transporter: `4904 mm` long against the T7's
+`5050`, and `2283 mm` wide, which is a mirrors-included figure. Both are superseded.
+
+| | held | issued |
+|---|---|---|
+| CELEX price / MRO / MTPLM / payload | £59,150 · 2340 · 3000 · 660 | **£65,500 · 2475 · 3025 · 550** |
+| NEXA | £59,150 · 2425 · 3000 · 575 | **£65,500 · 2460 · 3025 · 565** |
+| NEXA+ | £59,150 · 2425 · 3000 · 575 | **£66,300 · 2460 · 3025 · 565** |
+| length / width (all three) | 4904 · 2283 | **5050 · 2032** |
+
+Height `2030`, berths `2` and four travel seats were already right.
+
+**`year` is not written.** The requester updates only the current-year rows and bumps them
+into the next year by hand in the export, so writing a year here would pre-empt that.
