@@ -107,8 +107,8 @@ def test_the_products_are_named_as_fmlv_files_them() -> None:
 
 
 def test_the_170ps_ford_is_named_tourneo_against_fmlvs_limited() -> None:
-    """**The one place FMLV's string is not used.** The retail brochure heads its variant
-    columns `Ford Custom TREND 110PS`, `Ford Custom LIMITED 136PS` and `Ford Custom
+    """**The one place FMLV's string is not used.** Below its price table the same leaflet
+    carries a specification table headed `Ford Custom TREND 110PS`, `Ford Custom LIMITED 136PS` and `Ford Custom
     TOURNEO 170PS` — Custom is the family, the capitalised word is the trim. So the 170 is
     a Tourneo and FMLV's `170 Limited` is wrong; `Limited` is the 136. The corrected name
     is emitted with provenance so the run proposes the rename."""

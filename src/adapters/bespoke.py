@@ -130,14 +130,19 @@ class BespokeExplore:
 
 
 #: **FMLV's names, not the leaflet's**, per the rule in `docs/adapters/README.md` — with
-#: one deliberate exception, settled by the retail brochure on 6 October 2026.
+#: one deliberate exception, settled on 6 October 2026.
 #:
-#: The brochure's variant table heads its columns `Ford Custom TREND 110PS Manual`,
-#: `Ford Custom LIMITED 136PS Auto` and `Ford Custom TOURNEO 170PS Auto`. **Custom is the
-#: model family and the capitalised word is the trim**, so the 170 PS Ford is a Tourneo
-#: and FMLV's `170 Limited` is wrong — `Limited` already belongs to the 136 PS. The
-#: corrected name is emitted so the run proposes the rename; it still matches FMLV's row
-#: at 0.714 and scores 0.000 against both siblings, whose engine codes disagree.
+#: Below the price table the **same leaflet** carries a specification table, and its
+#: columns are headed `Ford Custom TREND 110PS Manual`, `Ford Custom LIMITED 136PS Auto`
+#: and `Ford Custom TOURNEO 170PS Auto`, with the VW side reading `T7 Commerce PLUS` and
+#: `T7 Commerce PRO` the same way. **Custom is the Transit Custom family and the
+#: capitalised word is the trim**, which is why the site gives the Tourneo its own page.
+#:
+#: So FMLV's `170 Limited` carries the wrong trim — `Limited` belongs to the 136 PS. The
+#: corrected name is emitted, with provenance on `model`, so the run proposes the rename
+#: rather than quietly agreeing with FMLV. It still matches FMLV's row at 0.714, over the
+#: 0.5 threshold, and scores 0.000 against the 110 and the 136, whose engine codes read as
+#: layout codes and disagree.
 EXPLORE: tuple[BespokeExplore, ...] = (
     BespokeExplore(
         "ford custom trend 110ps 6 speed manual",

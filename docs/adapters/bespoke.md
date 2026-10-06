@@ -92,7 +92,8 @@ Against the export of 5 October 2026: **9 collected against 8 live rows — 5 un
 
 ## Settled: the 170 PS Ford is a Tourneo, not a Limited
 
-The retail brochure heads its variant columns **`Ford Custom TREND 110PS Manual`**,
+Below the price table the **same leaflet** carries a specification table — alloy wheels,
+cameras, warranty — and its columns are headed **`Ford Custom TREND 110PS Manual`**,
 **`Ford Custom LIMITED 136PS Auto`** and **`Ford Custom TOURNEO 170PS Auto`**, with the VW
 columns reading **`T7 Commerce PLUS`** and **`T7 Commerce PRO`** the same way. **Custom is
 the Transit Custom family and the capitalised word is the trim**, which is why the site
