@@ -11,7 +11,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.cli import main
+from src.product_model.caravan_io import write_csv as write_caravan_csv
 from src.product_model.io import write_csv
+from src.product_model.caravan import Caravan
 from src.product_model.model import Motorhome
 
 
@@ -133,3 +135,51 @@ def test_columns_reports_a_product_id_that_is_not_there(tmp_path, capsys) -> Non
 
     assert exit_code == 1
     assert "no row with product_id 1" in capsys.readouterr().out
+
+
+def _adria_caravan_export(root: Path) -> Path:
+    """A caravan baseline. **A `Caravan` has no `base_vehicle_manufacturer`** — a caravan
+    has no base vehicle — which is the whole point of the test below."""
+    export = root / "exports" / "3_Adria Mobil" / "2026-10-06_Adria Mobil_touring-caravans.csv"
+    export.parent.mkdir(parents=True, exist_ok=True)
+    write_caravan_csv(
+        [
+            Caravan(
+                product_id=3797,
+                year=2026,
+                manufacturer="Adria Mobil",
+                manufacturer_range="Action",
+                model="361 LT",
+            )
+        ],
+        export,
+    )
+    return export
+
+
+def test_a_caravan_baseline_prints_instead_of_raising(tmp_path, capsys) -> None:
+    """**The trap this exists for.** The row printer read `base_vehicle_manufacturer`
+    unconditionally, which a `Caravan` does not have, so `--vehicle-class caravan` died
+    with an `AttributeError` after printing the counts — on the product area where a
+    baseline is hardest to eyeball, and while checking whether Adria had dropped a layout.
+    """
+    _adria_caravan_export(tmp_path)
+
+    exit_code = main(
+        ["show-baseline", "Adria", "--vehicle-class", "caravan", "--data-dir", str(tmp_path)]
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "361 LT" in out
+    assert "Action" in out
+
+
+def test_the_caravan_listing_leaves_out_the_base_vehicle_column(tmp_path, capsys) -> None:
+    """Not merely blank — absent. A column headed `base vehicle` on a caravan listing
+    invites someone to wonder what is missing from it."""
+    _adria_caravan_export(tmp_path)
+
+    main(["show-baseline", "Adria", "--vehicle-class", "caravan", "--data-dir", str(tmp_path)])
+
+    assert "base vehicle" not in capsys.readouterr().out

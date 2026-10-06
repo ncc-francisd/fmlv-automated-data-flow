@@ -967,18 +967,25 @@ def _show_baseline_command(args: argparse.Namespace) -> int:
     superseded = [r for r in in_scope if r.latest_model_id]
     print(f"  of those, naming a later model {len(superseded)}\n")
 
+    # **`base_vehicle_manufacturer` is a motorhome field.** A caravan has no base vehicle
+    # and `Caravan` has no such attribute, so reading it unconditionally made
+    # `show-baseline --vehicle-class caravan` raise `AttributeError` instead of printing
+    # the rows — on the one product area where a baseline is hardest to eyeball.
+    shows_base_vehicle = any(hasattr(row, "base_vehicle_manufacturer") for row in in_scope)
     header = (
         f"{'id':>7}  {'year':>4}  {'range':<28} {'model':<22} "
-        f"{'base vehicle':<14} {'later model'}"
+        + (f"{'base vehicle':<14} " if shows_base_vehicle else "")
+        + "later model"
     )
     print(header)
     print("-" * len(header))
     for row in sorted(in_scope, key=lambda r: (r.manufacturer_range or "", r.model or "")):
+        base_vehicle = getattr(row, "base_vehicle_manufacturer", None)
         print(
             f"{row.product_id or '':>7}  {row.year or '':>4}  "
             f"{(row.manufacturer_range or ''):<28} {(row.model or ''):<22} "
-            f"{(row.base_vehicle_manufacturer or ''):<14} "
-            f"{row.latest_model_id or ''}"
+            + (f"{(base_vehicle or ''):<14} " if shows_base_vehicle else "")
+            + f"{row.latest_model_id or ''}"
         )
     return 0
 
