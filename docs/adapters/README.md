@@ -1701,6 +1701,23 @@ answer is still a human reading the proposal.
 claimed baseline row cannot also be reported as disappeared. Etrusco's run said 4 new and 3
 disappeared where the truth was 7 and 6.
 
+### An answer about one base vehicle is not a statement about the range
+
+When a manufacturer replies to a question, the scope of the answer is the scope of the
+question. Bilbo's sales manager wrote, on 6 October 2026, *"Attached are the dimensions &
+payload and a price list for the **new VW T7**. We have 3 models in the range at the
+moment Celex, Nexa & Nexa+ all based on the SWB VW T7."* Read as a description of the
+range, that retires two models and five wheelbase variants. Read as what it says — three
+models **on the new van** — it retires nothing: the website sells five models across nine
+SWB/LWB combinations, all on the T6.1, and the stock list carried a T7 and a T6.1 side by
+side that same day.
+
+**A converter mid-changeover publishes two ranges at once**, exactly as a manufacturer
+publishes two model years at once during the rollover. Before treating any product as
+withdrawn, check it against the site rather than against the scope of an email, and ask
+which base vehicle each existing FMLV row describes — the new figures may belong on new
+rows rather than over the old ones. See [`bilbos.md`](bilbos.md).
+
 ## Start here: is there a brochure or price list PDF?
 
 **Ask this before looking at the website's rendering behaviour at all.** It was the

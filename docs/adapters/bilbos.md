@@ -25,14 +25,33 @@ nobody had re-read the source. Revisit only if Bilbo's start publishing the pric
 
 ## The range, as Bilbo's state it
 
-Steve Ayles, 6 October 2026: *"We have 3 models in the range at the moment Celex, Nexa &
-Nexa+ all based on the SWB VW T7. LWB and high top variants not available at the moment.
-All have 4 belted seats and can have a roof bed as an option, so standard 2 berth but
-could be 2+2 (4 berth)."*
+Steve Ayles, 6 October 2026: *"Attached are the dimensions & payload and a price list for
+the **new VW T7**. We have 3 models in the range at the moment Celex, Nexa & Nexa+ all
+based on the SWB VW T7. LWB and high top variants not available at the moment. All have 4
+belted seats and can have a roof bed as an option, so standard 2 berth but could be 2+2 (4
+berth)."*
 
-**The site still lists Komba and Space** alongside those three. Both are absent from the
-2026 price list and from Steve's range, so the menu is stale — but that is a question for
-the requester, not an inference to act on.
+**That is a statement about the T7, not about the range.** Read as "Bilbo's now sell three
+campervans" it is wrong, and reading it that way is the mistake this paragraph exists to
+stop. The website sells **five**, each on one or both wheelbases — nine products:
+
+| | SWB | LWB |
+|---|---|---|
+| Space | yes | yes |
+| Komba | — | **LWB only** |
+| Celex | yes | yes |
+| Nexa | yes | yes |
+| Nexa+ | yes | yes |
+
+**The website is the T6.1 site.** Its title is *"Bilbo's Campervans | **T6.1**, T6 & T5
+Volkswagen Campervan Conversions & Sales"*, its range page offers *"a brand new **T6.1**
+Volkswagen"*, and its footer reads © 2025. The T7 is named nowhere on it except in the
+stock list, which on 6 October 2026 carried **both** — a `VW T7 Bilbos Celex PRO` at
+£75,430 and a `VW T6.1 Nexa+` at £65,950.
+
+So Bilbo's are mid-changeover. Komba and Space are **not discontinued**; they are not yet
+offered on the new van. What Steve sent describes the T7 range as it stands: three models,
+SWB only, LWB and high top still to come.
 
 ## What the two documents hold
 
@@ -91,7 +110,9 @@ equipment, which would be 181 kg if it matched Celex. Worth putting to Steve.
 1. **Are all four belted seats three-point?** Steve says "4 belted seats" without saying
    which. [`README.md`](README.md) counts three-point belts only, so a lap belt in the
    four would change the figure.
-2. **Komba and Space**, still on the site but not in the range or the price list.
+2. **Can a T6.1 still be ordered new?** The site says yes — *"a brand new T6.1
+   Volkswagen"* — but its footer reads © 2025. The answer decides whether the eight T6.1
+   rows stay live beside the T7 or give way to it.
 3. **LWB and high top** are "not available at the moment" — so any FMLV row for one has no
    current product behind it.
 4. **What is the LWB's MTPLM?** The handbook gives the LWB its length (`5.304 m`, which
@@ -113,17 +134,22 @@ all archived) and a current block of 13, of which **eight are live**.
 | **5489** | CELEX / SWB - Elevating Roof | **updated** |
 | **5493** | NEXA / SWB - Elevating Roof | **updated** |
 | **5496** | NEXA+ / SWB - Elevating Roof | **updated** |
-| 5491 | CELEX / LWB Elevating roof | LWB not available |
-| 5495 | NEXA / LWB Elevating roof | LWB not available |
-| 5498 | NEXA+ / LWB Elevating roof | LWB not available |
-| 5492 | KOMBA / LWB Elevating roof | not in the range, and LWB |
-| 5499 | NEXA / SPACE - SWB - Elevating Roof | not in the range |
+| 5491 | CELEX / LWB Elevating roof | T6.1; no T7 LWB yet |
+| 5495 | NEXA / LWB Elevating roof | T6.1; no T7 LWB yet |
+| 5498 | NEXA+ / LWB Elevating roof | T6.1; no T7 LWB yet |
+| 5492 | KOMBA / LWB Elevating roof | T6.1, and Komba is LWB only |
+| 5499 | NEXA / SPACE - SWB - Elevating Roof | T6.1; Space is not yet on the T7 |
 
-The three SWB rows are the only ones Steve's documents cover. The other five have no
-current product behind them — a question for the requester, and **not** an archiving one.
+Those eight rows are the **T6.1** range and they are correct for it — they match the
+website's five models across their wheelbases almost exactly. The three SWB rows are the
+only ones Steve's T7 documents cover.
 
-The figures FMLV held were the **T6.1** Transporter: `4904 mm` long against the T7's
-`5050`, and `2283 mm` wide, which is a mirrors-included figure. Both are superseded.
+**Which raises the question the figures cannot answer.** FMLV's SWB rows are `4904 mm`
+long, which is the T6.1; the T7 is `5050`. Writing the T7 figures into them replaces a
+product Bilbo's still advertise with a different one, rather than recording the new van
+alongside it. The alternative is to add the three T7 models as **new products** and leave
+the T6.1 rows alone. That is a decision for the requester — it turns on whether a T6.1 can
+still be ordered new, which the site implies and the changeover makes doubtful.
 
 | | held | issued |
 |---|---|---|
