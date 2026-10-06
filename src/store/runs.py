@@ -184,13 +184,16 @@ class RunTotals:
 
     #: Products this run read off the manufacturer's site.
     collected: int
-    #: Of those, the ones no earlier run had seen.
+    #: Of those, the ones **FMLV does not hold** — no `fmlv_product_id`, so they matched
+    #: no baseline row. See `run_totals` for why it is not "first seen by this pipeline".
     new: int
     #: Baseline products the run did not find. See `disappearance_notice`.
     disappeared: int
 
     @property
-    def unchanged(self) -> int:
+    def matched(self) -> int:
+        """Collected products that found an FMLV row. Not *unchanged* — they may well
+        carry proposed corrections; what they are is already in FMLV."""
         return self.collected - self.new
 
 
@@ -207,17 +210,30 @@ _NOT_ACTUALLY_FOUND = (
 def run_totals(connection: sqlite3.Connection, run_id: int) -> RunTotals:
     """`RunTotals` for one run.
 
-    `last_seen_run_id` is stamped on every product a run touched and `first_seen_run_id`
-    only by the run that introduced it, so both counts fall out of the product table
-    without the run needing to record anything — **less the disappearances**, which are
-    stamped too and were never found. See `_NOT_ACTUALLY_FOUND`.
+    `last_seen_run_id` is stamped on every product a run touched, so `collected` falls out
+    of the product table without the run needing to record anything — **less the
+    disappearances**, which are stamped too and were never found. See `_NOT_ACTUALLY_FOUND`.
+
+    **`new` means absent from FMLV, not absent from this pipeline.** It was
+    `first_seen_run_id = run_id`, which is a different question and reads right only after
+    a manufacturer's first run: on that run every product is first-seen, so the page said
+    `9 products collected · 9 new` for Bespoke's run 190 where eight of the nine had
+    matched an FMLV row and the upload CSV correctly carried one new product. The reviewer
+    reads "new" as "FMLV does not have this", which is also what the run page means by it
+    one line further down — `run_detail.html` marks a card new on `not
+    product.fmlv_product_id`. This counts the same thing, so the header and the cards
+    below it can no longer disagree.
+
+    A product stays new until it is uploaded and comes back in an export with an id. That
+    is correct: for as long as FMLV does not hold it, the run really is proposing it.
     """
     collected = connection.execute(
         f"SELECT COUNT(*) FROM product WHERE last_seen_run_id = ? AND NOT {_NOT_ACTUALLY_FOUND}",
         (run_id, run_id),
     ).fetchone()[0]
     new = connection.execute(
-        f"SELECT COUNT(*) FROM product WHERE first_seen_run_id = ? AND NOT {_NOT_ACTUALLY_FOUND}",
+        "SELECT COUNT(*) FROM product WHERE last_seen_run_id = ?"
+        f" AND fmlv_product_id IS NULL AND NOT {_NOT_ACTUALLY_FOUND}",
         (run_id, run_id),
     ).fetchone()[0]
     disappeared = connection.execute(
