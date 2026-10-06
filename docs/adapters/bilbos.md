@@ -94,6 +94,14 @@ equipment, which would be 181 kg if it matched Celex. Worth putting to Steve.
 2. **Komba and Space**, still on the site but not in the range or the price list.
 3. **LWB and high top** are "not available at the moment" — so any FMLV row for one has no
    current product behind it.
+4. **What is the LWB's MTPLM?** The handbook gives the LWB its length (`5.304 m`, which
+   FMLV already holds), the same width and height, and `LWB versions ... weigh 70kg more
+   than the SWB version` — so MIRO is derivable at 2545 (Celex) and 2530 (Nexa/Nexa+).
+   **The payload is not**, because the only MTPLM printed is the SWB T30's 3025 and FMLV's
+   LWB rows hold 3200, which is the T32. Without the LWB's own MTPLM those rows cannot be
+   completed, and the 2032 mm width cannot safely be carried across to them either: every
+   SWB row FMLV holds has a length of 4904 mm, which is the **T6.1**, so the LWB rows may
+   describe the older van rather than the T7.
 
 ## What FMLV holds, and what was issued
 
