@@ -139,8 +139,11 @@ them. More variants are coming, but Bilbo's cannot say which or when, so there i
 to list: a row needs a name and figures, and "other variants will follow later" supplies
 neither. The three go up and the rest are left at 2026 to fall out of scope on 1 January.
 
-**Nothing is archived.** See [`README.md`](README.md) — a product that stops being sold
-stays findable.
+**Nothing is archived, and nothing is deactivated either.** The three continuing models
+are uploaded as 2027 and the rest are simply left at 2026 — that *is* the retirement. They
+stay on FMLV, visible and findable, badged as last year's models, and they drop out of the
+pipeline's comparison scope on 1 January when `_is_current_model_year` stops counting 2026.
+See [`README.md`](README.md): a product that stops being sold stays findable.
 
 The website still showed five models across nine wheelbase combinations when this was
 written. Steve says it is being updated; until it is, **the site is not evidence of the
