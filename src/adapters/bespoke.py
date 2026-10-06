@@ -129,12 +129,15 @@ class BespokeExplore:
         return f"{self.fmlv_range} {self.fmlv_model}"
 
 
-#: **FMLV's names, not the leaflet's**, per the rule in `docs/adapters/README.md`.
+#: **FMLV's names, not the leaflet's**, per the rule in `docs/adapters/README.md` — with
+#: one deliberate exception, settled by the retail brochure on 6 October 2026.
 #:
-#: One mismatch is worth knowing about: the leaflet calls the 170 PS Ford a **Tourneo**
-#: where FMLV holds `170 Limited`, and the site gives the Tourneo its own page. Whether
-#: FMLV's row is really the Tourneo is a question for the requester; the name here is
-#: FMLV's so the row matches, and the disagreement is narrated every run.
+#: The brochure's variant table heads its columns `Ford Custom TREND 110PS Manual`,
+#: `Ford Custom LIMITED 136PS Auto` and `Ford Custom TOURNEO 170PS Auto`. **Custom is the
+#: model family and the capitalised word is the trim**, so the 170 PS Ford is a Tourneo
+#: and FMLV's `170 Limited` is wrong — `Limited` already belongs to the 136 PS. The
+#: corrected name is emitted so the run proposes the rename; it still matches FMLV's row
+#: at 0.714 and scores 0.000 against both siblings, whose engine codes disagree.
 EXPLORE: tuple[BespokeExplore, ...] = (
     BespokeExplore(
         "ford custom trend 110ps 6 speed manual",
@@ -146,7 +149,7 @@ EXPLORE: tuple[BespokeExplore, ...] = (
     ),
     BespokeExplore(
         "ford custom tourneo 170ps 8 speed auto",
-        "Explore Custom", "170 Limited Elevating Roof", "Ford",
+        "Explore Custom", "170 Tourneo Elevating Roof", "Ford",
     ),
     BespokeExplore(
         "vw t7 commerce plus 110ps 6 speed manual",
@@ -266,6 +269,12 @@ def _build_explore(variant: BespokeExplore, price: int | None, source_url: str) 
     record(
         "base_vehicle_manufacturer",
         f"the leaflet prices this variant as a {variant.leaflet_label}",
+    )
+    record(
+        "model",
+        f"the leaflet's 'Choose your vehicle base' table names this variant "
+        f"'{variant.leaflet_label}', giving the engine and the trim; 'Elevating Roof' is "
+        f"the Austops pop-top every Explore carries",
     )
     record(
         "berths",

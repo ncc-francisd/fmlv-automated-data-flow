@@ -87,15 +87,30 @@ Against the export of 5 October 2026: **9 collected against 8 live rows — 5 un
 |---|---|
 | `Explore Custom / 110 Trend` | £61,000 → **£60,995** |
 | `Explore Custom / 136 Limited` | £64,995 → **£65,995** |
-| `Explore Custom / 170 Limited` | £69,995 → **£68,995** |
+| `Explore Custom / 170 Limited` | £69,995 → **£68,995**, and renamed **`170 Tourneo`** |
 | `Explore Transporter / 170 Commerce Pro` | **new**, £73,995 |
+
+## Settled: the 170 PS Ford is a Tourneo, not a Limited
+
+The retail brochure heads its variant columns **`Ford Custom TREND 110PS Manual`**,
+**`Ford Custom LIMITED 136PS Auto`** and **`Ford Custom TOURNEO 170PS Auto`**, with the VW
+columns reading **`T7 Commerce PLUS`** and **`T7 Commerce PRO`** the same way. **Custom is
+the Transit Custom family and the capitalised word is the trim**, which is why the site
+gives the Tourneo its own page.
+
+So FMLV's `Explore Custom / 170 Limited` carries the wrong trim — `Limited` is the 136 PS.
+The adapter emits **`170 Tourneo Elevating Roof`** with provenance on `model`, so the run
+proposes the rename rather than quietly agreeing with FMLV. It still matches the right row
+(0.714, over the 0.5 threshold) and scores 0.000 against the 110 and the 136, whose engine
+codes read as layout codes and disagree.
+
+**This is the one place the adapter does not use FMLV's own string.** The rule in
+[`README.md`](README.md) says file products as FMLV files them; it does not say repeat an
+error the manufacturer's own brochure contradicts.
 
 ## Open questions
 
-1. **Is FMLV's `170 Limited` really the Tourneo?** The leaflet calls the 170 PS Ford a
-   *Tourneo* and the site gives the Tourneo its own page, where FMLV holds `170 Limited`.
-   The adapter emits FMLV's name so the row matches, and narrates the mismatch.
-2. **Weights.** Worth asking Shane for MIRO and maximum permissible weight per variant —
+1. **Weights.** Worth asking Shane for MIRO and maximum permissible weight per variant —
    FMLV has figures but nothing can confirm them, and the new Commerce Pro has none.
-3. **The PHEV and the Sports Edition** have pages but no FMLV rows. The Sports Edition
+2. **The PHEV and the Sports Edition** have pages but no FMLV rows. The Sports Edition
    states no price at all, so it may be an upgrade pack rather than a product.

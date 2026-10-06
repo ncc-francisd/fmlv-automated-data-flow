@@ -11,6 +11,7 @@ from src.adapters.bespoke import (
     parse_explore_prices,
     price_disagreements,
 )
+from src.diff.matching import DEFAULT_THRESHOLD, _identity_tokens, _jaccard
 from src.product_model.enums import BodyType
 from src.vehicle_class import VehicleClass
 
@@ -100,10 +101,48 @@ def test_every_explore_variant_is_priced_by_the_leaflet() -> None:
 
 
 def test_the_products_are_named_as_fmlv_files_them() -> None:
-    """FMLV's own strings, not the leaflet's — see the rule in `docs/adapters/README.md`.
-    The leaflet calls the 170PS Ford a Tourneo where FMLV holds `170 Limited`."""
-    assert _explore("170 Limited Elevating Roof").fmlv_range == "Explore Custom"
-    assert "tourneo" in _explore("170 Limited Elevating Roof").leaflet_label
+    """FMLV's own strings, not the leaflet's — see the rule in `docs/adapters/README.md`."""
+    assert _explore("110 Trend Elevating Roof").fmlv_range == "Explore Custom"
+    assert _explore("110 Commerce Plus Elevating Roof").fmlv_range == "Explore Transporter"
+
+
+def test_the_170ps_ford_is_named_tourneo_against_fmlvs_limited() -> None:
+    """**The one place FMLV's string is not used.** The retail brochure heads its variant
+    columns `Ford Custom TREND 110PS`, `Ford Custom LIMITED 136PS` and `Ford Custom
+    TOURNEO 170PS` — Custom is the family, the capitalised word is the trim. So the 170 is
+    a Tourneo and FMLV's `170 Limited` is wrong; `Limited` is the 136. The corrected name
+    is emitted with provenance so the run proposes the rename."""
+    variant = _explore("170 Tourneo Elevating Roof")
+
+    assert variant.fmlv_range == "Explore Custom"
+    assert "tourneo" in variant.leaflet_label
+    assert not any(v.fmlv_model == "170 Limited Elevating Roof" for v in EXPLORE)
+
+
+def test_the_corrected_name_still_finds_fmlvs_row_and_not_its_siblings() -> None:
+    """A rename is only safe if it still matches. `170 Tourneo` scores 0.714 against
+    FMLV's `170 Limited` — over the 0.5 threshold — and 0.000 against the 110 and the 136,
+    whose engine codes read as layout codes and disagree."""
+    corrected = _explore("170 Tourneo Elevating Roof")
+
+    def score(model: str) -> float:
+        return _jaccard(
+            _identity_tokens(corrected.fmlv_range, corrected.fmlv_model),
+            _identity_tokens("Explore Custom", model),
+        )
+
+    assert score("170 Limited Elevating Roof") > DEFAULT_THRESHOLD
+    assert score("136 Limited Elevating Roof") == 0.0
+    assert score("110 Trend Elevating Roof") == 0.0
+
+
+def test_the_model_name_is_sourced_so_the_rename_reaches_the_reviewer() -> None:
+    """Without provenance for `model` the corrected name would match FMLV's row and then
+    sit there unproposed — `compare_fields` only examines fields the adapter sourced."""
+    extracted = bespoke._build_explore(_explore("170 Tourneo Elevating Roof"), 68995, "u")
+
+    assert "model" in extracted.provenance
+    assert "tourneo" in extracted.provenance["model"].snippet.lower()
 
 
 def test_the_base_vehicle_is_the_marque_alone() -> None:
