@@ -168,10 +168,15 @@ LAYOUTS: tuple[_Layout, ...] = (
 #: names them and says not to.
 #: Each pairs the MY2027 name with the FMLV row that is really the same vehicle, so the
 #: run can say which disappearance notices to ignore.
+#: **Each FMLV row is named twice on purpose.** The requester moves these three into the
+#: `Final Edition` range by hand, because the run cannot propose a rename for a product it
+#: never matched. Once he has, naming only the old range would point at rows that no
+#: longer exist under that name — so both are given, and the layout code, which does not
+#: change, is what actually identifies them.
 ROSTER_WITHOUT_A_PAGE: tuple[tuple[str, str], ...] = (
-    ("Final Edition I 7400 GD", "M-Line / I 7400 GD"),
-    ("Final Edition I 7400 Plus", "M-Line / I 7400 Plus"),
-    ("Final Edition I 7900 GD", "Platin / I 7900 GD"),
+    ("Final Edition I 7400 GD", "Final Edition (was M-Line) / I 7400 GD"),
+    ("Final Edition I 7400 Plus", "Final Edition (was M-Line) / I 7400 Plus"),
+    ("Final Edition I 7900 GD", "Final Edition (was Platin) / I 7900 GD"),
 )
 
 #: What the site now calls a layout, against what FMLV still holds. Keyed on the site's
