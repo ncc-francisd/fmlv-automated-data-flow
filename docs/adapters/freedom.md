@@ -182,6 +182,12 @@ invention: counted across every export on disk, **27 rows do exactly this** — 
 Wildax, Westfalia, Visiontech and Moto-Trek — and **not one row in any export leaves the
 model blank**.
 
+**It reads oddly on purpose, and never reaches a consumer.** Nova requires a brand, a
+range and a model and rejects an upload that leaves any of them empty, so a single-named
+product carries its name twice; the requester corrects the display name by hand in Nova
+after the upload. See the rule in [`README.md`](README.md) — this is a storage shape, not
+what the site shows.
+
 **`RENAMED_MODELS` is what keeps it matching.** Without it the correction scores exactly
 **0.500** against the row it corrects, which is the default threshold itself — one shared
 token of a two-token union. It would match, with no margin whatever, and if it ever

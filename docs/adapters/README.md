@@ -544,6 +544,41 @@ check how often it really does.** Bailey's comparison table would have caught B6
 and it was rejected as an automatic check for one reason: it appears on only 3 of the 22
 model pages. A check that fires on an eighth of the roster reads as reliable and is not.
 
+### A product with only one name carries it twice, because Nova will not take a blank
+
+Some manufacturers give a product a single name and no variant: Auto-Sleepers' **Air**,
+Hymer's **Grand Canyon**, Freedom's **Sunseeker**. FMLV has three name columns — brand,
+range and model — and **Nova rejects an upload that leaves any of them empty**, so the one
+name goes in twice and the row reads `Air / Air`.
+
+**This is the convention, not a defect in the data.** Counted across every export on disk,
+7 October 2026: **27 unarchived rows repeat the range as the model**, across Auto-Sleepers,
+Hymer, Wingamm, Wildax, Westfalia, Visiontech and Moto-Trek — and **not one row anywhere
+leaves the model blank**. So an adapter facing a single-named product repeats the name
+rather than inventing a variant from a strapline or a layout code, and rather than leaving
+a column empty that the upload would bounce.
+
+The requester explained it on 7 October 2026: *"every model must have a brand name, a
+range name and a model name and sometimes they don't … if I leave it blank then Nova
+rejects the upload. We normally upload them with the duplicate naming, and then once it's
+uploaded we change the display name manually in Nova."*
+
+Two things follow:
+
+- **The duplication is never shown to a consumer.** The display name is corrected by hand
+  in Nova after the upload, so `Air / Air` is a storage shape, not what the site reads.
+  Do not "fix" it by shortening one of the columns, and do not treat it as a rename
+  waiting to be proposed.
+- **It is a known rough edge, not a settled design.** The requester would change the
+  blank-field rule if Nova allowed it. If that changes, this convention goes with it.
+
+**Where FMLV holds an invented variant that the manufacturer has dropped, propose the
+duplicate.** Freedom's Sunseeker was `Sunseeker / Classic` from an earlier range name the
+site no longer uses anywhere; the correction to `Sunseeker / Sunseeker` scores exactly
+0.500 against the row it corrects — the default threshold itself — so declare it in
+`RENAMED_MODELS` or it may arrive as a new product beside a disappearance notice for the
+row it was meant to fix. See [`freedom.md`](freedom.md).
+
 ### Spell the base vehicle FMLV's way, not the manufacturer's
 
 `base_vehicle_manufacturer` is compared against FMLV's own stored string, so the spelling
