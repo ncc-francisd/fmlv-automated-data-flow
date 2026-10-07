@@ -133,3 +133,34 @@ Freedom model is under the 1250 kg micro threshold anyway.
   without a berth count would be.
 - **No internal length**, from any model.
 - **No awning length**, and no twin-axle question — all are single-axle.
+
+## First run — #140, 7 October 2026
+
+**8 scraped against 9 baseline: 1 changed, 7 unchanged, 0 new, 1 disappeared**, 3 rows for
+review and **117 fields verified unchanged**. Every price, mass and dimension on all eight
+models matches FMLV exactly — which is the strongest confirmation available that the model
+pages, and not the index, are where FMLV's own figures came from.
+
+The three rows:
+
+| | |
+|---|---|
+| `Carpento / 360` berths | **4 → 3**, from the page titling itself a *3 Berth Caravan* |
+| `Jetstream / Twin Sport` berths | not found this run — FMLV's 2 stands |
+| `Microlite / Discovery` berths | not found this run — FMLV's 2 stands |
+
+**The Carpento 360 is a genuine correction.** The page says three berths and lists a double
+plus a single, which is three sleeping places; FMLV holds four. Worth a reviewer's eye
+rather than a blind accept, but the evidence is on the site's side.
+
+**The one disappearance is `Carpento / 410` (5958)**, which Freedom no longer list — the
+requester's "slightly fewer models now". It is a genuine withdrawal, not a rename: no
+other model shares its 1000 kg MTPLM or its 5400 mm length.
+
+## The five-versus-nine confusion, for the record
+
+The first pass of this survey said FMLV held five products. It holds **nine** — the
+screenshot it was read from showed only the first five rows. The four it missed are
+`Carpento / 360`, `Carpento / 410`, `Wayfarer / Quad` and `Wayfarer / Duet`, which changed
+the expected first run from *three new* to *none new and one withdrawn*. Count off the
+export, never off a screenshot of one.
