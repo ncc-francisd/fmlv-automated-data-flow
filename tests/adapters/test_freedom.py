@@ -13,6 +13,7 @@ from src.adapters import ADAPTERS, adapter_for, freedom
 from src.adapters.freedom import (
     EXPECTED_MODELS,
     MODELS,
+    RENAMED_MODELS,
     Specification,
     _reconciles,
     build_extracted,
@@ -21,6 +22,7 @@ from src.adapters.freedom import (
     parse_specification,
     roster_slugs,
 )
+from src.diff.matching import _identity_tokens, _jaccard
 from src.product_model.enums import CaravanBodyType
 from src.vehicle_class import VehicleClass
 
@@ -97,15 +99,40 @@ def test_the_roster_is_read_from_the_index(models_index: str) -> None:
     assert {m.slug for m in MODELS} == set(slugs)
 
 
-def test_fmlv_files_by_model_family_not_the_sites_classic_range() -> None:
-    """The site groups five models under a `Classic Range` heading. FMLV does not use it —
-    its range is the family, and the Sunseeker is the one no slug would give you."""
+def test_the_range_is_the_model_family_not_the_sites_classic_heading() -> None:
+    """The site groups five models under a `Classic Range` heading. That is a page section
+    rather than a model name, and FMLV has never used it."""
     assert {m.fmlv_range for m in MODELS} == {
         "Jetstream", "Microlite", "Sunseeker", "Carpento", "Wayfarer",
     }
-    assert _model("Classic").slug == "sunseeker"
-    assert _model("Classic").fmlv_range == "Sunseeker"
     assert not any(m.fmlv_range == "Classic" for m in MODELS)
+    assert not any(m.fmlv_model == "Classic" for m in MODELS)
+
+
+def test_the_sunseeker_is_named_as_freedom_name_it() -> None:
+    """**The one place this adapter argues with FMLV, and it is deliberate.** Freedom give
+    the Sunseeker no variant name; FMLV holds `Sunseeker / Classic`, which the site uses
+    nowhere. The requester's rule for this brand is to match the website, and repeating
+    the range is what FMLV does for a product with no variant — 27 rows across seven other
+    manufacturers do it, and no row in any export leaves the model blank."""
+    sunseeker = _model("Sunseeker")
+
+    assert sunseeker.slug == "sunseeker"
+    assert (sunseeker.fmlv_range, sunseeker.fmlv_model) == ("Sunseeker", "Sunseeker")
+
+
+def test_the_sunseeker_rename_is_declared_so_it_still_matches() -> None:
+    """**Without this the correction would score exactly 0.500** against the row it is
+    correcting — the default threshold itself, one shared token of a two-token union. It
+    would match, with no margin at all, and the failure if it ever slipped is the one the
+    adapter guide warns of: a new product beside a disappearance notice for the very row
+    it was meant to correct. Declared, it scores 1.000 both before and after the fix."""
+    assert RENAMED_MODELS == {("Sunseeker", "Sunseeker"): ("Sunseeker", "Classic")}
+
+    own = _identity_tokens("Sunseeker", "Sunseeker")
+    held = _identity_tokens("Sunseeker", "Classic")
+    assert _jaccard(own, held) == pytest.approx(0.5), "the margin this entry removes"
+    assert _jaccard(held, held) == 1.0, "what the rename entry scores instead"
 
 
 # --- the specification ----------------------------------------------------------------

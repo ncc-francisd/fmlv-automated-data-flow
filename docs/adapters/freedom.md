@@ -164,3 +164,34 @@ screenshot it was read from showed only the first five rows. The four it missed 
 `Carpento / 360`, `Carpento / 410`, `Wayfarer / Quad` and `Wayfarer / Duet`, which changed
 the expected first run from *three new* to *none new and one withdrawn*. Count off the
 export, never off a screenshot of one.
+
+## The names follow the website
+
+The requester's rule for this brand, 7 October 2026: *"we just match the website for the
+names — if they call it the Freedom Sunseeker we'll call it the Freedom Sunseeker. We have
+a Classic on it because that's what was there in the past and it must have changed."*
+
+**One product argues with FMLV because of it.** Freedom give the Sunseeker no variant name
+— its page is simply `/models/sunseeker/` — where FMLV holds `Sunseeker / Classic`, a name
+the site now uses nowhere. So the adapter emits **`Sunseeker / Sunseeker`** and the run
+proposes `model: Classic → Sunseeker`.
+
+**Repeating the range is FMLV's own convention for a product with no variant**, not an
+invention: counted across every export on disk, **27 rows do exactly this** — Auto-Sleepers
+(`Air / Air`, `Burford / Burford`, and seven more), Hymer's `Grand Canyon`, Wingamm,
+Wildax, Westfalia, Visiontech and Moto-Trek — and **not one row in any export leaves the
+model blank**.
+
+**`RENAMED_MODELS` is what keeps it matching.** Without it the correction scores exactly
+**0.500** against the row it corrects, which is the default threshold itself — one shared
+token of a two-token union. It would match, with no margin whatever, and if it ever
+slipped the correction would arrive as a *new product beside a disappearance notice for
+the row it was meant to fix*. Declared, it scores 1.000 against the name FMLV holds now
+and 1.000 against its own once the fix is accepted, so the entry is safe to leave in place
+afterwards.
+
+### Run #141, after the change
+
+**8 scraped against 9 baseline: 2 changed, 6 unchanged, 0 new, 1 disappeared**, 116 fields
+verified unchanged. The Sunseeker rename lands on product 5955 as a field change — not as
+a new product — which is the whole point of the rename entry.

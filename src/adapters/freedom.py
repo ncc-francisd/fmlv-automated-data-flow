@@ -57,6 +57,7 @@ __all__ = [
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
     "MODELS",
+    "RENAMED_MODELS",
     "VEHICLE_CLASS",
     "collect",
     "parse_berths",
@@ -94,20 +95,47 @@ class FreedomModel:
         return f"{self.fmlv_range} {self.fmlv_model}"
 
 
-#: **FMLV's names, not the site's.** The site groups five of these under a `Classic Range`
-#: heading that FMLV does not use at all; FMLV's range is the model family. The Sunseeker
-#: is the one that cannot be derived from its slug — the page is `/models/sunseeker/` and
-#: FMLV files it as `Sunseeker / Classic`.
+#: **The names Freedom use, which is the requester's rule for this brand** (7 October
+#: 2026): *"we just match the website for the names — if they call it the Freedom
+#: Sunseeker we'll call it the Freedom Sunseeker."*
+#:
+#: The range is the model family. The site also groups five of these under a `Classic
+#: Range` heading, but that is a page section rather than a model name and FMLV has never
+#: used it.
+#:
+#: **The Sunseeker is the one that argues with FMLV.** Freedom give it no variant name —
+#: the page is simply `/models/sunseeker/` — where FMLV still holds `Sunseeker / Classic`,
+#: a name the site no longer uses anywhere. Repeating the range as the model is what FMLV
+#: does for a product with no variant: 27 rows across Auto-Sleepers, Hymer, Wingamm,
+#: Wildax, Westfalia, Visiontech and Moto-Trek do exactly this, and **not one row in any
+#: export leaves the model blank**. So the correction is proposed, and `RENAMED_MODELS`
+#: below keeps it matching the row it is correcting.
 MODELS: tuple[FreedomModel, ...] = (
     FreedomModel("jetstream-twin-sport", "Jetstream", "Twin Sport"),
     FreedomModel("jetstream-first-class", "Jetstream", "First Class"),
-    FreedomModel("sunseeker", "Sunseeker", "Classic"),
+    FreedomModel("sunseeker", "Sunseeker", "Sunseeker"),
     FreedomModel("microlite-discovery", "Microlite", "Discovery"),
     FreedomModel("microlite-sport", "Microlite", "Sport"),
     FreedomModel("carpento-360", "Carpento", "360"),
     FreedomModel("wayfarer-quad", "Wayfarer", "Quad"),
     FreedomModel("wayfarer-duet", "Wayfarer", "Duet"),
 )
+
+#: What the site now says, against what FMLV still holds — for **matching only**; nothing
+#: here renames anything in FMLV.
+#:
+#: Without it `Sunseeker / Sunseeker` scores exactly **0.500** against `Sunseeker /
+#: Classic`, which is the default threshold itself: one shared token of a two-token union.
+#: It matches, but with no margin at all, and the failure if it ever slipped is the one
+#: `docs/adapters/README.md` warns of — the correction arriving as a new product beside a
+#: disappearance notice for the row it was meant to correct.
+#:
+#: With the entry it scores 1.000 against the name FMLV holds today **and** 1.000 against
+#: its own name once the correction is accepted, because `token_similarity` takes the
+#: better of the two. That is what makes it safe to leave here afterwards.
+RENAMED_MODELS: dict[tuple[str, str], tuple[str, str]] = {
+    ("Sunseeker", "Sunseeker"): ("Sunseeker", "Classic"),
+}
 
 #: Eight on the site against FMLV's nine. The ninth is `Carpento / 410`, which Freedom no
 #: longer list — the requester's "slightly fewer models now". A run reports it missing.
@@ -299,7 +327,14 @@ def build_extracted(
     record("manufacturer_range", f'range "{model.fmlv_range}" — the model family, which is '
                                  f"how FMLV files it; the site groups it under a "
                                  f'"Classic Range" heading FMLV does not use')
-    record("model", f'model "{model.fmlv_model}" as FMLV holds it')
+    moved = (
+        '. FMLV still holds "Classic", a name the site uses nowhere: Freedom give this '
+        "model no variant, and repeating the range is what FMLV does for a product that "
+        "has none"
+        if model.fmlv_range == model.fmlv_model
+        else ""
+    )
+    record("model", f'model "{model.fmlv_model}" — the name Freedom use for it{moved}')
     if price_pounds is not None:
         record(
             "rrp_pounds",
