@@ -148,7 +148,11 @@ LAYOUTS: tuple[_Layout, ...] = (
     _Layout("Neo", "Liner 7.0 L", _NEO_LINER, "FRANKIA NEO Liner 7.0 L"),
     _Layout("Neo", "Liner 7.0 B", _NEO_LINER, "FRANKIA NEO Liner 7.0 B"),
     _Layout("Neo", "Liner 6.6 H", _NEO_LINER, "FRANKIA NEO Liner 6.6 H"),
-    _Layout("Now", "Cruiser 7.0 L", _NOW, "FRANKIA NOW 7.0 L"),
+    # **The heading gained `Cruiser` between 19 September and 7 October 2026**, becoming
+    # `FRANKIA NOW Cruiser 7.0 L – A NOW AGE OF SPACE`. The prefix match already tolerated
+    # the tagline, but `FRANKIA NOW 7.0 L` is no longer a prefix of it, so the layout was
+    # dropped and FMLV's `Now / 7.0 L` reported as missing from a site that still sells it.
+    _Layout("Now", "Cruiser 7.0 L", _NOW, "FRANKIA NOW Cruiser 7.0 L"),
     _Layout("Final Edition", "I 640 SD", _FINAL_FIAT, "FRANKIA FINAL EDITION I 640 SD"),
     _Layout("Final Edition", "I 740 GD", _FINAL_FIAT, "FRANKIA FINAL EDITION I 740 GD"),
     _Layout("Final Edition", "I 790 GDW", _FINAL_FIAT, "FRANKIA FINAL EDITION I 790 GDW"),

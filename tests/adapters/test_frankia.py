@@ -119,6 +119,22 @@ def test_a_heading_with_a_tagline_still_matches(now: list[str]) -> None:
     assert _match_heading(blocks, "FRANKIA NOW 7.0 L") is not None
 
 
+def test_the_now_layout_matches_the_heading_the_page_offers_today() -> None:
+    """**The trap this exists for, and it is not the tagline.** Between 19 September and
+    7 October 2026 Frankia put `Cruiser` into the NOW heading, making it `FRANKIA NOW
+    Cruiser 7.0 L – A NOW AGE OF SPACE`. The prefix match handles the tagline, but
+    `FRANKIA NOW 7.0 L` stopped being a prefix of it at all, so the layout was dropped and
+    FMLV's live `Now / 7.0 L` was reported missing from a site that still sells it — a
+    false disappearance that looks exactly like a discontinued model.
+    """
+    heading = "FRANKIA NOW Cruiser 7.0 L – A NOW AGE OF SPACE"
+    blocks: dict[str, object] = {heading: object()}
+    now = next(layout for layout in LAYOUTS if layout.range_name == "Now")
+
+    assert _match_heading(blocks, now.heading) is blocks[heading]
+    assert _match_heading(blocks, "FRANKIA NOW 7.0 L") is None, "the heading it used to be"
+
+
 def test_an_ambiguous_prefix_matches_nothing() -> None:
     """What keeps the prefix match safe: two siblings sharing a prefix return neither."""
     blocks = {"FRANKIA NEO Liner 7.0 L": object(), "FRANKIA NEO Liner 7.0 LX": object()}
