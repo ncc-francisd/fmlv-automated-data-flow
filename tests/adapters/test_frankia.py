@@ -15,6 +15,7 @@ from src.adapters.frankia import (
     EUR_PER_GBP_RATE,
     EXPECTED_LAYOUTS,
     LAYOUTS,
+    MATCH_THRESHOLD,
     RENAMED_MODELS,
     ROSTER_WITHOUT_A_PAGE,
     FrankiaMotorhome,
@@ -27,6 +28,7 @@ from src.adapters.frankia import (
     spec_blocks,
     visible_lines,
 )
+from src.diff.matching import DEFAULT_THRESHOLD, _identity_tokens, _jaccard
 from src.product_model.enums import BodyType
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -295,3 +297,29 @@ def test_each_value_lands_on_its_own_line() -> None:
         "Total length",
         "699 cm",
     ]
+
+
+def test_a_new_noctra_liner_does_not_capture_the_cruisers_fiat_row() -> None:
+    """**The trap this exists for.** `Noctra / Liner 7.6 L` is new and matches nothing,
+    but it scores 0.600 against `Noctra / Cruiser 7.6 L`: three shared tokens of five, and
+    the layout code `7.6 L` is identical so the code rule cannot zero it. On the default
+    threshold it took 8889, the Fiat Cruiser FMLV still sells — the review proposed
+    rewriting a live Cruiser into a Liner, the Liner never appeared as new, and 8889 was
+    in neither the matched nor the missing list."""
+    liner = _identity_tokens("Noctra", "Liner 7.6 L")
+    cruiser = _identity_tokens("Noctra", "Cruiser 7.6 L")
+
+    assert _jaccard(liner, cruiser) == pytest.approx(0.600, abs=0.001)
+    assert _jaccard(liner, cruiser) < MATCH_THRESHOLD, "must not match on Frankia"
+    assert _jaccard(liner, cruiser) > DEFAULT_THRESHOLD, "but does on the default"
+
+
+def test_the_threshold_still_admits_frankias_lowest_real_rename() -> None:
+    """What keeps 0.65 safe. `Together I 740 Plus` against FMLV's `Together / I 740` is a
+    genuine rename at 0.667 — the lowest legitimate score in the 7 October 2026 run, and
+    the only thing standing between it and the 0.600 above."""
+    scraped = _identity_tokens("Together", "I 740 Plus")
+    held = _identity_tokens("Together", "I 740")
+
+    assert _jaccard(scraped, held) == pytest.approx(0.667, abs=0.001)
+    assert _jaccard(scraped, held) > MATCH_THRESHOLD

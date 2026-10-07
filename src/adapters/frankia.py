@@ -104,6 +104,32 @@ EUR_PER_GBP_RATE_DATE = "2026-09-19"
 
 EXPECTED_LAYOUTS = 20
 
+#: **0.65, so a brand-new Noctra Liner stops swallowing the Noctra Cruiser's Fiat row.**
+#:
+#: `Noctra / Liner 7.6 L` is genuinely new and matches nothing, but it scores **0.600**
+#: against `Noctra / Cruiser 7.6 L` — the tokens are `{noctra, 7, 6l, liner}` against
+#: `{noctra, 7, 6l, cruiser}`, three shared of five, and the layout code `7.6 L` is the
+#: same on both so the code rule cannot zero it. In run 194 it took product **8889**, the
+#: Fiat build of the Cruiser, which FMLV still sells: the review proposed rewriting a live
+#: Cruiser into a Liner, the new Liner never appeared as new, and 8889 showed up in neither
+#: the matched list nor the missing one. A silent swap of one product for another.
+#:
+#: Every score in the 7 October 2026 run was listed, as `docs/adapters/README.md` requires
+#: before touching a threshold. **The gap is one token wide and it is real:**
+#:
+#: * legitimate matches are all **1.000**, bar `Together I 740 Plus` -> 8887
+#:   `Together / I 740`, a real rename at **0.667** — the lowest good score;
+#: * the highest *harmful* score is **0.600**, the Noctra Liner above.
+#:
+#: The sibling pairs at 0.667 — `Neo Liner 7.0 L` against its `7.0 B` twin, and the other
+#: way round — are harmless, because each has a 1.000 to its own row and the best match
+#: wins. Only a product with no true match can be captured by a sibling score.
+#:
+#: Re-check if Frankia add a layout whose only legitimate match falls below 0.65. The
+#: symptom is the one Knaus documents: a product proposed as new *and* its baseline row
+#: reported as disappeared, in the same run.
+MATCH_THRESHOLD = 0.65
+
 
 @dataclass(frozen=True)
 class _Layout:
