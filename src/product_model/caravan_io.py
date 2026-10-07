@@ -31,7 +31,15 @@ from .enums import (
     LoungeLocation,
     Refrigeration,
 )
-from .io import _is_yes, _rows_from_csv, _rows_from_xlsx, _select_many, _select_single, _to_images
+from .io import (
+    _is_yes,
+    _rows_from_csv,
+    _rows_from_xlsx,
+    _select_many,
+    _select_single,
+    _to_images,
+    is_active,
+)
 from .io import _to_int as _to_int
 from .io import _to_str as _to_str
 from .validation import Issue
@@ -120,6 +128,7 @@ def row_to_caravan(row: dict[str, Any]) -> tuple[Caravan, list[Issue]]:
         latest_model_id=_to_int(row.get("latest_model_id")),
         images=_to_images(row.get("images")),
         archived=_is_yes(row.get("archived")),
+        active=is_active(row.get("active")),
         extra_column_flags=extra_column_flags,
         manufacturer=_to_str(row.get("manufacturer")),
         manufacturer_display_name=_to_str(row.get("manufacturer_display_name")),

@@ -183,3 +183,39 @@ def test_the_caravan_listing_leaves_out_the_base_vehicle_column(tmp_path, capsys
     main(["show-baseline", "Adria", "--vehicle-class", "caravan", "--data-dir", str(tmp_path)])
 
     assert "base vehicle" not in capsys.readouterr().out
+
+
+def _carado_export_with_active(root: Path) -> Path:
+    """Carado's export as it arrives from 7 October 2026, carrying the `active` column.
+
+    **Written by hand, not with `write_csv`.** `active` is read-only and our writer
+    deliberately omits it, so building this with the writer would produce a file without
+    the column and test nothing.
+    """
+    export = root / "exports" / "92_Carado" / "2026-10-07_Carado_motorhome-campervans.csv"
+    export.parent.mkdir(parents=True, exist_ok=True)
+    export.write_text(
+        "product_id,year,manufacturer,manufacturer_range,model,archived,active\n"
+        "9017,2027,Carado,Campervan,CV640,No,Yes\n"
+        # Deactivated in Nova but never archived.
+        "7718,2027,Carado,Semi-Integrated,Edition26 T447,No,No\n",
+        encoding="utf-8-sig",
+    )
+    return export
+
+
+def test_a_deactivated_product_is_not_in_the_baseline(tmp_path, capsys) -> None:
+    """**The trap this exists for.** A product deactivated in FMLV still arrives with
+    `archived = No`, so every run compared it against a site that no longer lists it and
+    proposed deactivating it again - runs 175 through 179 all reported the same six, a
+    loop no amount of reviewing could break. Steadfast added `active` on 7 October 2026
+    and this is what it is for."""
+    _carado_export_with_active(tmp_path)
+
+    main(["show-baseline", "Carado", "--data-dir", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert "deactivated, dropped        1" in out
+    assert "BASELINE A RUN WOULD USE      1" in out
+    assert "Edition26 T447" not in out, "the deactivated product must not reach the run"
+    assert "CV640" in out

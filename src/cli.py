@@ -593,6 +593,7 @@ def execute_run(
                     for product in read_baseline(export_path, vehicle_class)
                     if product.manufacturer == manufacturer.fmlv_manufacturer
                     and not product.archived
+                    and product.active
                     and _is_current_model_year(product.year)
                     and (in_scope is None or in_scope(product))
                 ),
@@ -946,7 +947,7 @@ def _show_baseline_command(args: argparse.Namespace) -> int:
     rows = list(read_baseline(export_path, vehicle_class))
     theirs = [r for r in rows if r.manufacturer == manufacturer.fmlv_manufacturer]
     others = [r for r in rows if r.manufacturer != manufacturer.fmlv_manufacturer]
-    live = [r for r in theirs if not r.archived]
+    live = [r for r in theirs if not r.archived and r.active]
     in_scope = [r for r in live if _is_current_model_year(r.year)]
 
     print(f"\nrows in the file              {len(rows)}")
@@ -956,7 +957,9 @@ def _show_baseline_command(args: argparse.Namespace) -> int:
         # carried two copies of Bodans' `Caradon XL`.
         names = sorted({str(r.manufacturer) for r in others})
         print(f"  not {manufacturer.fmlv_manufacturer}, dropped      {len(others)}  {names}")
-    print(f"  archived, dropped           {len(theirs) - len(live)}")
+    archived = sum(1 for r in theirs if r.archived)
+    print(f"  archived, dropped           {archived}")
+    print(f"  deactivated, dropped        {len(theirs) - archived - len(live)}")
     print(f"  wrong model year, dropped   {len(live) - len(in_scope)}")
     print(f"BASELINE A RUN WOULD USE      {len(in_scope)}")
 
@@ -1118,6 +1121,7 @@ def _generate_upload_command(args: argparse.Namespace) -> int:
             for product in read_baseline(export_path, run.vehicle_class)
             if product.manufacturer == manufacturer.fmlv_manufacturer
             and not product.archived
+            and product.active
             and _is_current_model_year(product.year)
         )
 

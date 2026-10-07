@@ -64,6 +64,10 @@ class Motorhome(BaseModel):
     latest_model_id: int | None = None
     images: list[str] = Field(default_factory=list)
     archived: bool = False
+    #: Live on findmyleisurevehicle.co.uk. **Read-only** — `active` is not in the upload
+    #: template, so nothing we write changes it; FMLV is deactivated by hand in Nova.
+    #: Defaults to `True` so an export predating the column leaves every product in scope.
+    active: bool = True
 
     #: Column names FMLV has set to `Yes` that this model cannot otherwise represent.
     #:

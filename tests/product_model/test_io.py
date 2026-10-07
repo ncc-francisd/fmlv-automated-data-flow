@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from src.product_model import io, schema, validation
+from src.product_model.io import read_csv, write_csv
 from src.product_model.model import Motorhome
 
 ADRIA_EXPORT = (
@@ -167,3 +168,47 @@ def test_a_plain_csv_still_has_no_dash_rows(tmp_path: Path) -> None:
     raw = path.read_bytes()
     assert not raw.removeprefix(b"\xef\xbb\xbf").startswith(b"-")
     assert raw.count(b"\n") == raw.count(b"\r\n")
+
+
+# --- the `active` column, added to the export by Steadfast on 7 October 2026 -----------
+
+
+def test_an_export_without_the_active_column_leaves_every_product_active(tmp_path) -> None:
+    """**The trap this exists for, and the reason `active` defaults to True.** Every
+    export taken before 7 October 2026 has no such column, and reading a missing cell as
+    "not active" would empty the baseline of every manufacturer at once and propose
+    deactivating their entire range."""
+    export = tmp_path / "old-format.csv"
+    write_csv([Motorhome(product_id=1, manufacturer="Carado", model="CV640")], export)
+
+    [product] = read_csv(export).motorhomes
+
+    assert product.active is True
+
+
+def test_a_product_marked_not_active_is_read_as_deactivated(tmp_path) -> None:
+    export = tmp_path / "with-active.csv"
+    export.write_text(
+        "product_id,manufacturer,model,archived,active\n"
+        "7718,Carado,Edition26 T447,No,No\n"
+        "9017,Carado,CV640,No,Yes\n",
+        encoding="utf-8-sig",
+    )
+
+    by_id = {p.product_id: p for p in read_csv(export).motorhomes}
+
+    assert by_id[7718].active is False
+    assert by_id[7718].archived is False, "deactivated is not archived"
+    assert by_id[9017].active is True
+
+
+def test_active_is_never_written_back(tmp_path) -> None:
+    """**Read-only.** `active` is not in the FMLV upload template, so an upload carrying
+    it would be malformed. FMLV is deactivated by hand in Nova; nothing we write sets it.
+    """
+    export = tmp_path / "out.csv"
+    write_csv([Motorhome(product_id=1, manufacturer="Carado", model="CV640", active=False)], export)
+
+    text = export.read_text(encoding="utf-8-sig")
+
+    assert "active" not in text.splitlines()[0].split(",")

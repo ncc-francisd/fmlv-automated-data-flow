@@ -101,6 +101,21 @@ def _is_yes(value: Any) -> bool:
     return value is not None and str(value).strip().lower() == schema.YES.lower()
 
 
+def is_active(value: Any) -> bool:
+    """Whether an export row's `active` cell says the product is live on FMLV.
+
+    **Absent means active**, which is the whole care of this function. `active` is a
+    read-only column Steadfast added to the export on 7 October 2026 — it is not in the
+    upload template and nothing we write sets it. Every export taken before that date
+    lacks the column entirely, and `_is_yes(None)` would be `False`, which would empty
+    the baseline of every manufacturer and propose deactivating their whole range.
+
+    So only an explicit `No` counts. A missing column, a blank cell or anything
+    unrecognised leaves the product active.
+    """
+    return value is None or str(value).strip().lower() != schema.NO.lower()
+
+
 def _to_int(value: Any) -> int | None:
     if value is None or value == "":
         return None
@@ -198,6 +213,7 @@ def row_to_motorhome(row: dict[str, Any]) -> tuple[Motorhome, list[Issue]]:
         latest_model_id=_to_int(row.get("latest_model_id")),
         images=_to_images(row.get("images")),
         archived=_is_yes(row.get("archived")),
+        active=is_active(row.get("active")),
         extra_column_flags=extra_column_flags,
         manufacturer=_to_str(row.get("manufacturer")),
         base_vehicle_manufacturer=_to_str(row.get("base_vehicle_manufacturer")),

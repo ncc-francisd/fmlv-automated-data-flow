@@ -563,7 +563,8 @@ def test_every_field_carries_provenance_naming_the_layout() -> None:
         for name, value in vars(extracted.caravan).items()
         if value is not None
         and value != []
-        and name not in {"images", "extra_column_flags", "archived"}
+        # `archived` and `active` are read-only export columns, never proposed.
+        and name not in {"images", "extra_column_flags", "archived", "active"}
     }
     for name in valued - {"manufacturer", "manufacturer_display_name", "twin_axle"}:
         assert name in extracted.provenance, f"{name} is set but unregistered"
