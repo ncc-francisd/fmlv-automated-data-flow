@@ -278,6 +278,39 @@ Two things will bite anyone using it:
   series called `Lyseo TD`, and its `B66 644 C` under one called `Eliseo C`. Join on the
   layout, never the series.
 
+### Look for a drawing by what it is, not by what it is called
+
+**Barefoot, 8 October 2026, and it is the second time this has happened.** The survey
+searched the site's markup for an image whose name contained `floorplan`, `layout`, `plan`
+or `diagram`, found none, and wrote into both the survey document and the adapter that
+Barefoot publish no layout drawing at all. The drawing was on `/vital-statistics/` — a page
+the adapter was already fetching for another figure — under the name
+**`internal-model1.png`**. Nobody who names a file calls it what you are grepping for.
+
+Search by **format and position** instead, and require both:
+
+* **Line art is a PNG or an SVG; a photograph is a JPEG.** That one test separates a plan
+  from the gallery, and without it the first photograph on a model page comes back as a
+  layout.
+* **Then exclude the site furniture by name.** Logos, "Made in Britain" flashes and
+  warranty badges are line art too, and they sit on *every* page — so an image that passes
+  the format test on one page and appears on all the others is furniture.
+
+Discover it per run rather than writing the URL in, so the pointer only appears while a
+drawing is really published, and check the whole page rather than the content area alone:
+these are lazy-loaded as often as not, and the real address is in `data-src` while `src`
+holds a placeholder.
+
+**A drawing is not automatically a drawing of the product in front of you.** Barefoot
+publish one for the range, and the Bothy has no washroom where the drawing plainly has
+one — so the pointer is withheld for it, on the authority of the same page's bathroom row
+reading *"(n/a in Bothy)"*. Sending a reviewer to a drawing of a different vehicle is worse
+than sending them nowhere, because nothing downstream will catch it.
+
+This is the roster lesson applied to assets: **an absence you cannot explain is a gap in
+the search.** Eriba's configurator, immediately below, is the same mistake reached by a
+different route.
+
 ### A configurator is a data source, not a dead end
 
 A "needs JavaScript" page is not the same as unreachable data. Eriba's configurator renders
