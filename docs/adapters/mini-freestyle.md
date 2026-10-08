@@ -121,9 +121,14 @@ the Silver line, each laying two models side by side:
 | Max authorized weight | 750 | 750 | 750 | 1050 |
 | BERTHS | 2 | 2 | 2 | 3 |
 
-**Models are identified by overall length**, since the columns carry no heading — 3,95 is
-the 270, 5,91 the 442, and the two 4,42 columns are the 300 (Minis page) and the 290
-(Silver page). FMLV's own figures confirm every pairing.
+**Models are identified by overall length**, because the column headings are *graphics* —
+`MINI 270`, `MINI 300`, `MINI 290`, `MINI 442` are set as styled artwork and never reach
+the extracted text. So 3,95 is the 270, 5,91 the 442, and the two 4,42 columns are the 300
+(Minis page) and the 290 (Silver page).
+
+**Confirmed twice over.** FMLV's own figures match every pairing to the millimetre, and the
+requester supplied screenshots of the printed pages on 8 October 2026 showing the headings
+above exactly those columns. The mapping is the manufacturer's, not an inference.
 
 **Every dimension matches FMLV exactly** on all three live models — shipping, body,
 internal, width, berths and MTPLM, six fields apiece, no exceptions. That is as strong a
