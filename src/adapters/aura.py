@@ -60,6 +60,7 @@ __all__ = [
     "BASE_URL",
     "DEFAULT_RANGES",
     "EXPECTED_LAYOUTS",
+    "FIRST_EDITION",
     "HIGH_TOP_ABOVE_MM",
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
@@ -114,8 +115,10 @@ PAGES: tuple[_Page, ...] = (
     _Page("aura-campervans-prestige-layouts.php", "Prestige", "Citroën", BodyType.CAMPERVAN),
 )
 
-#: Thirteen across the seven pages, matching FMLV's thirteen live rows exactly.
-EXPECTED_LAYOUTS = 13
+#: **Twenty-three**: thirteen layouts, ten of which are published a second time badged
+#: `First Edition`. FMLV held only the thirteen until 8 October 2026, because this
+#: adapter had been collapsing each pair into one.
+EXPECTED_LAYOUTS = 23
 
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = tuple(
     (page.path, page.fmlv_range) for page in PAGES
@@ -198,6 +201,9 @@ class AuraLayout:
     fmlv_range: str
     fmlv_model: str
     spec: Specification
+    #: Whether the page badges this one `First Edition`. The model name already carries
+    #: the badge; this is kept so the provenance can say where the name came from.
+    first_edition: bool = False
 
     @property
     def label(self) -> str:
@@ -307,20 +313,42 @@ def columns_of(page_html: str) -> list[tuple[str, str]]:
     return pairs
 
 
+#: The badge AURA appends to a layout's heading to mark the launch edition.
+FIRST_EDITION = "First Edition"
+
+_FIRST_EDITION = re.compile(r"first\s*edition", re.I)
+
+
 def parse_layouts(page_html: str, fmlv_range: str) -> list[AuraLayout]:
     """Every distinct layout on one page, with the figures from its own column.
 
-    **Deduplicated on the model name**, because the tables repeat: each layout appears in
-    a slider and again in a dialog, so without this the roster doubles or trebles.
+    **A `First Edition` is its own product, not a duplicate.** Ten of the thirteen layouts
+    are published twice — once badged `First Edition` and once not — with *byte-identical*
+    weights and dimensions, and for a while this adapter collapsed each pair into one. They
+    are two products by the settled rule in `docs/adapters/README.md`: a trim or option
+    package is not a second product *"unless that extra package comes with a different name
+    to it … then it's got a different name, it's a different model"*. `First Edition` is
+    such a name, and AURA price the two differently — the edition is between £1,800 and
+    £11,000 cheaper on every one of the ten.
+
+    So the key is the model **and** the badge. The three with no twin — OnTour T 700 FH,
+    OnTour T 710 GE and OnTour A 720 GFM — are exactly the three absent from AURA's own
+    First Edition price list, which is the roster checking out against the site.
+
+    **Still deduplicated within each of the two**, because the tables repeat: a layout
+    appears in a slider and again in a dialog.
     """
-    found: dict[str, AuraLayout] = {}
+    found: dict[tuple[str, bool], AuraLayout] = {}
     for heading, figures in columns_of(page_html):
         match = AURA_HEADING.search(heading)
         if match is None:
             continue
         model = re.sub(r"\s+", " ", match.group("model")).strip()
         model = FMLV_MODEL_NAMES.get(model, model)
-        if model in found:
+        first_edition = bool(_FIRST_EDITION.search(heading))
+        if first_edition:
+            model = f"{model} {FIRST_EDITION}"
+        if (model, first_edition) in found:
             continue
         values: dict[str, int] = {}
         for field, label, kind in _FIELDS:
@@ -331,7 +359,9 @@ def parse_layouts(page_html: str, fmlv_range: str) -> list[AuraLayout]:
                     values[field] = value
         if not values:
             continue
-        found[model] = AuraLayout(fmlv_range, model, Specification(**values))
+        found[model, first_edition] = AuraLayout(
+            fmlv_range, model, Specification(**values), first_edition=first_edition
+        )
     return list(found.values())
 
 
@@ -411,6 +441,14 @@ def build_extracted(layout: AuraLayout, page: _Page, basis: str) -> ExtractedMot
             source_url=f"{BASE_URL}/{page.path}", snippet=f"{layout.label} — {snippet}"
         )
 
+    if layout.first_edition:
+        record(
+            "model",
+            f"the page badges this layout {FIRST_EDITION!r}. It is a product rather than an "
+            f"option because it carries a name of its own — the settled rule — and AURA "
+            f"price it separately, below the unbadged model, though the two publish "
+            f"identical weights and dimensions",
+        )
     record("base_vehicle_manufacturer", f"{page.base_vehicle}, which the importer's own "
                                         f"list names per layout — it is not derivable from "
                                         f"the range, since OnTour C is a Citroën where "

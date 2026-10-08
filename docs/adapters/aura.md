@@ -82,6 +82,50 @@ high top — which is what FMLV already holds for all three. A **coach-built**'s
 does not: the OnTour A describes its over-cab bed as an *option*, so nothing distinguishes a
 low profile from an over-cab, and FMLV's own value is better than a guess.
 
+## The First Edition is a product, not a duplicate — 8 October 2026
+
+**Ten of the thirteen layouts are published twice**, once badged `First Edition` and once
+not, with **byte-identical weights and dimensions**. The adapter collapsed each pair into
+one until this was found, so FMLV never learned the editions existed.
+
+They are two products by the settled rule in [`README.md`](README.md): an option package is
+not a second product *"unless that extra package comes with a different name to it, like
+Special or Anniversary version — then it's got a different name, it's a different model"*.
+**`First Edition` is such a name**, and AURA price the two separately.
+
+**The site and AURA's own price list agree exactly.** The three layouts with no twin —
+`OnTour T 700 FH`, `OnTour T 710 GE`, `OnTour A 720 GFM` — are precisely the three absent
+from the First Edition list Mike Lake sent on 8 October. That is the roster checking out.
+
+**The edition is cheaper on every one**, by £1,800 to £11,000:
+
+| | standard (FMLV) | First Edition |
+|---|---|---|
+| OnTour 600 FT | £77,295 | **£69,995** |
+| OnTour 640 ET | £79,395 | **£69,995** |
+| Prestige 640 ET | £80,695 | **£79,995** |
+| OnTour C 680 GE | £85,795 | **£83,995** |
+| OnTour C 700 GQ | £87,395 | **£83,995** |
+| OnTour T 700F | £87,195 | **£83,995** |
+| Prestige T 710 GE | £93,295 | **£84,995** |
+| Maxia T 710 GE | £95,995 | **£84,995** |
+| Maxia T 740 WE | £97,295 | **£89,995** |
+| Maxia T 740 WF | £96,495 | **£89,995** |
+
+**The badge goes on the model, not the range** — `OnTour C / 680 GE First Edition` — so the
+range filter keeps a range together. That is the opposite of Frankia, whose `Final Edition`
+*is* a range on its own roster; here the badge is appended to a layout inside each range.
+
+**The prices are not on the site**, and Mike Lake says so himself — they apply now but are
+unpublished. They are not in the adapter: an emailed figure cannot be re-fetched, so the
+ten arrive without a price and it is filled on the upload CSV.
+
+### Run #145
+
+23 scraped against 13 baseline — **9 changed, 4 unchanged, 10 new, 0 disappeared.** The
+thirteen existing products all still match, so nothing was broken by giving the editions
+their own names.
+
 ## The shape of the pages, which is the whole parsing problem
 
 **Every layout page is a two-column HTML table** — two layouts side by side, their names in

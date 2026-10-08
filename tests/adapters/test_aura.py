@@ -110,7 +110,12 @@ def test_every_layout_block_is_read_once(ontour_t: str) -> None:
     deduplication the roster doubles."""
     layouts = parse_layouts(ontour_t, "OnTour T")
 
-    assert sorted(layout.fmlv_model for layout in layouts) == ["700F", "700FH", "710 GE"]
+    assert sorted(layout.fmlv_model for layout in layouts) == [
+        "700F",
+        "700F First Edition",
+        "700FH",
+        "710 GE",
+    ]
 
 
 # --- the four heading shapes ----------------------------------------------------------
@@ -198,7 +203,7 @@ def test_a_payload_that_does_not_reconcile_is_refused() -> None:
 
 
 def test_the_roster_size_is_pinned() -> None:
-    assert EXPECTED_LAYOUTS == 13
+    assert EXPECTED_LAYOUTS == 23
 
 
 # --- what reaches the pipeline --------------------------------------------------------
@@ -309,3 +314,58 @@ def test_a_campervans_body_type_comes_from_its_height(prestige_campervan: str) -
     assert layout.spec.height_mm == 2670
     assert extracted.motorhome.body_type is BodyType.CAMPERVAN_HIGH_TOP
     assert "body_type" in extracted.provenance
+
+
+# --- the First Edition, added 8 October 2026 ------------------------------------------
+
+
+def test_a_first_edition_is_its_own_product(ontour_t: str) -> None:
+    """**The trap this exists for.** Ten of the thirteen layouts are published twice, badged
+    `First Edition` and not, with byte-identical weights and dimensions — so this adapter
+    collapsed each pair into one and FMLV never learned the editions existed.
+
+    They are two products by the settled rule: an option package is not a second product
+    *"unless that extra package comes with a different name to it"*. `First Edition` is such
+    a name, and AURA price the two separately — the edition is cheaper on every one of the
+    ten."""
+    layouts = _by_model(parse_layouts(ontour_t, "OnTour T"))
+
+    assert "700F" in layouts
+    assert "700F First Edition" in layouts
+    assert layouts["700F First Edition"].first_edition is True
+    assert layouts["700F"].first_edition is False
+
+
+def test_the_two_publish_identical_figures(ontour_t: str) -> None:
+    """Which is why they looked like duplicates. Nothing in the weights or dimensions tells
+    them apart — only the name and the price."""
+    layouts = _by_model(parse_layouts(ontour_t, "OnTour T"))
+
+    assert layouts["700F"].spec == layouts["700F First Edition"].spec
+
+
+def test_a_layout_with_no_twin_yields_one_product(ontour_t: str) -> None:
+    """Three layouts have no First Edition, and they are exactly the three absent from
+    AURA's own First Edition price list — the roster checking out against the site."""
+    models = {layout.fmlv_model for layout in parse_layouts(ontour_t, "OnTour T")}
+
+    assert "700FH" in models and "700FH First Edition" not in models
+    assert "710 GE" in models and "710 GE First Edition" not in models
+
+
+def test_the_edition_says_in_its_provenance_why_it_is_a_product(ontour_t: str) -> None:
+    page = next(p for p in PAGES if "ontour-t" in p.path)
+    layout = _by_model(parse_layouts(ontour_t, "OnTour T"))["700F First Edition"]
+
+    extracted = aura.build_extracted(layout, page, "basis")
+
+    assert extracted.motorhome.model == "700F First Edition"
+    assert "a name of its own" in extracted.provenance["model"].snippet
+
+
+def test_an_unbadged_layout_says_nothing_about_its_model_name(ontour_t: str) -> None:
+    """Only the edition explains itself; the plain model is FMLV's own name already."""
+    page = next(p for p in PAGES if "ontour-t" in p.path)
+    layout = _by_model(parse_layouts(ontour_t, "OnTour T"))["700F"]
+
+    assert "model" not in aura.build_extracted(layout, page, "basis").provenance
