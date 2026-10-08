@@ -1,7 +1,7 @@
 # Mini Freestyle — survey, 7 October 2026
 
 **NCC id 222.** `fmlv_manufacturer` **`Trigano`**, display name **`Mini Freestyle`**.
-**Caravans only**, and very small ones. No adapter yet — this is the stage-1 checkpoint.
+**Caravans only**, and very small ones. **Adapter written 8 October 2026.**
 
 ## The join key, and the two other Triganos
 
@@ -141,7 +141,7 @@ something this adapter can propose, and its FMLV row has errors besides: an inte
 length of 1950 that merely repeats its width, against the catalogue's 4400, and an MTPLM
 of 1200 where the catalogue now says 1050.
 
-## What still needs deciding before a build
+## Decided before the build
 
 **The mass in running order does not match, on any model.**
 
@@ -168,3 +168,37 @@ maintain them.
 
 **The model pages are empty.** `/en/mini-freestyle-270.html` and its siblings carry no
 figure at all, so the catalogue PDF is the only source and a run is one or two fetches.
+
+
+## The build, 8 October 2026
+
+**Source:** the catalogue PDF alone. Two fetches per run — the home page, to rediscover
+the catalogue, and the catalogue itself.
+
+**Read page by page, never as one document.** Both spec tables share every row label, so a
+search across the joined text finds only the first table's — which silently gave the 290
+the 300's masses and lost two models entirely. `ExtractedPdf.pages` is what makes it work.
+
+**The two 4,42 m columns are told apart by their page**: the 300 among the Minis, the 290
+on the Silver page, which is the only one carrying an awning row. They differ in exactly
+one figure — the mass in running order, 695 against 693 — so getting it wrong would be
+invisible in every other field.
+
+### Run #146
+
+4 scraped against 3 baseline — **3 changed, 0 unchanged, 1 new, 0 disappeared**, 36
+proposals, 27 fields verified unchanged. Every proposal is one of the decisions above:
+
+| | |
+|---|---|
+| `body_type` | `pop_up` → `rigid` on all three |
+| `height_mm` | 2330 → **1980**, the roof-closed figure |
+| `headroom_mm` | 2330 → **1870**, the internal height |
+| `mro_kilograms` | 583 → 641, 676 → 693, 612 → 695 |
+| **442** | arrives new, with every field |
+
+### Prices
+
+**Carried over, and not maintainable.** There is no price in the catalogue or on the site,
+so the adapter proposes none and FMLV's existing three stand. The requester is writing to
+Mini Freestyle to ask them to check them.
