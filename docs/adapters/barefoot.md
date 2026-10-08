@@ -1,8 +1,9 @@
-# Barefoot Caravans — survey, 8 October 2026
+# Barefoot Caravans — survey and build, 8 October 2026
 
 **NCC id 30.** `fmlv_manufacturer` **`Barefoot Caravans`**, display name **`Barefoot`**,
 supplier name `Barefoot Caravans`. Caravans only, built at Blockley in the Cotswolds.
-No adapter yet — this is the stage-1 checkpoint.
+**Built on 8 October 2026** as `src/adapters/barefoot.py`; the first run is at the foot of
+this file.
 
 **One shell, several interiors.** Every model shares the same fibreglass body: 5080 mm over
 the hitch, a 3780 mm shell, 1920 wide, 2360 tall. What differs between them is the fit-out,
@@ -111,3 +112,98 @@ payload **240**, the upgraded pair, which is presumably why it was superseded.
 Forward and Eclipse, £40,500 for Country Living. It also prices the two new models and a
 `Barefoot and Go` bundle at £41,500, which is an accessory package rather than a product.
 All prices include VAT.
+
+## What the adapter does
+
+Four fetches of substance and six small ones. The catalogue is **rediscovered from the home
+page** each run, because its folder carries a year (`uploads/2025/10/`) and will move.
+
+| source | what it gives |
+|---|---|
+| catalogue p.10, specification block | berths, axles, MTPLM, MRO, published payload |
+| catalogue p.10, dimension block | shipping, body, width, height, internal height |
+| `/vital-statistics/` | **internal length**, the one figure the catalogue omits |
+| `/barefoot-caravan-prices/` | the price, which the catalogue omits entirely |
+| each model's own page | the habitation findings |
+
+**Neither block hardcodes which model sits in which column.** The specification heading
+introduces every column with the word `Barefoot`, so splitting on it gives the columns in
+order. The dimension heading has no such marker, and is read by **punctuation**: models
+within a column are separated by a comma or an ampersand, models in different columns by
+nothing at all — `... Forward, Lite Bothy`. A seventh model is therefore picked up rather
+than silently given its neighbour's weights.
+
+Two guards sit under that. A row whose cell count disagrees with the heading's column count
+is dropped rather than aligned by guesswork, and a heading that stops saying `Specification
+Barefoot ...` raises rather than producing a plausible roster.
+
+> The dimension heading **wraps mid-column**, and the first draft matched `[^\n]*` after the
+> label — which ate `Classic, Eclipse, Country` and left the shared column reading
+> `Forward, Lite`. The Classic came out with no dimensions at all.
+
+## The Lite's MTPLM is corrected, and the correction expires by itself
+
+`ERRATA` holds one entry and is keyed on the **wrong** value, so the day Barefoot fix the
+catalogue it stops firing rather than overwriting a corrected figure. Everything downstream,
+the self-check included, runs on the corrected pair, and the reviewer's provenance says what
+was published and why it was not taken.
+
+## Nothing is proposed for the awning, and nothing for the layout
+
+Barefoot publish no awning length anywhere, so FMLV's own 3000mm stands untouched — the
+pipeline shows it as a no-op change, which is the intended way an unfound figure is
+surfaced. They publish **no layout drawing of any kind**, so the positional habitation
+fields cannot be answered and no floorplan pointer is offered.
+
+## The habitation findings are a genuine blank, which is itself the finding
+
+The Bothy's page and the Lite's each carry a 33-line fittings list; the four older pages
+carry prose and navigation alone. Reading those 66 lines settles **no habitation field**,
+and the run says so in those words:
+
+* Barefoot describe the washroom in their own language — *"Beautiful curved bathroom with
+  basin and shower"*, *"Dometic cassette toilet"* — never the industry phrasing
+  `habitation` reads.
+* Both new models carry a **24L cool box**, not a fridge. `habitation` reads only the words
+  fridge, refrigerator and refrigeration, so this reaches a reviewer as nothing said rather
+  than as a fridge Barefoot never claimed.
+* Neither new model has heating. The catalogue's `Heating` row is blank in both their
+  columns and the Truma Combi 4E belongs to the other four.
+
+Silence is not a negative, so nothing is asserted. The one thing the lists do settle is
+`bed_types`, which is dropped for the reason every caravan adapter drops it: the copy names
+the beds without saying which are built in and which are made up from the seating.
+
+## Body type is tested, not asserted
+
+Every Barefoot is under the 1250kg a micro may weigh — the 1100kg Classic included — so the
+weight half of the rule passes on all six. The **naming** half is what decides it, and
+Barefoot's word throughout is *"small caravan"*, never micro or mini. The test is applied
+each run rather than its answer written in, because `wingamm_caravan.py` found the brand
+that breaks the usual answer by asserting it.
+
+## The first run — #147, 8 October 2026
+
+```
+baseline    4 products
+scraped     6 products
+classified  0 changed, 4 unchanged, 2 new, 0 disappeared
+proposed    40 changes for review
+            of which 4 are year bumps
+            of which 4 are in-scope fields not found this run
+verified    64 fields checked and unchanged
+```
+
+**Nothing changed on the four FMLV already holds** — every mass, every dimension and every
+price came back identical, which is the strongest confirmation available that the right
+document is being read. The two new products are the Bothy and the Lite, with the figures
+the survey predicted:
+
+| | berths | MTPLM | MRO | payload | headroom | price |
+|---|---|---|---|---|---|---|
+| **Bothy** | 3 | 750 | 706 | 44 | 1910 | £25,950 |
+| **Lite** | 2 | **1000** | 900 | 100 | 1870 | £34,950 |
+
+The four "in-scope fields not found" are the awning length on each matched product, as
+expected. The four year bumps are the ordinary changeover-window proposal, not this
+adapter's doing.
