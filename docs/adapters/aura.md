@@ -190,6 +190,60 @@ motorhomes advertise from £83,995 where the cheapest layout is £85,795, camper
 £74,777 where the cheapest is £77,295. Prices come from the importer's lists, and
 `rrp_pounds == price_min_range_pounds` on all 21 live rows.
 
+## The Beachy has its own site, and it is the original source
+
+**`https://www.beachy.de/en/model/beachy/<360|420|450>/`** — found 8 October 2026 from the
+`Discover the Beachy` link on Hobby's caravan index. The Beachy is a Hobby brand with its
+own site, Facebook, Instagram and YouTube, which is why it has no range page on
+`hobby-caravan.de` and why the first search for it came back empty.
+
+**Each model page carries a full technical table in plain HTML**, which is more than the
+rest of Hobby's site offers:
+
+```
+Overall length                               5.687 mm
+Body length                                  4.260 mm
+Overall width / Inside width                 2.165 / 2.044 mm
+Overall height / Interior headroom           2.659 / 1.900 - 2.050 mm
+Maximum technically permissible laden mass   1.000 kg
+Mass in running order (-/+5%)                811 (770-852) kg
+Technically possible increase in load capacity to  1.200 kg
+Number of berths (adults / children)         2 / 1
+```
+
+### What it settles
+
+**FMLV's Beachy 420 body length is wrong.** Hobby say **4260** and AURA's own site says
+4260; FMLV holds **4105**, and is the only source that does. FMLV's shipping length of
+5687 is right — it matches Hobby exactly, where AURA's site rounds it to 5680.
+
+**FMLV's Beachy 420 berth count is wrong.** Hobby publish `2 / 1` adults and children —
+**three** — and AURA's site says 3. FMLV holds 4. The 360 is also `2 / 1` and the 450 is
+`2 / 2`, matching AURA's 3 and 4 exactly.
+
+**The MTPLM question is the base-versus-upgrade one after all**, at least here: Hobby give
+`1.000 kg` with a `technically possible increase to 1.200 kg`, AURA's site says
+`1000kg (option to increase 1200kg)`, and FMLV holds 1000. All three agree, and the
+settled rule takes the base. *(This does not resolve the DeLuxe, where AURA's site says
+1300 against FMLV's 1400 — neither the base nor the stated 1500 upgrade.)*
+
+### What it does not settle
+
+**The mass in running order differs by about 32 kg** — Hobby 749/811/843 against AURA's
+782/842/876 for the 360/420/450. That is consistent across all three and reads as UK
+specification rather than an error, so **Hobby's MIRO is not proposed over AURA's**.
+
+**The 420 Plus has no published figures anywhere.** `beachy.de` lists only the 360, 420 and
+450 as models; the 420 Plus appears solely as an announcement under
+`/en/models-and-equipment/the-new-beachy-420-plus/`, with no technical table. So the
+conflict stands — AURA's page gives it the **360's** dimensions (5.08 m / 3.66 m) where
+FMLV gives it the **420's**. Since the model numbers plainly track body length — 360 to
+3.66 m, 420 to 4.26 m, 450 to 4.56 m — a 420 Plus with a 3.66 m body remains the figure
+that looks wrong, and it is one for the importer rather than a thing to infer.
+
+**If a Beachy adapter is ever wanted, `beachy.de` is the source** — plain HTML, a full
+table per model, and no configurator in the way.
+
 ## Hobby's own site is not a fallback
 
 Checked on the requester's suggestion, and it does not work:
