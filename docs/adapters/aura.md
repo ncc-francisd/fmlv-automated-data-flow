@@ -213,9 +213,21 @@ Number of berths (adults / children)         2 / 1
 
 ### What it settles
 
-**FMLV's Beachy 420 body length is wrong.** Hobby say **4260** and AURA's own site says
-4260; FMLV holds **4105**, and is the only source that does. FMLV's shipping length of
-5687 is right — it matches Hobby exactly, where AURA's site rounds it to 5680.
+**FMLV's Beachy 420 has its body and internal lengths the wrong way round.** Hobby say the
+body is **4260** and AURA's site agrees; FMLV holds **4105** in that column and **4260** in
+the internal one. Swapping them makes both figures right and explains the impossible row
+noted below — an internal length longer than the body. The shipping length of 5687 is
+already right, matching Hobby exactly where AURA's site rounds to 5680.
+
+| | FMLV holds | should be |
+|---|---|---|
+| `exterior_body_length_mm` | 4105 | **4260** |
+| `internal_length_mm` | 4260 | **4105** |
+
+`4260 − 4105 = 155`, against the `body − 120` the other AURA caravans show, so the pair is
+plausible as well as evidenced. **This applies to both the 420 and the 420 Plus**, which
+hold identical figures. It is a correction to make rather than a question for the
+importer: two independent sources give the body as 4260.
 
 **FMLV's Beachy 420 berth count is wrong.** Hobby publish `2 / 1` adults and children —
 **three** — and AURA's site says 3. FMLV holds 4. The 360 is also `2 / 1` and the 450 is
