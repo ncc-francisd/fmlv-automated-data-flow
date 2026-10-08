@@ -98,8 +98,73 @@ implying otherwise.
 differently from the other three. `/en/Minis.html` and `/en/exclusives.html` are the two
 range indexes, and `/en/pop-top-caravans.html` is prose.
 
-## Still to decide at the build checkpoint
+## Both checkpoint questions, answered 8 October 2026
 
-1. Whether the catalogue's tables survive extraction for all four models.
-2. Whether the 442 arrives as a new product or is the archived Silver/Trend 442 returning
-   under a new badge — the masses will tell, per the rename rule.
+### The tables extract cleanly, and the catalogue is only four pages
+
+Not a 500-page catalogue with image tables, as the byte count suggested — **four pages**,
+two of which carry a full spec table in extractable text. Page 2 is the Minis and page 4
+the Silver line, each laying two models side by side:
+
+| | page 2 | | page 4 | |
+|---|---|---|---|---|
+| | **270** | **300** | **290** | **442** |
+| Overall length | 3,95 | 4,42 | 4,42 | 5,91 |
+| External body length | 2,99 | 3,47 | 3,47 | 4,88 |
+| Internal length | 2,5 | 2,97 | 2,97 | 4,4 |
+| Overall width | 2,03 | 2,03 | 2,03 | 2,03 |
+| Overall height (roof closed) | 1,98 | 1,98 | 1,98 | 2,03 |
+| Overall height (roof open) | 2,33 | 2,33 | 2,33 | 2,33 |
+| Internal height | 1,87 | 1,87 | 1,87 | 1,95 |
+| Empty weight | 600 | 688 | 676 | 925* |
+| Mass in running order | 641 | 695 | 693 | 942* |
+| Max authorized weight | 750 | 750 | 750 | 1050 |
+| BERTHS | 2 | 2 | 2 | 3 |
+
+**Models are identified by overall length**, since the columns carry no heading — 3,95 is
+the 270, 5,91 the 442, and the two 4,42 columns are the 300 (Minis page) and the 290
+(Silver page). FMLV's own figures confirm every pairing.
+
+**Every dimension matches FMLV exactly** on all three live models — shipping, body,
+internal, width, berths and MTPLM, six fields apiece, no exceptions. That is as strong a
+confirmation as a survey gets that this document is where FMLV's figures came from.
+
+### The 442 is the archived Trend 442 returning
+
+Conclusive on mass and dimension, which is what the rename rule requires: shipping
+**5910** and body **4880** match FMLV's archived `7239` to the millimetre, berths 3 agree,
+and the mass in running order is **942** against FMLV's **943**.
+
+**But it is archived under the display name `Silver`, which is NCC id 187** — a different
+manufacturer from this one. So reviving it is a cross-manufacturer question rather than
+something this adapter can propose, and its FMLV row has errors besides: an internal
+length of 1950 that merely repeats its width, against the catalogue's 4400, and an MTPLM
+of 1200 where the catalogue now says 1050.
+
+## What still needs deciding before a build
+
+**The mass in running order does not match, on any model.**
+
+| | catalogue MiRO | catalogue empty | FMLV |
+|---|---|---|---|
+| 270 | 641 | 600 | **583** |
+| 290 | 693 | 676 | **676** |
+| 300 | 695 | 688 | **612** |
+
+Only the 290 lines up, and with the *empty weight* rather than the MiRO. An adapter
+proposing the catalogue's figure would change all three. The catalogue is explicitly
+*"valid at the time of printing (August 2025)"* while FMLV's rows are model year 2026, so
+FMLV may hold newer figures from a source we have not seen. **This is the blocking
+question.**
+
+**Both height fields look wrong in FMLV.** All three hold **2330**, which is the
+catalogue's *roof-open* height, in `height_mm` **and** in `headroom_mm`. The roof-closed
+height is 1980 and the internal height is 1870. Freedom settled the equivalent question by
+taking the roof-down figure as the height, which would make these 1980 and 1870.
+
+**There is no price anywhere** — not in the catalogue, not on the site. FMLV holds
+£13,994.99, £14,995 and £14,994.99, so they came from elsewhere and an adapter cannot
+maintain them.
+
+**The model pages are empty.** `/en/mini-freestyle-270.html` and its siblings carry no
+figure at all, so the catalogue PDF is the only source and a run is one or two fetches.
