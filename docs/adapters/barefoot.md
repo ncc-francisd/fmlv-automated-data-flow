@@ -148,12 +148,44 @@ catalogue it stops firing rather than overwriting a corrected figure. Everything
 the self-check included, runs on the corrected pair, and the reviewer's provenance says what
 was published and why it was not taken.
 
-## Nothing is proposed for the awning, and nothing for the layout
+## Nothing is proposed for the awning
 
 Barefoot publish no awning length anywhere, so FMLV's own 3000mm stands untouched — the
 pipeline shows it as a no-op change, which is the intended way an unfound figure is
-surfaced. They publish **no layout drawing of any kind**, so the positional habitation
-fields cannot be answered and no floorplan pointer is offered.
+surfaced.
+
+## There *is* a layout drawing, and the first pass said there was not
+
+**Corrected 8 October 2026, after the requester pointed at it.** Part-way down
+`/vital-statistics/` — the page this adapter was already fetching for the internal length —
+sits a plan drawing of the interior. It is called **`internal-model1.png`**, and the survey
+had searched for an image named "floorplan" or "layout", found none, and concluded Barefoot
+published no drawing at all. The lesson is the roster one from `README.md` turned on
+assets: an absence you cannot explain is a gap in the search.
+
+It is discovered each run rather than written in, by two tests that are both needed:
+
+* **it is line art, and every photograph on this site is a JPEG** — without this the first
+  photograph on a model page comes back as a layout;
+* **it is not one of the badges** — Made in Britain and the 10-year warranty are line art
+  too, and sit on every page.
+
+So the pointer only appears while a drawing is really published.
+
+**The drawing is unlabelled**, one for the whole range, and shown in two states: the bed
+made up, and the seating with the floor clear. Nothing is read off it. Each product gets a
+`reviewer_reference` pointer at Vital Statistics for the positional fields, which is the
+project's standing division — the specification is the adapter's, the drawing is the
+reviewer's.
+
+**It is not offered for the Bothy.** The drawing plainly has a washroom and the same page's
+bathroom row reads *"1040w x 760d (n/a in Bothy)"*, so it cannot be a drawing of that
+model; pointing a reviewer at a drawing of a different caravan is worse than pointing at
+nothing. Which models are excluded is parsed from that row, not written in here.
+
+> One thing checked and found not to be so: the Specifications menu is byte-for-byte
+> identical on every page of the site and always leads to the single `/vital-statistics/`.
+> There is no per-model specification page, and no per-model drawing.
 
 ## The habitation findings are a genuine blank, which is itself the finding
 
@@ -207,3 +239,7 @@ the survey predicted:
 The four "in-scope fields not found" are the awning length on each matched product, as
 expected. The four year bumps are the ordinary changeover-window proposal, not this
 adapter's doing.
+
+**Run #148**, later the same day, is the same run with the floorplan pointer added: the
+same 6/4/2/0 classification, plus `findings 5 habitation readings stated for a person to
+enter by hand` — one floorplan pointer per model with a washroom, the Bothy excluded.

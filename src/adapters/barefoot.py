@@ -9,7 +9,7 @@ demonstrably where they came from.
 **Three further fetches, each for one thing the catalogue does not carry:**
 
 * `/vital-statistics/` — the **internal length**, 3560mm, which the catalogue omits and
-  FMLV holds.
+  FMLV holds, and the **layout drawing**, which is part-way down the same page.
 * `/barefoot-caravan-prices/` — the prices, which the catalogue omits entirely.
 * each model's own page — the habitation findings, which only the two new models publish.
 
@@ -34,6 +34,23 @@ The Lite's own page settles which figure is wrong: *"The tow weight is just 1,00
 `ERRATA` rewrites that one cell, and everything downstream — the self-check included —
 runs on the corrected pair.
 
+## The drawing is pointed at, never read, and not for every model
+
+One **unlabelled** drawing serves the whole range, shown in two states — the bed made up,
+and the seating with the floor clear. So the positional habitation fields get a
+`reviewer_reference` pointer at Vital Statistics and nothing is asserted about them.
+
+It is **not** offered for the Bothy. The drawing plainly has a washroom and the same page's
+bathroom row reads *"1040w x 760d (n/a in Bothy)"*, so it cannot be a drawing of that
+model — and sending a reviewer to a drawing of a different caravan is worse than sending
+them nowhere. Which models those are is parsed from that row rather than written in here.
+
+> The drawing is called `internal-model1.png`. A first pass looked for an image named
+> "floorplan" or "layout", found none, and wrote into both the survey and the adapter that
+> Barefoot publish no drawing at all. They do, on the one page this adapter was already
+> fetching. It is discovered each run by elimination against the site furniture, so the
+> pointer only appears while a drawing is really there.
+
 ## The columns are read from the table's own headings
 
 Neither block hardcodes which model sits in which column. The specification header
@@ -53,7 +70,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.adapters import habitation
-from src.adapters.base import ExtractedCaravan, Provenance
+from src.adapters.base import ExtractedCaravan, Provenance, floorplan_provenance
 from src.fetch.browser import BrowserFetcher
 from src.fetch.http import Fetcher
 from src.fetch.pdf import extract_text
@@ -76,8 +93,10 @@ __all__ = [
     "body_type_for",
     "build_extracted",
     "catalogue_url",
+    "floorplan_from",
     "collect",
     "internal_length_from",
+    "models_without_a_washroom",
     "parse_dimensions",
     "parse_specifications",
     "prices_from",
@@ -365,6 +384,53 @@ def _flatten(page_html: str) -> str:
     return re.sub(r"(?:\s*\|\s*)+", " | ", text)
 
 
+#: Images that appear on every page of the site, so an image that is *not* one of these is
+#: the Vital Statistics drawing. Named rather than pattern-matched because the drawing's own
+#: filename gives nothing away — it is `internal-model1.png`, which is why a first pass
+#: looking for "floorplan" or "layout" concluded there was no drawing at all.
+_SITE_FURNITURE_IMAGES = re.compile(
+    r"made-in-britain|yearlogo|logo\d*\.|fav-|sand-repeat|new-contact|proudly-british", re.I
+)
+
+
+def floorplan_from(page_html: str) -> str | None:
+    """The layout drawing on `/vital-statistics/`, if it is still there.
+
+    Two tests, because neither alone is enough. **The drawing is line art and every
+    photograph on this site is a JPEG**, so the format does most of the work; the furniture
+    list then removes the badges, which are line art too and sit on every page. Without the
+    format test this returns the first photograph on a model page.
+
+    Returned rather than assumed so the pointer is only offered while a drawing is really
+    published, instead of sending a reviewer to a page that no longer carries one.
+    """
+    content = re.sub(r"(?is)<(script|style|head|nav|header|footer)\b.*?</\1>", " ", page_html)
+    for tag in re.findall(r"<img[^>]+>", content):
+        source = re.search(r'(?:data-(?:lazy-)?src|src)="(https?://[^"]+)"', htmllib.unescape(tag))
+        if source is None:
+            continue
+        url = source.group(1)
+        if re.search(r"\.(?:png|svg|gif)(?:\?|$)", url, re.I) and not _SITE_FURNITURE_IMAGES.search(
+            url
+        ):
+            return url
+    return None
+
+
+def models_without_a_washroom(page_html: str, roster: Iterable[str]) -> set[str]:
+    """Models the Vital Statistics bathroom row excludes — *"1040w x 760d (n/a in Bothy)"*.
+
+    The one published drawing has a washroom in it, so it cannot be a drawing of a model
+    that has none. Pointing a reviewer at it for the Bothy would be worse than pointing at
+    nothing, and this is the only place on the site that says which models those are.
+    """
+    match = re.search(r"\bBathroom\b.{0,80}?\(\s*n/a in ([^)]*)\)", _flatten(page_html), re.I)
+    if match is None:
+        return set()
+    named = {part.strip().lower() for part in re.split(r",|\band\b", match.group(1))}
+    return {model for model in roster if model.lower() in named}
+
+
 def internal_length_from(page_html: str) -> int | None:
     """The internal length off `/vital-statistics/`, which is a label-then-value list.
 
@@ -490,7 +556,9 @@ _FEATURE_NOTES: dict[str, str] = {
 }
 
 
-def build_extracted(spec: Specification, *, basis: str, catalogue: str) -> ExtractedCaravan:
+def build_extracted(
+    spec: Specification, *, basis: str, catalogue: str, floorplan: str | None = None
+) -> ExtractedCaravan:
     """One Barefoot as a `Caravan`, with provenance on everything it proposes."""
     features = habitation.features_from(spec.equipment)
     # Dropped for the same reason as on every other caravan adapter: the copy names beds
@@ -612,6 +680,22 @@ def build_extracted(spec: Specification, *, basis: str, catalogue: str) -> Extra
                 f"{feature.snippet!r}"
             ),
         )
+    if floorplan is not None:
+        # One drawing serves the whole range and it carries no labels, so the reviewer is
+        # pointed at it rather than told what it shows — the positional fields are theirs
+        # to read off it. `floorplan_provenance` skips any field already answered.
+        provenance.update(
+            floorplan_provenance(
+                caravan,
+                VITAL_STATISTICS_URL,
+                f"Barefoot {spec.model}",
+                drawing=(
+                    "the unlabelled layout drawing part-way down Vital Statistics, which "
+                    "Barefoot publish once for the whole range and show in two states — the "
+                    "bed made up, and the seating with the floor clear"
+                ),
+            )
+        )
     return ExtractedCaravan(caravan=caravan, provenance=provenance)
 
 
@@ -675,6 +759,24 @@ def collect(
     vital = http.fetch(VITAL_STATISTICS_URL).file_path.read_text(
         encoding="utf-8", errors="replace"
     )
+    floorplan = floorplan_from(vital)
+    washroomless = models_without_a_washroom(vital, [spec.model for spec in specs])
+    if floorplan is None:
+        on_progress(
+            f"NO LAYOUT DRAWING — {VITAL_STATISTICS_URL} no longer publishes one, so the "
+            f"positional habitation fields cannot be pointed at anything"
+        )
+    else:
+        on_progress(
+            f"the layout drawing is on Vital Statistics ({floorplan.rsplit('/', 1)[-1]}), "
+            f"published once for the whole range and unlabelled"
+            + (
+                f" — and NOT offered for {', '.join(sorted(washroomless))}, which the same "
+                f"page says has no bathroom where the drawing plainly has one"
+                if washroomless
+                else ""
+            )
+        )
     internal_length = internal_length_from(vital)
     if internal_length is None:
         on_progress(
@@ -724,7 +826,14 @@ def collect(
         if not reconciles:
             on_progress(f"{spec.model} — DROPPED: {basis}")
             continue
-        results.append(build_extracted(spec, basis=basis, catalogue=url))
+        results.append(
+            build_extracted(
+                spec,
+                basis=basis,
+                catalogue=url,
+                floorplan=None if spec.model in washroomless else floorplan,
+            )
+        )
         on_progress(
             f"{spec.model} — read: {spec.berths} berth, {spec.mtplm_kilograms}kg MTPLM, "
             f"{spec.mro_kilograms}kg MRO, {spec.derived_payload_kilograms}kg payload, "
@@ -750,8 +859,7 @@ def collect(
         "catalogue is taken, being two sources to one and the only figure that reconciles."
     )
     on_progress(
-        "NO AWNING LENGTH AND NO LAYOUT DRAWING ARE PUBLISHED ANYWHERE, so FMLV's own awning "
-        "figures stand and the positional habitation fields cannot be answered."
+        "NO AWNING LENGTH IS PUBLISHED ANYWHERE, so FMLV's own awning figures stand."
     )
     if len(results) != EXPECTED_MODELS:
         on_progress(

@@ -199,6 +199,37 @@ def test_the_internal_length_comes_off_vital_statistics() -> None:
     assert barefoot.internal_length_from(_fixture("barefoot_vital_statistics.html")) == 3560
 
 
+def test_the_layout_drawing_is_found_on_vital_statistics() -> None:
+    """It is called `internal-model1.png`, which is why looking for "floorplan" missed it."""
+    plan = barefoot.floorplan_from(_fixture("barefoot_vital_statistics.html"))
+    assert plan is not None
+    assert plan.endswith("internal-model1.png")
+
+
+def test_the_site_badges_are_not_mistaken_for_a_drawing() -> None:
+    """Made in Britain and the 10-year warranty sit on the same page and on every other."""
+    plan = barefoot.floorplan_from(_fixture("barefoot_vital_statistics.html"))
+    assert plan is not None
+    assert "made-in-britain" not in plan and "yearlogo" not in plan
+
+
+def test_a_photograph_is_never_mistaken_for_a_drawing() -> None:
+    """The Classic's page leads with a photograph of an interior, which is not a layout.
+
+    The drawing is line art and every photograph on this site is a JPEG, which is what
+    tells them apart — without that test this returns `Rosebudinside-1024x668.jpeg`.
+    """
+    assert barefoot.floorplan_from(_fixture("barefoot_classic.html")) is None
+
+
+def test_the_bothy_is_excluded_from_the_drawing_by_the_bathroom_row() -> None:
+    """*"1040w x 760d (n/a in Bothy)"* — the drawing has a washroom, so it is not the Bothy."""
+    roster = ["Bothy", "Lite", "Classic", "Forward", "Eclipse", "Country Living"]
+    assert barefoot.models_without_a_washroom(
+        _fixture("barefoot_vital_statistics.html"), roster
+    ) == {"Bothy"}
+
+
 def test_the_prices_page_gives_one_price_per_model() -> None:
     roster = ["Bothy", "Lite", "Classic", "Forward", "Eclipse", "Country Living"]
     assert barefoot.prices_from(_fixture("barefoot_prices.html"), roster) == {
@@ -297,6 +328,30 @@ def test_the_whole_payload_is_recorded_as_personal_effects(
     )
     assert built.caravan.personal_effects_payload_kilograms == 140
     assert built.caravan.optional_equipment_payload_kilograms is None
+
+
+def test_the_floorplan_is_a_pointer_not_an_answer(specs: list[barefoot.Specification]) -> None:
+    """The drawing is unlabelled, so the positional fields are the reviewer's to read off it."""
+    built = barefoot.build_extracted(
+        _by_model(specs)["Classic"],
+        basis="the arithmetic",
+        catalogue="http://example/cat.pdf",
+        floorplan="http://example/internal-model1.png",
+    )
+    pointer = built.provenance["sleeping_area"]
+    assert pointer.reviewer_reference is True
+    assert pointer.source_url == barefoot.VITAL_STATISTICS_URL
+    assert built.caravan.sleeping_area is None
+    assert built.caravan.kitchen_location is None
+
+
+def test_the_bothy_gets_no_floorplan_pointer(specs: list[barefoot.Specification]) -> None:
+    """`collect` passes None for a model the bathroom row excludes, and none is recorded."""
+    built = barefoot.build_extracted(
+        _by_model(specs)["Bothy"], basis="the arithmetic", catalogue="http://example/cat.pdf"
+    )
+    assert "sleeping_area" not in built.provenance
+    assert "kitchen_location" not in built.provenance
 
 
 def test_no_awning_length_is_ever_proposed(specs: list[barefoot.Specification]) -> None:
