@@ -30,6 +30,34 @@ Whenever a single number cannot express the whole truth, carry the manufacturer'
 published wording into the `Provenance` snippet** — a reviewer needs to see `4-6` even
 though `berths` records `4`. Sunlight and Rimor already do this.
 
+### An asterisked bed is not a berth
+
+**Rule from the NCC side, 9 October 2026, found on Malibu's Relax 640 LE XR.** Where a
+specification gives a bed's *dimensions* but marks the figure with an asterisk the page's
+own footnote ties to optional equipment, that bed is **not part of the vehicle as standard
+and does not count towards `berths`**.
+
+Malibu's table states both:
+
+| row | value | counts? |
+|---|---|---|
+| `Rear bed dimensions (mm)` | `2020 x 900 / 1890 x 1020` | **yes** — a fixed double, two berths |
+| `Dimensions bed conversion seating group (mm)` | `1600 x 1145***` | **no** — the footnote reads *"in conjunction with special equipment"* |
+
+So the Relax is a **two**-berth van, not a four. The requester: *"if you get dimensions of
+a bed, but it requires with an asterisk that requires extra equipment, it's not standard...
+a fixed double bed means two berths."*
+
+This is the berth-range rule arriving by another route — the lower figure is the vehicle as
+built — and it is **better evidence than a range hero**, which is marketing. Malibu's van
+pages say `up to 4` sleeping berths beside `Optional: Pop-up roof family-for-4`, so the
+hero and the beds agree; the beds say it in the manufacturer's own technical data.
+
+Two things to carry to the next adapter. **Count a bed, not a row**: one fixed double is
+two berths. And **the asterisk count varies by page** — Malibu use `**` on the Genius and
+`***` on the Relax for the same caveat — so match a run of them rather than a particular
+number.
+
 ### "Mirrors folded" is recorded; "including mirrors" never is
 
 A common label, and it does not mean the same thing on the two body shapes:

@@ -121,6 +121,7 @@ __all__ = [
     "MalibuProduct",
     "collect",
     "lap_belt_warning",
+    "berths_from_beds",
     "hero_berths",
     "model_name",
     "normalised_title",
@@ -407,7 +408,57 @@ _LABELS: tuple[tuple[str, re.Pattern[str]], ...] = (
     # optinal)`, their typo — so both layouts are read.
     ("berths_combined", re.compile(r"^Sleeping places$", re.I)),
     ("heating", re.compile(r"^Heating system$", re.I)),
+    # The bed rows, which are how a van states its berths — see `berths_from_beds`.
+    ("bed_fixed", re.compile(r"^(?:Rear bed|Fixed bed|Lengthways single bed).*\(mm\)", re.I)),
+    ("bed_conversion", re.compile(r"^(?:Dimensions bed conversion|Seating area bed conversion).*\(mm\)", re.I)),
 )
+
+
+#: A figure the page footnotes as needing equipment the buyer has to ask for. Malibu mark
+#: it with asterisks — `1600 x 1145***` against a footnote reading *"in conjunction with
+#: special equipment"* — and the count of asterisks varies by page, so any run of them
+#: after a bed's dimensions is read as the same caveat.
+_OPTIONAL_MARK = re.compile(r"\*+\s*$")
+
+#: Every bed in a van's vehicle-data table is a double: Malibu print its two sleeping
+#: dimensions, `2020 x 900 / 1890 x 1020`.
+_BERTHS_PER_BED = 2
+
+
+def berths_from_beds(fields: dict[str, str]) -> tuple[int | None, str]:
+    """Berths counted from the bed rows, ignoring any bed marked as optional.
+
+    **The requester's rule, 9 October 2026**, from the Relax 640 LE XR: *"if you get
+    dimensions of a bed, but it requires with an asterisk that requires extra equipment,
+    it's not standard... a fixed double bed means two berths."*
+
+    That page states a `Rear bed dimensions (mm)` of `2020 x 900 / 1890 x 1020` — a real
+    fixed double, two berths — and a `Dimensions bed conversion seating group (mm)` of
+    `1600 x 1145***`, where the footnote reads *"in conjunction with special equipment"*.
+    The asterisked bed needs something bought, so it is not part of the vehicle as
+    standard and the answer is **2**, not 4.
+
+    This replaces reading the range hero's `up to 4`, which was never a berth count: the
+    same pages say `Optional: Pop-up roof family-for-4`, so the third and fourth berths
+    were always an option. The hero said the right thing for the wrong reason.
+    """
+    counted: list[str] = []
+    optional: list[str] = []
+    for key in ("bed_fixed", "bed_conversion"):
+        value = (fields.get(key) or "").strip()
+        if not value:
+            continue
+        (optional if _OPTIONAL_MARK.search(value) else counted).append(f"{key} {value!r}")
+    if not counted:
+        return None, "no bed is stated without an optional-equipment mark"
+    berths = len(counted) * _BERTHS_PER_BED
+    reason = f"{berths} berths — {' and '.join(counted)}, each a double"
+    if optional:
+        reason += (
+            f"; {' and '.join(optional)} is marked as needing special equipment, so it is "
+            f"not counted"
+        )
+    return berths, reason
 
 
 def parse_technical_data(lines: list[str]) -> dict[str, str]:
@@ -511,6 +562,9 @@ def normalised_title(title: str) -> str:
     one alone is enough to lose the price.
     """
     plain = title.translate(_QUOTES).translate(_DASHES)
+    # `4×4` on a card against `4x4` on the product page — a multiplication sign, not a
+    # letter, and enough on its own to lose the Genius performance 4x4's price.
+    plain = plain.replace("×", "x").replace("✕", "x")
     return re.sub(r"\s+", " ", plain).strip()
 
 
@@ -547,6 +601,59 @@ def prices_from(lines: list[str]) -> dict[tuple[str, int | None], int]:
     return found
 
 
+#: One van card's labelled rows, as Malibu's `fahrzeug_eigenschaften` widget renders them:
+#: `<div class="eigenschaft">Price</div><div class="wert">58.930 £</div>`.
+_CARD_ROW = re.compile(
+    r'class="eigenschaft">([^<]*)</div>\s*<div class="wert">([^<]*)</div>', re.I
+)
+_CARD_WIDGET = re.compile(r'fahrzeug_eigenschaften\.default"')
+_HEADING = re.compile(r"<h[1-6][^>]*>(.*?)</h[1-6]>", re.S)
+
+
+def van_prices_from(page_html: str) -> dict[tuple[str, int | None], int]:
+    """Prices off a **van** range page, which uses a different card from the motorhomes.
+
+    The motorhome pages print a card the text reader can follow — title, length, value,
+    `GBP`. The van pages do not: they render a `fahrzeug_eigenschaften` widget of labelled
+    pairs, price the car in **`58.930 £`** rather than `GBP`, and sit in a part of the
+    markup `visible_lines` does not reach at all — 497 lines come back from a 979KB page.
+
+    So every van and the Genius came through with *no price*, which the run reported
+    honestly and nobody could act on. The requester found them on the page by eye,
+    9 October 2026.
+
+    Read straight from the markup rather than from flattened text, because the structure
+    is exact and the flattening is what failed. Keyed like `prices_from` so `price_for`
+    serves both.
+    """
+    found: dict[tuple[str, int | None], int] = {}
+    for widget in _CARD_WIDGET.finditer(page_html):
+        headings = _HEADING.findall(page_html[max(0, widget.start() - 4000) : widget.start()])
+        if not headings:
+            continue
+        title = " ".join(re.sub(r"<[^>]+>", " ", htmllib.unescape(headings[-1])).split())
+        rows = {
+            label.strip().lower(): value.strip()
+            for label, value in _CARD_ROW.findall(page_html[widget.start() : widget.start() + 1600])
+        }
+        raw_price = rows.get("price", "")
+        # `58.930 £` — a dot for thousands, and a symbol rather than a currency code.
+        price = re.match(r"([\d.]+)\s*£", raw_price)
+        if not price:
+            continue
+        # `6,355 m` is 6.355 metres; `5,41 m` is 5.41. A comma for the decimal, throughout.
+        # The card gives metres where the product page gives millimetres, and this is the
+        # join `price_for` uses when two cards share a title.
+        length = re.match(r"([\d,]+)\s*m\b", rows.get("total length", ""))
+        length_mm = (
+            round(float(length.group(1).replace(",", ".")) * 1000) if length else None
+        )
+        found.setdefault(
+            (normalised_title(title), length_mm), int(price.group(1).replace(".", ""))
+        )
+    return found
+
+
 def price_for(
     prices: dict[tuple[str, int | None], int], title: str, length_mm: int | None
 ) -> int | None:
@@ -558,7 +665,19 @@ def price_for(
     if (key, length_mm) in prices:
         return prices[(key, length_mm)]
     same_title = [value for (name, _), value in prices.items() if name == key]
-    return same_title[0] if len(same_title) == 1 else None
+    if len(same_title) == 1:
+        return same_title[0]
+    # **Last resort: the same words in a different order.** Malibu's 4x4 card is headed
+    # `Malibu genius performance 4x4 641 LE` where the product is `Malibu genius 641 LE`
+    # plus the variant this adapter appends — the same tokens, rearranged. Only used when
+    # exactly one card matches, so a title that genuinely collides still returns nothing.
+    tokens = frozenset(key.lower().split())
+    same_words = [
+        value
+        for (name, _), value in prices.items()
+        if frozenset(name.lower().split()) == tokens
+    ]
+    return same_words[0] if len(same_words) == 1 else None
 
 
 #: The range hero's berth figure, which is the only place a van states one. `up to 4`
@@ -665,7 +784,11 @@ class MalibuProduct:
         combined = self.fields.get("berths_combined")
         if combined:
             return _number(combined)
-        # Vans state none in their table; the range hero is the only place they do.
+        # A van states no sleeping-places row, but it does state its beds.
+        from_beds, _ = berths_from_beds(self.fields)
+        if from_beds is not None:
+            return from_beds
+        # Last resort: the range hero, which says `up to 4` and means fewer.
         return self.hero_berths
 
     @property
@@ -847,6 +970,8 @@ def collect(
 
         page_lines = visible_lines(page)
         prices.update(prices_from(page_lines))
+        # The van pages carry their prices in a widget the text reader never reaches.
+        prices.update(van_prices_from(page))
         heroes[config.fmlv_range] = hero_berths(page_lines)
         # **Every motorhome page lists every motorhome product.** The four range pages are
         # filtered views of one catalogue, not separate sets, so a product cannot be
@@ -902,8 +1027,10 @@ def collect(
         #
         # Taken from the URL, the only thing distinguishing them, and only where the title
         # has not already said it.
+        price_title = _TITLE_TAIL.sub("", htmllib.unescape(title)).strip()
         if PERFORMANCE_4X4 in link and "4x4" not in model.lower():
             model = f"{model} performance 4x4"
+            price_title = f"{price_title} performance 4x4"
 
         # **A `-2` slug is a second page, and only sometimes a second vehicle.** Malibu
         # publish one at `relax-640-le-r-2`, which the roster dropped for years as a
@@ -930,9 +1057,13 @@ def collect(
             url=url,
             model=model,
             chassis=chassis_from(link) or chassis_from(fields.get("base_vehicle")),
+            # The 4x4's page title is `Malibu genius 641 LE`, the same as the standard
+            # van's, while its card is headed `Malibu genius performance 4x4 641 LE`. The
+            # variant is added here too so the two carry the same words — `price_for`
+            # matches them as a token set once nothing else does.
             rrp_pounds=price_for(
                 prices,
-                _TITLE_TAIL.sub('', htmllib.unescape(title)).strip(),
+                price_title,
                 _number(fields.get('length')),
             ),
             hero_berths=heroes.get(range_for(title, config).fmlv_range, (None, None))[0],

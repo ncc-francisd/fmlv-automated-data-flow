@@ -18,6 +18,8 @@ from src.adapters.malibu import (
     PERFORMANCE_4X4,
     hero_berths,
     RANGES,
+    berths_from_beds,
+    van_prices_from,
     MalibuProduct,
     _mass,
     _reconciles,
@@ -251,14 +253,17 @@ def test_a_gross_weight_below_the_running_order_is_refused() -> None:
 # --- vans and the Genius -----------------------------------------------------------------
 
 
-def test_a_van_states_no_berth_count_of_its_own() -> None:
-    """A van's vehicle-data table has no sleeping-places row at all. Its range hero says
-    `up to 4`, which is an upper bound needing the optional pop-up roof, so nothing is
-    recorded and FMLV's 2 stands."""
+def test_a_van_counts_its_berths_from_its_bed_rows() -> None:
+    """A van's table has no sleeping-places row, but it does state its beds.
+
+    It used to fall through to the range hero's `up to 4` and record nothing. The
+    requester's rule of 9 October 2026 reads the beds instead: a fixed double is two
+    berths, and a bed marked as needing special equipment is not counted at all.
+    """
     van = _product("van_compact_540", "Van Compact")
 
     assert van.model == "540 DB"
-    assert van.berths is None
+    assert van.berths == 2
     assert van.travel_seats == 4
     assert van.mro_kilograms == 2735
 
@@ -387,3 +392,81 @@ def test_a_dash_two_slug_is_no_longer_dropped_by_the_roster() -> None:
         '<a href="/en/camper-vans/crelax-camper-van/relax-640-le-r-2/">XR</a>'
     )
     assert len(roster_from(page, _range("Van Relax"))) == 2
+
+
+# --- the van price card, and the berths it does not state ---------------------------------
+#
+# Both found by the requester on 9 October 2026, reading the page himself after the run
+# reported no price and no berths for every van.
+
+
+_VAN_CARD = (
+    '<h3>Malibu relax 640 LE XR</h3>'
+    '<div class="elementor-widget-container" data-widget_type="fahrzeug_eigenschaften.default">'
+    '<div class="wrapper"><div class="eigenschaft">Total length</div>'
+    '<div class="wert">6,355 m</div></div>'
+    '<div class="wrapper"><div class="eigenschaft">Gross weight</div>'
+    '<div class="wert">3,5 - 4 t</div></div>'
+    '<div class="wrapper"><div class="eigenschaft">Price</div>'
+    '<div class="wert">58.930 £</div></div></div>'
+)
+
+
+def test_a_van_card_is_read_from_its_own_widget() -> None:
+    """The van pages price in `58.930 £`, not `GBP`, and in markup the text reader never
+    reaches — 497 visible lines come back from a 979KB page, so every van had no price."""
+    prices = van_prices_from(_VAN_CARD)
+    assert ("Malibu relax 640 LE XR", 6355) in prices
+    assert prices[("Malibu relax 640 LE XR", 6355)] == 58930
+
+
+def test_a_dot_is_a_thousands_separator_not_a_decimal() -> None:
+    """`58.930 £` is fifty-eight thousand, not fifty-eight."""
+    assert next(iter(van_prices_from(_VAN_CARD).values())) == 58930
+
+
+def test_a_multiplication_sign_does_not_lose_a_price() -> None:
+    """The 4x4's card reads `4×4` and its product page `4x4`."""
+    assert normalised_title("Malibu genius performance 4\u00d74 641 LE") == (
+        "Malibu genius performance 4x4 641 LE"
+    )
+
+
+def test_the_same_words_in_a_different_order_still_match() -> None:
+    """`genius performance 4x4 641 LE` on the card, `genius 641 LE performance 4x4` built."""
+    prices = {("Malibu genius performance 4x4 641 LE", None): 133630}
+    assert price_for(prices, "Malibu genius 641 LE performance 4x4", None) == 133630
+
+
+def test_an_ambiguous_token_match_returns_nothing() -> None:
+    """The fallback only fires where exactly one card matches on its words."""
+    prices = {("B A", None): 1, ("A B  ", None): 2}
+    assert price_for(prices, "A B C", None) is None
+    assert price_for(prices, "A  B", None) is None
+
+
+def test_an_asterisked_bed_is_not_a_berth() -> None:
+    """The requester's rule: a bed needing special equipment is not standard.
+
+    Relax 640 LE XR — a fixed rear double at `2020 x 900 / 1890 x 1020`, and a seating
+    conversion at `1600 x 1145***` whose footnote reads "in conjunction with special
+    equipment". Two berths, not four.
+    """
+    berths, reason = berths_from_beds(
+        {"bed_fixed": "2020 x 900 / 1890 x 1020", "bed_conversion": "1600 x 1145***"}
+    )
+    assert berths == 2
+    assert "special equipment" in reason
+
+
+def test_two_unmarked_beds_are_four_berths() -> None:
+    berths, _ = berths_from_beds(
+        {"bed_fixed": "2020 x 900", "bed_conversion": "1600 x 1145"}
+    )
+    assert berths == 4
+
+
+def test_no_bed_at_all_proposes_nothing() -> None:
+    """Silence stays silence — FMLV's own figure is left alone."""
+    assert berths_from_beds({})[0] is None
+    assert berths_from_beds({"bed_conversion": "1600 x 1145**"})[0] is None
