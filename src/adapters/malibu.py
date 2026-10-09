@@ -480,6 +480,11 @@ def parse_technical_data(lines: list[str]) -> dict[str, str]:
         for key, pattern in _LABELS:
             if key not in found and pattern.match(line):
                 found[key] = block[i + 1]
+                # **The value of the row below, kept only for the gross weight.** Where
+                # Malibu's table has slipped a row the mass is still printed, one row down
+                # under the wrong label — see `MalibuProduct.gross_weight`.
+                if key == "mtplm" and i + 3 < len(block):
+                    found["mtplm_next_row"] = block[i + 3]
                 break
     return found
 
@@ -754,7 +759,51 @@ class MalibuProduct:
 
     @property
     def mtplm_kilograms(self) -> int | None:
-        return _mass(self.fields.get("mtplm"))
+        return self.gross_weight[0]
+
+    @property
+    def gross_weight(self) -> tuple[int | None, str]:
+        """The permissible gross weight, **recovered where Malibu's table has slipped**.
+
+        The requester spotted this on the Coachbuilt Edition + T490 RB-LE comfort,
+        9 October 2026. One label is missing from that page's table — `Rear garage
+        interior height` — so every label below it is printed against the value of the row
+        above. The *values* are in the right order and the mass is still there, one row
+        down, under `Door width / height, rear garage on driver's side`:
+
+            Technically permissible gross vehicle weight (kg)        1050 x 1140
+            Door width / height, rear garage on driver's side (mm)   4250
+
+        Its siblings settle it beyond doubt: the I490 comfort and the T480 RB-QB K comfort
+        print exactly the same sequence of values with the labels intact, and both state
+        **4250** — the 4.25t comfort class this vehicle belongs to.
+
+        Four guards, so this fires only on that signature and never shifts a sound table:
+        the labelled cell must hold something that is *not* a mass, the row below must
+        hold one, it must exceed the mass in running order, and `_mass` must already have
+        found it inside 1500-8000kg.
+        """
+        stated = _mass(self.fields.get("mtplm"))
+        if stated is not None:
+            return stated, f"{stated}kg, as the page's gross-weight row states"
+        labelled = self.fields.get("mtplm")
+        if labelled is None:
+            return None, "the page states no gross weight at all"
+        below = _mass(self.fields.get("mtplm_next_row"))
+        mro = self.mro_kilograms
+        if below is None or mro is None or below <= mro:
+            return None, (
+                f"the gross-weight row holds {labelled!r}, which is a door opening rather "
+                f"than a mass — their table has slipped a row — and the row below it holds "
+                f"nothing usable either"
+            )
+        return below, (
+            f"{below}kg, RECOVERED from the row below. The gross-weight row holds "
+            f"{labelled!r}, a rear-garage door opening: one label is missing from this "
+            f"page's table, so every label below it sits against the row above's value. "
+            f"{below}kg is above the {mro}kg mass in running order and is what the other "
+            f"comfort-class models publish"
+        )
 
     @property
     def mro_kilograms(self) -> int | None:
@@ -801,11 +850,10 @@ def _reconciles(product: MalibuProduct) -> tuple[bool, str]:
     mro, band = product.mro_kilograms, product.tolerance_band
     if mro is None:
         return False, "the page states no weight in running order"
-    # **A missing gross weight does not drop the product.** Two Coachbuilt Edition + pages
-    # print `1050 x 1140` under `Technically permissible gross vehicle weight (kg)` - a
-    # rear-garage door opening, because Malibu's own table has slipped a row. Everything
-    # else on those pages is sound, so the product is kept and only the mass it cannot
-    # state is withheld; `build_extracted` proposes no MTPLM and no payload without it.
+    # **A missing gross weight does not drop the product.** Where the mass cannot be
+    # recovered at all the product is kept and only the figure it cannot state is withheld;
+    # `build_extracted` proposes no MTPLM and no payload without it. See
+    # `MalibuProduct.gross_weight` for the row-slip this first appeared as.
     if product.mtplm_kilograms is None:
         return True, (
             f"mass in running order {mro}kg. NO GROSS WEIGHT IS PROPOSED: the page's "
@@ -914,7 +962,7 @@ def build_extracted(product: MalibuProduct, *, mass_basis: str) -> ExtractedMoto
     if product.mtplm_kilograms is not None:
         record(
             "mtplm_kilograms",
-            f"Technically permissible gross vehicle weight: {product.mtplm_kilograms}kg",
+            f"Technically permissible gross vehicle weight: {product.gross_weight[1]}",
         )
     if product.mro_kilograms is not None:
         record("mro_kilograms", f"Weight in running order: {mass_basis}")

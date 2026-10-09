@@ -210,22 +210,25 @@ def test_a_door_opening_is_not_a_mass() -> None:
     assert _mass(None) is None
 
 
-def test_the_slipped_page_keeps_its_product_and_loses_only_that_mass() -> None:
-    """Dropping it would have made two live FMLV rows look discontinued. Everything else
-    on the page reads normally, so the product is kept and the mass withheld."""
+def test_the_slipped_page_recovers_the_mass_a_row_below() -> None:
+    """It used to withhold the mass; the requester found it on the page, 9 October 2026.
+
+    One label is missing from this table, so every label below sits against the row
+    above's value — and the gross weight is still printed, under the driver's-side door
+    label. Its siblings publish the same 4250kg with their labels intact.
+    """
     product = _product("t490_slipped", "Coachbuilt")
 
-    assert product.mtplm_kilograms is None
+    assert product.mtplm_kilograms == 4250
     assert product.mro_kilograms == 3113
-    assert product.derived_payload_kilograms is None
+    assert product.derived_payload_kilograms == 1137
 
     ok, reason = _reconciles(product)
     assert ok is True
-    assert "NO GROSS WEIGHT IS PROPOSED" in reason
 
     extracted = build_extracted(product, mass_basis=reason)
-    assert "mtplm_kilograms" not in extracted.provenance
-    assert "mh_payload_kilograms" not in extracted.provenance
+    assert "RECOVERED" in extracted.provenance["mtplm_kilograms"].snippet
+    assert extracted.motorhome.mh_payload_kilograms == 1137
     assert extracted.motorhome.mh_length_mm == 7345
 
 
@@ -470,3 +473,59 @@ def test_no_bed_at_all_proposes_nothing() -> None:
     """Silence stays silence — FMLV's own figure is left alone."""
     assert berths_from_beds({})[0] is None
     assert berths_from_beds({"bed_conversion": "1600 x 1145**"})[0] is None
+
+
+# --- the slipped table -------------------------------------------------------------------
+#
+# The requester spotted this on the Coachbuilt Edition + T490 RB-LE comfort, 9 October
+# 2026: the run reported no gross weight and no payload, and the mass was on the page all
+# along, one row below where its label sits.
+
+
+_SLIPPED = {
+    "mtplm": "1050 x 1140",
+    "mtplm_next_row": "4250",
+    "mro": "3.113 (2.957 - 3.269)",
+}
+
+
+def _weights(fields: dict[str, str]) -> malibu.MalibuProduct:
+    return malibu.MalibuProduct(
+        config=RANGES[0], url="x", model="x", chassis=None, rrp_pounds=None,
+        hero_berths=None, fields=fields, lines=[],
+    )
+
+
+def test_a_gross_weight_one_row_down_is_recovered() -> None:
+    """One label is missing from the page, so every label below sits a row too high."""
+    product = _weights(_SLIPPED)
+    weight, reason = product.gross_weight
+    assert weight == 4250
+    assert product.mro_kilograms == 3113
+    assert product.derived_payload_kilograms == 1137
+    assert "RECOVERED" in reason
+
+
+def test_an_intact_table_is_never_shifted() -> None:
+    """The guard that matters: a sound page must read its own gross-weight row."""
+    product = _weights({"mtplm": "4250", "mtplm_next_row": "3.213 (3.052 - 3.374)", "mro": "3.213"})
+    weight, reason = product.gross_weight
+    assert weight == 4250
+    assert "RECOVERED" not in reason
+
+
+def test_a_recovered_weight_must_exceed_the_running_order() -> None:
+    """Otherwise the row below is not a gross weight either, and nothing is proposed."""
+    product = _weights({"mtplm": "1050 x 1140", "mtplm_next_row": "2000", "mro": "3.113"})
+    assert product.gross_weight[0] is None
+
+
+def test_nothing_is_recovered_from_a_row_that_is_not_a_mass() -> None:
+    product = _weights({"mtplm": "1050 x 1140", "mtplm_next_row": "1050 x 1100", "mro": "3.113"})
+    assert product.gross_weight[0] is None
+
+
+def test_the_lower_of_a_recovered_pair_is_taken() -> None:
+    """The Mercedes T490 reads `4200 / 4500***` — the base vehicle, per the settled rule."""
+    product = _weights({"mtplm": "1050 x 1140", "mtplm_next_row": "4200 / 4500***", "mro": "3.136"})
+    assert product.gross_weight[0] == 4200
