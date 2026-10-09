@@ -17,6 +17,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
+from playwright.sync_api import Error as PlaywrightError
 
 from src.fetch.ncc import (
     CREDENTIALS_EMAIL_ENV,
@@ -25,6 +26,7 @@ from src.fetch.ncc import (
     NccCredentialsError,
     NccExportError,
     NccSiteConfig,
+    _save_download,
     caravan_export_path,
     download_export,
 )
@@ -165,3 +167,89 @@ def test_download_export_raises_a_clear_error_when_the_xlsx_is_missing(
 
     with pytest.raises(NccExportError, match="does-not-exist.xlsx"):
         download_export(credentials, "Test Motorhomes", dest_path, config=bad_config)
+
+
+# --- Why a download failed ------------------------------------------------------------
+#
+# Playwright reports every unfinished download as `Download.save_as: canceled` whatever
+# the cause, and on 8-9 October 2026 that cost two days: Nova had generated the export
+# correctly and Cloudflare was refusing the link with a 403, but the message named none
+# of it, so the adapter, the VM, the registry row and the account were all suspected
+# first. These cover the message that replaced it.
+
+
+class _FakeResponse:
+    def __init__(self, status: int, body: str, headers: dict[str, str] | None = None) -> None:
+        self.status = status
+        self.headers = headers or {}
+        self._body = body
+
+    def text(self) -> str:
+        return self._body
+
+
+class _FakeRequest:
+    def __init__(self, response: _FakeResponse | None) -> None:
+        self._response = response
+
+    def get(self, url: str) -> _FakeResponse:  # noqa: ARG002
+        if self._response is None:
+            raise PlaywrightError("connection closed")
+        return self._response
+
+
+class _FakePage:
+    def __init__(self, response: _FakeResponse | None) -> None:
+        self.request = _FakeRequest(response)
+
+
+class _FakeDownload:
+    """A download that never completes, which is the only case `_save_download` handles."""
+
+    url = "https://findmyleisurevehicle.co.uk/storage/product-exports/1791539091-x.zip"
+
+    def save_as(self, path: Path) -> None:  # noqa: ARG002
+        raise PlaywrightError("Download.save_as: canceled")
+
+
+_CLOUDFLARE_403 = (
+    "Sorry, you have been blocked You are unable to access findmyleisurevehicle.co.uk"
+)
+
+
+def test_a_blocked_download_names_the_status_the_url_and_who_refused(tmp_path: Path) -> None:
+    page = _FakePage(_FakeResponse(403, _CLOUDFLARE_403, {"cf-ray": "a47c72fcdafdc4f1-LHR"}))
+    with pytest.raises(NccExportError) as caught:
+        _save_download(page, _FakeDownload(), tmp_path / "export.zip", "Barefoot Caravans")
+    message = str(caught.value)
+    assert "HTTP 403" in message
+    assert "Cloudflare" in message
+    assert "a47c72fcdafdc4f1-LHR" in message
+    assert "storage/product-exports" in message
+    assert "Barefoot Caravans" in message
+
+
+def test_a_blocked_download_says_nova_did_its_part(tmp_path: Path) -> None:
+    """The point of the message: stop the reader suspecting the adapter or the account."""
+    page = _FakePage(_FakeResponse(403, _CLOUDFLARE_403))
+    with pytest.raises(NccExportError, match="Nova generated the export correctly"):
+        _save_download(page, _FakeDownload(), tmp_path / "export.zip", "Barefoot Caravans")
+
+
+def test_a_non_cloudflare_failure_still_reports_its_status(tmp_path: Path) -> None:
+    """A 500 from the site itself is reported the same way, without naming Cloudflare."""
+    page = _FakePage(_FakeResponse(500, "<html>Server Error</html>"))
+    with pytest.raises(NccExportError) as caught:
+        _save_download(page, _FakeDownload(), tmp_path / "export.zip", "Swift Group Ltd")
+    message = str(caught.value)
+    assert "HTTP 500" in message
+    assert "refused by the server" in message
+    assert "Cloudflare" not in message
+
+
+def test_an_unreachable_link_says_so_rather_than_hiding_the_failure(tmp_path: Path) -> None:
+    """If the probe itself fails there is still a better message than 'canceled'."""
+    page = _FakePage(None)
+    with pytest.raises(NccExportError) as caught:
+        _save_download(page, _FakeDownload(), tmp_path / "export.zip", "Barefoot Caravans")
+    assert "could not be re-requested" in str(caught.value)

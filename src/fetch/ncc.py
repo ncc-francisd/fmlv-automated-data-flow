@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Download, Error as PlaywrightError, Page, sync_playwright
 
 load_dotenv()
 
@@ -224,6 +224,57 @@ def caravan_export_path(
     return motorhome_path.with_name(f"{motorhome_path.stem}_{caravan_stem}.xlsx")
 
 
+#: Cloudflare's block page, which is served with the 403 rather than by Nova. Matching it
+#: is only so the message can say *who* refused — the status and URL are reported either way.
+_CLOUDFLARE_BLOCK = "You are unable to access"
+
+
+def _save_download(page: Page, download: Download, zip_path: Path, supplier_name: str) -> None:
+    """Write the export to disk, and say **why** if the transfer never completes.
+
+    Playwright reports every unfinished download as `Download.save_as: canceled`,
+    regardless of cause, and that message cost two days on 8-9 October 2026. Nova had
+    done its part — the login, the action and the file generation all returned 200 — and
+    the download link itself was being refused with **403 by Cloudflare**, whose WAF was
+    blocking the whole `/storage/` path after the site was put behind tighter rules during
+    an exhibition traffic spike. Nothing in the error said so, so the adapter, the VM, the
+    registry row and the account were all suspected first.
+
+    The fix is to **ask the URL what happened** rather than guess. The browser is still
+    open and still logged in at this point, so one request re-runs the fetch the download
+    just failed and reads the real status off it.
+    """
+    try:
+        download.save_as(zip_path)
+        return
+    except PlaywrightError as exc:
+        url = download.url
+        detail = ""
+        try:
+            response = page.request.get(url)
+            blocked_by = (
+                "Cloudflare" if _CLOUDFLARE_BLOCK in response.text() else "the server"
+            )
+            ray = response.headers.get("cf-ray")
+            detail = (
+                f" The link itself returns HTTP {response.status}, refused by {blocked_by}"
+                f"{f' (Cloudflare Ray ID {ray})' if ray else ''}."
+            )
+            if response.status == 403:
+                detail += (
+                    " Nova generated the export correctly — this is the download of it being"
+                    " blocked, which is for whoever administers the site, not something this"
+                    " pipeline can work around."
+                )
+        except PlaywrightError:
+            detail = " The link could not be re-requested to find out why."
+        msg = (
+            f"the {supplier_name!r} export was generated but could not be downloaded from "
+            f"{url}.{detail}"
+        )
+        raise NccExportError(msg) from exc
+
+
 def download_export(
     credentials: NccCredentials,
     supplier_name: str,
@@ -279,7 +330,7 @@ def download_export(
             on_progress(f"triggering the export download for {supplier_name!r}")
             with page.expect_download() as download_info:
                 page.click(config.run_action_selector)
-            download_info.value.save_as(zip_path)
+            _save_download(page, download_info.value, zip_path, supplier_name)
         finally:
             browser.close()
 
