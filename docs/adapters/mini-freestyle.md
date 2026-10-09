@@ -207,3 +207,13 @@ proposals, 27 fields verified unchanged. Every proposal is one of the decisions 
 **Carried over, and not maintainable.** There is no price in the catalogue or on the site,
 so the adapter proposes none and FMLV's existing three stand. The requester is writing to
 Mini Freestyle to ask them to check them.
+
+## The 442 is withdrawn — 9 October 2026
+
+Mini Freestyle told the requester the **442 is no longer in the range**, and it is still
+on their website and still in the catalogue this adapter reads. Their word settles it: it
+is not collected, and it is **not to be uploaded as a 2027 model**.
+
+This reverses the plan of 7 October, when the intention was to bring the deactivated 442
+back by reusing product 7239. `EXPECTED_LAYOUTS` is **3**, and `WITHDRAWN` carries the
+reason so a run says out loud why a model in the source is being passed over.

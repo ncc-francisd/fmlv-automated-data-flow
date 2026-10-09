@@ -13,6 +13,8 @@ import pytest
 from src.adapters import ADAPTERS, adapter_for, mini_freestyle
 from src.adapters.mini_freestyle import (
     EXPECTED_LAYOUTS,
+    MODELS_BY_LENGTH,
+    WITHDRAWN,
     FMLV_RANGE,
     Specification,
     _reconciles,
@@ -259,7 +261,25 @@ def test_no_price_is_ever_proposed(minis: str) -> None:
 
 
 def test_the_roster_size_is_pinned() -> None:
-    assert EXPECTED_LAYOUTS == 4
+    """Three since 9 October 2026, when Mini Freestyle withdrew the 442."""
+    assert EXPECTED_LAYOUTS == 3
+
+
+def test_the_withdrawn_model_is_still_in_the_catalogue() -> None:
+    """Which is the whole difficulty: the source still publishes what the maker has dropped.
+
+    The 442 parses perfectly from the catalogue — it is excluded on Mini Freestyle's own
+    word, not because anything failed to read.
+    """
+    assert "442" in WITHDRAWN
+    assert "5,91" in MODELS_BY_LENGTH and MODELS_BY_LENGTH["5,91"] == "442"
+
+
+def test_the_reason_for_withdrawing_it_is_recorded() -> None:
+    """A silent exclusion gets undone by the next person who looks at the catalogue."""
+    reason = WITHDRAWN["442"]
+    assert "9 October 2026" in reason
+    assert "2027" in reason
 
 
 def test_a_named_catalogue_wins_where_several_pdfs_are_linked() -> None:

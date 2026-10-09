@@ -30,6 +30,27 @@ Whenever a single number cannot express the whole truth, carry the manufacturer'
 published wording into the `Provenance` snippet** — a reviewer needs to see `4-6` even
 though `berths` records `4`. Sunlight and Rimor already do this.
 
+### What a manufacturer says about their own range outranks their website
+
+**Mini Freestyle, 9 October 2026.** They told the requester the **442 is no longer in the
+range** — while it sits on their website and in the catalogue the adapter reads. The
+contradiction is theirs, and their word settles it: the 442 is not collected and not
+uploaded as a 2027 model.
+
+A site is evidence of what a maker publishes, not of what they sell. Catalogues outlive
+the models in them, a page costs nothing to leave up, and the person who told you is the
+person who decides.
+
+**Write it into the adapter, with the reason and the date, and narrate it every run.** The
+evidence for dropping a model is a sentence in an email; the evidence against it is right
+there in the source. Left as a silent exclusion, the next person sees a model being thrown
+away for no visible cause and puts it back — see `mini_freestyle.WITHDRAWN`, and
+`malibu`'s Van Charming note for the same shape of problem.
+
+The reverse case needs the same care and is more dangerous: a model **absent** from the
+site that the maker still sells. That is `rolling_homes`' empty pages, where collecting
+nothing would read as a withdrawal.
+
 ### An asterisked bed is not a berth
 
 **Rule from the NCC side, 9 October 2026, found on Malibu's Relax 640 LE XR.** Where a

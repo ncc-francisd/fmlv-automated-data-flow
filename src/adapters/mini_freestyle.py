@@ -54,6 +54,7 @@ __all__ = [
     "DEFAULT_RANGES",
     "EXPECTED_LAYOUTS",
     "FMLV_RANGE",
+    "WITHDRAWN",
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
     "MODELS_BY_LENGTH",
@@ -87,7 +88,22 @@ MODELS_BY_LENGTH: dict[str, str] = {
 #: so the page decides, and only for that length.
 SILVER_PAGE_LENGTHS: dict[str, str] = {"4,42": "290"}
 
-EXPECTED_LAYOUTS = 4
+#: A model the maker says is **out of the range, while still publishing it**. Mapped to
+#: the reason, which is narrated on every run — because the evidence for dropping it is a
+#: sentence in an email and the evidence against it is right there in the catalogue, so
+#: the next person to look will see a model being thrown away for no visible cause.
+#:
+#: `docs/adapters/README.md`: the manufacturer's own word outranks their website.
+WITHDRAWN: dict[str, str] = {
+    "442": (
+        "Mini Freestyle told the requester on 9 October 2026 that the 442 is no longer in "
+        "the range. It is still on their website and still in the catalogue this adapter "
+        "reads, so the contradiction is theirs — but what they say about their own range "
+        "settles it, and it is not to be uploaded as a 2027 model"
+    ),
+}
+
+EXPECTED_LAYOUTS = 3
 
 #: One range, so `--range` still works the way every other adapter allows.
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (("mini", FMLV_RANGE),)
@@ -343,6 +359,7 @@ def collect(
 
     results: list[ExtractedCaravan] = []
     seen: set[str] = set()
+    withdrawn_seen: set[str] = set()
     for page in (p.text for p in extracted.pages):
         if "Max authorized weight" not in page and "Max authorised weight" not in page:
             continue
@@ -351,6 +368,11 @@ def collect(
         silver = "Awning length" in page
         for spec in parse_specifications(page, silver=silver):
             if spec.model in seen:
+                continue
+            if spec.model in WITHDRAWN:
+                if spec.model not in withdrawn_seen:
+                    withdrawn_seen.add(spec.model)
+                    on_progress(f"{spec.model} — NOT COLLECTED: {WITHDRAWN[spec.model]}")
                 continue
             reconciles, basis = _reconciles(spec)
             if not reconciles:
