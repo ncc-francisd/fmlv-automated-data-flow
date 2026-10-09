@@ -160,3 +160,86 @@ reported missing.
 The site publishes no "N models" claim of its own — the "Meet the explorers" footer is a
 rotating carousel showing three at a time, not a roster — so the home page's eleven `/van/`
 links are the only roster, and should be rediscovered each run rather than written in.
+
+---
+
+# Built — 9 October 2026
+
+`src/adapters/rolling_homes.py`. The requester's instruction, the same day: **roll the
+weights and dimensions over** on the continuing models and ask Rolling Homes for figures,
+with their exhibition appearance next week as levered, *"rather than not build and not have
+them updated."*
+
+## What it proposes, and what it deliberately never touches
+
+| proposed | never proposed |
+|---|---|
+| `rrp_pounds`, `price_min_range_pounds` | `mtplm_kilograms`, `mro_kilograms`, `mh_payload_kilograms` |
+| `berths`, `mh_passenger_seats_inc_driver` | `mh_length_mm`, `mh_width_mm`, `mh_height_mm` |
+| `manufacturer_range`, `base_vehicle_manufacturer` | **`model`** |
+| `body_type` where a roof is stated | |
+| habitation findings | |
+
+**`model` is never proposed**, and that is deliberate rather than an omission. FMLV files
+the model as the base-vehicle generation — `Columbus S` / `T7`, `Expedition` / `SWB` — and
+the site prints neither string anywhere. `FMLV_IDENTITY` carries FMLV's own answer so each
+product *matches*; no provenance is recorded for it, so `compare_fields` is never invited
+to look and nothing can be disturbed.
+
+## Three cuts, each of which the first run got wrong
+
+**1. The New Vehicle section, against the Conversion Only one.** Taken between the two
+`<h2>` headings. Everything after the second describes converting a customer's own van: a
+price a fifth of the real one *and* a second `Key Features` list stating different berths.
+Reading the page whole gets price, berths and seats wrong together, and nothing downstream
+could tell.
+
+**2. The Key Features tab, against Vehicle Upgrades and Extras.** The New Vehicle block
+holds three tabs and the last two are options. Run #153 reported the Columbus's heating as
+`'Diesel blown air heating*'` — an item off its Extras list, not equipment it has. Berths,
+seats, body type and the habitation findings all read the first tab only. **The price does
+not**, because the trim tables live under Vehicle Upgrades.
+
+**3. The section, against the whole page, for the base vehicle.** Every page carries a
+"Volkswagen Van Converters" block in its furniture, so a page-wide search answers `VW` for
+everything — including a Ford-based van, and including a page with no content at all.
+
+## An empty page is not a withdrawal
+
+`/van/expedition/` and `/van/weekender/` render every tab heading with nothing under any of
+them, and **both are live FMLV products**. Run #152 collected nothing for them and reported
+both as disappeared, which is the one failure this manufacturer makes easy.
+
+They are now emitted **for their identity alone**: they match, carry through unchanged, and
+the run says in terms that the page is an empty shell rather than the vehicle being gone.
+A missing price is likewise not a failure — `_reconciles` passes it, because dropping the
+product would lose the fields the page *does* publish.
+
+> Worth raising with Rolling Homes: the Expedition's berths and seats exist **only** in its
+> Conversion Only block. Its New Vehicle tab has simply not been filled in.
+
+## Run #155 — the first clean one
+
+```
+scraped     10 products against a baseline of 8
+classified  4 changed, 4 unchanged, 2 new, 0 disappeared
+            60 in-scope fields not found this run
+```
+
+The 60 not-found are the masses and dimensions across all ten, which is the roll-over
+working as instructed. The 2 new are **Columbus / T7** (FMLV's 5850 is deactivated and
+archived) and **Darwin / FL 6.0**.
+
+Only four real changes, and they divide cleanly:
+
+| | |
+|---|---|
+| Shackleton £59,995, Livingstone £68,995 | **unchanged** — the base-vehicle price rule reproduces FMLV exactly |
+| Columbus S £63,495 → **£64,495** | a £1,000 increase |
+| Darwin EL, FL, ML £94,995 → **£89,995** | **needs a decision** — see below |
+
+**The Darwin price is the one open question.** All four Darwin pages share a single price
+table running £89,995–£96,095, and FMLV holds all three at £94,995. The base-vehicle rule
+says take the entry trim, which cuts each by £5,000. It is proposed rather than suppressed
+so a reviewer sees it, but if £94,995 came from Rolling Homes directly it should be
+rejected each run until their table agrees.
