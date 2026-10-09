@@ -23,6 +23,9 @@ from src.adapters.bailey import (
     _leading_int,
     _metres_to_mm,
     _reconciles,
+    find_range_paths,
+    reconcile_roster,
+    payload_discrepancy,
     find_model_urls,
     parse_equipment,
     parse_model_page,
@@ -454,3 +457,79 @@ def test_habitation_is_left_alone_when_no_equipment_is_supplied() -> None:
     assert motorhome.microwave is None
     assert motorhome.bed_types == []
     assert "microwave" not in extracted.provenance
+
+
+def test_a_2kg_discrepancy_in_baileys_own_figures_no_longer_drops_the_product() -> None:
+    """The Alora 69-4T, 9 October 2026 — a false disappearance caused by 1kg of slack.
+
+    Bailey publish MTPLM 3500kg, MRO 2958kg and Total User Payload 540kg, where the
+    subtraction gives 542. Verified against the page: it is their arithmetic, not a
+    misread, and dropping a live model reads downstream as a withdrawal.
+    """
+    product = _product(mtplm_kilograms=3500, mro_kilograms=2958, mh_payload_kilograms_published=540)
+    assert _reconciles(product) is True
+    assert payload_discrepancy(product) == 2
+
+
+def test_a_discrepancy_within_tolerance_is_still_reported() -> None:
+    """Slack that passes silently is slack that hides things, so `collect` narrates it."""
+    product = _product(mtplm_kilograms=3500, mro_kilograms=2958, mh_payload_kilograms_published=540)
+    assert payload_discrepancy(product) == 2
+    exact = _product(mtplm_kilograms=3500, mro_kilograms=2827, mh_payload_kilograms_published=673)
+    assert payload_discrepancy(exact) == 0
+
+
+def test_a_misread_row_is_still_far_outside_the_tolerance() -> None:
+    """What the check defends: a figure taken from the wrong row is hundreds of kg out."""
+    product = _product(mtplm_kilograms=3500, mro_kilograms=2958, mh_payload_kilograms_published=2958)
+    assert _reconciles(product) is False
+
+
+# --- The range roster ------------------------------------------------------------------
+#
+# A hardcoded roster is the one way this adapter can be badly wrong while looking healthy.
+# On 9 October 2026 Bailey launched Ascent and de-listed Alora on the same day: the run
+# would have collected its usual 21 products, reported success, and never mentioned the
+# five vehicles it had missed.
+
+
+_MOTORHOME_INDEX = """
+<a href="https://www.baileyofbristol.co.uk/motorhomes/adamo/">Adamo</a>
+<a href="https://www.baileyofbristol.co.uk/motorhomes/ascent/">Ascent</a>
+<a href="/motorhomes/autograph/">Autograph</a>
+<a href="https://www.baileyofbristol.co.uk/motorhomes/ascent/ascent-64-2/">Ascent 64-2</a>
+<a href="https://www.baileyofbristol.co.uk/campervan/endeavour/">Endeavour</a>
+"""
+
+
+def test_the_section_index_yields_its_ranges_and_not_its_model_pages() -> None:
+    assert find_range_paths(_MOTORHOME_INDEX, "motorhomes") == [
+        "motorhomes/adamo",
+        "motorhomes/ascent",
+        "motorhomes/autograph",
+    ]
+
+
+def test_a_range_on_the_site_but_not_in_the_list_is_swept_and_announced() -> None:
+    """Ascent: collected the day it appears, rather than waiting for someone to notice."""
+    said: list[str] = []
+    known = (("motorhomes/adamo", "Adamo"),)
+    swept = reconcile_roster(known, {"motorhomes/adamo", "motorhomes/ascent"}, said.append)
+    assert ("motorhomes/ascent", "Ascent") in swept
+    assert any("NEW RANGE ON THE SITE" in line and "ascent" in line for line in said)
+
+
+def test_a_range_dropped_from_the_index_is_still_swept() -> None:
+    """Alora: de-listing is not withdrawal, and dropping it would fake 3 disappearances."""
+    said: list[str] = []
+    known = (("motorhomes/adamo", "Adamo"), ("motorhomes/alora", "Alora"))
+    swept = reconcile_roster(known, {"motorhomes/adamo"}, said.append)
+    assert ("motorhomes/alora", "Alora") in swept
+    assert any("RANGE NO LONGER LISTED" in line and "alora" in line for line in said)
+
+
+def test_an_unchanged_roster_says_nothing() -> None:
+    said: list[str] = []
+    known = (("motorhomes/adamo", "Adamo"),)
+    assert reconcile_roster(known, {"motorhomes/adamo"}, said.append) == known
+    assert said == []

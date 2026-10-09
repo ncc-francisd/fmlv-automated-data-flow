@@ -81,10 +81,21 @@ MANUFACTURER_DISPLAY_NAME = "Bailey"
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("motorhomes/adamo", "Adamo"),
     ("motorhomes/alora", "Alora"),
+    ("motorhomes/ascent", "Ascent"),
     ("motorhomes/autograph", "Autograph"),
     ("campervan/endeavour", "Endeavour"),
     ("campervan/endurance", "Endurance"),
 )
+
+#: The two section indexes every range hangs off, used to **check this list against the
+#: site on every full sweep** — see `find_range_paths` and `reconcile_roster`.
+#:
+#: A hardcoded roster is the one way this adapter can be badly wrong while looking
+#: perfectly healthy, and on 9 October 2026 it was: Bailey launched **Ascent** and the run
+#: would have collected its usual products, reported success, and never mentioned the five
+#: missing vehicles. `docs/adapters/README.md` has the rule — an absence you cannot
+#: explain is a gap in the search — and this is it enforced rather than trusted.
+RANGE_SECTIONS: tuple[str, ...] = ("motorhomes", "campervan")
 
 #: A range whose literal `Range` field disagrees with FMLV's own name for it — see the
 #: module docstring. `Adamo` deliberately has no entry: the site's `XL-I`/`XL-T`/`XL-DL`
@@ -104,6 +115,22 @@ _MOTORHOME_ROOF_PROFILES: dict[str, BodyType] = {
 #: windows. Same threshold as every other adapter that needs it (`auto_trail.py`,
 #: `chausson.py`), set by the NCC side from FMLV's own data.
 HIGH_TOP_ABOVE_MM = 2300
+
+#: How far Bailey's published payload may sit from `MTPLM - MRO` before the product is
+#: dropped as a probable misread.
+#:
+#: **Widened from 1kg to 5kg on 9 October 2026**, because 1kg was producing a *false
+#: disappearance*. The Alora 69-4T publishes MTPLM 3500kg, MRO 2958kg and Total User
+#: Payload 540kg, where the subtraction gives 542 — a 2kg inconsistency in Bailey's own
+#: arithmetic, verified against the page rather than assumed. The product was being
+#: dropped, and a live model absent from a run reads downstream as withdrawn.
+#:
+#: Widening it costs nothing this check was defending. Bailey put **one vehicle on one
+#: page**, so there is no column to misattribute; the failure it guards against is reading
+#: a figure out of the wrong row, and those rows differ by hundreds of kilograms — MTPLM
+#: 3500, MRO ~2900-3200, payload ~340-700. Nothing plausible lands within 5kg by accident.
+#: Any discrepancy at all is narrated by `collect`, so the slack hides nothing.
+PAYLOAD_SLACK_KG = 5
 
 #: One label's value: text immediately following the label's own `<div>...</div>` pair,
 #: inside the next `col-6` value `<div>`. Both the label and the value may wrap an inner
@@ -232,6 +259,59 @@ def find_model_urls(range_html: str, path: str) -> list[str]:
     return list(seen)
 
 
+def find_range_paths(index_html: str, section: str) -> list[str]:
+    """Every range `section`'s index links, as `motorhomes/ascent`-style paths.
+
+    Deliberately read from the **section index** rather than the home page, which links
+    only a couple of ranges as features, and matched tightly enough that a model page
+    (`/motorhomes/ascent/ascent-64-2/`) cannot be mistaken for a range.
+    """
+    pattern = re.compile(
+        rf'href="(?:{re.escape(BASE_URL)})?/{re.escape(section)}/([a-z0-9-]+)/?"'
+    )
+    seen: dict[str, None] = {}
+    for match in pattern.finditer(index_html):
+        seen.setdefault(f"{section}/{match.group(1)}", None)
+    return list(seen)
+
+
+def reconcile_roster(
+    known: tuple[tuple[str, str], ...],
+    discovered: set[str],
+    on_progress: Callable[[str], None],
+) -> tuple[tuple[str, str], ...]:
+    """The ranges to sweep: everything known, **plus anything the site lists that is not**.
+
+    A union rather than a replacement, and both directions are narrated:
+
+    * **On the site but not in `DEFAULT_RANGES`** — swept anyway, so a new range is
+      collected the day it appears instead of waiting for someone to notice. Bailey's
+      Ascent is why.
+    * **In `DEFAULT_RANGES` but no longer on the index** — still swept, never dropped.
+      Bailey de-listed **Alora** from the motorhome index on the same day while leaving
+      its pages live, and dropping it would have reported three products as disappeared
+      on the strength of a navigation change. A range that has really gone returns 404 or
+      links no models, which `collect` already narrates.
+    """
+    known_paths = {path for path, _ in known}
+    added: list[tuple[str, str]] = []
+    for path in sorted(discovered - known_paths):
+        label = path.split("/")[-1].replace("-", " ").title()
+        added.append((path, label))
+        on_progress(
+            f"NEW RANGE ON THE SITE: {path!r} is linked from the index and is not in this "
+            f"adapter's list — sweeping it as {label!r}. Add it to DEFAULT_RANGES so "
+            f"`--range` can select it."
+        )
+    for path in sorted(known_paths - discovered):
+        on_progress(
+            f"RANGE NO LONGER LISTED: {path!r} is in this adapter's list but the index no "
+            f"longer links it — sweeping it anyway, because de-listing is not withdrawal "
+            f"and its pages may still be live"
+        )
+    return (*known, *added)
+
+
 @dataclass(frozen=True)
 class BaileyProduct:
     """One model, as read from its own page."""
@@ -289,9 +369,19 @@ def _reconciles(product: BaileyProduct) -> bool:
     column to misattribute. A product missing any of the three passes, having nothing to
     contradict.
 
-    1kg of slack is allowed: a few models (Autograph IV 79-4F) publish MRO and payload to
-    one decimal place, and `_kilograms` rounds each independently, so the two roundings
-    can differ by 1kg even when the underlying figures are exactly consistent.
+    `PAYLOAD_SLACK_KG` of slack is allowed — see that constant for why it is as wide as
+    it is, and `payload_discrepancy` for the narration that stops the slack hiding
+    anything.
+    """
+    discrepancy = payload_discrepancy(product)
+    return discrepancy is None or discrepancy <= PAYLOAD_SLACK_KG
+
+
+def payload_discrepancy(product: BaileyProduct) -> int | None:
+    """How far Bailey's published payload is from `MTPLM - MRO`, or `None` if unknowable.
+
+    Separate from `_reconciles` so `collect` can **narrate a discrepancy it tolerated**.
+    Slack that passes silently is slack that hides things.
     """
     mtplm, mro, payload = (
         product.mtplm_kilograms,
@@ -299,8 +389,8 @@ def _reconciles(product: BaileyProduct) -> bool:
         product.mh_payload_kilograms_published,
     )
     if mtplm is None or mro is None or payload is None:
-        return True
-    return abs((mtplm - mro) - payload) <= 1
+        return None
+    return abs((mtplm - mro) - payload)
 
 
 def parse_model_page(html: str, *, is_campervan: bool) -> BaileyProduct | None:
@@ -518,6 +608,26 @@ def collect(
     """
     results: list[ExtractedMotorhome] = []
 
+    # Only on a full sweep: `--range Ascent` has already named what it wants, and
+    # announcing the five ranges it did not ask for would be noise.
+    if tuple(ranges) == DEFAULT_RANGES:
+        discovered: set[str] = set()
+        for section in RANGE_SECTIONS:
+            index = http.fetch(f"{BASE_URL}/{section}/")
+            if index.status_code != 200:
+                on_progress(
+                    f"could not check the {section} index for new ranges "
+                    f"({index.status_code}) — sweeping the known list only"
+                )
+                continue
+            discovered.update(
+                find_range_paths(
+                    index.file_path.read_text(encoding="utf-8", errors="replace"), section
+                )
+            )
+        if discovered:
+            ranges = reconcile_roster(ranges, discovered, on_progress)
+
     for path, label in ranges:
         is_campervan = path.startswith("campervan/")
         range_url = f"{BASE_URL}/{path}/"
@@ -557,6 +667,16 @@ def collect(
                 )
                 continue
 
+            discrepancy = payload_discrepancy(product)
+            if discrepancy:
+                on_progress(
+                    f"[{product.label}] NOTE: Bailey publish a payload of "
+                    f"{product.mh_payload_kilograms_published}kg where MTPLM "
+                    f"({product.mtplm_kilograms}kg) - MRO ({product.mro_kilograms}kg) is "
+                    f"{product.mtplm_kilograms - product.mro_kilograms}kg, a {discrepancy}kg "
+                    f"discrepancy in their own figures. Within the {PAYLOAD_SLACK_KG}kg "
+                    f"tolerance, so the published payload is recorded as it stands."
+                )
             if product.rrp_pounds is None:
                 on_progress(f"[{product.label}] WARNING: no OTR Price found, left blank")
             if product.body_type is None:

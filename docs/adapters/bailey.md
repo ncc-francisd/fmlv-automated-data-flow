@@ -444,3 +444,62 @@ Checked against FMLV's own export (81 products, 27 live) on 3 September 2026:
   the site now lists only `Alicanto Grande Deluxe`. Expected, not a fault — they need a
   human decision about deactivating them on the NCC site.
 * Three Discovery models publish no awning size, and FMLV holds it blank for them too.
+
+## Ascent arrives and Alora is de-listed — 9 October 2026
+
+Bailey did two things on the same day, and the adapter would have handled neither.
+
+**`DEFAULT_RANGES` was a hardcoded list of five.** Bailey launched **Ascent** — five
+motorhomes, all of them parsing perfectly against the existing reader — and the run would
+have collected its usual 21 products, reported success, and never mentioned them. This is
+the failure `README.md` warns about in its sharpest form: nothing errors, nothing is
+missing from the output that a reviewer could notice, and the range simply is not there.
+
+The fix is `reconcile_roster`, run on every full sweep. The two section indexes
+(`/motorhomes/`, `/campervan/`) are read for the ranges they link, and the sweep becomes
+the **union** of that and `DEFAULT_RANGES`, with both differences narrated:
+
+| | what happens |
+|---|---|
+| on the site, not in the list | swept anyway, announced as `NEW RANGE ON THE SITE` |
+| in the list, not on the site | swept anyway, announced as `RANGE NO LONGER LISTED` |
+
+**A union, not a replacement, and Alora is why.** Bailey dropped `motorhomes/alora` from
+the motorhome index on the same day — but the pages are still live, the slugs have been
+renamed `…-series-1`, and FMLV holds three Alora products. Had the sweep followed the
+index, three live models would have been reported as disappeared on the strength of a
+navigation change. A range that has really gone 404s or links no models, and `collect`
+already narrates both.
+
+**Alora's prices have been removed.** All three pages have lost the hero banner, the
+`OTR Price` row and the price paragraph; the only `£` left on the page is stale SEO
+metadata in the `<meta description>` and the JSON-LD, which is **not** read — it is not a
+published price. The adapter emits nothing, and the pipeline preserves FMLV's figure as a
+no-op change, which is the settled behaviour for an unfound spec.
+
+## The payload tolerance, and the false disappearance it was causing
+
+`_reconciles` allowed 1kg of slack, for two independently-rounded decimal figures. The
+**Alora 69-4T** publishes MTPLM 3500kg, MRO 2958kg and Total User Payload 540kg, where the
+subtraction gives 542 — so it was being dropped, and a live model absent from a run reads
+downstream as withdrawn.
+
+Checked against the page before widening anything: the figures above are Bailey's own, read
+correctly. It is their arithmetic that is 2kg out, not our parse. `PAYLOAD_SLACK_KG` is now
+**5kg**, which costs this check nothing it was defending — Bailey put one vehicle on one
+page, so the failure it guards against is reading a figure out of the wrong row, and those
+rows differ by hundreds of kilograms (MTPLM 3500, MRO ~2900-3200, payload ~340-700).
+
+**Any discrepancy at all is narrated**, including one inside the tolerance. Slack that
+passes silently is slack that hides things.
+
+## Run #151, 9 October 2026
+
+```
+scraped     27 products against a baseline of 24
+classified  6 changed, 16 unchanged, 5 new, 2 disappeared
+```
+
+The 5 new are exactly the 5 Ascent layouts, and nothing disappeared to match them — so
+this is a new range, not a rename. The 2 disappeared are **Endeavour B63 and B64**, both
+of which now return a genuine 404.
