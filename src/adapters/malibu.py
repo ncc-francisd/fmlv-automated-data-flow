@@ -114,6 +114,7 @@ from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 __all__ = [
     "BASE_URL",
     "EXPECTED_PRODUCTS",
+    "PERFORMANCE_4X4",
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
     "RANGES",
@@ -142,7 +143,7 @@ MANUFACTURER_DISPLAY_NAME = "Malibu"
 #: **FMLV holds a ninth van this cannot reach**: `Genius 641 LE performance 4x4`. Malibu
 #: give the 4x4 a section page of its own but no product page, so there is nothing to read
 #: and it falls out unmatched. It is a live vehicle, not a discontinued one.
-EXPECTED_PRODUCTS = 47
+EXPECTED_PRODUCTS = 49
 
 
 @dataclass(frozen=True)
@@ -212,7 +213,24 @@ RANGES: tuple[_Range, ...] = (
         False,
     ),
     _Range("/en/malibu-genius/", "Genius", BodyType.CAMPERVAN_HIGH_TOP, False),
+    # **The 4x4 has a section page of its own and is linked from nowhere else.**
+    # `/en/malibu-genius/` lists only the 641 LE, so without this entry the performance
+    # 4x4 is never reached — and FMLV's 8573 was reported disappeared on every run from
+    # 135 onward. It does have a product page, at
+    # `/en/camper-vans/malibu-genius-performance-4x4-641-le/`; an earlier survey concluded
+    # it did not and left a standing "this disappearance is false" note in its place.
+    _Range(
+        "/en/malibu-genius-performance-4x4/",
+        "Genius",
+        BodyType.CAMPERVAN_HIGH_TOP,
+        False,
+    ),
 )
+
+#: The slug fragment marking the 4x4's product page. Its page title is identical to the
+#: standard Genius's — both read `Malibu genius 641 LE` — so the URL is the only thing
+#: telling the two apart. See `collect`.
+PERFORMANCE_4X4 = "performance-4x4"
 
 _DROP = re.compile(r"<(script|style|noscript|svg)\b.*?</\1>", re.S | re.I)
 _TAG = re.compile(r"<[^>]+>")
@@ -236,9 +254,14 @@ _MOTORHOME = re.compile(r'href="(?:' + re.escape(BASE_URL) + r')?(/en/[^"#?]*mal
 
 #: A van product, which always sits under a camper-van path. `camper-vans?` and the stray
 #: `c` on `crelax` are Malibu's misspellings, not a pattern that needs to be general.
+#:
+#: **The middle allows digits, and that is load-bearing.** It was `[a-z-]*`, which cannot
+#: span the `4x4` in `/en/camper-vans/malibu-genius-performance-4x4-641-le/` — so the
+#: Genius performance 4x4 was never collected, and FMLV's 8573 was reported **disappeared
+#: on every run**. A product missing from a roster looks exactly like a withdrawal.
 _VAN = re.compile(
     r'href="(?:' + re.escape(BASE_URL) + r')?(/en/camper-vans?/[a-z0-9-]*/?'
-    r"(?:compact|comfort|diversity|first-class-two-rooms|relax|genius)[a-z-]*-\d{3}[a-z0-9-]*/)\""
+    r"(?:compact|comfort|diversity|first-class-two-rooms|relax|genius)[a-z0-9-]*-\d{3}[a-z0-9-]*/)\""
 )
 
 
@@ -254,9 +277,15 @@ def roster_from(page_html: str, config: _Range) -> list[str]:
     """
     pattern = _MOTORHOME if config.is_motorhome else _VAN
     found = {htmllib.unescape(link) for link in pattern.findall(page_html)}
-    # `relax-640-le-r-2` is a second page for the same van; the shorter slug is the real
-    # one and both carry identical data.
-    return sorted(link for link in found if not link.rstrip("/").endswith("-2"))
+    # **Every link is kept, including a `-2` slug.** This used to drop them as duplicate
+    # pages of the same van, on the evidence that `relax-640-le-r-2` carried data
+    # identical to `relax-640-le-r`. It no longer does: that page is now titled
+    # **`Malibu relax 640 LE XR`**, a second Relax, and the rule was discarding it.
+    #
+    # Two pages for one vehicle are still collapsed, but on the **model name parsed from
+    # the page** rather than the shape of its URL — see `collect`. A slug cannot be
+    # trusted to say what a page is about.
+    return sorted(found)
 
 
 # --- identity -------------------------------------------------------------------------
@@ -838,6 +867,11 @@ def collect(
     on_progress(f"roster: {len(roster)} products across {len(RANGES)} ranges")
 
     extracted: list[ExtractedMotorhome] = []
+    #: `(range, model)` already built, used **only to judge a `-2` slug** — see below.
+    #: Malibu publish the same layout on a Fiat and a Mercedes page, and FMLV holds those
+    #: as two products, so `(range, model)` is not an identity on its own.
+    seen: dict[tuple[str, str], str] = {}
+    duplicates: list[str] = []
     unpriced: list[str] = []
     no_berths: list[str] = []
     no_mass: list[str] = []
@@ -858,6 +892,33 @@ def collect(
         if model is None:
             on_progress(f"dropping {link} — no model name could be read from {title!r}")
             continue
+
+        # **The 4x4 names itself identically to the standard Genius.** Its page is titled
+        # `Malibu genius 641 LE`, exactly like the 3.5t van, and only the weights differ —
+        # 4100kg against 3500kg, 980kg of payload against 560kg. FMLV holds it as
+        # `641 LE performance 4x4` (8573), so without this the two collide and the run
+        # aborts on `ProductIdentityConflict` — which is the pipeline working, but it
+        # stops the whole manufacturer.
+        #
+        # Taken from the URL, the only thing distinguishing them, and only where the title
+        # has not already said it.
+        if PERFORMANCE_4X4 in link and "4x4" not in model.lower():
+            model = f"{model} performance 4x4"
+
+        # **A `-2` slug is a second page, and only sometimes a second vehicle.** Malibu
+        # publish one at `relax-640-le-r-2`, which the roster dropped for years as a
+        # duplicate of `relax-640-le-r` — and it is now titled `Malibu relax 640 LE XR`, a
+        # different van. So the slug no longer decides: it is kept unless the page turns
+        # out to name a vehicle already built.
+        #
+        # Judged on `(range, model)` and *not* on a `-2` slug alone, because the same
+        # layout appears on a Fiat page and a Mercedes page and FMLV holds those as two
+        # products — keying every link this way collapsed 49 products into 32.
+        identity = (range_for(title, config).fmlv_range, model)
+        if link.rstrip("/").endswith("-2") and identity in seen:
+            duplicates.append(f"{identity[0]} {identity[1]} ({link}, already at {seen[identity]})")
+            continue
+        seen.setdefault(identity, link)
 
         warning = lap_belt_warning(lines)
         if warning:
@@ -932,12 +993,11 @@ def collect(
             f"matched the product page's own title. FMLV's own figures stand"
         )
 
-    on_progress(
-        "DISAPPEARANCE NOTICE THAT IS FALSE — DO NOT DEACTIVATE: Genius 641 LE "
-        "performance 4x4. Malibu give the 4x4 a section page of its own but no product "
-        "page, so no figures can be read for it and it falls out unmatched. It is still on "
-        "sale; FMLV's own figures stand"
-    )
+    if duplicates:
+        on_progress(
+            "TWO PAGES FOR ONE VEHICLE, collapsed on the name read from the page rather "
+            "than the slug: " + "; ".join(duplicates)
+        )
     on_progress(
         "VAN CHARMING IS NOT COLLECTED, deliberately. FMLV holds ten `Van Charming` rows "
         "(600 DB Coupe, 640 LE K GT and so on) but Malibu sell no such range: the charming "

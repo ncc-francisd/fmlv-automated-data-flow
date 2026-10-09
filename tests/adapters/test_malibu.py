@@ -15,6 +15,7 @@ import pytest
 from src.adapters import malibu
 from src.adapters.malibu import (
     EXPECTED_PRODUCTS,
+    PERFORMANCE_4X4,
     hero_berths,
     RANGES,
     MalibuProduct,
@@ -71,9 +72,16 @@ def test_the_manufacturer_is_one_word_in_both_roles() -> None:
     assert malibu.MANUFACTURER_DISPLAY_NAME == "Malibu"
 
 
-def test_ten_ranges_and_the_expected_product_count() -> None:
-    assert len(RANGES) == 10
-    assert EXPECTED_PRODUCTS == 47
+def test_eleven_ranges_and_the_expected_product_count() -> None:
+    """Eleven since 9 October 2026: the Genius performance 4x4 has a page of its own.
+
+    `/en/malibu-genius/` lists only the 641 LE, so the 4x4's product page was reachable
+    from nowhere the adapter looked — and FMLV's 8573 was reported disappeared on every
+    run from #135 on.
+    """
+    assert len(RANGES) == 11
+    assert EXPECTED_PRODUCTS == 49
+    assert any(PERFORMANCE_4X4 in config.path for config in RANGES)
 
 
 def test_the_roster_finds_products_at_the_site_root_too() -> None:
@@ -86,9 +94,12 @@ def test_the_roster_finds_products_at_the_site_root_too() -> None:
 
     under = [x for x in links if x.startswith("/en/motorhome/")]
     at_root = [x for x in links if not x.startswith("/en/motorhome/")]
-    # Nine of each in this capture; the live page carries nineteen.
-    assert len(under) == 9
+    # Nine of each in this capture; the live page carries nineteen. The tenth under the
+    # range path is a `-2` slug, which `roster_from` no longer drops — two pages for one
+    # vehicle are now collapsed in `collect`, on the name read from the page.
+    assert len(under) == 10
     assert len(at_root) == 9
+    assert sum(1 for x in links if x.rstrip("/").endswith("-2")) == 1
 
 
 def test_the_range_comes_from_the_name_not_the_page() -> None:
@@ -346,3 +357,33 @@ def test_a_shared_title_with_no_length_finds_nothing() -> None:
     }
 
     assert price_for(prices, "Malibu I 470 lightweight", None) is None
+
+
+# --- the two vans that were being missed -------------------------------------------------
+#
+# Both found by the requester on 9 October 2026, who noticed two Genius vans and two Relax
+# vans on the site where the run produced one of each.
+
+
+def test_the_van_pattern_allows_a_digit_in_the_slug() -> None:
+    """`4x4` has a digit in the middle, and the pattern used to allow only letters there.
+
+    So `/en/camper-vans/malibu-genius-performance-4x4-641-le/` never matched, and FMLV's
+    8573 was reported disappeared on every run.
+    """
+    page = (
+        '<a href="/en/camper-vans/malibu-genius-performance-4x4-641-le/">4x4</a>'
+        '<a href="/en/camper-van/genius-641-le/">standard</a>'
+    )
+    links = roster_from(page, _range("Genius"))
+    assert "/en/camper-vans/malibu-genius-performance-4x4-641-le/" in links
+    assert "/en/camper-van/genius-641-le/" in links
+
+
+def test_a_dash_two_slug_is_no_longer_dropped_by_the_roster() -> None:
+    """It was, as a duplicate — and `relax-640-le-r-2` is now the 640 LE **XR**."""
+    page = (
+        '<a href="/en/camper-vans/crelax-camper-van/relax-640-le-r/">R</a>'
+        '<a href="/en/camper-vans/crelax-camper-van/relax-640-le-r-2/">XR</a>'
+    )
+    assert len(roster_from(page, _range("Van Relax"))) == 2
