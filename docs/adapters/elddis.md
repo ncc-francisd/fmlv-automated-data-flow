@@ -693,3 +693,77 @@ roof as standard. The adapter already emitted both, so nothing changed in the co
   of it is structured. Not attempted, so baseline values are preserved — the Adria precedent.
 - **`Maximum Towing Limit`, axle weights and tyre data** are published and unused; FMLV has no
   column for them.
+
+---
+
+# Rebuilt on the EHG configurator — 10 October 2026
+
+**Elddis told the requester FMLV was showing models no longer in the 2027 range. It was
+worse than that: a run collected nothing at all.** The adapter read `sitemap.xml`, which now
+404s, so every one of FMLV's 29 Elddis rows would have been reported as disappeared.
+
+Three things changed together:
+
+* every page moved under **`/en/`**;
+* **the sitemap went**, taking the roster source with it;
+* the range was replaced outright.
+
+## The 2027 range, from Elddis's own product database
+
+Elddis has moved onto the Erwin Hymer Group platform, so `ehg_configurator` — already read
+for Bürstner, Carado, Eriba and Niesmann-Bischoff — serves here too, under
+`brandKey=elddis`. The series list carries `modelYear`, so **"what is in the 2027 range" is
+answered rather than inferred**:
+
+| range | layouts | chassis |
+|---|---|---|
+| Autoquest GT | 70 DS, 74 DS, 74 DI | Fiat |
+| Autoquest GTS | 66 DS, 70 CS | Fiat |
+| Autoquest GTV | 260, 460, 554, 560, 563 | Fiat |
+| Whirlwind GT | 70 DS, 74 DS, 74 DI | Peugeot |
+| Whirlwind GTS | 66 DS, 70 CS | Peugeot |
+| Whirlwind GTV | 554, 560, 563 | Peugeot |
+
+**Six series, eighteen layouts, every one model year 2027.** Apex, Avalon and all the Evolve
+variants are gone, and the old numbering (105, 115, 120, 150, 155, 185, 194, 196, 196+) has
+become layout codes. **Not one model name carries over.**
+
+## This is a re-baseline, not a diff
+
+Run #166 against the export of 9 October: **18 new, 29 disappeared, nothing matched.** That
+is the correct answer rather than a matching failure — there is genuinely nothing in common
+between what FMLV holds and what Elddis now sell.
+
+## Two units, and a prefix
+
+* **Dimensions are centimetres.** `lengthOverall` of `741` is 7410mm. Read as millimetres it
+  would be a 74cm motorhome.
+* **Width is `widthOverallwithoutMirrors`.** `widthOverall` exists and is empty on every
+  layout, so there is no mirrors-folded question to settle here.
+* **`Autoquest GT` is a prefix of `Autoquest GTS`.** The model is stripped against *this
+  layout's own series*, never against a list of names — matching by the longest name that
+  fits would file every GTS layout under GT and leave `S 66 DS` as the model.
+
+The API also sends `Autoquest GT ` and `Whirlwind GT ` with trailing spaces, which
+`parse_series_index` already cleans.
+
+## The price is the one beside the vehicle
+
+Each layout page footnotes its price *"This is a recommended retail price based on German
+retail prices"*. The requester's instruction, 10 October 2026: **mirror what sits next to the
+vehicle on the website**, which is `grossPrice`. The provenance quotes the footnote so a
+reviewer sees what Elddis say about their own figure.
+
+**The old site's £1,690 on-the-road charge is gone** — no page carries it — so the adapter no
+longer mentions it.
+
+## An optional pop-top does not change the body type
+
+Every campervan is 2580mm and therefore a high top. Three Autoquest GTVs offer a pop-top, and
+their pages mark it `(○) Optional`, printing `258 / 280 (○)` for the height and 358 for the
+roof open. Per the base-vehicle rule it is not part of the vehicle as standard.
+
+## What is not published
+
+**No floorplan and no photograph** for any layout — every image field in the API is null. The
+positional habitation fields cannot be pointed at a drawing, and the run says so.
