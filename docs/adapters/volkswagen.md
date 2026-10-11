@@ -144,3 +144,68 @@ seats *"creates two additional sleeping spaces"*, and *"eHybrid Beach models hav
 individual seats in the rear"* — while the Grand California gives `Number of beds: 2, +2`
 with the over-cab bed optional. The lower figure of that is 2, which is what FMLV holds.
 Reading berths reliably from prose is the one field this source does not make easy.
+
+---
+
+# Built — 11 October 2026
+
+`src/adapters/volkswagen.py`. Four fetches: the brochure index, then the three PDFs it
+links, rediscovered there each run.
+
+## Run #167 — the first one
+
+```
+scraped     8 products against a baseline of 8
+classified  8 changed, 0 unchanged, 0 new, 0 disappeared
+verified    72 fields checked and unchanged
+```
+
+**Every product matched and nothing arrived as new**, which is the right answer for a
+manufacturer FMLV already holds in full. The changes divide cleanly:
+
+| | |
+|---|---|
+| all eight prices | the six Californias **up**, both Grand Californias **down** |
+| Grand California masses | MRO 3098 → 3096 and 3273 → 3271, payload 402 → 404 and 607 → 609 |
+| the rest | year bumps, and 72 fields confirmed unchanged |
+
+The 2kg shift on the Grand California is a marginally newer brochure, not a different
+reading: 3,021 + 75 = 3,096 against the 3,098 FMLV held.
+
+## The three cuts that decide whether this is right
+
+**1. Two brochures, two definitions of mass.** The California's *unladen weight* includes
+75kg for a driver and is therefore the mass in running order; its payload subtracts
+directly and the table checks itself. The Grand California's *kerb weight* excludes the
+driver, and its printed payload is 75kg below gross minus kerb on **every one of its eight
+rows** — so the mass in running order is kerb + `DRIVER_ALLOWANCE_KG`. `_reconciles_grand`
+tests that corrected subtraction, so recording the kerb weight itself fails the check
+rather than passing quietly.
+
+**2. The base variant is the lowest-powered engine.** That takes the 150PS 2.0 TDI over the
+204PS 2.0 TSI on the Coast and the Ocean, and front-wheel drive over 4MOTION at the same
+weight class on the Grand California. The run names each row it passes over.
+
+**3. Dune is a trim, not a model.** Its rows are skipped at the heading, before any figure
+is read.
+
+## Two fields deliberately left to FMLV
+
+**The Grand California's dimensions.** Its brochure gives them only as `5.99m 2.04m 2.97m`,
+two decimals of a metre, where FMLV holds 5986, 2040 and 2971. Proposing 5990 and 2970
+would replace better figures with rounder ones, so nothing is emitted and the run says so.
+
+**The California's berths.** Neither brochure states a berth count as a figure for it — the
+Beach's is prose about *"two additional sleeping spaces"*. The Grand California **does**
+print `Number of beds: 2`, so that one is proposed and the other is not.
+
+## Parsing traps that were real
+
+* **The length is not labelled on the dimensions page.** It prints `Vehicle length with
+  trailer hitch – mm 5,276` and leaves the real 5,173 as a bare figure beside a drawing, so
+  the length is read from the model page's prose, where it is stated outright and wraps
+  across two lines.
+* **A footnote digit is glued to a weight**: `3,8803` is a 3.88 tonne class with footnote 3
+  stuck to it. The pattern captures the comma form and discards what follows.
+* **`Width including mirrors – mm 2,252`** is published beside the body width and is
+  ignored, which is the settled rule.
