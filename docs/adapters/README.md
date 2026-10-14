@@ -712,6 +712,38 @@ labelled "permitted", the lower bound is a homologation minimum, not a fitment c
 corroborate it before recording it, and leave the field unset (and *unregistered*) if you
 cannot. See [`burstner.md`](burstner.md).
 
+### An MTPLM can be a band, and a unit's plate sits somewhere inside it
+
+Airstream, 14 October 2026. Their European owner's manual publishes **two** MTPLMs per
+model, not one:
+
+```
+                            534      684     25IB
+MASS IN RUNNING ORDER     1580kg   2165kg  2475kg
+MTPLM Lower limit         1830kg   2500kg  2800kg
+MTPLM Upper limit         1900kg   2920kg  3500kg
+```
+
+**Record the upper limit.** MTPLM is the *maximum* technically permissible laden mass, and
+the band exists because a caravan may be plated anywhere inside it — downplating is routine
+and is usually done so the outfit fits a towing licence. The lower-figure rule that governs
+berths does not transfer here: a berth range is a statement about one vehicle's capacity,
+whereas a mass band is a range of vehicles.
+
+The consequence matters more than the rule. **A figure read off a specific vehicle — a
+dealer's stock listing, a registered unit, anything with a plate — is a fact about that
+vehicle and not about the model.** Lowdhams list the 534 at 1830kg, its band's floor, and
+the 684 at 2400kg, which is *below* its band. Recorded, the second would have taken 520kg
+off a live product, and nothing downstream would have questioned it: the number is
+plausible, internally consistent and genuinely published.
+
+So where an adapter's source is a dealer or a stock page, treat every mass as suspect by
+default and prefer the manufacturer's own document even when it is harder to reach. Where
+a band is published, it also gives a **real self-check** — place the figure against the
+band and say which it is, rather than quietly dropping it. `airstream.plating_verdict` is
+the worked example; a refusal that explains itself is worth far more to a reviewer than a
+field that was silently never read.
+
 ### `sleeping_area_separate_childrens_area` is always blank
 
 Rule from the NCC side, 3 September 2026: **never select it.** *"We don't use the separate
