@@ -441,3 +441,50 @@ writing any code, re-run the survey probes and settle these four:
   their own product count, per range, in a machine-readable field.
 - **A `.pdf` href is not necessarily a PDF.** Two of Coachman's current documents 404 to an
   HTML page while looking like live links.
+
+## The campervan range, and a prefix that cost two products — 14 October 2026
+
+Coachman told the requester they had a new campervan range on the site. They have, and
+**the adapter needed no change to find it**: ranges are read from the taxonomy at run time,
+so `campervan_model` returning a new term is collected automatically. `Veloce` comes
+through with **VL 65** and **VR 65**, both complete apart from the fields Coachman publish
+for nothing.
+
+What *did* need fixing was a matching failure the same run exposed.
+
+### Travel Master was being counted twice
+
+FMLV holds the two original Travel Masters as **`TM 545`** and **`TM 565`** where Coachman
+call them `545` and `565` — and where FMLV's own other Coachman ranges carry no prefix at
+all (`Avventura 545`, `Travel Master Imperial 845`). `TM 545` against `545` scores exactly
+**0.5** on token overlap, which is the threshold rather than above it, so the pair never
+matched: each product was reported **once as disappeared and once as new**.
+
+`RENAMED_MODELS` declares the two, and the pairing is evidenced on the figures rather than
+the name:
+
+| | mass in running order | length | berths | seats | price |
+|---|---|---|---|---|---|
+| site `Travel Master 545` | 3571 | 8391 | 4 | 4 | £133,030 |
+| FMLV `Travel Master TM 545` | **3571** | **8391** | **4** | **4** | £130,350 |
+
+Identical but for the price, which is a real rise. **`565L` is left alone** — 3510kg and
+8058mm are a different vehicle, and it is genuinely new.
+
+Nothing is renamed in FMLV by this. The adapter records no provenance for `model`, so no
+model change is proposed; normalising FMLV's two rows to `545` and `565` would make the
+entry unnecessary, and `cli.stale_renames` will say so when it does.
+
+### Run #169
+
+```
+scraped     11 products against a baseline of 6
+classified  5 changed, 1 unchanged, 5 new, 0 disappeared
+```
+
+The five new are **Sportivo 565 Compact**, **Sportivo 565 TRAQ**, **Travel Master 565L**
+and the two Veloce campervans. Before the rename it read 7 new and 2 disappeared.
+
+**Width, height and body type are still unavailable** — Coachman publish none of them, for
+campervans no less than motorhomes, so all five new products need those three by hand. That
+is the pre-existing gap recorded above, not something the campervans introduce.

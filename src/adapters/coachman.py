@@ -62,6 +62,29 @@ DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("campervan", "Campervans"),
 )
 
+#: What Coachman call a model against what FMLV holds, **for matching only** — nothing is
+#: renamed in FMLV by this, and no `model` change is proposed, because the adapter records
+#: no provenance for that field.
+#:
+#: FMLV prefixes the two original Travel Masters `TM ` where Coachman do not, and where
+#: FMLV's own other Coachman ranges do not either: it holds `Avventura 545` and
+#: `Travel Master Imperial 845` without a prefix. `TM 545` against `545` scores exactly
+#: 0.5 on token overlap, which is the threshold rather than above it, so the pair failed to
+#: match and each product was reported **twice** — once as disappeared and once as new.
+#:
+#: **Evidenced on the figures, not on the name.** Each pair is identical in mass in running
+#: order (3571kg), length (8391mm), berths and travelling seats; only the price differs,
+#: and that is a real rise. The layout code is preserved exactly on both sides, which is
+#: the part of a name meant to be unique within a range. `565L` is a genuinely new layout —
+#: 3510kg and 8058mm — and is left alone.
+#:
+#: Normalising FMLV's two rows to `545` and `565` would make this entry unnecessary, and
+#: `cli.stale_renames` will say so once that happens.
+RENAMED_MODELS: dict[tuple[str, str], tuple[str, str]] = {
+    ("Travel Master", "545"): ("Travel Master", "TM 545"),
+    ("Travel Master", "565"): ("Travel Master", "TM 565"),
+}
+
 #: One product card on the homepage. Every product is rendered twice, so callers
 #: deduplicate; the first occurrence wins.
 _CARD = re.compile(r'<div class="listings--posts--grid[^"]*">(?P<body>.*?)</ul>', re.S)

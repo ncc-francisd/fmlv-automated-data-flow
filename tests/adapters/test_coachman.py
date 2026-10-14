@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from src.adapters import coachman
-from src.adapters.coachman import CoachmanCard, CoachmanProduct
+from src.adapters.coachman import RENAMED_MODELS, CoachmanCard, CoachmanProduct
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -398,3 +398,37 @@ def test_the_base_vehicle_reaches_the_product_and_is_flagged_as_manual(
 def test_manufacturer_matches_the_registry_key() -> None:
     """`MANUFACTURER` is the `ADAPTERS` key and must equal `fmlv_manufacturer` exactly."""
     assert coachman.MANUFACTURER == "Coachman"
+
+
+# --- the Travel Master prefix -------------------------------------------------------------
+#
+# Found on 14 October 2026, when a run reported Travel Master TM 545 and TM 565 as BOTH
+# disappeared and new. FMLV prefixes those two `TM ` where Coachman do not — and where
+# FMLV's own other Coachman ranges do not either.
+
+
+def test_the_travel_master_prefix_is_declared_for_matching() -> None:
+    """`TM 545` against `545` scores exactly 0.5, the threshold rather than above it."""
+    assert RENAMED_MODELS[("Travel Master", "545")] == ("Travel Master", "TM 545")
+    assert RENAMED_MODELS[("Travel Master", "565")] == ("Travel Master", "TM 565")
+
+
+def test_only_the_two_original_travel_masters_are_renamed() -> None:
+    """`565L` is a genuinely new layout — 3510kg against 3571 — and must stay new.
+
+    Nor do the other ranges need it: FMLV holds `Avventura 545` and `Travel Master
+    Imperial 845` with no prefix, which is why this is two entries and not a rule.
+    """
+    assert set(RENAMED_MODELS) == {("Travel Master", "545"), ("Travel Master", "565")}
+
+
+def test_the_rename_renames_nothing_in_fmlv(
+    motorhomes: dict[str, CoachmanProduct],
+) -> None:
+    """It is for matching only: the adapter records no provenance for `model`, so no model
+    change is ever proposed and FMLV keeps whatever name it holds."""
+    extracted = coachman._build_extracted_motorhome(
+        motorhomes["Sportivo 565"], "https://www.coachman.co.uk/", "https://example.invalid/api"
+    )
+    assert extracted.motorhome.model == "565"
+    assert "model" not in extracted.provenance
