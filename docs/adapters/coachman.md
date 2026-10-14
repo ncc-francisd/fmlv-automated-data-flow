@@ -550,3 +550,45 @@ classified  6 changed, 0 unchanged, 5 new, 0 disappeared
 | Travel Master Imperial height | *blank* | **3015** |
 
 Every other width, height and base vehicle came back matching what FMLV already held.
+
+## Habitation findings — 14 October 2026
+
+**The requester noticed that new Coachman products arrived with no habitation notes at
+all.** They never had: this adapter read figures and nothing else. It does now, and at no
+cost in fetches — the range page was already being pulled for the technical panel, and the
+equipment is on it.
+
+Each range page carries nine headed sections — `Feature Highlights`, `Cab and Chassis`,
+`Exterior Features`, `Interior Features`, `Kitchen Features`, `Bathroom Features`,
+`Electrical`, `Plumbing and Heating`, `Safety and Security` — as ordinary `<li>` lists.
+They are named explicitly rather than matched as "any heading", because the same page
+carries `Latest news & events` and a footer full of list items.
+
+The sections are bounded by the first technical panel. Without that the last one runs to
+the end of the document and takes the site's model lists and newsletter form with it.
+
+### What it finds
+
+| | |
+|---|---|
+| Veloce | blown-air heating, fridge freezer |
+| Travel Master | wet central heating, fridge freezer, microwave |
+| Avventura | wet central heating, fridge freezer, microwave |
+| Sportivo | wet central heating, fridge freezer |
+
+Run #172 reports **11 findings across the 5 new products**, where it reported none.
+
+### The list is per range, and `bed_types` is dropped because of it
+
+Coachman publish one equipment list per range, shared by every model in it. For
+refrigeration, heating and a microwave that is sound — they are range-wide standard
+fittings. For beds it is not: the Veloce's list reads *"Electronic rear 'Rise and Fall'
+fixed bed (Veloce VR65)"*, which is one of its two models and not the other. The field is
+dropped rather than written onto both, and every finding's provenance says the list is
+shared.
+
+> One reading worth understanding before it surprises a reviewer: the Veloce states only
+> *"Thetford T109OE 90 litre fridge"*, with no freezer mentioned anywhere, and is still
+> recorded as a **fridge freezer**. That is `habitation`'s standing rule — *"a fridge, with
+> a freezer neither stated nor ruled out — nearly all of these have a freezer
+> compartment"* — and the reasoning is carried into the finding so it can be judged.

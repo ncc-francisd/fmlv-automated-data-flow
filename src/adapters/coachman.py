@@ -50,6 +50,7 @@ from decimal import Decimal
 from html import unescape
 from pathlib import Path
 
+from . import habitation
 from ..fetch.http import Fetcher
 from ..product_model.model import Motorhome
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
@@ -212,6 +213,43 @@ class CoachmanCard:
         return (self.kind, self.term_id, _squash(self.model))
 
 
+#: Coachman's equipment headings, named explicitly rather than matched loosely. The same
+#: page carries `Latest news & events` and a footer full of `<li>`s, and a general "any h2"
+#: rule swallows both.
+_EQUIPMENT_HEADING = re.compile(
+    r"<h2[^>]*>\s*(Feature Highlights|Cab and Chassis|Exterior Features|Interior Features"
+    r"|Kitchen Features|Bathroom Features|Electrical|Plumbing and Heating"
+    r"|Safety and Security)\s*</h2>",
+    re.I | re.S,
+)
+
+#: Coachman publish no options section today. The pattern is still declared, because a
+#: section that appears later and is read as standard is how a vehicle acquires equipment
+#: it has not got — see `habitation.Equipment`.
+_OPTIONAL_HEADING = re.compile(r"(?:option|optional|extra|upgrade|pack)s?", re.I)
+
+#: Where the equipment stops. Without it the last section runs to the end of the document
+#: and takes the footer's model lists and newsletter form with it.
+_EQUIPMENT_UNTIL = re.compile(r'<div class="specifications">')
+
+
+def parse_equipment(page_html: str) -> habitation.Equipment:
+    """A range page's headed equipment sections, for the habitation findings.
+
+    **Coachman publish equipment per range, not per model**, so every model in a range
+    shares this list. That is fine for the fields it is read for — refrigeration, heating
+    and a microwave are range-wide standard fittings — and it is why `bed_types` is
+    dropped: the Veloce's list names *"Electronic rear 'Rise and Fall' fixed bed (Veloce
+    VR65)"*, which belongs to one of its two models and not the other.
+    """
+    return habitation.sectioned_equipment(
+        page_html,
+        heading=_EQUIPMENT_HEADING,
+        optional_heading=_OPTIONAL_HEADING,
+        until=_EQUIPMENT_UNTIL,
+    )
+
+
 #: One labelled row of a range page's technical panel:
 #: `<div class='meta-label'><strong>Overall Width</strong></div><div class='meta-value'><p>2050 mm</p></div>`
 _SPEC_PAIR = re.compile(
@@ -308,6 +346,8 @@ class CoachmanProduct:
     spec: CoachmanSpec | None = None
     #: The range page's URL slug, for the technical panel.
     range_slug: str = ""
+    #: The range's equipment, for the habitation findings. Shared by its models.
+    equipment: habitation.Equipment | None = None
 
     @property
     def label(self) -> str:
@@ -603,6 +643,26 @@ def _build_extracted_motorhome(
             ),
         )
 
+    if product.equipment is not None:
+        panel_url = f"{BASE_URL}/{product.range_slug}/"
+        features = habitation.features_from(
+            habitation.usable_lines(product.equipment.standard)
+        )
+        # **Dropped, and this one matters here.** Coachman publish equipment per range, so
+        # a bed named for one of its models — "fixed bed (Veloce VR65)" — would be read
+        # onto both.
+        features.pop("bed_types", None)
+        for name, feature in features.items():
+            setattr(motorhome, name, feature.value)
+            provenance[name] = Provenance(
+                source_url=panel_url,
+                snippet=(
+                    f"{product.title} — {feature.note or 'from the range page'}: "
+                    f"{feature.snippet!r}. Coachman publish this list per range, so it is "
+                    f"shared by every model in {product.range_label}"
+                ),
+            )
+
     provenance["manufacturer_range"] = Provenance(
         source_url=api_url,
         snippet=(
@@ -675,6 +735,7 @@ def collect(
         # else on the site publishes — width, height and the base vehicle — and a payload
         # that checks the two masses. See `parse_specification_panels`.
         panels: dict[int, dict[str, dict[str, str]]] = {}
+        equipment: dict[int, habitation.Equipment] = {}
         for term, slug in slugs_by_id.items():
             if term not in {p.term_id for p in products}:
                 continue
@@ -686,13 +747,14 @@ def collect(
                     f"vehicle are left to FMLV"
                 )
                 continue
-            panels[term] = parse_specification_panels(
-                page.file_path.read_text(encoding="utf-8", errors="replace")
-            )
+            range_html = page.file_path.read_text(encoding="utf-8", errors="replace")
+            panels[term] = parse_specification_panels(range_html)
+            equipment[term] = parse_equipment(range_html)
         products = [
             replace(
                 product,
                 range_slug=slugs_by_id.get(product.term_id, ""),
+                equipment=equipment.get(product.term_id),
                 spec=(
                     spec_from_panel(panels[product.term_id][product.model])
                     if product.term_id in panels and product.model in panels[product.term_id]

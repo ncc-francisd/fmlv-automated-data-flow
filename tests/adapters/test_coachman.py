@@ -517,3 +517,72 @@ def test_the_range_slug_is_read_not_built() -> None:
     states; deriving it from the name would be a guess."""
     payload = '[{"id": 56, "slug": "travel-master-imperial", "name": "Travel Master Imperial"}]'
     assert coachman.parse_range_slugs(payload) == {56: "travel-master-imperial"}
+
+
+# --- habitation findings -------------------------------------------------------------------
+#
+# Added 14 October 2026, after the requester noticed that new Coachman products arrived
+# with no habitation notes at all. The range page's feature sections are the source, and
+# they were already being fetched for the technical panel.
+
+
+@pytest.fixture(scope="module")
+def veloce_equipment() -> coachman.habitation.Equipment:
+    return coachman.parse_equipment(_read("coachman_veloce_panels.html"))
+
+
+def test_the_feature_sections_are_read_as_equipment(
+    veloce_equipment: coachman.habitation.Equipment,
+) -> None:
+    assert len(veloce_equipment.standard) > 50
+    assert any("fridge" in line.lower() for line in veloce_equipment.standard)
+
+
+def test_the_footer_is_not_read_as_equipment(
+    veloce_equipment: coachman.habitation.Equipment,
+) -> None:
+    """The last section otherwise runs to the end of the document and takes the site's
+    model lists and newsletter form with it."""
+    joined = " ".join(veloce_equipment.standard).lower()
+    assert "newsletter" not in joined
+    assert "latest news" not in joined
+
+
+def test_findings_come_out_of_the_equipment(
+    veloce_equipment: coachman.habitation.Equipment,
+) -> None:
+    features = coachman.habitation.features_from(
+        coachman.habitation.usable_lines(veloce_equipment.standard)
+    )
+    assert features["heating"].value.value == "blown_air_heating"
+    assert "refrigeration" in features
+
+
+def test_bed_types_are_dropped_because_the_list_is_per_range(
+    veloce_equipment: coachman.habitation.Equipment,
+) -> None:
+    """The Veloce's list names a bed for one of its two models.
+
+    `Electronic rear 'Rise and Fall' fixed bed (Veloce VR65)` belongs to the VR 65 alone,
+    and a range-level list cannot say which model a bed is on — so the field is dropped
+    rather than written onto both.
+    """
+    assert any("VR65" in line for line in veloce_equipment.standard)
+    features = coachman.habitation.features_from(
+        coachman.habitation.usable_lines(veloce_equipment.standard)
+    )
+    assert "bed_types" in features  # the reader finds one…
+    built = coachman._build_extracted_motorhome(
+        replace(
+            coachman.CoachmanProduct(
+                kind="campervan", term_id=VELOCE, range_label="Veloce", model="VL 65",
+                title="Veloce VL 65", slug="veloce-vl-65",
+                card=CoachmanCard(kind="campervan", term_id=VELOCE, model="VL 65"),
+            ),
+            equipment=veloce_equipment,
+            range_slug="veloce",
+        ),
+        "https://www.coachman.co.uk/",
+        "https://example.invalid/api",
+    )
+    assert "bed_types" not in built.provenance  # …and the adapter does not keep it
