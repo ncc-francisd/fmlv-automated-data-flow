@@ -488,3 +488,65 @@ and the two Veloce campervans. Before the rename it read 7 new and 2 disappeared
 **Width, height and body type are still unavailable** — Coachman publish none of them, for
 campervans no less than motorhomes, so all five new products need those three by hand. That
 is the pre-existing gap recorded above, not something the campervans introduce.
+
+## The technical panel — width, height and base vehicle, at last
+
+**Found by the requester on 14 October 2026**, behind each model's `Technical` button. When
+Coachman was surveyed the model pages carried no figures at all, which is why the rest of
+this adapter reads a homepage card. They do now, and the panel is **server-rendered**:
+
+```html
+<h2>…<div>VL 65</div></h2>
+<p class="fs-22">Specification</p>
+<div class="specifications">
+  <div class='specification'><div class='meta-label'><strong>Overall Width</strong></div>
+    <div class='meta-value'> <p>2050 mm</p> </div></div>
+```
+
+One panel per model, on the **range** page, under an `<h2>` holding the model name alone —
+`VL 65`, `565 Compact`, `845` — which is exactly what `model_name` produces, so the two
+join without translation. The range's URL slug is read from the taxonomy rather than built
+from its name: `Travel Master Imperial` lives at `/travel-master-imperial/`.
+
+### What it adds
+
+| field | before | now |
+|---|---|---|
+| `mh_width_mm` | blank on every product | published per model |
+| `mh_height_mm` | blank on every product | published per model |
+| `base_vehicle_manufacturer` | transcribed from a spec sheet, could not refresh | read live |
+
+The base vehicle is given as a whole description — `Fiat Ducato Panel Van in Expedition
+Grey`, `Mercedes-Benz 170 HP Sprinter Automatic` — so only the first word is the make, and
+it goes through `fmlv_base_vehicle` so `Mercedes-Benz` lands on FMLV's `Mercedes`. The
+manual `_BASE_VEHICLE_BY_RANGE` fallback is kept for a range whose panel cannot be read, and
+the panel wins wherever it has an answer.
+
+**The height is the one Coachman publish**, which their own label says includes the
+roof-mounted air conditioning. The requester's instruction, 14 October 2026: mirror the
+website. That is also why `body_type` stays unset — an air-conditioned height is not the
+body height the campervan threshold was set against.
+
+### A self-check, for the first time
+
+The panel prints a `Personal Payload` that equals `MTPLM − mass in running order` on every
+model — 3500 − 3077 = 423 on the Veloce VL 65, as printed. It is read and it agrees. The
+masses still come from the homepage card, so this is corroboration rather than the source,
+but it is the first redundancy this manufacturer has offered.
+
+### What run #171 corrects
+
+```
+scraped     11 products against a baseline of 6
+classified  6 changed, 0 unchanged, 5 new, 0 disappeared
+```
+
+| | FMLV held | the panel says |
+|---|---|---|
+| Travel Master width | 2400 | **2470** |
+| Travel Master height | 2960 | **2980** |
+| Sportivo 565 width | 2410 | **2390** |
+| Avventura width | 2445 | **2443** |
+| Travel Master Imperial height | *blank* | **3015** |
+
+Every other width, height and base vehicle came back matching what FMLV already held.

@@ -432,3 +432,88 @@ def test_the_rename_renames_nothing_in_fmlv(
     )
     assert extracted.motorhome.model == "565"
     assert "model" not in extracted.provenance
+
+
+# --- the technical panel ------------------------------------------------------------------
+#
+# Found by the requester on 14 October 2026, behind the `Technical` button on a model.
+# When Coachman was surveyed the model pages carried no figures at all, which is why the
+# rest of this adapter reads a homepage card. They do now — and they carry three fields
+# nothing else on the site publishes.
+
+
+@pytest.fixture(scope="module")
+def panels() -> dict[str, dict[str, str]]:
+    return coachman.parse_specification_panels(_read("coachman_veloce_panels.html"))
+
+
+def test_each_panel_is_keyed_on_its_own_model(panels: dict[str, dict[str, str]]) -> None:
+    """The `<h2>` above each panel holds the model name alone — exactly what `model_name`
+    produces, so the two join without translation."""
+    assert sorted(panels) == ["VL 65", "VR 65"]
+
+
+def test_the_panel_carries_the_three_fields_nothing_else_does(
+    panels: dict[str, dict[str, str]],
+) -> None:
+    """Width, height and base vehicle were blank on every Coachman product before this."""
+    spec = coachman.spec_from_panel(panels["VL 65"])
+    assert spec.mh_width_mm == 2050
+    assert spec.mh_height_mm == 2655
+    assert spec.base_vehicle_manufacturer == "Fiat"
+
+
+def test_the_base_vehicle_is_reduced_to_the_make(panels: dict[str, dict[str, str]]) -> None:
+    """Coachman give a whole description — `Fiat Ducato Panel Van in Expedition Grey`."""
+    assert "Ducato" in panels["VL 65"]["Base Vehicle"]
+    assert coachman.spec_from_panel(panels["VL 65"]).base_vehicle_manufacturer == "Fiat"
+
+
+def test_a_hyphenated_make_lands_on_fmlvs_spelling() -> None:
+    """`Mercedes-Benz 170 HP Sprinter Automatic` is FMLV's `Mercedes`."""
+    spec = coachman.spec_from_panel({"Base Vehicle": "Mercedes-Benz 170 HP Sprinter Automatic"})
+    assert spec.base_vehicle_manufacturer == "Mercedes"
+
+
+def test_the_height_is_the_one_coachman_publish(panels: dict[str, dict[str, str]]) -> None:
+    """Their only height includes the roof-mounted air conditioning, and the requester's
+    instruction of 14 October 2026 is to mirror what the website states."""
+    assert "Overall Height (including Air Conditioning)" in panels["VL 65"]
+    assert coachman.spec_from_panel(panels["VL 65"]).mh_height_mm == 2655
+
+
+def test_the_panel_publishes_a_payload_that_checks_the_masses(
+    panels: dict[str, dict[str, str]],
+) -> None:
+    """The first self-check Coachman have offered: 3500 - 3077 = 423, as printed.
+
+    Not yet used as one — the masses still come from the homepage card — but it is here
+    and it agrees.
+    """
+    for model, expected in (("VL 65", 423), ("VR 65", 401)):
+        pairs = panels[model]
+        spec = coachman.spec_from_panel(pairs)
+        assert spec.personal_payload_kilograms == expected
+        mtplm = coachman._kilograms(pairs["MTPLM"])
+        mro = coachman._kilograms(pairs["Mass in Running Order"])
+        assert mtplm is not None and mro is not None
+        assert mtplm - mro == expected
+
+
+def test_two_models_in_one_range_keep_their_own_figures(
+    panels: dict[str, dict[str, str]],
+) -> None:
+    """They share a width here, but not a payload — so the panels must not be merged."""
+    assert coachman.spec_from_panel(panels["VL 65"]).personal_payload_kilograms == 423
+    assert coachman.spec_from_panel(panels["VR 65"]).personal_payload_kilograms == 401
+
+
+def test_a_page_with_no_panel_yields_nothing() -> None:
+    assert coachman.parse_specification_panels("<html><body>nothing here</body></html>") == {}
+
+
+def test_the_range_slug_is_read_not_built() -> None:
+    """`Travel Master Imperial` lives at `/travel-master-imperial/`, which the taxonomy
+    states; deriving it from the name would be a guess."""
+    payload = '[{"id": 56, "slug": "travel-master-imperial", "name": "Travel Master Imperial"}]'
+    assert coachman.parse_range_slugs(payload) == {56: "travel-master-imperial"}

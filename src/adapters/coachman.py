@@ -24,11 +24,20 @@ different vehicles. The range therefore comes from the **taxonomy term ID in the
 section's class** (`listings--posts-2-motorhome-8` → term 8 → Travel Master), never from the
 card, so the join key is the triple `(post type, term ID, model)`.
 
-Not extracted, because Coachman publish them nowhere a run can reach: **width, height and
-base vehicle manufacturer**. All three are in `schema.REQUIRED`, so they surface as
-`missing_required` for a human rather than being guessed — see the missing-data rule in
-`docs/adapters/README.md`. `body_type` is left unset for the same reason: the campervan rule
-turns on roof height, and no height is published.
+**Width, height and the base vehicle now come from the range page's technical panel**, added
+to the site since the survey and found by the requester on 14 October 2026 behind each
+model's `Technical` button. They are server-rendered as labelled rows, one panel per model
+under an `<h2>` carrying the model name alone — see `parse_specification_panels`. All three
+were previously blank on every Coachman product, and the base vehicle was transcribed from
+a spec sheet that could not refresh itself.
+
+The panel also publishes a `Personal Payload` that equals `MTPLM - mass in running order` on
+every model, which is the first self-check this manufacturer has offered. It is read and
+agrees; the masses themselves still come from the homepage card.
+
+`body_type` remains unset. A published height makes the campervan rule answerable in
+principle, but Coachman's height **includes the roof-mounted air conditioning** — their own
+label says so — which is not the body height the threshold was set against.
 """
 
 from __future__ import annotations
@@ -203,6 +212,88 @@ class CoachmanCard:
         return (self.kind, self.term_id, _squash(self.model))
 
 
+#: One labelled row of a range page's technical panel:
+#: `<div class='meta-label'><strong>Overall Width</strong></div><div class='meta-value'><p>2050 mm</p></div>`
+_SPEC_PAIR = re.compile(
+    r"<strong>(?P<label>.*?)</strong></div>\s*<div class='meta-value'>\s*"
+    r"(?:<p>)?(?P<value>.*?)(?:</p>)?\s*</div></div>",
+    re.S,
+)
+
+#: Where one model's panel begins. Each is preceded by an `<h2>` carrying the model name
+#: alone — `VL 65`, `565 Compact` — which is exactly what `model_name` produces.
+_SPEC_PANEL = '<div class="specifications">'
+
+
+def _plain(fragment: str) -> str:
+    return " ".join(re.sub(r"<[^>]+>", " ", unescape(fragment)).split())
+
+
+def parse_specification_panels(page_html: str) -> dict[str, dict[str, str]]:
+    """`{model: {label: value}}` from one range page's technical panels.
+
+    **The panels are server-rendered**, which the rest of this adapter's sources exist
+    because they were not: when Coachman was surveyed the model pages carried no figures at
+    all. They do now, behind the `Technical` button, and they carry three fields nothing
+    else on the site publishes — **overall width, overall height and the base vehicle** —
+    as well as a payload, which is the first self-check this manufacturer has offered.
+
+    Keyed on the `<h2>` immediately above each panel, which holds the model name on its own.
+    """
+    found: dict[str, dict[str, str]] = {}
+    for index, panel in enumerate(page_html.split(_SPEC_PANEL)[1:], start=1):
+        before = _SPEC_PANEL.join(page_html.split(_SPEC_PANEL)[:index])
+        headings = re.findall(r"<h2[^>]*>(.*?)</h2>", before, re.S)
+        model = _plain(headings[-1]) if headings else ""
+        if not model:
+            continue
+        pairs = {
+            _plain(match.group("label")): _plain(match.group("value"))
+            for match in _SPEC_PAIR.finditer(panel[:12000])
+        }
+        if pairs:
+            found.setdefault(model, pairs)
+    return found
+
+
+#: The panel labels this adapter reads, against the `CoachmanSpec` field they fill.
+_PANEL_FIELDS: tuple[tuple[str, str], ...] = (
+    ("Overall Width", "mh_width_mm"),
+    ("Overall Height (including Air Conditioning)", "mh_height_mm"),
+)
+
+
+@dataclass(frozen=True)
+class CoachmanSpec:
+    """The three fields only the range page's technical panel carries, plus its payload."""
+
+    mh_width_mm: int | None = None
+    mh_height_mm: int | None = None
+    base_vehicle_manufacturer: str | None = None
+    #: Coachman's own `Personal Payload`, which is `MTPLM - MRO` on every model checked.
+    personal_payload_kilograms: int | None = None
+
+
+def spec_from_panel(pairs: dict[str, str]) -> CoachmanSpec:
+    """One technical panel as the fields FMLV wants.
+
+    The base vehicle is given as a whole description — `Fiat Ducato Panel Van in Expedition
+    Grey`, `Mercedes-Benz 170 HP Sprinter Automatic` — so only its first word is the make,
+    and that goes through `fmlv_base_vehicle` so `Mercedes-Benz` lands on FMLV's `Mercedes`.
+    """
+    values: dict[str, int | None] = {}
+    for label, field in _PANEL_FIELDS:
+        values[field] = _millimetres(pairs.get(label, ""))
+    described = pairs.get("Base Vehicle", "").strip()
+    make = fmlv_base_vehicle(described.split()[0]) if described else None
+    return CoachmanSpec(
+        mh_width_mm=values.get("mh_width_mm"),
+        mh_height_mm=values.get("mh_height_mm"),
+        base_vehicle_manufacturer=make,
+        personal_payload_kilograms=_kilograms(pairs.get("Personal Payload", "")),
+    )
+
+
 @dataclass(frozen=True)
 class CoachmanProduct:
     """One product from the REST API, once its homepage card has been attached."""
@@ -214,6 +305,9 @@ class CoachmanProduct:
     title: str
     slug: str
     card: CoachmanCard | None = None
+    spec: CoachmanSpec | None = None
+    #: The range page's URL slug, for the technical panel.
+    range_slug: str = ""
 
     @property
     def label(self) -> str:
@@ -278,6 +372,19 @@ def parse_range_counts(payload: str) -> dict[int, int]:
         int(term["id"]): int(term["count"])
         for term in json.loads(payload)
         if term.get("count") is not None
+    }
+
+
+def parse_range_slugs(payload: str) -> dict[int, str]:
+    """Taxonomy term ID -> the range's own URL slug, for reaching its technical panel.
+
+    `Travel Master Imperial` lives at `/travel-master-imperial/`, which is the taxonomy's
+    `slug` rather than anything derivable from the name — read it rather than build it.
+    """
+    return {
+        int(term["id"]): str(term["slug"])
+        for term in json.loads(payload)
+        if term.get("id") is not None and term.get("slug")
     }
 
 
@@ -400,7 +507,12 @@ def _build_extracted_motorhome(
     card = product.card
     assert card is not None  # `collect` skips products without one
 
-    base_vehicle = base_vehicle_for(product.range_label)
+    spec = product.spec
+    # **The range page's technical panel wins where it has an answer.** It is Coachman's
+    # own per-model figure, read live, where `base_vehicle_for` is a document someone was
+    # sent in August and which cannot refresh itself.
+    panel_base_vehicle = spec.base_vehicle_manufacturer if spec else None
+    base_vehicle = panel_base_vehicle or base_vehicle_for(product.range_label)
 
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -415,6 +527,8 @@ def _build_extracted_motorhome(
         mro_kilograms=card.mro_kilograms,
         mh_payload_kilograms=product.mh_payload_kilograms,
         mh_length_mm=card.mh_length_mm,
+        mh_width_mm=spec.mh_width_mm if spec else None,
+        mh_height_mm=spec.mh_height_mm if spec else None,
     )
 
     snippets = {
@@ -432,6 +546,32 @@ def _build_extracted_motorhome(
         for field, (row, value) in snippets.items()
         if value is not None
     }
+
+    if spec is not None:
+        panel_url = f"{BASE_URL}/{product.range_slug}/"
+        for field, label, value in (
+            ("mh_width_mm", "Overall Width", spec.mh_width_mm),
+            ("mh_height_mm", "Overall Height (including Air Conditioning)", spec.mh_height_mm),
+        ):
+            if value is not None:
+                provenance[field] = Provenance(
+                    source_url=panel_url,
+                    snippet=(
+                        f"{product.title} — {label}: {value}mm, from the technical panel on "
+                        f"the range page. The height is the one Coachman publish, which "
+                        f"includes the roof-mounted air conditioning"
+                    ),
+                )
+        if panel_base_vehicle is not None:
+            provenance["base_vehicle_manufacturer"] = Provenance(
+                source_url=panel_url,
+                snippet=(
+                    f"{product.title} — Base Vehicle: "
+                    f"{(spec and spec.base_vehicle_manufacturer) or ''}, read from the "
+                    f"technical panel. This replaces the figure previously taken from a "
+                    f"supplied spec sheet, so it now refreshes with the site"
+                ),
+            )
 
     if card.rrp_pounds is not None:
         provenance["rrp_pounds"] = Provenance(
@@ -451,7 +591,7 @@ def _build_extracted_motorhome(
                 f"= {product.mh_payload_kilograms}kg (Coachman publish no payload)"
             ),
         )
-    if base_vehicle is not None:
+    if base_vehicle is not None and panel_base_vehicle is None:
         provenance["base_vehicle_manufacturer"] = Provenance(
             source_url=f"{BASE_URL}/",
             snippet=(
@@ -518,6 +658,7 @@ def collect(
             continue
         ranges_by_id = parse_ranges(taxonomy)
         counts = parse_range_counts(taxonomy)
+        slugs_by_id = parse_range_slugs(taxonomy)
         on_progress(
             f"[{label}] {len(ranges_by_id)} range(s): "
             + ", ".join(f"{name} ({counts.get(term, '?')})" for term, name in ranges_by_id.items())
@@ -529,6 +670,43 @@ def collect(
             continue
         products = join_cards(parse_roster(roster, post_type, ranges_by_id), cards)
         on_progress(f"[{label}] {len(products)} product(s) in the roster")
+
+        # **The technical panel, one fetch per range.** It carries the three fields nothing
+        # else on the site publishes — width, height and the base vehicle — and a payload
+        # that checks the two masses. See `parse_specification_panels`.
+        panels: dict[int, dict[str, dict[str, str]]] = {}
+        for term, slug in slugs_by_id.items():
+            if term not in {p.term_id for p in products}:
+                continue
+            page = http.fetch(f"{BASE_URL}/{slug}/")
+            if page.status_code != 200:
+                on_progress(
+                    f"[{label}] no technical panel for {ranges_by_id.get(term, term)!r}: "
+                    f"/{slug}/ returned {page.status_code}, so its width, height and base "
+                    f"vehicle are left to FMLV"
+                )
+                continue
+            panels[term] = parse_specification_panels(
+                page.file_path.read_text(encoding="utf-8", errors="replace")
+            )
+        products = [
+            replace(
+                product,
+                range_slug=slugs_by_id.get(product.term_id, ""),
+                spec=(
+                    spec_from_panel(panels[product.term_id][product.model])
+                    if product.term_id in panels and product.model in panels[product.term_id]
+                    else None
+                ),
+            )
+            for product in products
+        ]
+        without = [p.title for p in products if p.spec is None]
+        if without:
+            on_progress(
+                f"[{label}] NO TECHNICAL PANEL MATCHED for {sorted(without)} — their width, "
+                f"height and base vehicle are left to FMLV's own figures"
+            )
 
         # Say so every run: the base vehicle is transcribed from a document, not fetched,
         # so it cannot notice Coachman changing a chassis.
