@@ -95,3 +95,59 @@ with wrong prices, so the value is real and immediate.
 1. **Is the International 25 IB discontinued?** It is on FMLV and not on their site.
 2. **Weights and dimensions for the three Internationals** — nothing published reaches them.
 3. **Is there an International brochure** to match the World Traveller one?
+
+## The stock pages — 14 October 2026
+
+The requester pointed at Lowdhams' stock listings as the source for the Internationals'
+weights and dimensions. The **fields are there**; the **values are not a model
+specification**, and should not be read as one.
+
+Four vehicles are linked from the browse page, and each has a `Specification` block:
+
+```
+Make Airstream   Range International   Model 534   Condition New
+Berths 4   Overall Width 2.28m   MTPLM 1830kg   Overall Length 6.80m
+Overall Height 1.99m   Axles Single   Registration ST575111
+```
+
+### Against FMLV
+
+| | MTPLM | length | width | height |
+|---|---|---|---|---|
+| **534** site / FMLV | 1830 / **1900** | 6.80m / 6860 | 2.28m / 2280 ✓ | **1.99m** / 2700 |
+| **684** site / FMLV | 2400 / **2920** | 8.20m / 8290 | 2.50m / 2490 | 2.69m / 2750 |
+| **22RB** site / FMLV | 2000 / 2000 ✓ | 7.21m / 7210 ✓ | 2.29m / 2290 ✓ | **2.00m** / 2740 |
+| **25 IB** site / FMLV | 2750 / **3500** | 8.21m / 8290 | 2.50m / 2490 | **1.99m** / 2840 |
+
+**Lengths and widths agree** to within 90mm, and the World Traveller's agree exactly.
+**Heights and masses do not.**
+
+### Why these are unit listings, not model data
+
+* **Three of the four heights are about 2.0m**, which no Airstream is. Only the 684's
+  2.69m is credible. There is one height field per page and that is what it says.
+* **MTPLM varies from FMLV by up to 750kg** — the 684 reads 2400 against 2920, the 25 IB
+  2750 against 3500. That is what individually plated units look like.
+* **Every one of the four carries a registration and is marked sold** — *"Sorry, this one
+  has hit the road. This model has sold"*.
+* **The 25 IB is listed `used`**, at £72,995 where FMLV holds the new price of £109,950.
+
+So the prices are **stock prices for particular units**, not list prices: the World
+Traveller's card reads *"From £72,995"* against FMLV's £79,995.
+
+### What the stock pages can be trusted for
+
+* the **roster** — which models Lowdhams are selling, and that the 25 IB is now used stock
+  only, which is the evidence for discontinuing it;
+* **berths**;
+* **`Axles` — `Single` or `Twin`** — which is unambiguous and feeds `twin_axle`, a field
+  FMLV needs and nothing else here publishes.
+
+Length and width agree closely enough to confirm FMLV's figures but are less precise than
+them, so there is nothing to gain by proposing them.
+
+### Where that leaves a build
+
+The World Traveller remains sound — its brochure gives masses with a payload that
+reconciles, and it is a **Lowdhams exclusive**, which is why it alone has one. The three
+Internationals still have **no reliable source for their masses or heights**.
