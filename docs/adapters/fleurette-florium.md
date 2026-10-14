@@ -107,10 +107,37 @@ This is the whole finding, and it is not a near miss.
 So **the proposed euro conversion at 1.15 has nothing to convert.** There is no published
 euro price to divide.
 
-**And no UK distributor is named on the site.** The dealer page is a JavaScript-loaded
-Google map and lists no GB entry. Under the settled rule the exclusive importer decides
-what exists and what it costs — so until someone is importing these, there is no one whose
-price we would be recording.
+### The four UK dealers, and why none of them is a price either
+
+The dealer page renders nothing server-side — it is a **WP Google Maps Pro** map — but the
+plugin's own REST route is open and returns all 64 markers:
+
+```
+https://www.fleurette-florium.fr/wp-json/wpgmza/v1/markers
+```
+
+Four are in the UK, which is the number the requester had without a list:
+
+| dealer | | |
+|---|---|---|
+| **Wandahome South Cave** | Brough Rd, South Cave, Brough HU15 2DB | +44 1430 330430 |
+| **River Motorhomes** Birmingham | Kingsbury Rd, Sutton Coldfield B76 9EE | +44 330 808 0805 |
+| **River Motorhomes** Hereford | Worcester Rd, Whitestone HR1 3RX | +44 1432 278833 |
+| **River Motorhomes** Newport | Mere Park, Stafford Rd, Newport TF10 9BY | +44 1952 446989 |
+
+**Three of the four are River Motorhomes**, who this repo already knows: they are the UK
+importer for **Mink Campers**, and `mink.py` reads their site precisely because it is *"the
+only place a price is"*. That made them the obvious route to a price here.
+
+**They are not.** River's own site mentions neither brand — 255 URLs in their sitemap and
+not one match for Fleurette, Florium or any of the nine range names, with only Mink on
+their home page. So either the French dealer map is stale or the arrangement has not gone
+live. Wandahome would need the same check.
+
+**So there is no exclusive UK importer**, which matters beyond the missing number. The
+settled rule gives the importer authority over what exists and what it costs; with four
+independent dealers and no distributor, there is no single UK price to record and no one
+deciding which of the thirty products reach the UK.
 
 ## Verdict
 
@@ -124,8 +151,9 @@ registered twice.
 
 ## To ask
 
-1. **Who imports them into the UK?** Nobody is named, and that answers both the price and
-   the roster.
+1. **Is anyone actually importing them?** Four dealers are mapped — three of them River
+   Motorhomes — but none lists either brand on its own website, so the map may be stale.
+   River are already the Mink importer, which makes them the obvious person to ask.
 2. **Is there a UK or export price list?** The dealer portal implies tariffs exist; they
    are just not public.
 3. **Are all thirty products coming to the UK**, or a subset? Thirteen of the thirty are
