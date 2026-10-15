@@ -248,6 +248,31 @@ publishes no price anywhere in the world, and its products still carry one, beca
 exclusive UK importer prices every layout it sells. See [Rimor](rimor.md), which reads the
 importer for the price and the range and the factory for the specifications.
 
+### A sterling price is taken as displayed, even where it is plainly the euro figure
+
+Settled by the requester on 15 October 2026, when Beauer forced the question.
+
+River Motorhomes sell Beauer in the UK at **£39,990 / £74,990 / £109,990**. Beauer
+themselves publish **39.990 € / 74.990 € / 109.990 €** — the same digits with the symbol
+changed. Converted at the house rate the X4 would be about £34,800, so the sterling figure
+is either a 15% import uplift or a number carried across without conversion.
+
+**Record what the seller displays.** The requester: *"if that's the price they're
+displaying, in pounds, even though it's actually the euros price and not converted, let's
+use their pounds price. That's defendable — that's what's on their website."*
+
+This follows from the guide-price rule above rather than competing with it: FMLV shows a
+reader the figure they will meet on the seller's own site, and a converted price would
+match nothing the buyer can see. **The house conversion rate applies only where there is no
+sterling price at all** — it is a last resort for a brand sold from a euro price list, not
+a correction to be applied to a sterling one.
+
+**Say so in the adapter, and say it as a ruling.** A digit-for-digit coincidence looks like
+a fault to anyone meeting it for the first time, so the run should put the two figures side
+by side — but phrased as settled, not as a query. A note that asks a question already
+answered reappears on every run forever, which is the same failure as a re-proposed figure
+that was rejected once. `beauer.price_note` is the worked example.
+
 ### A side-by-side PDF table may still yield the one row you need
 
 The standing warning about brochure spec tables is that columns cannot be recovered:

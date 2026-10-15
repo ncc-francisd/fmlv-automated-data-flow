@@ -260,13 +260,19 @@ def test_the_single_price_is_read(x4: str, x6: str, x8: str) -> None:
     assert parse_price(x8) == 109990
 
 
-def test_the_price_matching_the_euro_figure_is_flagged_not_refused(x4: str) -> None:
+def test_the_displayed_sterling_price_is_the_price(x4: str) -> None:
     """River ask £39,990 and Beauer 39,990 euros — the same digits with the symbol
-    changed. It is recorded, because they are the UK seller, and reported every run."""
+    changed. Settled by the requester on 15 October 2026: FMLV matches what the seller
+    displays, and the conversion rate applies only where no sterling price exists.
+
+    The note is kept so nobody has to re-derive that, and it must **state** the ruling
+    rather than ask for one — otherwise it is a query that reappears on every run forever.
+    """
     model = _model(x4)
     note = price_note(model)
     assert note is not None
     assert "£34,774" in note
+    assert "SETTLED, NOT A QUERY" in note
     assert build_extracted(model, basis="test").caravan.rrp_pounds == 39990
 
 

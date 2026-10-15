@@ -188,18 +188,27 @@ The mass in running order **is** recorded, but its provenance says plainly that 
 footnote it *"depending on the options selected"*, so it may include fitted options. It is
 their only published mass and it matches their own site exactly.
 
-## The price is recorded and flagged every run
+## The price is the one River display — settled
 
 Beauer price the X4 at **39.990 €** and River at **£39,990** — the same digits with the
 symbol changed. At 1.15 euros per pound the French price is about **£34,774**.
 
-Nothing in either source settles whether that is an ordinary import uplift or a currency
-slip, so `price_note` prints the comparison on every run and the figure recorded is
-River's: they are the UK seller and the price is theirs to state.
+**The requester ruled on 15 October 2026**: *"if that's the price they're displaying, in
+pounds, even though it's actually the euros price and not converted, let's use their pounds
+price. That's defendable — that's what's on their website."* FMLV shows a reader the figure
+they will meet on the seller's own site, and the house conversion rate applies only where
+there is no sterling price at all. Now a cross-manufacturer rule in [`README.md`](README.md).
+
+`price_note` still prints the two figures side by side every run, because the coincidence
+looks like a fault to anyone meeting it for the first time — but it **states the ruling
+rather than asking for one**, so it does not become a question that reappears forever.
 
 ## Still to ask
 
-1. **Is £39,990 right**, or has a euro figure been carried across? See above.
-2. **Is the `fully equipped` weight a mass in running order**, or an optioned figure?
-3. **One product per model, or two?** The layouts are recorded as one.
+1. **Is the `fully equipped` weight a mass in running order**, or an optioned figure?
+   Beauer footnote it *"depending on the options selected"*. It is recorded, with that
+   footnote quoted in its provenance.
+2. **One product per model, or two?** Each offers Layout 1 and Layout 2, differing in
+   fridge, shower and table. They are recorded as one.
 
+*(The price question is answered — see above.)*

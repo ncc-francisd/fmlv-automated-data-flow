@@ -508,12 +508,17 @@ def _reconciles(model: Model) -> tuple[bool, str]:
 
 
 def price_note(model: Model) -> str | None:
-    """River's sterling price set beside Beauer's euro one, every run.
+    """River's sterling price set beside Beauer's euro one — as a settled matter.
 
-    Not a refusal and not a conversion — the UK seller's price is the price. But the two
-    figures are digit-for-digit identical with the symbol changed, which is either a normal
-    import uplift or a number carried across by mistake, and a reviewer should be the one
-    deciding that rather than finding out later.
+    **This is not a question.** The requester ruled on 15 October 2026: *"if that's the
+    price they're displaying, in pounds, even though it's actually the euros price and not
+    converted, let's use their pounds price. That's defendable — that's what's on their
+    website."* The displayed sterling figure is the price, and the house conversion rate
+    applies only where there is no sterling price to take.
+
+    The note is kept anyway, because the coincidence looks like a fault to anyone meeting
+    it for the first time and a reviewer should not have to re-derive the answer. It states
+    the ruling rather than asking for one.
     """
     published = FACTORY_WEIGHTS.get(model.name or "")
     if published is None or model.rrp_pounds is None:
@@ -522,11 +527,11 @@ def price_note(model: Model) -> str | None:
     if model.rrp_pounds != published.euro_price:
         return None
     return (
-        f"{model.label} — PRICE WORTH A LOOK: River ask £{model.rrp_pounds:,} and Beauer "
-        f"publish {published.euro_price:,} euros, the same digits with the symbol changed. "
-        f"At {EUROS_PER_POUND} euros per pound the French price is about £{converted:,}. "
-        f"Recorded as River's, since they are the UK seller and the price is theirs to "
-        f"state, but it is worth confirming it is not a currency slip"
+        f"{model.label} — the price is £{model.rrp_pounds:,}, and Beauer publish "
+        f"{published.euro_price:,} euros, the same digits with the symbol changed "
+        f"(converted it would be about £{converted:,}). THIS IS SETTLED, NOT A QUERY: "
+        f"River display it in pounds and FMLV matches what the seller displays, which is "
+        f"defendable. The conversion rate applies only where no sterling price exists"
     )
 
 
