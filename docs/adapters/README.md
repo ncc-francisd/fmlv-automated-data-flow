@@ -485,6 +485,30 @@ and says which in the snippet. It stands down in three cases:
 * **caravans** — `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the
   personal-effects half of a split, and one published figure may be the total. Deriving it would be wrong.
 
+### One published mass, qualified, is still the mass to record
+
+Settled by the requester on 15 October 2026, when Beauer forced the question.
+
+Beauer publish a single mass per model — *"Weight of the fully equipped trailer"* — and
+footnote it *"depending on the options selected"*. That reads like the optioned figure the
+base-vehicle rule exists to refuse.
+
+**It is recorded anyway.** The requester: *"the MRO is supposed to be the weight as it
+comes out of the factory, so I think I'm going to have to quote what they quote and hope
+that it is effectively the caravan with beds and equipment in it but perhaps not all the
+optional extras … at least it mirrors what they say."*
+
+The distinction from the base-vehicle rule is **how many figures are published**. That rule
+chooses between two: a base and an optioned variant, and it takes the base. Where a
+manufacturer publishes only one, there is nothing to choose — and the alternatives are both
+worse than a qualified figure. Leaving the field blank loses a mass the manufacturer does
+publish; adjusting it downwards invents a number nobody published and that no buyer can
+check against the brochure.
+
+**So mirror the manufacturer and say so in the provenance**, naming the qualification in
+their own words. A reviewer can then see exactly what was recorded and on what basis, which
+is the thing that makes it defendable.
+
 ### To withhold a mass, clear the value — not just its provenance
 
 Because that derivation reads **the masses the product carries**, not the fields the

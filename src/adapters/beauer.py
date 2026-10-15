@@ -621,10 +621,13 @@ def build_extracted(model: Model, *, basis: str) -> ExtractedCaravan:
     if model.fully_equipped_kilograms is not None:
         record(
             "mro_kilograms",
-            f"Weight of the fully equipped trailer {model.fully_equipped_kilograms}kg. "
-            f"BEAUER FOOTNOTE THIS '*depending on the options selected', so it is not "
-            f"plainly a mass in running order and may include fitted options. It is their "
-            f"only published mass and it matches their own site exactly",
+            f"Weight of the fully equipped trailer {model.fully_equipped_kilograms}kg — "
+            f"Beauer's only published mass, matching their own site exactly. They footnote "
+            f"it '*depending on the options selected'; SETTLED 15 Oct 2026 that it is "
+            f"recorded as the mass in running order anyway, read as the caravan leaving "
+            f"the factory with its beds and equipment but not every optional extra. "
+            f"Mirroring what the manufacturer states is defendable; inventing a figure "
+            f"they do not publish is not",
         )
     if model.length_mm is not None:
         record(

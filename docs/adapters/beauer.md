@@ -184,9 +184,17 @@ pattern has to stop at the next `<li>` or the end of the list.
   second product.
 * **Any heating**, for the reason above.
 
-The mass in running order **is** recorded, but its provenance says plainly that Beauer
-footnote it *"depending on the options selected"*, so it may include fitted options. It is
-their only published mass and it matches their own site exactly.
+The mass in running order **is** recorded. Beauer footnote it *"depending on the options
+selected"*, which reads like the optioned figure the base-vehicle rule refuses — but that
+rule chooses between two published figures and Beauer publish only one.
+
+**Settled by the requester on 15 October 2026**: *"the MRO is supposed to be the weight as
+it comes out of the factory, so I think I'm going to have to quote what they quote … at
+least it mirrors what they say."* Read as the caravan leaving the factory with its beds and
+equipment but not every optional extra. The provenance names the qualification in Beauer's
+own words, which is what makes it defendable — and the alternatives are worse: a blank
+loses a mass they do publish, and an adjusted figure invents one nobody can check. Now a
+cross-manufacturer rule in [`README.md`](README.md).
 
 ## The price is the one River display — settled
 
@@ -205,10 +213,8 @@ rather than asking for one**, so it does not become a question that reappears fo
 
 ## Still to ask
 
-1. **Is the `fully equipped` weight a mass in running order**, or an optioned figure?
-   Beauer footnote it *"depending on the options selected"*. It is recorded, with that
-   footnote quoted in its provenance.
-2. **One product per model, or two?** Each offers Layout 1 and Layout 2, differing in
-   fridge, shower and table. They are recorded as one.
+1. **One product per model, or two?** Each offers Layout 1 and Layout 2, differing in
+   fridge, shower and table. They share one price, one gross weight and one set of
+   dimensions, so they are recorded as one.
 
-*(The price question is answered — see above.)*
+*(The price and the mass in running order are both settled — see above.)*
