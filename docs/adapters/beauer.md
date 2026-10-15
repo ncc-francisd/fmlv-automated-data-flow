@@ -97,11 +97,109 @@ a brand FMLV does not hold at all.
 The work is mostly in the two traps: discarding the extended dimensions, and deciding
 whether the fully-equipped weight is a mass in running order.
 
-## To ask
+---
 
-1. **Is the `fully equipped` weight a mass in running order**, or an optioned figure? The
-   footnote says it depends on the options selected.
-2. **One product per model, or two** — the layouts share every figure but differ in fridge,
-   shower and table.
-3. **Is there any space heating?** Nothing on any page lists one.
-4. **Does Beauer need an NCC id allocating**, and is River the exhibitor of record?
+# Built — 15 October 2026
+
+`src/adapters/beauer.py`, **NCC id 280**, registered as a caravan brand. Four fetches: the
+`/beauer/` index and the three model pages it links. Plain HTML throughout.
+
+## The dealer-page rule is broken here on purpose, and the licence is checked every run
+
+The settled rule says specifications are not read off a dealer page. This does, because it
+was verified rather than assumed: **River have republished Beauer's own copy verbatim** —
+the same wording and the same figures to the kilogram — while the factory's own pages do
+not expose the dimensions to a plain fetch.
+
+`FACTORY_WEIGHTS` holds Beauer's three published masses per model, and `_reconciles` tests
+every page against them. **If River ever edit a number, the product is dropped and the run
+says so**, so the licence to read a dealer lasts exactly as long as the dealer stays
+faithful.
+
+## Run #174 — the first one
+
+```
+baseline    0 products
+scraped     3 products
+classified  0 changed, 0 unchanged, 3 new, 0 disappeared
+proposed    48 changes
+findings    3 habitation readings
+```
+
+| | price | berths | MTPLM | MRO | travelling L×W×H | axle |
+|---|---|---|---|---|---|---|
+| **X4** | £39,990 | 4 | 1350 | 1200 | 3850 × 1950 × 2650 | single |
+| **X6** | £74,990 | 6 | 1800 | 1700 | 7200 × 2150 × 2670 | single |
+| **X8** | £109,990 | 8 | 2700 | 2600 | 6650 × 2050 × 2900 | **twin** |
+
+### The baseline read zero, and that is correct
+
+A mock X4 (product 9203, range `Traveler`) was placed in Nova to give the run something to
+match against. It carries **`active: No`**, so the baseline scope excluded it and all three
+models arrived as new. The pipeline did the right thing.
+
+**There is no `Traveler` range.** `Travelers` on Beauer's page is the English word, used as
+a capacity label — *"Designed for up to 4 travellers"*. Beauer give these models no range
+name at all, so each is a one-name product carrying its name twice, and the display name is
+fixed by hand after upload.
+
+## The four traps
+
+**1. Every model publishes two widths.** The body telescopes, and the page gives
+`Dimensions` and `Dimensions when extended` under the same labels. The X4 is 1950mm closed
+and **4600mm extended**.
+
+The reading cannot be rescued by comparing magnitudes: the extended **width** is far larger
+than the travelling one while the extended **height** is *smaller* (2000 against 2650), so
+"take the larger" and "take the smaller" are each wrong on one field. `technical_data`
+keys on the sub-heading, which is the only thing that separates them.
+
+**2. All the heating is an option.** `Heating + 2,000 W Webasto gas or electric underfloor
+water heater` and `Truma 1800W Eezy Electric Heater` sit in the `Options` accordion on all
+three models, and neither line marks itself as an extra. Read whole, the page gives every
+Beauer wet underfloor heating it has not got. Equipment is read **by section**.
+
+A second-order version of the same thing: the only line that then mentions a heater is the
+`6-Liter Electric Water Heater`, which heats water rather than the caravan. Reporting that
+as "heating of an undetermined kind" would send a reviewer hunting for a system that is not
+there, so the run names it for what it is.
+
+**3. The cookie banner is an accordion.** Its container reuses `accordion-header`, so its
+"heading" is several hundred words of consent copy and four branches' opening hours. Any
+heading over 60 characters is furniture.
+
+**4. The weight list's `<li>`s are unclosed.** Only the last one is terminated, so the item
+pattern has to stop at the next `<li>` or the end of the list.
+
+## Four things deliberately not recorded
+
+* **The payload.** Beauer publish one figure and it is the **total**, not the
+  personal-effects half FMLV's column holds, and a brand new to FMLV has no baseline to
+  show which way it files them. Used for the self-check only.
+* **The body length.** One length is published and Beauer do not say whether it includes
+  the drawbar, so only the shipping length is proposed.
+* **The second layout.** Each model offers Layout 1 and Layout 2, differing in fridge,
+  shower and table. They share one price, one gross weight and one set of dimensions and
+  carry **no name of their own**, so the settled rule makes them a choice rather than a
+  second product.
+* **Any heating**, for the reason above.
+
+The mass in running order **is** recorded, but its provenance says plainly that Beauer
+footnote it *"depending on the options selected"*, so it may include fitted options. It is
+their only published mass and it matches their own site exactly.
+
+## The price is recorded and flagged every run
+
+Beauer price the X4 at **39.990 €** and River at **£39,990** — the same digits with the
+symbol changed. At 1.15 euros per pound the French price is about **£34,774**.
+
+Nothing in either source settles whether that is an ordinary import uplift or a currency
+slip, so `price_note` prints the comparison on every run and the figure recorded is
+River's: they are the UK seller and the price is theirs to state.
+
+## Still to ask
+
+1. **Is £39,990 right**, or has a euro figure been carried across? See above.
+2. **Is the `fully equipped` weight a mass in running order**, or an optioned figure?
+3. **One product per model, or two?** The layouts are recorded as one.
+
