@@ -147,6 +147,89 @@ It would propose **nothing** for any mass or dimension, and would exclude the Mo
 Four products is small, but these are live on FMLV with wrong prices, so the value is
 immediate — the same argument that justified Airstream.
 
+---
+
+# Built — 15 October 2026
+
+`src/adapters/kaktus.py`, **NCC id 219**. Four fetches: the configurator, the home page
+for the roster, and the two model pages for their summary prose.
+
+## Run #175 — the first one
+
+```
+baseline    4 products
+scraped     4 products
+classified  4 changed, 0 unchanged, 0 new, 0 disappeared
+proposed    44 changes, of which 4 are year bumps
+verified    12 fields checked and unchanged
+```
+
+**All four matched, and nothing arrived as new** — the right answer for a manufacturer
+FMLV already holds in full, and confirmation that the X2/X4 split was read correctly.
+
+| | FMLV held | Kaktus |
+|---|---|---|
+| Oasis X2 LWB / X4 LWB | 149,000 | **157,000** |
+| Dune X2 MWB / X4 MWB | 135,000 | **142,000** |
+
+`manufacturer_range`, `berths` and `base_vehicle_manufacturer` verified unchanged on all
+four, which independently confirms the identity mapping.
+
+## Reject the derived payload of 0kg, every run
+
+The one thing a reviewer must get right. FMLV holds **MRO 3500 and MTPLM 3500** for every
+Kaktus, so the pipeline derives a payload of **0** and offers it against the 200kg and
+400kg on record:
+
+> *"Derived payload, not read from the site: 3500kg MTPLM - 3500kg MRO = 0kg, against the
+> 200kg on record. Neither mass was published this run, so both are FMLV's own figures
+> carried over."*
+
+**The arithmetic is right and the conclusion is wrong.** A campervan has a payload, so the
+figure at fault is the mass in running order — it cannot be 3500 if the MTPLM is. Kaktus
+publish nothing that can correct it, so this will be proposed on **every** run until they
+supply real masses. Reject it each time rather than leaving it pending, as with the Bailey
+B65 length.
+
+The adapter names this in its own output so nobody has to rediscover it.
+
+## What it maintains, and what it refuses
+
+| takes | leaves to FMLV |
+|---|---|
+| the price, from each model's `basePrice` | every mass — none is published anywhere |
+| berths, from the sleeping-layout group | every dimension — likewise |
+| the range name and the base vehicle | the body type: no height is published, and the elevating roof is an *option* |
+| the habitation findings, from the model page summaries | the seat count: `Sleeps up to 4` is berths, not belted seats |
+
+## The four things that would have gone wrong quietly
+
+**1. Reaching for a browser.** The pages render almost nothing as HTML and look like a
+`BrowserFetcher` job. They are not: the `self.__next_f` chunks are JSON-encoded strings
+that concatenate and decode over an ordinary fetch.
+
+**2. The option prices.** `/configure` publishes **41 options** from an £85 windscreen
+cover to a £4,750 seat retrim, beside the two `basePrice` keys that matter. Any
+lowest-number heuristic buys the windscreen cover, so the price is read from `basePrice`
+alone and `MINIMUM_CREDIBLE_PRICE` is set at £50,000 — a gap the options cannot cross.
+
+**3. Mojave.** Linked from the home page like the other two, and excluded by name. Without
+that, a prototype priced "from £235,000 subject to confirmation" arrives as a new product.
+
+**4. The Dune's stance row.** `60mm lift · 16" off-road tyres` carries a quote that is
+escaped in the flight payload, where a naive value pattern stops at it and loses the row.
+The summary is therefore read from the **rendered** `<dt>`/`<dd>` markup, which carries
+the same text as an HTML entity.
+
+## Two readings deliberately left alone
+
+* **The heating.** The Oasis's summary says `75L fresh · 75L waste · diesel heater`, which
+  names a heater without saying whether the system is blown air or wet. Narrated, not
+  guessed — the same call as Beauer's "central heating".
+* **The model string.** `X4 LWB` carries a wheelbase Kaktus publish only for the Oasis;
+  the Dune's page names none. `FMLV_WHEELBASE` carries FMLV's own answer so the products
+  *match*, and `model` is given no provenance so it is never offered as a change.
+
 ## To ask Kaktus
 
 1. **MTPLM, mass in running order and payload**, which nothing published reaches. FMLV's
