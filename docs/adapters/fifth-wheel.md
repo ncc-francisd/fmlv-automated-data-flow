@@ -134,6 +134,100 @@ building the website half first if the brochures are slow.
 **Asked of the requester:** the Celtic Rambler and DreamSeeker brochures, which need an
 email to Fifth Wheel Co. With all three, this ships complete.
 
+---
+
+# Built — 16 October 2026
+
+`src/adapters/fifth_wheel.py`, **NCC id 268**. Six fetches: a range page and its brochure,
+three times over.
+
+## The email form turned out not to matter
+
+Each range page offers its brochure behind an email form, and **every page also carries the
+PDF's own Squarespace `/s/` path in its markup**. Fetching that returns the document, on
+all three. So the adapter needs no stored copy and no manual step — the requester filled in
+the form three times and, as it turns out, did not need to.
+
+## Run #184 — the first one
+
+```
+baseline    3 products
+scraped     3 products
+classified  0 changed, 3 unchanged, 0 new, 0 disappeared
+proposed    16 changes, of which 3 are year bumps
+verified    27 fields checked and unchanged
+```
+
+**Nothing is proposed but the year**, which is the right answer: FMLV already holds all
+three correctly, and 27 fields were confirmed against the manufacturer's own brochures.
+
+## The INOS is published three times, and only two of the three add up
+
+The finding that shaped the adapter.
+
+| source | unit weight | payload | MTPLM | adds up |
+|---|---|---|---|---|
+| the brochure the email form sends | 2,400 | 400 | 2,800 | **yes** |
+| the brochure the site links | 2,600 | 1,000 | 2,800 or 3,500 | **no — 3,600** |
+| the range page itself | 2,500 | up to 1,000 | from 2,800 to 3,500 | yes, at 3,500 |
+
+FMLV holds the emailed brochure's figures. The site's brochure **contradicts itself**, so
+`_reconciles` refuses it and the INOS records nothing — the check earning its keep rather
+than a special case written for one range.
+
+**It is still emitted for its identity**, with no figures and no provenance beyond the
+range name. All three are live products, so collecting nothing would report the INOS as
+disappeared and invite a reviewer to deactivate a caravan that is still sold. A false
+disappearance is worse than a missing figure.
+
+## Three parsing traps, all of which cost the whole table
+
+The specification is **columnar** — every label first, grouped under its section heading,
+then every value in the same order — so a single lost value unbalances the columns and the
+table is refused entirely. Each of these cost all three ranges until it was fixed:
+
+**1. A value written in words.** The site's INOS gives `up to 1000kg` and `from 2800kg to
+3,500kg`. A pattern anchored on a leading digit misses both and folds them into the value
+above, leaving fourteen labels against twelve values.
+
+**2. `²` is a word character.** The slide-out areas read `5.3m²`, and a word boundary after
+the unit — `m` — fails on exactly those rows. One row lost, whole table refused. There is
+no boundary now, which is safe because no label on any brochure contains a digit.
+
+**3. A wrapped value.** `4,300kg (3,500kg if downplated` continues onto `for towing on
+standard licence)`. A continuation is told from a value by carrying **no figure at all**,
+which is what lets it coexist with trap 1.
+
+## Both mass rules appear here, one per range
+
+* **Celtic Rambler and DreamSeeker** publish `4,300kg (3,500kg if downplated for towing on
+  standard licence)` — one chassis plated differently, so the band rule takes the **upper**
+  figure.
+* **INOS**'s larger figure needs an **upgraded chassis**, so the base-vehicle rule takes
+  the **base**.
+
+`_primary_figure` reads the figure stated before any bracket, which is correct in both
+cases for the same reason: it is what the manufacturer states plainly before qualifying it.
+
+## FMLV's spelling is kept over the manufacturer's
+
+They write **`Dreamseeker`** throughout their site and brochure; FMLV holds
+**`DreamSeeker`**. The first run proposed the rename, and it was removed: the settled rule
+is that the export decides the identity strings, and a casing change buys a reviewer
+nothing while touching the one thing a rename can corrupt. Their spelling is in the
+provenance instead.
+
+## What is not recorded
+
+* **The extended width** — `3.3m` on the Celtic Rambler against a travelling `2.3m`. Kept
+  out by its label, never by its magnitude.
+* **The internal length** — not published. FMLV's three look like a typist's
+  approximation: two equal the length behind the tow vehicle and one the body length.
+* **The Celtic Rambler's berths** — its brochure states no count, describing an island bed
+  and a slide-out sofa that converts. Counting furniture is not deriving a berth figure.
+* **Internal width, bathroom and bedroom heights, and every slide-out dimension** — read
+  and discarded, because FMLV holds no column for them. The run lists them each time.
+
 ## To ask Fifth Wheel Co
 
 1. **The Celtic Rambler's berth count**, which nothing published states.
