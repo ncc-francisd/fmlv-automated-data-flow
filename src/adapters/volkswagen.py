@@ -71,6 +71,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import habitation
 from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
@@ -402,6 +403,7 @@ class Product:
     mh_height_mm: int | None = None
     body_type: BodyType | None = None
     body_type_reason: str = ""
+    equipment: tuple[str, ...] = ()
 
     @property
     def label(self) -> str:
@@ -444,6 +446,61 @@ def _reconciles_grand(row: GrandWeight) -> tuple[bool, str]:
         f"driver, so {DRIVER_ALLOWANCE_KG}kg is added to it — matching the "
         f"{row.payload_kilograms}kg payload printed beside it"
     )
+
+
+# --- Equipment, for the habitation findings ------------------------------------------
+
+#: The Grand California brochure's own standard-equipment list. Its `Living area` section
+#: is where FMLV's habitation fields live — the fridge freezer, the washroom and the
+#: heating.
+#:
+#: **The negative lookahead is load-bearing.** The very next heading is the same words
+#: plus `Dune`, and that section is the Dune trim's *additional* equipment. The Dune is
+#: excluded from this adapter entirely, so its decals and black bumpers must not arrive as
+#: standard equipment on a Grand California.
+_GRAND_EQUIPMENT_START = re.compile(
+    r"Standard equipment highlights of the Grand California(?! Dune)", re.I
+)
+_GRAND_EQUIPMENT_END = re.compile(
+    r"Standard equipment highlights of the Grand California Dune", re.I
+)
+
+
+def parse_grand_equipment(brochure: str) -> tuple[str, ...]:
+    """The Grand California's standard equipment, one line per item."""
+    start = _GRAND_EQUIPMENT_START.search(brochure)
+    if start is None:
+        return ()
+    end = _GRAND_EQUIPMENT_END.search(brochure, start.end())
+    section = brochure[start.end() : end.start() if end else len(brochure)]
+    return tuple(
+        dict.fromkeys(line.strip() for line in section.splitlines() if line.strip())
+    )
+
+
+#: Why the California gets no habitation findings, said on every run.
+#:
+#: **This is a finding in itself, not a gap.** Three things in its brochure read like
+#: FMLV's fields and are not them, and `habitation`'s vocabulary is already careful enough
+#: to return nothing for all three — which is why no parse of the California's equipment is
+#: attempted. Checked against the whole brochure on 16 October 2026.
+CALIFORNIA_HABITATION_NOTE = (
+    "NO HABITATION FINDINGS ARE REPORTED FOR THE CALIFORNIA, and that is the right answer "
+    "rather than a gap. It has a COOL BOX, not a fridge; an OUTDOOR COLD SHOWER reached "
+    "through the tailgate, not a washroom — FMLV holds no_toilet on the Beach and "
+    "shower_only on the Coast and Ocean; and every heater in its brochure is an AUXILIARY "
+    "or PARKING heater rather than a habitation heating system. Its equipment is therefore "
+    "not parsed at all, which also keeps the price list's priced options out of the "
+    "findings."
+)
+
+#: How each habitation reading is introduced.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heating in the brochure's standard equipment",
+    "refrigeration": "the refrigeration in the brochure's standard equipment",
+    "microwave": "a microwave in the brochure's standard equipment",
+    "shower_toilet_separated": "the washroom as the brochure's standard equipment has it",
+}
 
 
 def build_extracted(product: Product) -> ExtractedMotorhome:
@@ -505,6 +562,31 @@ def build_extracted(product: Product) -> ExtractedMotorhome:
             record(field, f"{value}mm {label}")
     if product.body_type is not None:
         record("body_type", product.body_type_reason)
+    # The habitation findings, from the brochure's own standard-equipment list. Only the
+    # Grand California carries one worth reading — see `CALIFORNIA_HABITATION_NOTE`.
+    if product.equipment:
+        features = habitation.features_from(product.equipment)
+        # Dropped as on every other adapter: the copy names beds without saying which are
+        # built in and which are made up out of the seating.
+        features.pop("bed_types", None)
+        for name, feature in features.items():
+            setattr(motorhome, name, feature.value)
+            note = feature.note or _FEATURE_NOTES.get(name, name)
+            if name == "heating":
+                # VW's line reads "Heating and hot water heating powered by gas and mains
+                # electric", which is a Truma Combi: it warms the air and heats water
+                # both. FMLV holds blown_air AND wet_central for these, so the finding
+                # says what the brochure says and leaves the typist to enter both.
+                note += (
+                    ". NOTE: this is a Truma-type combi that both warms air and heats "
+                    "water, and FMLV already holds blown air and wet central together on "
+                    "the Grand California — enter what the brochure supports, not one of "
+                    "the two"
+                )
+            provenance[name] = Provenance(
+                source_url=product.source_url,
+                snippet=f"{product.label} — {note}: {feature.snippet!r}",
+            )
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
@@ -592,6 +674,19 @@ def collect(
     grand_prices = parse_grand_prices(grand)
     grand_rows = parse_grand_weights(grand)
     on_progress(f"the Grand California weights table lists {len(grand_rows)} row(s), Dune excluded")
+
+    grand_equipment = parse_grand_equipment(grand)
+    if grand_equipment:
+        on_progress(
+            f"the Grand California's standard-equipment list gives "
+            f"{len(grand_equipment)} line(s), the Dune's additions excluded"
+        )
+    else:
+        on_progress(
+            "NO STANDARD-EQUIPMENT LIST could be read from the Grand California brochure, "
+            "so its habitation findings are not reported this run. Every other field is "
+            "unaffected"
+        )
     by_model: dict[str, GrandWeight] = {}
     for row in grand_rows:
         current = by_model.get(row.model)
@@ -627,8 +722,11 @@ def collect(
                     "a high-top campervan: its brochure gives an exterior height of 2.97m, "
                     f"well above the {HIGH_TOP_ABOVE_MM}mm threshold"
                 ),
+                equipment=grand_equipment,
             )
         )
+
+    on_progress(CALIFORNIA_HABITATION_NOTE)
 
     results = [build_extracted(product) for product in products]
     for product in products:

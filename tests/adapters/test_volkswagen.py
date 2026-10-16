@@ -30,7 +30,10 @@ from src.adapters.volkswagen import (
     parse_california_weights,
     parse_grand_prices,
     parse_grand_weights,
+    parse_grand_equipment,
+    CALIFORNIA_HABITATION_NOTE,
 )
+from src.product_model.enums import Refrigeration
 from src.product_model.enums import BodyType
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -278,3 +281,93 @@ def test_nothing_is_proposed_for_a_field_that_was_not_read() -> None:
 
 def test_the_expected_count_is_what_fmlv_holds() -> None:
     assert EXPECTED_PRODUCTS == 8
+
+
+# --- the habitation findings, added 16 October 2026 -----------------------------------
+#
+# The adapter was built on 11 October without them, which broke the rule that a new
+# adapter reports findings from the start. The Grand California's brochure carries a
+# standard-equipment list; the California's does not carry one worth reading.
+
+
+@pytest.fixture(scope="module")
+def grand_equipment_page() -> str:
+    return _fixture("volkswagen_grand_california_equipment.txt")
+
+
+def test_the_grand_californias_equipment_is_read(grand_equipment_page: str) -> None:
+    equipment = parse_grand_equipment(grand_equipment_page)
+    assert any("fridge-freezer" in line for line in equipment)
+    assert any("Wet room" in line for line in equipment)
+
+
+def test_the_dunes_additions_are_not_read_as_standard(grand_equipment_page: str) -> None:
+    """The very next heading is the same words plus `Dune`, and the Dune is excluded from
+    this adapter entirely — so its decals must not arrive as standard equipment."""
+    assert "Dune decals" in grand_equipment_page
+    assert not any("Dune decals" in line for line in parse_grand_equipment(grand_equipment_page))
+
+
+def test_a_brochure_with_no_such_list_yields_nothing() -> None:
+    assert parse_grand_equipment("a brochure about paint") == ()
+
+
+def test_the_findings_reach_the_grand_california(grand_equipment_page: str) -> None:
+    built = build_extracted(
+        Product(
+            "Grand California", "600", 3500, 3096, 404, "http://x", "the arithmetic",
+            equipment=parse_grand_equipment(grand_equipment_page),
+        )
+    )
+    assert built.motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert built.motorhome.shower_toilet_separated is False
+    assert "fridge-freezer" in built.provenance["refrigeration"].snippet
+
+
+def test_a_wet_room_is_not_a_separated_washroom(grand_equipment_page: str) -> None:
+    """`Wet room with shower and cassette toilet` — one room, so not separated."""
+    built = build_extracted(
+        Product(
+            "Grand California", "600", 3500, 3096, 404, "http://x", "b",
+            equipment=parse_grand_equipment(grand_equipment_page),
+        )
+    )
+    assert built.motorhome.shower_toilet_separated is False
+
+
+def test_the_combi_heating_finding_says_it_is_both(grand_equipment_page: str) -> None:
+    """VW's line is "Heating and hot water heating powered by gas and mains electric" — a
+    Truma-type combi that warms air and heats water both, and FMLV holds blown air AND
+    wet central together on these. The finding must not push a typist to pick one."""
+    built = build_extracted(
+        Product(
+            "Grand California", "600", 3500, 3096, 404, "http://x", "b",
+            equipment=parse_grand_equipment(grand_equipment_page),
+        )
+    )
+    snippet = built.provenance["heating"].snippet
+    assert "blown air and wet central together" in snippet
+
+
+def test_bed_types_are_dropped(grand_equipment_page: str) -> None:
+    built = build_extracted(
+        Product(
+            "Grand California", "600", 3500, 3096, 404, "http://x", "b",
+            equipment=parse_grand_equipment(grand_equipment_page),
+        )
+    )
+    assert "bed_types" not in built.provenance
+
+
+def test_a_california_reports_no_findings_and_says_why() -> None:
+    """A cool box is not a fridge, an outdoor cold shower is not a washroom, and a parking
+    heater is not a habitation heating system. `habitation` returns nothing for all three,
+    which is why no parse is attempted — stated rather than left as a silent gap."""
+    built = build_extracted(
+        Product("California", "Beach", 2850, 2383, 467, "http://x", "the arithmetic")
+    )
+    assert built.motorhome.refrigeration is None
+    assert built.motorhome.heating is None
+    assert "refrigeration" not in built.provenance
+    assert "COOL BOX" in CALIFORNIA_HABITATION_NOTE
+    assert "OUTDOOR COLD SHOWER" in CALIFORNIA_HABITATION_NOTE
