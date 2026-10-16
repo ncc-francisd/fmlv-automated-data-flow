@@ -223,14 +223,23 @@ provenance instead.
   out by its label, never by its magnitude.
 * **The internal length** — not published. FMLV's three look like a typist's
   approximation: two equal the length behind the tow vehicle and one the body length.
-* **The Celtic Rambler's berths** — its brochure states no count, describing an island bed
-  and a slide-out sofa that converts. Counting furniture is not deriving a berth figure.
 * **Internal width, bathroom and bedroom heights, and every slide-out dimension** — read
   and discarded, because FMLV holds no column for them. The run lists them each time.
 
+## The Celtic Rambler's berths are written down, not counted
+
+Its brochure describes *"a fitted island king-size bed (1.9m x 1.5m)"* and *"a 2.5m
+L-shaped slide-out sofa (converts to double bed)"*, and never states a count. The requester
+settled it on 16 October 2026 — *"it's designed to sleep four people, so that's two double
+beds, so a four berth"* — which is what FMLV already holds.
+
+`KNOWN_BERTHS` carries that answer rather than a rule for counting beds, because the
+settled rules do not derive a berth figure from furniture and one confirmed answer is no
+reason to teach every adapter to try. **A brochure that starts stating a count is preferred
+over it**, so the written-down figure retires itself. The provenance names its source.
+
 ## To ask Fifth Wheel Co
 
-1. **The Celtic Rambler's berth count**, which nothing published states.
 2. **Shipping lengths for the Celtic Rambler and DreamSeeker** — the length behind the tow
    vehicle, which only the INOS publishes.
 3. **`Unlit Weight`** on the Celtic Rambler page is a typo worth reporting to them.

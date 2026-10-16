@@ -18,6 +18,7 @@ import pytest
 
 from src.adapters.fifth_wheel import (
     EXPECTED_PRODUCTS,
+    KNOWN_BERTHS,
     MANUFACTURER,
     MANUFACTURER_DISPLAY_NAME,
     MANUFACTURER_SPELLING,
@@ -236,17 +237,26 @@ def test_berths_come_from_a_stated_count(dreamseeker: Brochure) -> None:
     assert dreamseeker.berths == 5
 
 
-def test_the_celtic_rambler_states_no_berth_count(celtic: Brochure) -> None:
-    """Its beds are described without a count — an island bed and a slide-out sofa that
-    converts. Counting furniture is not deriving a berth figure."""
-    assert celtic.berths is None
-    assert "not derived from furniture" in celtic.berths_basis
+def test_the_celtic_ramblers_berths_come_from_the_requester(celtic: Brochure) -> None:
+    """Its brochure describes an island king-size bed and a slide-out sofa that converts
+    to a double, and states no count. The requester settled it at four on 16 October 2026,
+    which is what FMLV holds — written down rather than counted off the furniture."""
+    assert KNOWN_BERTHS["Celtic Rambler"][0] == 4
+    assert celtic.berths == 4
+    assert "confirmed by the requester" in celtic.berths_basis
     built = build_extracted(celtic, basis="b")
-    assert "berths" not in built.provenance
+    assert "confirmed by the requester" in built.provenance["berths"].snippet
 
 
-def test_no_sleeping_capacity_is_reported_as_such() -> None:
-    berths, basis = berths_from("a lovely caravan")
+def test_the_brochures_own_count_beats_the_written_down_one() -> None:
+    """So a range that starts stating a count is read from the document, not from here."""
+    berths, basis = berths_from("Sleeps up to 6", manufacturer_range="Celtic Rambler")
+    assert berths == 6
+    assert "brochure's own" in basis
+
+
+def test_a_range_with_neither_proposes_nothing() -> None:
+    berths, basis = berths_from("a lovely caravan", manufacturer_range="Unknown")
     assert berths is None
     assert "no sleeping capacity" in basis
 
@@ -279,3 +289,23 @@ def test_an_identity_only_product_proposes_no_figure() -> None:
     assert built.caravan.overall_width_mm is None
     assert "mtplm_kilograms" not in built.provenance
     assert "rrp_pounds" not in built.provenance
+
+
+def test_the_floorplan_is_offered_as_a_reviewer_pointer(celtic: Brochure) -> None:
+    """The positional fields can only be answered off a drawing by a person, and each
+    range page carries a DAY and a NIGHT plan per layout variant. One pointer per
+    unanswered field, so the link sits beside the question it answers."""
+    built = build_extracted(celtic, basis="b")
+    pointers = {
+        name: p for name, p in built.provenance.items() if p.source_url.endswith("#layout")
+    }
+    assert pointers
+    assert all("celtic-rambler" in p.source_url for p in pointers.values())
+    assert any("DAY and NIGHT floorplans" in p.snippet for p in pointers.values())
+
+
+def test_an_answered_field_gets_no_floorplan_pointer(celtic: Brochure) -> None:
+    """There is nothing left to look up for a field the brochure already settled."""
+    built = build_extracted(celtic, basis="b")
+    assert built.caravan.berths == 4
+    assert not built.provenance["berths"].source_url.endswith("#layout")

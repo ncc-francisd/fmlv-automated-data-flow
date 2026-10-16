@@ -85,11 +85,12 @@ from ..product_model.caravan import Caravan
 from ..product_model.enums import CaravanBodyType
 from ..vehicle_class import VehicleClass
 from . import habitation
-from .base import ExtractedCaravan, Provenance
+from .base import ExtractedCaravan, Provenance, floorplan_provenance
 
 __all__ = [
     "BASE_URL",
     "EXPECTED_PRODUCTS",
+    "KNOWN_BERTHS",
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
     "MICRO_CARAVAN_CEILING_KG",
@@ -133,6 +134,26 @@ RANGE_PATHS: dict[str, str] = {
 
 #: How the manufacturer spells a range where that differs from FMLV, for the provenance.
 MANUFACTURER_SPELLING: dict[str, str] = {"DreamSeeker": "Dreamseeker"}
+
+#: A berth count the brochure does not state as a figure, settled by the requester.
+#:
+#: **The Celtic Rambler's brochure describes its beds and never counts them**: a *"fitted
+#: island king-size bed (1.9m x 1.5m)"* in the master bedroom and a *"2.5m L-shaped
+#: slide-out sofa (converts to double bed)"*. Two doubles is four berths, which the
+#: requester confirmed on 16 October 2026 — *"it's designed to sleep four people, so that's
+#: two double beds, so a four berth"* — and which is what FMLV already holds.
+#:
+#: Written down rather than counted off the furniture, because the settled rules do not
+#: derive a berth figure from bed descriptions and one manufacturer's confirmed answer is
+#: not a reason to teach every adapter to try. The provenance says where it came from.
+KNOWN_BERTHS: dict[str, tuple[int, str]] = {
+    "Celtic Rambler": (
+        4,
+        "the brochure describes an island king-size bed and a slide-out sofa that "
+        "converts to a double, and states no count. Two doubles is four berths, confirmed "
+        "by the requester on 16 October 2026",
+    ),
+}
 
 EXPECTED_PRODUCTS = 3
 
@@ -312,22 +333,23 @@ def price_from(page_text: str) -> int | None:
     return int(re.sub(r"[\s,]", "", match.group(1)))
 
 
-def berths_from(page_text: str) -> tuple[int | None, str]:
-    """`Sleeps up to 5`, where the brochure states one.
+def berths_from(page_text: str, *, manufacturer_range: str = "") -> tuple[int | None, str]:
+    """`Sleeps up to 5`, where the brochure states one — otherwise `KNOWN_BERTHS`.
 
-    **The Celtic Rambler states none**, and its beds are described without a count — an
-    island bed and a slide-out sofa that converts. Counting those would be deriving a berth
-    figure from furniture, which the settled rules do not allow, so nothing is proposed and
-    FMLV's own figure stands.
+    The brochure's own statement is preferred over the written-down answer, so that a
+    range which starts stating a count is read from the document rather than from here.
     """
     match = _SLEEPS.search(page_text)
-    if match is None:
-        return None, (
-            "no sleeping capacity is stated in this brochure; its beds are described "
-            "without a count, and a berth figure is not derived from furniture"
-        )
-    berths = int(match.group(1))
-    return berths, f"{berths} berths, from the brochure's own {match.group(0)!r}"
+    if match is not None:
+        berths = int(match.group(1))
+        return berths, f"{berths} berths, from the brochure's own {match.group(0)!r}"
+    if known := KNOWN_BERTHS.get(manufacturer_range):
+        berths, basis = known
+        return berths, f"{berths} berths — {basis}"
+    return None, (
+        "no sleeping capacity is stated in this brochure; its beds are described "
+        "without a count, and a berth figure is not derived from furniture"
+    )
 
 
 def parse_brochure(text: str, *, manufacturer_range: str, url: str) -> Brochure:
@@ -346,7 +368,9 @@ def parse_brochure(text: str, *, manufacturer_range: str, url: str) -> Brochure:
             brochure.specification = specification
             break
     brochure.rrp_pounds = price_from(text)
-    brochure.berths, brochure.berths_basis = berths_from(text)
+    brochure.berths, brochure.berths_basis = berths_from(
+        text, manufacturer_range=manufacturer_range
+    )
     brochure.equipment = habitation.usable_lines(
         line.strip() for line in text.splitlines() if line.strip()
     )
@@ -407,6 +431,17 @@ def _reconciles(brochure: Brochure) -> tuple[bool, str]:
         f"{mro}kg + {payload}kg = {mtplm}kg, the brochure's own published arithmetic"
     )
 
+
+#: Each range page's own floorplan section, which carries a DAY and a NIGHT drawing per
+#: layout variant — `CR20-Day.png` and `U-Shape Night.png` on the Celtic Rambler.
+#:
+#: **Recorded as a reviewer pointer, not read.** The positional habitation fields — which
+#: end the caravan the beds are at, where the kitchen sits, how the washroom is arranged —
+#: can only be answered off a drawing by a person, and this is where that person should
+#: look. The requester's own reading of these on 16 October 2026 is what settled the Celtic
+#: Rambler's berths: *"nighttime layout has a double bed like an island bed at the front
+#: and then in the bit that sticks out the side there's another double bed."*
+_FLOORPLAN_ANCHOR = "#layout"
 
 #: How each habitation reading is introduced.
 _FEATURE_NOTES: dict[str, str] = {
@@ -518,6 +553,17 @@ def build_extracted(brochure: Brochure, *, basis: str) -> ExtractedCaravan:
             )
         record(field_name, f"{label} {value}mm, published in metres.{extra}")
     record("body_type", body_type_reason)
+    # A pointer at the range page's own DAY/NIGHT drawings, for every positional field
+    # still unanswered. One entry per field, so the link sits beside the question it
+    # answers rather than once per product.
+    provenance.update(
+        floorplan_provenance(
+            caravan,
+            f"{BASE_URL}{RANGE_PATHS.get(brochure.manufacturer_range, '')}{_FLOORPLAN_ANCHOR}",
+            brochure.label,
+            drawing="the DAY and NIGHT floorplans on the range's own page",
+        )
+    )
     for name, feature in features.items():
         provenance[name] = Provenance(
             source_url=brochure.url,
