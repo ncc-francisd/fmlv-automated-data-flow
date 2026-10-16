@@ -60,13 +60,16 @@ standard, so the body type stays `campervan_high_top` and the height recorded is
 
 from __future__ import annotations
 
+import html as htmllib
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from . import ehg_configurator as ehg
+from . import habitation
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
@@ -286,6 +289,141 @@ def parse_layouts(payload: str, series_name: str) -> list[ElddisLayout]:
     return layouts
 
 
+# --- Equipment, for the habitation findings ------------------------------------------
+#
+# **The configurator API carries no equipment at all** — only engine and mass data — so
+# the findings come from the brand's public site, one page per layout. That is why this
+# costs around twenty-five extra fetches: a home page for the ranges, an index per range
+# for its layouts, and then each layout page.
+#
+# The rebuild of 10 October 2026 moved this adapter onto the API and dropped the findings
+# with the old site parser. This restores them against the site as it now stands, which is
+# a different shape entirely: tables inside a named accordion rather than bulleted `<p>`
+# blocks under `Highlights`.
+
+#: One accordion section's title. Every layout page has exactly three — the layout's own
+#: name, then `Standard equipment`, then `Optional equipment`.
+_ACCORDION_TITLE = re.compile(r"o-accordion__title[^>]*>(?P<title>.*?)</", re.S)
+
+#: The two sections worth reading, matched on the title rather than on the words
+#: themselves. **The phrase "standard equipment" also appears in the legal boilerplate**
+#: every page carries about what a mass in running order includes, and the first table
+#: after that prose is the technical-data table — `Price (incl. VAT)`, `Standard chassis`.
+#: Read as equipment it would put a price and a chassis name into the habitation findings.
+_STANDARD_SECTION = re.compile(r"^\s*standard equipment\s*$", re.I)
+_OPTIONAL_SECTION = re.compile(r"^\s*optional equipment\s*$", re.I)
+
+#: Inside a section, each `<table>`'s `<th>` is a group name — `Fiat chassis features`,
+#: `Exterior features` — and its `<td>`s are the items. Only the cells are equipment.
+_TABLE_CELL = re.compile(r"<td[^>]*>(?P<cell>.*?)</td>", re.S)
+
+
+def _plain(fragment: str) -> str:
+    """One line of readable text out of a markup fragment."""
+    return " ".join(htmllib.unescape(re.sub(r"<[^>]+>", " ", fragment)).split())
+
+
+def accordion_sections(page: str) -> dict[str, str]:
+    """A layout page's accordion, as `{title: body markup}`.
+
+    Each section runs from its own title to the next, and the last to the end of the
+    document — which is safe here because the last section is always `Optional equipment`,
+    whose contents are discarded anyway.
+    """
+    titles = list(_ACCORDION_TITLE.finditer(page))
+    sections: dict[str, str] = {}
+    for index, title in enumerate(titles):
+        end = titles[index + 1].start() if index + 1 < len(titles) else len(page)
+        sections.setdefault(_plain(title.group("title")), page[title.end() : end])
+    return sections
+
+
+def _cells(fragment: str) -> list[str]:
+    """Every table cell in a fragment, as readable lines."""
+    return [
+        text for cell in _TABLE_CELL.finditer(fragment) if (text := _plain(cell.group("cell")))
+    ]
+
+
+def parse_equipment(page: str) -> habitation.Equipment:
+    """One layout page's standard and optional equipment.
+
+    **Only the two named sections are read.** A section is standard *because its title says
+    `Standard equipment`*, not because it failed to say `Optional` — the page's first
+    section is the technical-data table, and treating everything non-optional as equipment
+    would sweep a price and a chassis name into it.
+    """
+    sections = accordion_sections(page)
+    standard: list[str] = []
+    optional: list[str] = []
+    for title, body in sections.items():
+        if _STANDARD_SECTION.match(title):
+            standard.extend(_cells(body))
+        elif _OPTIONAL_SECTION.match(title):
+            optional.extend(_cells(body))
+    return habitation.Equipment(
+        tuple(dict.fromkeys(standard)), tuple(dict.fromkeys(optional))
+    )
+
+
+#: `/en/motorhomes/autoquest-gt`, `/en/campervans/autoquest-gtv`. The product area is part
+#: of the path and differs across the range — GT and GTS are motorhomes, GTV campervans —
+#: so both are matched and the range is identified by its slug rather than by the folder.
+_RANGE_LINK = re.compile(r'href="(?P<path>/en/(?:motorhomes|campervans)/(?P<slug>[a-z0-9-]+))"')
+
+
+def find_range_paths(home_html: str) -> dict[str, str]:
+    """Every range's page, keyed by its normalised slug.
+
+    **Rediscovered rather than written in.** The slug *is* derivable from the series name
+    the API gives — `Autoquest GT` normalises to the same thing as `autoquest-gt` — which
+    is what makes this possible without a hardcoded map. Only the layout codes beneath are
+    inconsistent; see `layout_title`.
+    """
+    return {
+        _normalise(match.group("slug")): match.group("path")
+        for match in _RANGE_LINK.finditer(home_html)
+    }
+
+
+def find_layout_paths(index_html: str, range_path: str) -> list[str]:
+    """Every layout page a range's index links, in order."""
+    pattern = re.compile(rf'href="({re.escape(range_path)}/[a-z0-9-]+)"')
+    seen: dict[str, None] = {}
+    for match in pattern.finditer(index_html):
+        seen.setdefault(match.group(1), None)
+    return list(seen)
+
+
+def layout_title(page: str) -> str | None:
+    """The layout's own name, from the first accordion title.
+
+    **Matched on this rather than on the slug, because the slugs disagree with each
+    other.** Autoquest writes `aq-gt-74ds` and Whirlwind writes `ww-gt-74-ds` for the same
+    layout code, and neither prefix is derivable from the series name the API gives. The
+    page's own heading is.
+    """
+    first = _ACCORDION_TITLE.search(page)
+    return _plain(first.group("title")) or None if first else None
+
+
+def _normalise(value: str) -> str:
+    """A name reduced to the letters and digits that identify it."""
+    return re.sub(r"[^A-Za-z0-9]+", "", value).upper()
+
+
+def titles_this_layout(title: str, *, manufacturer_range: str, model: str) -> bool:
+    """Whether a page titled `title` is the layout `manufacturer_range` / `model`.
+
+    The motorhome pages are titled with the bare code — `74 DS` — and the campervan pages
+    with the whole name — `Autoquest GTV 560`. So the series name is removed if it is
+    there and what remains must equal the model exactly. An equality test rather than a
+    suffix one, because `560` is a suffix of plenty that is not it.
+    """
+    stripped = _normalise(title).removeprefix(_normalise(manufacturer_range))
+    return stripped == _normalise(model)
+
+
 #: The widest payload any Elddis could credibly carry. A 3499kg motorhome against a mass in
 #: running order the parse has taken from the wrong field would land outside this.
 _PAYLOAD_RANGE = (100, 1500)
@@ -319,7 +457,25 @@ def _reconciles(layout: ElddisLayout) -> tuple[bool, str]:
     )
 
 
-def build_extracted(layout: ElddisLayout, *, basis: str, source_url: str) -> ExtractedMotorhome:
+#: How each habitation reading is introduced. Findings for a person to type in, with the
+#: source named because these come from a different place to every other field here — the
+#: public site, not the configurator API.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heating in the page's Standard equipment",
+    "refrigeration": "the refrigeration in the page's Standard equipment",
+    "microwave": "a microwave in the page's Standard equipment",
+    "shower_toilet_separated": "the washroom as the Standard equipment describes it",
+}
+
+
+def build_extracted(
+    layout: ElddisLayout,
+    *,
+    basis: str,
+    source_url: str,
+    equipment: habitation.Equipment | None = None,
+    equipment_url: str | None = None,
+) -> ExtractedMotorhome:
     """One Elddis layout, with provenance on everything it proposes."""
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -396,6 +552,24 @@ def build_extracted(layout: ElddisLayout, *, basis: str, source_url: str) -> Ext
             record(field, f"{value}mm {label}, published in centimetres and converted")
     if layout.body_type is not None:
         record("body_type", layout.body_type_reason)
+
+    # The habitation findings, from the public site rather than the API — which carries no
+    # equipment at all. Absent where the layout's page could not be matched or read, which
+    # `collect` narrates; a missing page costs the findings, never the product.
+    if equipment is not None:
+        features = habitation.features_from(equipment.standard)
+        # Dropped as on every other adapter: the copy names beds without saying which are
+        # built in and which are made up out of the seating.
+        features.pop("bed_types", None)
+        for name, feature in features.items():
+            setattr(motorhome, name, feature.value)
+            provenance[name] = Provenance(
+                source_url=equipment_url or source_url,
+                snippet=(
+                    f"{layout.label} — {feature.note or _FEATURE_NOTES.get(name, name)}: "
+                    f"{feature.snippet!r}"
+                ),
+            )
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
@@ -455,6 +629,23 @@ def collect(
         series = [s for s in series if s.name in wanted]
         on_progress(f"limited to {len(series)} series: {', '.join(s.name for s in series)}")
 
+    # The equipment the API does not carry. One fetch for the range links, then an index
+    # and a page per layout — around twenty-five in all, which is the price of the
+    # habitation findings and is paid once per run.
+    range_paths: dict[str, str] = {}
+    home = http.fetch(f"{BASE_URL}/")
+    if home.status_code == 200:
+        range_paths = find_range_paths(
+            home.file_path.read_text(encoding="utf-8", errors="replace")
+        )
+        on_progress(f"the home page links {len(range_paths)} range page(s) for equipment")
+    else:
+        on_progress(
+            f"WARNING: {BASE_URL}/ returned {home.status_code}, so no range pages could be "
+            f"found and NO HABITATION FINDINGS will be reported this run. Every other "
+            f"field comes from the configurator API and is unaffected"
+        )
+
     results: list[ExtractedMotorhome] = []
     for entry in series:
         url = _models_url(entry.id)
@@ -476,6 +667,45 @@ def collect(
             continue
         on_progress(f"[{entry.name}] {len(layouts)} layout(s)")
 
+        # Each layout's equipment, read from the brand's own site and keyed by the title
+        # the page gives itself. Built per range so a range whose index is missing costs
+        # only its own findings.
+        equipment_pages: list[tuple[str, str, habitation.Equipment]] = []
+        range_path = range_paths.get(_normalise(entry.name))
+        if range_path is None:
+            if range_paths:
+                on_progress(
+                    f"[{entry.name}] NO EQUIPMENT PAGE: nothing on the home page links a "
+                    f"range whose slug matches {entry.name!r}, so its habitation findings "
+                    f"are not reported. Every other field is unaffected"
+                )
+        else:
+            index_response = http.fetch(f"{BASE_URL}{range_path}")
+            if index_response.status_code != 200:
+                on_progress(
+                    f"[{entry.name}] its range index returned "
+                    f"{index_response.status_code}, so no habitation findings this run"
+                )
+            else:
+                for layout_path in find_layout_paths(
+                    index_response.file_path.read_text(encoding="utf-8", errors="replace"),
+                    range_path,
+                ):
+                    layout_url = f"{BASE_URL}{layout_path}"
+                    layout_page = http.fetch(layout_url)
+                    if layout_page.status_code != 200:
+                        on_progress(
+                            f"[{entry.name}] {layout_path} returned "
+                            f"{layout_page.status_code}; skipped for equipment"
+                        )
+                        continue
+                    body = layout_page.file_path.read_text(encoding="utf-8", errors="replace")
+                    title = layout_title(body)
+                    if title is None:
+                        on_progress(f"[{entry.name}] {layout_path} names no layout; skipped")
+                        continue
+                    equipment_pages.append((title, layout_url, parse_equipment(body)))
+
         for layout in layouts:
             reconciles, basis = _reconciles(layout)
             if not reconciles:
@@ -485,7 +715,33 @@ def collect(
                 on_progress(f"[{layout.label}] WARNING: no price published, left blank")
             if layout.body_type is None:
                 on_progress(f"[{layout.label}] WARNING: {layout.body_type_reason}")
-            results.append(build_extracted(layout, basis=basis, source_url=url))
+
+            matched = next(
+                (
+                    (page_url, equipment)
+                    for title, page_url, equipment in equipment_pages
+                    if titles_this_layout(
+                        title, manufacturer_range=entry.name, model=layout.model
+                    )
+                ),
+                None,
+            )
+            if matched is None and equipment_pages:
+                on_progress(
+                    f"[{layout.label}] NO EQUIPMENT PAGE MATCHED: the range's pages are "
+                    f"titled {[title for title, _u, _e in equipment_pages]}, none of which "
+                    f"reads as this layout. Its habitation findings are not reported"
+                )
+            equipment_url, equipment = matched or (None, None)
+            results.append(
+                build_extracted(
+                    layout,
+                    basis=basis,
+                    source_url=url,
+                    equipment=equipment,
+                    equipment_url=equipment_url,
+                )
+            )
             on_progress(
                 f"[{layout.label}] read: £{layout.rrp_pounds or 0:,}, "
                 f"{layout.berths} berth, {layout.seats} seats, "

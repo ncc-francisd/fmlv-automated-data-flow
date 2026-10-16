@@ -23,11 +23,18 @@ from src.adapters.elddis import (
     MANUFACTURER_DISPLAY_NAME,
     ElddisLayout,
     _reconciles,
+    accordion_sections,
     body_type_for,
     build_extracted,
+    find_layout_paths,
+    find_range_paths,
+    layout_title,
     model_name,
+    parse_equipment,
     parse_layouts,
+    titles_this_layout,
 )
+from src.product_model.enums import Heating, Refrigeration
 from src.product_model.enums import BodyType
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -267,3 +274,132 @@ def test_the_optional_fifth_seat_is_explained(autoquest_gt: list[ElddisLayout]) 
     snippet = built.provenance["mh_passenger_seats_inc_driver"].snippet
     assert "4 seats" in snippet
     assert "5 available as an option" in snippet
+
+
+# --- the habitation findings, restored 16 October 2026 ---------------------------------
+#
+# The rebuild of 10 October moved this adapter onto the configurator API and lost the
+# findings with the old site parser. The API carries engine and mass data only, so these
+# come from the public site: a page per layout, around twenty-five extra fetches.
+
+
+def test_every_range_page_is_discoverable_from_the_home_page() -> None:
+    """The range slug *is* derivable from the API's series name, which is what makes this
+    work without a hardcoded map — `Autoquest GT` and `autoquest-gt` normalise alike."""
+    ranges = find_range_paths(_fixture("elddis_home.html"))
+    assert ranges["AUTOQUESTGT"] == "/en/motorhomes/autoquest-gt"
+    assert ranges["WHIRLWINDGTV"] == "/en/campervans/whirlwind-gtv"
+    assert len(ranges) == 6
+
+
+def test_both_product_areas_are_matched() -> None:
+    """GT and GTS are under `/motorhomes/`, GTV under `/campervans/`."""
+    paths = set(find_range_paths(_fixture("elddis_home.html")).values())
+    assert any("/motorhomes/" in path for path in paths)
+    assert any("/campervans/" in path for path in paths)
+
+
+def test_a_range_index_lists_its_layouts() -> None:
+    paths = find_layout_paths(
+        _fixture("elddis_autoquest_gt_index.html"), "/en/motorhomes/autoquest-gt"
+    )
+    assert paths == [
+        "/en/motorhomes/autoquest-gt/aq-gt-70ds",
+        "/en/motorhomes/autoquest-gt/aq-gt-74di",
+        "/en/motorhomes/autoquest-gt/aq-gt-74ds",
+    ]
+
+
+def test_a_layout_page_names_itself() -> None:
+    """Matched on this rather than the slug, because the slugs disagree: Autoquest writes
+    `aq-gt-74ds` and Whirlwind `ww-gt-74-ds` for the same layout code."""
+    assert layout_title(_fixture("elddis_aq_gt_74ds.html")) == "74 DS"
+    assert layout_title(_fixture("elddis_aq_gtv_560.html")) == "Autoquest GTV 560"
+
+
+def test_both_title_formats_match_their_layout() -> None:
+    """A motorhome page is titled with the bare code, a campervan page with the whole
+    name, so the series is stripped and what remains must equal the model exactly."""
+    assert titles_this_layout("74 DS", manufacturer_range="Autoquest GT", model="74 DS")
+    assert titles_this_layout(
+        "Autoquest GTV 560", manufacturer_range="Autoquest GTV", model="560"
+    )
+
+
+def test_a_title_is_not_matched_on_a_suffix() -> None:
+    """`560` is a suffix of plenty that is not it — the test is equality, not endswith."""
+    assert not titles_this_layout(
+        "Autoquest GTV 560", manufacturer_range="Autoquest GTV", model="60"
+    )
+    assert not titles_this_layout("74 DS", manufacturer_range="Autoquest GT", model="74 DI")
+
+
+def test_the_accordion_has_exactly_three_sections() -> None:
+    sections = accordion_sections(_fixture("elddis_aq_gt_74ds.html"))
+    assert list(sections) == ["74 DS", "Standard equipment", "Optional equipment"]
+
+
+def test_the_technical_data_table_is_not_read_as_equipment() -> None:
+    """The page's first section holds `Price (incl. VAT)` and `Standard chassis` as table
+    cells. A section counts as standard **because its title says so**, not because it
+    failed to say `Optional` — otherwise a price lands in the habitation findings."""
+    equipment = parse_equipment(_fixture("elddis_aq_gt_74ds.html"))
+    joined = " ".join(equipment.standard)
+    assert "Price (incl. VAT)" not in joined
+    assert "Fiat Ducato Light Low Platform" not in joined
+
+
+def test_the_phrase_in_the_legal_boilerplate_is_not_a_heading() -> None:
+    """Every page explains what a mass in running order includes, using the words
+    "standard equipment" in prose."""
+    page = _fixture("elddis_aq_gt_74ds.html")
+    assert page.lower().count("standard equipment") > 1
+    assert len(accordion_sections(page)) == 3
+
+
+def test_an_upgrade_is_not_read_as_equipment() -> None:
+    equipment = parse_equipment(_fixture("elddis_aq_gt_74ds.html"))
+    assert any("Bike rack" in item for item in equipment.optional)
+    assert not any("Bike rack" in item for item in equipment.standard)
+    assert any("5th seat with seat belt" in item for item in equipment.optional)
+
+
+def test_the_findings_reach_the_product_with_their_source_quoted() -> None:
+    layout = ElddisLayout(
+        manufacturer_range="Autoquest GT", model="74 DS",
+        mtplm_kilograms=3499, mro_kilograms=2900,
+    )
+    built = build_extracted(
+        layout,
+        basis="the two masses",
+        source_url="http://api",
+        equipment=parse_equipment(_fixture("elddis_aq_gt_74ds.html")),
+        equipment_url="http://site/aq-gt-74ds",
+    )
+    assert built.motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
+    assert built.motorhome.heating is Heating.BLOWN_AIR
+    assert built.motorhome.shower_toilet_separated is True
+    assert "separate freezer compartment" in built.provenance["refrigeration"].snippet
+    # The findings come from the site, every other field from the API.
+    assert built.provenance["refrigeration"].source_url == "http://site/aq-gt-74ds"
+
+
+def test_bed_types_are_dropped_as_everywhere_else() -> None:
+    built = build_extracted(
+        ElddisLayout(manufacturer_range="Autoquest GT", model="74 DS"),
+        basis="b", source_url="http://api",
+        equipment=parse_equipment(_fixture("elddis_aq_gt_74ds.html")),
+    )
+    assert "bed_types" not in built.provenance
+
+
+def test_a_layout_with_no_equipment_page_still_builds() -> None:
+    """A missing page costs the findings, never the product — every other field comes
+    from the API and is unaffected."""
+    built = build_extracted(
+        ElddisLayout(manufacturer_range="Autoquest GT", model="74 DS", berths=5),
+        basis="b", source_url="http://api",
+    )
+    assert built.motorhome.berths == 5
+    assert built.motorhome.heating is None
+    assert "heating" not in built.provenance
