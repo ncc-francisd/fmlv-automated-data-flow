@@ -91,6 +91,7 @@ __all__ = [
     "BASE_URL",
     "EXPECTED_PRODUCTS",
     "KNOWN_BERTHS",
+    "KNOWN_MASSES",
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
     "MICRO_CARAVAN_CEILING_KG",
@@ -134,6 +135,40 @@ RANGE_PATHS: dict[str, str] = {
 
 #: How the manufacturer spells a range where that differs from FMLV, for the provenance.
 MANUFACTURER_SPELLING: dict[str, str] = {"DreamSeeker": "Dreamseeker"}
+
+#: Masses for a range whose fetched brochure contradicts itself, settled by the requester
+#: on 16 October 2026.
+#:
+#: **Only the INOS needs this, and only for its three masses.** Fifth Wheel Co publish it
+#: three times over and the figures disagree:
+#:
+#: | source | unit | payload | MTPLM | adds up |
+#: |---|---|---|---|---|
+#: | the brochure their email form sends | 2,400 | 400 | 2,800 | **yes** |
+#: | the brochure their site links | 2,600 | 1,000 | 2,800 or 3,500 | **no — 3,600** |
+#: | the range page | 2,500 | up to 1,000 | from 2,800 to 3,500 | yes, at 3,500 |
+#:
+#: The requester's ruling: *"the one that is in the brochure and matches FMLV should be the
+#: one that we go with. It is defendable, it's in the brochure as well … it's the fact that
+#: it adds up where the other one doesn't that sways me."* So the normal protocol — take
+#: what the manufacturer publishes now — gives way to the arithmetic, and the figures are
+#: still a brochure's rather than anyone's invention.
+#:
+#: **The fetched brochure is preferred whenever its own sums work**, so this retires itself
+#: the day Fifth Wheel Co fix their document. Its dimensions are already identical to the
+#: emailed one and are always read from the fetch; only the masses come from here.
+KNOWN_MASSES: dict[str, tuple[int, int, int, str]] = {
+    "INOS": (
+        2400,
+        400,
+        2800,
+        "from the brochure Fifth Wheel Co send by email, which reconciles — 2,400kg unit "
+        "weight plus 400kg payload is the 2,800kg MTPLM exactly, and is what FMLV holds. "
+        "THE BROCHURE THEIR SITE LINKS DISAGREES and does not add up: it gives 2,600kg, "
+        "1,000kg and 2,800kg, which is 3,600kg. Settled by the requester 16 October 2026 "
+        "on the arithmetic. Ask Fifth Wheel Co to reconcile their own documents",
+    ),
+}
 
 #: A berth count the brochure does not state as a figure, settled by the requester.
 #:
@@ -304,8 +339,37 @@ class Brochure:
     def label(self) -> str:
         return self.manufacturer_range
 
+    #: Set where the brochure's own masses do not reconcile and `KNOWN_MASSES` supplies
+    #: them instead, so the provenance can say which document a figure came from.
+    masses_overridden: bool = False
+
+    def published_figure(self, field_name: str) -> int | None:
+        """What **this document** gives for an FMLV field, ignoring any override.
+
+        `_reconciles` tests these rather than `figure`, so that it says the same thing
+        however many times it is called — checking the overridden masses would find they
+        reconcile, because they were chosen for it.
+        """
+        for label, mapped in RECORDED_LABELS.items():
+            if mapped != field_name or label not in self.specification:
+                continue
+            value = self.specification[label]
+            return (
+                _kilograms(value) if field_name.endswith("kilograms") else _millimetres(value)
+            )
+        return None
+
     def figure(self, field_name: str) -> int | None:
         """The figure this brochure publishes for an FMLV field, or `None`."""
+        if self.masses_overridden and (known := KNOWN_MASSES.get(self.manufacturer_range)):
+            mro, payload, mtplm, _basis = known
+            override = {
+                "mro_kilograms": mro,
+                "personal_effects_payload_kilograms": payload,
+                "mtplm_kilograms": mtplm,
+            }
+            if field_name in override:
+                return override[field_name]
         for label, mapped in RECORDED_LABELS.items():
             if mapped != field_name or label not in self.specification:
                 continue
@@ -412,20 +476,29 @@ def _reconciles(brochure: Brochure) -> tuple[bool, str]:
             "no specification table could be read from this brochure — its label and "
             "value columns did not pair, so the layout has changed"
         )
-    mro = brochure.figure("mro_kilograms")
-    payload = brochure.figure("personal_effects_payload_kilograms")
-    mtplm = brochure.figure("mtplm_kilograms")
+    mro = brochure.published_figure("mro_kilograms")
+    payload = brochure.published_figure("personal_effects_payload_kilograms")
+    mtplm = brochure.published_figure("mtplm_kilograms")
     if mro is None or payload is None or mtplm is None:
         return False, (
             f"the brochure does not give all three masses — read unit weight {mro!r}, "
             f"payload {payload!r} and MTPLM {mtplm!r}"
         )
     if mro + payload != mtplm:
-        return False, (
-            f"the brochure's own arithmetic does not close: {mro}kg unit weight plus "
-            f"{payload}kg payload is {mro + payload}kg, against an MTPLM of {mtplm}kg. "
-            f"Nothing is recorded from a document that contradicts itself — ask Fifth "
-            f"Wheel Co which figure is right"
+        known = KNOWN_MASSES.get(brochure.manufacturer_range)
+        if known is None:
+            return False, (
+                f"the brochure's own arithmetic does not close: {mro}kg unit weight plus "
+                f"{payload}kg payload is {mro + payload}kg, against an MTPLM of {mtplm}kg. "
+                f"Nothing is recorded from a document that contradicts itself — ask Fifth "
+                f"Wheel Co which figure is right"
+            )
+        brochure.masses_overridden = True
+        _mro, _payload, _mtplm, basis = known
+        return True, (
+            f"the fetched brochure's own arithmetic does NOT close — {mro}kg plus "
+            f"{payload}kg is {mro + payload}kg against an MTPLM of {mtplm}kg — so its "
+            f"masses are not used. Recorded instead: {basis}"
         )
     return True, (
         f"{mro}kg + {payload}kg = {mtplm}kg, the brochure's own published arithmetic"

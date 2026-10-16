@@ -154,12 +154,13 @@ the form three times and, as it turns out, did not need to.
 baseline    3 products
 scraped     3 products
 classified  0 changed, 3 unchanged, 0 new, 0 disappeared
-proposed    16 changes, of which 3 are year bumps
-verified    27 fields checked and unchanged
+proposed    6 changes, of which 3 are year bumps
+verified    39 fields checked and unchanged
+findings    3 habitation readings
 ```
 
 **Nothing is proposed but the year**, which is the right answer: FMLV already holds all
-three correctly, and 27 fields were confirmed against the manufacturer's own brochures.
+three correctly, and 39 fields were confirmed against the manufacturer's own brochures.
 
 ## The INOS is published three times, and only two of the three add up
 
@@ -171,14 +172,24 @@ The finding that shaped the adapter.
 | the brochure the site links | 2,600 | 1,000 | 2,800 or 3,500 | **no — 3,600** |
 | the range page itself | 2,500 | up to 1,000 | from 2,800 to 3,500 | yes, at 3,500 |
 
-FMLV holds the emailed brochure's figures. The site's brochure **contradicts itself**, so
-`_reconciles` refuses it and the INOS records nothing — the check earning its keep rather
-than a special case written for one range.
+**Settled by the requester on 16 October 2026, on the arithmetic**: *"the one that is in
+the brochure and matches FMLV should be the one that we go with. It is defendable, it's in
+the brochure as well … it's the fact that it adds up where the other one doesn't that sways
+me."*
 
-**It is still emitted for its identity**, with no figures and no provenance beyond the
-range name. All three are live products, so collecting nothing would report the INOS as
-disappeared and invite a reviewer to deactivate a caravan that is still sold. A false
-disappearance is worse than a missing figure.
+So the normal protocol — record what the manufacturer publishes now — gives way here, and
+`KNOWN_MASSES` carries the emailed brochure's three figures. They are still a brochure's
+rather than anyone's invention, and the provenance names both documents so a reviewer sees
+exactly which was preferred and why.
+
+**Only the three masses are overridden.** The two INOS brochures agree on every dimension,
+so length, width, height and headroom are always read from the fetched document. And **the
+fetch is preferred whenever its own sums work**, so this retires itself the day Fifth Wheel
+Co fix their file.
+
+`_reconciles` tests the document's *own* masses rather than the overridden ones — which
+were chosen because they reconcile, so checking those would always pass and the check would
+say something different the second time it ran.
 
 ## Three parsing traps, all of which cost the whole table
 
@@ -237,6 +248,13 @@ beds, so a four berth"* — which is what FMLV already holds.
 settled rules do not derive a berth figure from furniture and one confirmed answer is no
 reason to teach every adapter to try. **A brochure that starts stating a count is preferred
 over it**, so the written-down figure retires itself. The provenance names its source.
+
+## All three ranges publish their floorplans
+
+Each range page carries a DAY and a NIGHT drawing per layout variant — `INOS-Day.png`,
+`DS20-Night.png`, and both `CR20` and `U-Shape` on the Celtic Rambler, which is the only
+range with two. They are offered as a reviewer pointer on every positional habitation field
+still unanswered, since those can only be read off a drawing by a person.
 
 ## To ask Fifth Wheel Co
 

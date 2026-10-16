@@ -19,6 +19,7 @@ import pytest
 from src.adapters.fifth_wheel import (
     EXPECTED_PRODUCTS,
     KNOWN_BERTHS,
+    KNOWN_MASSES,
     MANUFACTURER,
     MANUFACTURER_DISPLAY_NAME,
     MANUFACTURER_SPELLING,
@@ -189,13 +190,47 @@ def test_the_emailed_inos_reconciles_and_is_what_fmlv_holds(inos_emailed: Brochu
     assert built.caravan.mtplm_kilograms == 2800
 
 
-def test_the_site_inos_contradicts_itself_and_is_refused(inos_site: Brochure) -> None:
-    """2,600 + 1,000 is 3,600 against an MTPLM of 2,800. Nothing is recorded from a
-    document that disagrees with itself."""
+def test_the_site_inos_masses_give_way_to_the_ones_that_add_up(inos_site: Brochure) -> None:
+    """2,600 + 1,000 is 3,600 against an MTPLM of 2,800, so the fetched brochure's masses
+    are not used. The requester settled it on the arithmetic, 16 October 2026: the figures
+    recorded are the emailed brochure's, which reconcile and are what FMLV holds."""
     ok, basis = _reconciles(inos_site)
+    assert ok is True
+    assert "does NOT close" in basis
+    assert inos_site.masses_overridden is True
+    assert inos_site.figure("mro_kilograms") == 2400
+    assert inos_site.figure("personal_effects_payload_kilograms") == 400
+    assert inos_site.figure("mtplm_kilograms") == 2800
+
+
+def test_the_overridden_masses_say_which_document_they_came_from(inos_site: Brochure) -> None:
+    ok, basis = _reconciles(inos_site)
+    assert ok
+    built = build_extracted(inos_site, basis=basis)
+    snippet = built.provenance["mro_kilograms"].snippet
+    assert "send by email" in snippet
+    assert "does not add up" in snippet
+
+
+def test_the_dimensions_still_come_from_the_fetched_brochure(inos_site: Brochure) -> None:
+    """Only the masses are overridden — the two INOS brochures agree on every dimension."""
+    _ok, basis = _reconciles(inos_site)
+    built = build_extracted(inos_site, basis=basis)
+    assert built.caravan.exterior_body_length_mm == 7000
+    assert built.caravan.shipping_length_mm == 8200
+    assert built.caravan.overall_width_mm == 2300
+
+
+def test_a_range_with_no_written_down_masses_is_still_refused() -> None:
+    """The override is one manufacturer's confirmed answer, not a licence to accept any
+    document that contradicts itself."""
+    broken = Brochure(manufacturer_range="Celtic Rambler", url="http://x")
+    broken.specification = {
+        "unit weight": "3,300kg", "payload": "1,000kg", "mtplm": "9,999kg",
+    }
+    ok, basis = _reconciles(broken)
     assert ok is False
     assert "does not close" in basis
-    assert "3600kg" in basis
 
 
 def test_the_two_inos_brochures_really_do_disagree(
@@ -309,3 +344,12 @@ def test_an_answered_field_gets_no_floorplan_pointer(celtic: Brochure) -> None:
     built = build_extracted(celtic, basis="b")
     assert built.caravan.berths == 4
     assert not built.provenance["berths"].source_url.endswith("#layout")
+
+
+def test_the_self_check_says_the_same_thing_twice(inos_site: Brochure) -> None:
+    """It tests the document's own masses, not the overridden ones — which were chosen
+    because they reconcile, so checking those would always pass."""
+    first = _reconciles(inos_site)
+    second = _reconciles(inos_site)
+    assert first == second
+    assert "does NOT close" in second[1]
