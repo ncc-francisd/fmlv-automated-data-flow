@@ -121,6 +121,79 @@ Four live products are each about £21,000 adrift.
 It would propose **nothing** for the mass in running order or the payload, which the 2027
 brochures put at `TBC`.
 
+---
+
+# Built — 16 October 2026
+
+`src/adapters/rp_motorhomes.py`, **NCC id 258**. Four fetches: a range page and its 2027
+brochure, twice over.
+
+## Run #188 — the first one
+
+```
+baseline    4 products
+scraped     4 products
+classified  4 changed, 0 unchanged, 0 new, 0 disappeared
+proposed    30 changes, of which 4 are year bumps
+verified    26 fields checked and unchanged
+```
+
+**Six real corrections, and four of them are the prices:**
+
+| | FMLV held | 2027 brochure | |
+|---|---|---|---|
+| Rebel RWD | 126,000 | **147,000** | +21,000 |
+| Rebel AWD | 134,000 | **155,000** | +21,000 |
+| Rebellion RWD | 136,000 | **157,000** | +21,000 |
+| Rebellion AWD | 148,000 | **170,000** | +22,000 |
+
+**£85,000 of price correction across four products**, which is the largest any adapter
+here has delivered on a first run.
+
+The other two are heights, both on the AWDs: **Rebel AWD 2990 → 2900** and **Rebellion AWD
+3170 → 3180**. Both are 2026 figures meeting a 2027 drawing, so a change is expected — but
+the 90mm move is worth a reviewer's eye rather than a nod.
+
+## Reading the drawing, never the tile
+
+The one thing this adapter has to get right. Each dimension is published twice and the
+tiles are wrong: the Rebel's read `5.9m` and `7.0m` where **both** its drawings say
+`5932 mm`, and FMLV holds 5932 for both. The `7.0m` looks copied from the Rebellion page.
+
+So nothing is read from the tiles except the **GVW**, which they give cleanly on a line of
+their own and the drawings do not give at all.
+
+The drawing's six figures are assigned without trusting their order:
+
+* the **widths** by size — 2020mm body against 2345mm across the mirrors, and the settled
+  rule takes the body;
+* the **heights** by magnitude, because an all-wheel-drive Sprinter sits higher on the same
+  body. Position could not be trusted: the captions beneath the drawings run AWD first and
+  then RWD, the reverse of the figures above them;
+* the **length** only where both drawings agree. They do on both ranges; if one ever gave
+  two there would be nothing to say which belonged to which model, since the tiles have
+  already been shown wrong.
+
+## Four fields deliberately not proposed
+
+* **The payload**, which reads `TBC*` on every model, footnoted *"Payload is affected by
+  additional habitation options"*.
+* **The mass in running order**, which neither brochure publishes anywhere — only the GVW.
+* **The berths and the seats.** The tiles state them as bare digits that run into the
+  figure beside them in the extracted text — `2.9m2 2` — so neither reads reliably. FMLV
+  holds 2 and 2 on all four and they carry through.
+
+With no payload and no running-order mass there is **no arithmetic self-check**, so the
+check here is structural: a price above what any option on the page costs, a GVW inside the
+band a Sprinter is plated in, and a body width narrower than the figure across the mirrors.
+
+## The Rebel Raid is reported, not collected
+
+`Special Edition Rebel Raid - £199,995`, found and priced on every run. A named edition is
+a product under the settled rule and FMLV does not hold it — but pages 24 to 26 carry no
+technical figures at all, so every required field would be inferred from the Rebel AWD.
+The run names it and asks for its data instead of creating a product with guessed masses.
+
 ## To ask RP Motorhomes
 
 1. **The payload and the mass in running order** for all four, which read `TBC` throughout.
