@@ -1360,6 +1360,20 @@ Two practical consequences, from the NCC side on 19 August 2026:
 > wrong?"** — here, that the Evolve figures are a different vehicle's, and that every
 > non-Evolve range agrees between the two sources exactly. Diverge from a rule only with
 > that kind of evidence, and write it down where the next person will see it.
+>
+> **A second exception on the same test, Fifth Wheel Co, 16 October 2026.** Their INOS is
+> published three times with three unit weights: 2,400kg in the brochure their email form
+> sends, 2,600kg in the brochure their site links, and 2,500kg on the range page itself.
+> The site's brochure **fails its own arithmetic** — 2,600 plus a 1,000kg payload is 3,600
+> against an MTPLM of 2,800 — while the emailed one reconciles exactly and matches what
+> FMLV holds. The requester: *"it's the fact that it adds up where the other one doesn't
+> that sways me."*
+>
+> So where published figures conflict, **a set that reconciles beats a set that is merely
+> newer**, and that is the same test rather than a different one: the arithmetic is how you
+> show one of them is wrong. `fifth_wheel.KNOWN_MASSES` carries the sound figures, names
+> both documents in the provenance, and defers to the fetched brochure the moment its own
+> sums work — so the override retires itself rather than outliving the fault.
 
 Where a site and its downloadable documents disagree, **the site wins**. A PDF is usually the
 last thing on a website to be updated, so a price list can be a model year behind the pages
