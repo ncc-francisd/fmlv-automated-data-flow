@@ -2109,6 +2109,18 @@ itself sits unauthenticated on a public asset path — no token, no cookie. The 
 a front door, not a lock. A web search for the filename found it in a minute. Try that
 before anything else; a gated-looking document may not be gated at all.
 
+**On a Squarespace site, look in the page's own markup first — no search needed.** Twice
+on 16 October 2026, with Fifth Wheel Co and RP Motorhomes, the page offering a brochure
+behind an email form **also carried the PDF's own `/s/…pdf` path in its HTML**, and
+fetching that served the document. Both adapters now rediscover the link per run and need
+no stored copy and no manual step. One requester had filled the form in three times before
+this was checked, so it is worth checking first.
+
+One caution learned the same day: **the form and the site can serve different revisions.**
+Fifth Wheel Co's emailed INOS brochure and the one their site links disagree on three
+masses, and only the emailed one adds up. Where both are to hand, check them against each
+other — see the exception recorded above under "The website overrules the PDF".
+
 **If it really is gated, use Ben's details.** `config/reviewers.csv` holds them, and
 there is standing permission to submit them to a manufacturer's catalogue or brochure
 request form. This is what the form is for: a real person at the NCC asking a
