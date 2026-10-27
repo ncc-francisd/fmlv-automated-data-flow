@@ -115,3 +115,95 @@ error the manufacturer's own brochure contradicts.
    FMLV has figures but nothing can confirm them, and the new Commerce Pro has none.
 2. **The PHEV and the Sports Edition** have pages but no FMLV rows. The Sports Edition
    states no price at all, so it may be an upgrade pack rather than a product.
+
+---
+
+# Rebuilt — 27 October 2026
+
+Bespoke replaced their website and their range at once. The old adapter read three model
+pages and a price leaflet; **all three now return 404**, and the failure was silent — it
+fell back on hardcoded variant names, collected nine products with no price, and reported
+*"9 collected, expected 9"*. A passing count check over a roster that no longer existed.
+
+## The new source is the site's own API
+
+```
+/wp-json/wp/v2/bl_range   → VW Transporter, VW Crafter
+/wp-json/wp/v2/bl_model   → Explore 4, Explore 4 Hybrid, Explore 5, Explore 5 Hybrid,
+                            Crafter Edition
+```
+
+Two fetches, structured JSON, no browser and no PDF. Each model carries an `acf` block
+with its berths, travel seats, toilet and shower, the equipment prose, and paths to its
+floorplans and its exterior photograph.
+
+## Run #190
+
+```
+baseline    8 products
+scraped     5 products
+classified  0 changed, 0 unchanged, 5 new, 8 disappeared
+findings    12 habitation readings
+```
+
+**The range changed, not just the website**, and the disappearances divide:
+
+| | base vehicle | |
+|---|---|---|
+| Explore Custom ×3 | **Ford** | genuinely withdrawn — Ford is gone from the line-up |
+| Explore Transporter ×2, Edition 2 ×2, Edition 4 | VW | five VW products replaced by five new VW models |
+
+So the five VW rows are very likely **succeeded** rather than withdrawn, but nothing can
+evidence it: the settled test for a rename is a shared mass in running order, and the new
+models publish none. The names are far too different to match on, so the run reports them
+as new and disappeared, correctly, and the judgement is the requester's.
+
+**Worth knowing when he makes it:** the eight old rows hold the masses and dimensions the
+five new ones lack.
+
+| | Explore 4 / 5 | Crafter Edition |
+|---|---|---|
+| berths | 4 | 2 |
+| travel seats | 4 / 5 | `Up to 4` — refused |
+| toilet | portable | built in |
+| shower | external | internal and external |
+
+## Four fields are published nowhere, and only one of them is a loss
+
+**No price.** The leaflet was the only source and it is gone. The site's other £ figures
+are `bl_stock_item` listings — individual vans with a registration, which is a fact about
+one vehicle and not about the model.
+
+**No mass of any kind**, and there never was: not a payload, gross vehicle weight, kerb
+weight, MiRO or MTPLM, on any page or in any document, old site or new.
+
+**No dimension — this one is a loss.** The old pages stated `Explore Length 5.05m` and a
+height of `1.98m`, which is where FMLV's 5050 and 1980 came from. The new site states no
+vehicle length, width or height anywhere; the ACF fields exist and are empty, and the only
+measurements left in the copy are bed sizes and an awning.
+
+**No body type**, because it needs a height. The requester reads it off the photographs
+instead (27 October 2026), so each product carries a pointer at its own exterior image.
+The pop-top that would otherwise settle it is ambiguous — listed under an `Optional`
+column on the Explore 5 and in marketing copy on the Explore 4.
+
+## Two judgements this adapter makes, both worth confirming
+
+**The identity split is its own.** All five are new products, so the rule that the export
+decides the identity strings has nothing to decide from. `IDENTITY` reads Bespoke's own
+naming as an `Explore` family with a variant, and the Crafter Edition as a single name
+carried twice. Confirm it on the first run: changing it later is a rename.
+
+**`Up to 4` is not a seat count.** The Crafter Edition states it, and the settled rule
+makes a "permitted" or "up to" figure a type-approval ceiling rather than the belts fitted
+as standard — FMLV already files the two Edition rows as 2 seats and 4.
+
+## Still to ask Bespoke
+
+Shane, `shane@bespokeni.com`, 02825 649494:
+
+1. **Prices** for the five.
+2. **Masses** — they have never published any.
+3. **Dimensions**, which the old site stated and the new one does not.
+4. **Whether the five new models succeed the five old VW ones**, which would let the
+   existing masses and dimensions carry across rather than be asked for twice.

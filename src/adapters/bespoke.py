@@ -1,61 +1,92 @@
-"""Bespoke NI (bespokeleisure.co.uk) — campervans converted in Ballymena.
+"""Bespoke (bespokeleisure.co.uk) — campervans converted in Ballymena.
 
-See `docs/adapters/bespoke.md` for the survey. **Deliberately a partial adapter**, and the
-reason is worth stating at the top: Bespoke publish **no mass of any kind**. Six model
-pages and three PDFs were searched and there is not one `kg` figure, nor the words
-payload, gross vehicle weight, kerb weight, MIRO or MTPLM. FMLV holds MRO and MTPLM for
-all eight of its rows, so the figures exist — they are simply not published, and this
-adapter emits nothing for them rather than disturbing good data.
+See `docs/adapters/bespoke.md` for the survey. **Rebuilt 27 October 2026**, because Bespoke
+replaced both their website and their range.
 
-**Two halves, and only one of them is strong.**
+## What changed, and why the old adapter had to go
 
-* The **Explore** is sold on the VW Transporter T7 and the Ford Transit Custom, and the
-  leaflet linked from its pages carries a real base-vehicle price table — six variants,
-  each with an engine, a gearbox and a price. That is the roster and the price source, and
-  it is rediscovered every run rather than hardcoded.
-* The **Edition** is the VW Crafter, and its page states **one** on-the-road price for
-  what FMLV holds as three products. One price cannot be attributed to three variants, so
-  the three are collected by **identity alone**: no price, no dimensions, nothing proposed.
-  That claims their FMLV rows so a run cannot report them missing from the site, which is
-  the Carthago lesson — see `docs/adapters/README.md`.
+The old one read three model pages and a price leaflet. All three pages now return **404**
+and the leaflet with them, and the failure was silent: the adapter fell back on hardcoded
+variant names, collected nine products with no price, and reported *"9 collected, expected
+9"* — a passing count check over a roster that no longer exists. That is the fault
+`docs/adapters/README.md` warns about, and it is why nothing here is hardcoded except the
+identity split.
 
-**What is read from the pages, and what is deliberately not.** The Explore pages state
-`Explore Length 5.05m`, a height of `1.98m` and `Explore Width 2.27m`. The first two match
-FMLV's 5050 and 1980 exactly and are emitted. **The width is not**: 2.27 m is 2270 mm
-against FMLV's 2032, which is the body width — 2270 is across the mirrors, and the rule
-in `docs/adapters/README.md` is that width excludes them.
+The range changed at the same time. FMLV holds **eight** products on three base vehicles;
+Bespoke now sell **five**, all Volkswagen — the Ford Transit Custom is gone entirely.
 
-**The self-check** is that two independent documents state the same thing: the leaflet's
-price table names the engine and gearbox of every variant, and the model pages state the
-headline prices for their own base vehicle. `price_disagreements` reports where the two
-differ.
+## The source is WordPress, and it is structured
+
+The new site exposes its own content types, which is a far better source than the prose it
+replaced:
+
+```
+/wp-json/wp/v2/bl_range   → VW Transporter, VW Crafter
+/wp-json/wp/v2/bl_model   → Explore 4, Explore 4 Hybrid, Explore 5, Explore 5 Hybrid,
+                            Crafter Edition
+```
+
+Each model carries an `acf` block with `model_berths`, `model_travel_seats`,
+`model_toilet`, `model_shower`, `model_hot_water`, the equipment prose, and paths to its
+day and night floorplans and its exterior photograph.
+
+## Four fields are published nowhere, and three of them were never published
+
+**No price.** The leaflet was the only price source and it is gone. The only £ figures on
+the site are `bl_stock_item` listings — individual vehicles with a registration, which is a
+fact about one van and not about the model.
+
+**No mass of any kind.** Bespoke have never published one: not a payload, a gross vehicle
+weight, a kerb weight, an MiRO or an MTPLM, on any page or in any document. FMLV's figures
+came from elsewhere and carry through untouched.
+
+**No dimension.** This one *is* a loss. The old pages stated `Explore Length 5.05m` and a
+height of `1.98m`, which is where FMLV's 5050 and 1980 came from. The new site states no
+vehicle length, width or height anywhere — the ACF fields for them exist and are empty, and
+the only measurements left in the copy are bed sizes and an awning.
+
+**No body type.** It needs a height, and there is none. The requester reads it off the
+photographs instead (27 October 2026), so `collect` points him at them rather than guessing
+— and the pop-top that would otherwise settle it is ambiguous, appearing under an
+`Optional` column on one model and in marketing copy on another.
+
+## The identity split is this adapter's own choice, and a reviewer should confirm it
+
+All five are **new** products, so there is no FMLV row whose strings to follow — the rule
+to let the export decide cannot apply where the export holds nothing. `IDENTITY` therefore
+carries a deliberate reading of Bespoke's own naming, and the run says so.
 """
 
 from __future__ import annotations
 
-import html as htmllib
-import re
-from collections.abc import Callable
-from dataclasses import dataclass
+import json
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from ..fetch.http import Fetcher
-from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
+from . import habitation
+from .base import ExtractedMotorhome, Provenance, floorplan_provenance, fmlv_base_vehicle
 
 __all__ = [
     "BASE_URL",
-    "EDITION",
     "EXPECTED_PRODUCTS",
-    "EXPLORE",
+    "IDENTITY",
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
-    "BespokeExplore",
+    "MODELS_URL",
+    "RANGES_URL",
+    "SEAT_CEILING",
+    "BespokeModel",
+    "build_extracted",
     "collect",
-    "leaflet_url",
-    "parse_explore_prices",
-    "price_disagreements",
+    "equipment_lines",
+    "identity_for",
+    "parse_models",
+    "parse_ranges",
+    "seats_from",
 ]
 
 BASE_URL = "https://bespokeleisure.co.uk"
@@ -65,346 +96,397 @@ BASE_URL = "https://bespokeleisure.co.uk"
 MANUFACTURER = "Bespoke NI"
 MANUFACTURER_DISPLAY_NAME = "Bespoke"
 
-#: Six Explore variants from the leaflet's price table, plus the three Edition products
-#: FMLV holds. The Explore count is Bespoke's own: their price table lists six.
-EXPECTED_PRODUCTS = 9
+#: WordPress serves both content types without authentication. `per_page` is set high
+#: enough that a growing range still arrives in one response.
+MODELS_URL = f"{BASE_URL}/wp-json/wp/v2/bl_model?per_page=100"
+RANGES_URL = f"{BASE_URL}/wp-json/wp/v2/bl_range?per_page=100"
 
-#: Pages that link the Explore leaflet. More than one, because the leaflet is the roster
-#: and losing it loses two thirds of the range — if Bespoke drop it from one page the next
-#: is tried before the run gives up.
-EXPLORE_PAGES: tuple[str, ...] = (
-    "/new-vw-transporter-campervan/",
-    "/ford-transit-custom-campervan-conversion/",
-    "/bespoke-explore-ford-tourneo-custom/",
-)
+#: Five models as of 27 October 2026. Compared against what the API returns so a model
+#: added or withdrawn is announced rather than passing unnoticed — which is exactly how
+#: the previous adapter went wrong.
+EXPECTED_PRODUCTS = 5
 
-#: The leaflet, whose upload folder carries the month it was issued
-#: (`/wp-content/uploads/2026/02/`). **Never hardcode that path** — it moves every time
-#: Bespoke reissue, and the point of rediscovering it is to follow the current one.
-_LEAFLET_HREF = re.compile(
-    r'["\'](?P<url>https?://[^"\']*Bespoke-Explore-Leaflet[^"\']*\.pdf)["\']', re.I
-)
+#: `Up to 4` on the Crafter Edition. A ceiling rather than a fitment, so it is **not
+#: recorded** — the Bürstner rule, which is in `docs/adapters/README.md`: a "permitted" or
+#: "up to" seat count is a type-approval maximum and FMLV holds the belted seats fitted as
+#: standard. FMLV already files the two Edition rows as 2 seats and 4.
+SEAT_CEILING = ("up to", "maximum", "max")
 
-#: One row of the leaflet's `Choose your vehicle base` table:
+#: How each model's name splits into FMLV's range and model columns.
 #:
-#:     Ford Custom Trend 110PS 6 speed manual   £60,995
+#: **This adapter's own choice, deliberately.** All five are new products, so the settled
+#: rule that the export decides the identity strings has nothing to decide from. The split
+#: follows Bespoke's own naming — an `Explore` family with a variant, and the Crafter
+#: Edition as a single name carried twice because Nova will not take a blank.
 #:
-#: The table prints Ford on the left and VW on the right, so two variants share a line and
-#: the pattern is run over the whole document rather than line by line.
-_PRICE_ROW = re.compile(
-    r"(?P<label>(?:Ford|VW)[A-Za-z0-9 ]*?\d{3}\s*PS[A-Za-z0-9 ]*?)\s*£\s*(?P<price>[\d,]+)",
-    re.I,
+#: A reviewer should confirm it on the first run; changing it later is a rename, which is
+#: the one edit that can corrupt a product's identity.
+IDENTITY: dict[str, tuple[str, str]] = {
+    "Explore 4": ("Explore", "4"),
+    "Explore 4 Hybrid": ("Explore", "4 Hybrid"),
+    "Explore 5": ("Explore", "5"),
+    "Explore 5 Hybrid": ("Explore", "5 Hybrid"),
+    "Crafter Edition": ("Crafter Edition", "Crafter Edition"),
+}
+
+#: The ACF fields carrying equipment prose. `model_spec_conversion_interior` is the
+#: conversion's own kit and `model_spec_base_interior` the base vehicle's; `model_benefits`
+#: is the headline list. Each is a newline-separated block.
+_EQUIPMENT_FIELDS = (
+    "model_benefits",
+    "model_spec_conversion_interior",
+    "model_spec_conversion_exterior",
+    "model_spec_conversion_other",
+    "model_spec_base_interior",
 )
 
-#: A headline price on a model page, for the cross-check in `price_disagreements`.
-_PAGE_PRICE = re.compile(r"£\s*(?P<price>\d{2},\d{3})")
-
-#: Every Explore is this long and this tall, stated on each page as `Explore Length 5.05m`
-#: and `1.98m`. Both agree with FMLV to the millimetre, which is why they are emitted.
-#: **The width is not**: the pages say 2.27 m across the mirrors where FMLV holds the
-#: 2032 mm body width.
-_EXPLORE_LENGTH_MM = 5050
-_EXPLORE_HEIGHT_MM = 1980
-
-#: A campervan taller than this is a high top — the shared NCC threshold. Every Explore is
-#: 1980 mm with the roof down, so they are elevating-roof campervans and not high tops.
-HIGH_TOP_ABOVE_MM = 2300
+#: How each habitation reading is introduced. Findings for a person to type in.
+_FEATURE_NOTES: dict[str, str] = {
+    "heating": "the heating in the model's own specification",
+    "refrigeration": "the refrigeration in the model's own specification",
+    "microwave": "a microwave in the model's own specification",
+    "shower_toilet_separated": "the washroom as the specification describes it",
+}
 
 
-@dataclass(frozen=True)
-class BespokeExplore:
-    """One Explore variant: how the leaflet names it, and how FMLV files it."""
+def _text(value: Any) -> str:
+    return value if isinstance(value, str) else ""
 
-    #: The engine and gearbox as the leaflet's price table writes them, lower-cased and
-    #: space-collapsed for matching. This is the join between the two.
-    leaflet_label: str
-    #: What FMLV holds. `Explore Transporter` for the VW, `Explore Custom` for the Ford.
-    fmlv_range: str
-    fmlv_model: str
-    #: The make, routed through `fmlv_base_vehicle`.
-    base_vehicle: str
+
+def parse_ranges(payload: str) -> dict[int, str]:
+    """`{id: name}` for the site's own ranges — `VW Transporter`, `VW Crafter`.
+
+    These name the **base vehicle**, not an FMLV range, which is why they are used to
+    derive `base_vehicle_manufacturer` and never `manufacturer_range`.
+    """
+    try:
+        entries = json.loads(payload)
+    except ValueError:
+        return {}
+    if not isinstance(entries, list):
+        return {}
+    found: dict[int, str] = {}
+    for entry in entries:
+        if isinstance(entry, dict) and isinstance(entry.get("id"), int):
+            found[entry["id"]] = _text((entry.get("title") or {}).get("rendered")).strip()
+    return found
+
+
+@dataclass
+class BespokeModel:
+    """One model as the site's own API describes it."""
+
+    name: str
+    slug: str
+    url: str
+    range_name: str = ""
+    berths: int | None = None
+    seats_raw: str = ""
+    floorplan_url: str | None = None
+    hero_url: str | None = None
+    equipment: list[str] = field(default_factory=list)
+    toilet: str = ""
+    shower: str = ""
+
+    @property
+    def identity(self) -> tuple[str, str]:
+        return identity_for(self.name)
 
     @property
     def label(self) -> str:
-        return f"{self.fmlv_range} {self.fmlv_model}"
+        return self.name
 
 
-#: **FMLV's names, not the leaflet's**, per the rule in `docs/adapters/README.md` — with
-#: one deliberate exception, settled on 6 October 2026.
-#:
-#: Below the price table the **same leaflet** carries a specification table, and its
-#: columns are headed `Ford Custom TREND 110PS Manual`, `Ford Custom LIMITED 136PS Auto`
-#: and `Ford Custom TOURNEO 170PS Auto`, with the VW side reading `T7 Commerce PLUS` and
-#: `T7 Commerce PRO` the same way. **Custom is the Transit Custom family and the
-#: capitalised word is the trim**, which is why the site gives the Tourneo its own page.
-#:
-#: So FMLV's `170 Limited` carries the wrong trim — `Limited` belongs to the 136 PS. The
-#: corrected name is emitted, with provenance on `model`, so the run proposes the rename
-#: rather than quietly agreeing with FMLV. It still matches FMLV's row at 0.714, over the
-#: 0.5 threshold, and scores 0.000 against the 110 and the 136, whose engine codes read as
-#: layout codes and disagree.
-EXPLORE: tuple[BespokeExplore, ...] = (
-    BespokeExplore(
-        "ford custom trend 110ps 6 speed manual",
-        "Explore Custom", "110 Trend Elevating Roof", "Ford",
-    ),
-    BespokeExplore(
-        "ford custom limited 136ps 8 speed auto",
-        "Explore Custom", "136 Limited Elevating Roof", "Ford",
-    ),
-    BespokeExplore(
-        "ford custom tourneo 170ps 8 speed auto",
-        "Explore Custom", "170 Tourneo Elevating Roof", "Ford",
-    ),
-    BespokeExplore(
-        "vw t7 commerce plus 110ps 6 speed manual",
-        "Explore Transporter", "110 Commerce Plus Elevating Roof", "VW",
-    ),
-    BespokeExplore(
-        "vw t7 commerce plus 150ps 8 speed auto",
-        "Explore Transporter", "150 Commerce Plus Elevating Roof", "VW",
-    ),
-    #: Not in FMLV as at 5 October 2026 — the leaflet's sixth row, which the first run
-    #: will propose as a new product.
-    BespokeExplore(
-        "vw t7 commerce pro 170ps 8 speed auto",
-        "Explore Transporter", "170 Commerce Pro Elevating Roof", "VW",
-    ),
-)
+def identity_for(name: str) -> tuple[str, str]:
+    """`(range, model)` as FMLV will file this product.
 
-#: The Crafter products, **collected by identity alone**. Their page carries one
-#: on-the-road price for all three and no engine, roof or berth breakdown, so there is
-#: nothing to propose — but emitting the identity claims the FMLV row, which stops a run
-#: reporting a van Bespoke still sell as missing from the site.
-EDITION: tuple[tuple[str, str, str], ...] = (
-    ("Edition 2", "140 Auto", "VW"),
-    ("Edition 2", "177 Commerce Plus Auto Fixed Roof", "VW"),
-    ("Edition 4", "177 Commerce Plus Auto Elevating Roof", "VW"),
-)
-
-EDITION_PAGE = "/volkswagen-crafter-campervan/"
-
-#: Every Explore sleeps four — the retail brochure's `Four Berth`, and the leaflet's
-#: standard specification lists a fold-out rear seat/bed plus a pop-top bed.
-_EXPLORE_BERTHS = 4
-#: Four belted travel seats, as FMLV holds for all eight rows. Bespoke state the vehicle
-#: is M1 registered but print no belt count, so this is **not** proposed — see
-#: `_build_explore`, which records no provenance for it.
-_EXPLORE_SEATS = 4
-
-
-def _normalise(label: str) -> str:
-    return re.sub(r"\s+", " ", label).strip().casefold()
-
-
-def leaflet_url(page_html: str) -> str | None:
-    """The Explore leaflet this page links, or `None`."""
-    match = _LEAFLET_HREF.search(htmllib.unescape(page_html))
-    return match.group("url") if match else None
-
-
-def parse_explore_prices(leaflet_text: str) -> dict[str, int]:
-    """Every variant the leaflet's base-vehicle table prices, keyed by normalised label.
-
-    The table prints Ford on the left of each line and VW on the right, so a line-by-line
-    read would find half of them; this runs over the whole document instead.
+    A name this adapter has not seen falls back on the single-name convention, carrying
+    the name twice — so a sixth model still gets a usable identity and the run's count
+    check is what flags it.
     """
-    found: dict[str, int] = {}
-    for match in _PRICE_ROW.finditer(leaflet_text):
-        label = _normalise(match.group("label"))
-        found[label] = int(match.group("price").replace(",", ""))
-    return found
+    if name in IDENTITY:
+        return IDENTITY[name]
+    return name, name
 
 
-def price_disagreements(prices: dict[str, int], page_prices: dict[str, set[int]]) -> list[str]:
-    """Where a model page's headline price is not one the leaflet prints.
+def _absolute(path: Any) -> str | None:
+    text = _text(path).strip()
+    if not text:
+        return None
+    return text if text.startswith("http") else f"{BASE_URL}{text}"
 
-    **The only cross-check this manufacturer offers.** There is no arithmetic to reconcile
-    — no mass is published, so `payload = MTPLM - MRO` is unavailable — but the leaflet and
-    the pages are maintained separately and state overlapping facts. A page quoting a price
-    the leaflet does not know is the signal that one of them has been reissued alone.
+
+def equipment_lines(acf: dict[str, Any]) -> list[str]:
+    """Every specification line a model publishes, as one list.
+
+    The blocks are newline-separated prose. `habitation.usable_lines` drops anything that
+    marks itself as a priced extra, which is the only defence available — Bespoke publish
+    no standard-against-optional split that can be read structurally.
     """
-    found: list[str] = []
-    printed = set(prices.values())
-    for path, seen in sorted(page_prices.items()):
-        unknown = sorted(p for p in seen if p not in printed)
-        if unknown:
-            found.append(
-                f"{path} shows "
-                f"{', '.join(f'GBP{p:,}' for p in unknown)}, which the Explore leaflet "
-                f"does not price. One of the two has been reissued without the other"
+    lines: list[str] = []
+    for key in _EQUIPMENT_FIELDS:
+        block = _text(acf.get(key))
+        lines.extend(line.strip() for line in block.splitlines() if line.strip())
+    return habitation.usable_lines(lines)
+
+
+def parse_models(payload: str, ranges: dict[int, str]) -> list[BespokeModel]:
+    """Every model in the API response, in the order it lists them."""
+    try:
+        entries = json.loads(payload)
+    except ValueError:
+        return []
+    if not isinstance(entries, list):
+        return []
+
+    models: list[BespokeModel] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        name = _text((entry.get("title") or {}).get("rendered")).strip()
+        if not name:
+            continue
+        acf: dict[str, Any] = entry.get("acf") or {}
+        berths = acf.get("model_berths")
+        models.append(
+            BespokeModel(
+                name=name,
+                slug=_text(entry.get("slug")),
+                url=_text(entry.get("link")) or f"{BASE_URL}/models/{entry.get('slug')}/",
+                range_name=ranges.get(acf.get("model_range"), ""),
+                berths=berths if isinstance(berths, int) else None,
+                seats_raw=str(acf.get("model_travel_seats") or "").strip(),
+                floorplan_url=_absolute(acf.get("model_floorplan_path")),
+                hero_url=_absolute(acf.get("model_hero_path")),
+                equipment=equipment_lines(acf),
+                toilet=_text(acf.get("model_toilet")),
+                shower=_text(acf.get("model_shower")),
             )
-    return found
+        )
+    return models
 
 
-def _build_explore(variant: BespokeExplore, price: int | None, source_url: str) -> ExtractedMotorhome:
-    """One Explore as a `Motorhome`. **No mass of any kind** — Bespoke publish none."""
+def seats_from(raw: str) -> tuple[int | None, str]:
+    """The belted seats fitted as standard, where the site states a plain figure.
+
+    **`Up to 4` is not recorded.** It is a ceiling, and the settled rule is that a
+    "permitted" or "up to" seat count is a type-approval maximum rather than a fitment
+    claim — FMLV holds the belts fitted as standard, and already files Bespoke's two
+    Edition rows as 2 seats and 4.
+    """
+    text = raw.strip()
+    if not text:
+        return None, "the model states no seat count"
+    if any(word in text.lower() for word in SEAT_CEILING):
+        return None, (
+            f"the model states {text!r}, which is a ceiling rather than the belts fitted "
+            f"as standard — not recorded, per the settled rule"
+        )
+    digits = "".join(character for character in text if character.isdigit())
+    if not digits:
+        return None, f"the model states {text!r}, which is not a seat count"
+    return int(digits), f"{int(digits)} travel seats, from the model's own specification"
+
+
+def _reconciles(model: BespokeModel) -> tuple[bool, str]:
+    """**Structural, because Bespoke publish no figure that checks another.**
+
+    No mass, no dimension and no price means there is no arithmetic anywhere — not even
+    the two-of-three the weaker adapters here manage. What can be verified is that the
+    API returned a model with a name and a range behind it, which is what the previous
+    adapter failed to notice it had stopped getting.
+    """
+    if not model.name:
+        return False, "the API returned a model with no name"
+    if not model.range_name:
+        return False, (
+            f"{model.name} names no range, so its base vehicle cannot be derived and "
+            f"nothing identifies which van it is built on"
+        )
+    return True, (
+        f"{model.name} on the {model.range_name}, from the site's own model API"
+    )
+
+
+def build_extracted(model: BespokeModel, *, basis: str) -> ExtractedMotorhome:
+    """One Bespoke campervan, with provenance on everything it proposes."""
+    features = habitation.features_from(model.equipment)
+    features.pop("bed_types", None)
+
+    manufacturer_range, model_name = model.identity
+    seats, seats_basis = seats_from(model.seats_raw)
+    base_vehicle = (
+        fmlv_base_vehicle("VW") if "volkswagen" in model.range_name.lower()
+        or model.range_name.upper().startswith("VW") else None
+    )
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
-        manufacturer_range=variant.fmlv_range,
-        model=variant.fmlv_model,
-        base_vehicle_manufacturer=fmlv_base_vehicle(variant.base_vehicle),
-        berths=_EXPLORE_BERTHS,
-        mh_passenger_seats_inc_driver=_EXPLORE_SEATS,
-        rrp_pounds=price,
-        mh_length_mm=_EXPLORE_LENGTH_MM,
-        mh_height_mm=_EXPLORE_HEIGHT_MM,
-        # Not emitted: the pages give 2.27m across the mirrors, FMLV holds the 2032mm body.
-        mh_width_mm=None,
-        body_type=BodyType.CAMPERVAN_ELEVATING_ROOF,
-        # Published nowhere. Omitted, never blanked, so FMLV's own figures stand.
+        manufacturer_range=manufacturer_range,
+        model=model_name,
+        base_vehicle_manufacturer=base_vehicle,
+        berths=model.berths,
+        mh_passenger_seats_inc_driver=seats,
+        # **Deliberately absent, all of them.** Bespoke publish no price, no mass of any
+        # kind and no vehicle dimension — see the module docstring. FMLV's own figures
+        # carry through untouched, and the body type is read off the photographs by a
+        # person because there is no height to apply the rule to.
+        rrp_pounds=None,
         mro_kilograms=None,
         mtplm_kilograms=None,
         mh_payload_kilograms=None,
+        mh_length_mm=None,
+        mh_width_mm=None,
+        mh_height_mm=None,
+        body_type=None,
     )
+    for name, feature in features.items():
+        setattr(motorhome, name, feature.value)
 
     provenance: dict[str, Provenance] = {}
 
-    def record(field: str, snippet: str) -> None:
-        provenance[field] = Provenance(source_url=source_url, snippet=snippet)
-
-    if price is not None:
-        record(
-            "rrp_pounds",
-            f"GBP{price:,} — the standard retail price for a fully converted Bespoke "
-            f"Explore on the {variant.leaflet_label}, from the leaflet's "
-            f"'Choose your vehicle base' table",
+    def record(field_name: str, snippet: str) -> None:
+        provenance[field_name] = Provenance(
+            source_url=model.url, snippet=f"{model.label} — {snippet}"
         )
+
     record(
-        "base_vehicle_manufacturer",
-        f"the leaflet prices this variant as a {variant.leaflet_label}",
+        "manufacturer_range",
+        f'range "{manufacturer_range}", split from Bespoke\'s own name {model.name!r}. '
+        f"THIS PRODUCT IS NEW TO FMLV, so the split is this adapter's reading rather than "
+        f"the export's — worth confirming now, because changing it later is a rename",
     )
-    record(
-        "model",
-        f"the leaflet's 'Choose your vehicle base' table names this variant "
-        f"'{variant.leaflet_label}', giving the engine and the trim; 'Elevating Roof' is "
-        f"the Austops pop-top every Explore carries",
-    )
-    record(
-        "berths",
-        "four — the retail brochure says 'Four Berth', and the standard specification "
-        "lists a fold-out rear seat/bed and a pop-top bed",
-    )
-    record(
-        "mh_length_mm",
-        f"{_EXPLORE_LENGTH_MM}mm — the model pages state 'Explore Length 5.05m'",
-    )
-    record(
-        "mh_height_mm",
-        f"{_EXPLORE_HEIGHT_MM}mm — the model pages state 1.98m, the roof down",
-    )
-    record(
-        "body_type",
-        f"an elevating-roof campervan: every Explore has an Austops pop-top and is "
-        f"{_EXPLORE_HEIGHT_MM}mm with it down, under the {HIGH_TOP_ABOVE_MM}mm high-top "
-        f"threshold",
-    )
+    record("model", f'model "{model_name}", the variant within {manufacturer_range}')
+    if model.berths is not None:
+        record("berths", f"{model.berths} berths, from the model's own specification")
+    if seats is not None:
+        record("mh_passenger_seats_inc_driver", seats_basis)
+    if base_vehicle is not None:
+        record(
+            "base_vehicle_manufacturer",
+            f"{base_vehicle}, from the site's own range for this model: "
+            f"{model.range_name!r}",
+        )
+    for name, feature in features.items():
+        provenance[name] = Provenance(
+            source_url=model.url,
+            snippet=(
+                f"{model.label} — {feature.note or _FEATURE_NOTES.get(name, name)}: "
+                f"{feature.snippet!r}"
+            ),
+        )
+
+    # Two pointers, at two different pictures. The floorplan answers where things are; the
+    # exterior photograph is what the requester reads the body type off, there being no
+    # height published to apply the high-top rule to.
+    if model.floorplan_url:
+        provenance.update(
+            floorplan_provenance(
+                motorhome,
+                model.floorplan_url,
+                model.label,
+                drawing="the day and night floorplans on the model's own page",
+            )
+        )
+    if model.hero_url and motorhome.body_type is None:
+        # **Not through `floorplan_provenance`.** That helper answers the five positional
+        # questions it knows, and the body type is not one of them — teaching it this one
+        # would put a pointer on every other adapter's products too. The need is Bespoke's
+        # alone, because they are the only brand here publishing no height at all.
+        provenance["body_type"] = Provenance(
+            source_url=model.hero_url,
+            snippet=(
+                f"{model.label} — read the body type off the exterior photograph. Bespoke "
+                f"publish no height, so the high-top rule cannot be applied, and the "
+                f"pop-top that would otherwise settle it is listed under an 'Optional' "
+                f"column on one model and in marketing copy on another"
+            ),
+        )
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
-def _build_edition(fmlv_range: str, fmlv_model: str, base_vehicle: str) -> ExtractedMotorhome:
-    """One Crafter, **identity only**.
-
-    Its page prices the range once and breaks out no engine, roof or berth count, so there
-    is nothing here to propose. The identity alone claims the FMLV row, which is the whole
-    point: without it a run reports three vans Bespoke still sell as missing from the site.
-    """
-    return ExtractedMotorhome(
-        motorhome=Motorhome(
-            manufacturer=MANUFACTURER,
-            manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
-            manufacturer_range=fmlv_range,
-            model=fmlv_model,
-            base_vehicle_manufacturer=fmlv_base_vehicle(base_vehicle),
-        ),
-        provenance={},
-    )
+def _notes(model: BespokeModel) -> Iterable[str]:
+    """What the model published that is reported rather than recorded."""
+    _seats, seats_basis = seats_from(model.seats_raw)
+    if _seats is None and model.seats_raw:
+        yield f"[{model.label}] SEATS NOT PROPOSED: {seats_basis}"
+    if model.toilet or model.shower:
+        yield (
+            f"[{model.label}] washroom, for the habitation fields: toilet "
+            f"{model.toilet or 'not stated'!r}, shower {model.shower or 'not stated'!r}"
+        )
 
 
 def collect(
     http: Fetcher,
-    browser: object,  # noqa: ARG001 — plain WordPress, no JavaScript needed
+    browser: object,  # noqa: ARG001 — the API is plain JSON
     snapshot_dir: Path,  # noqa: ARG001 — `http` already snapshots into it
     *,
-    ranges: tuple[tuple[str, str], ...] = (),  # noqa: ARG001
     on_progress: Callable[[str], None] = lambda message: None,
 ) -> list[ExtractedMotorhome]:
-    """Every Bespoke campervan: six Explores priced from the leaflet, three Editions named.
-
-    **Five fetches** — four model pages and the leaflet.
-    """
-    from ..fetch.pdf import extract_text  # noqa: PLC0415 — only this adapter needs it
-
-    leaflet: str | None = None
-    page_prices: dict[str, set[int]] = {}
-    for path in EXPLORE_PAGES:
-        url = f"{BASE_URL}{path}"
-        try:
-            html = http.fetch(url).file_path.read_text(encoding="utf-8", errors="replace")
-        except Exception as error:  # noqa: BLE001
-            on_progress(f"WARNING: {url} did not fetch ({type(error).__name__})")
-            continue
-        text = re.sub(r"<[^>]+>", " ", htmllib.unescape(html))
-        page_prices[path] = {
-            int(m.group("price").replace(",", "")) for m in _PAGE_PRICE.finditer(text)
-        }
-        if leaflet is None:
-            leaflet = leaflet_url(html)
-
-    prices: dict[str, int] = {}
-    if leaflet is None:
-        on_progress(
-            "WARNING: no Explore leaflet is linked from any model page. It is the roster "
-            "and the only price source for two thirds of the range, so the Explores are "
-            "collected without a price rather than not at all"
-        )
-    else:
-        on_progress(f"reading {leaflet.rsplit('/', 1)[-1]}")
-        try:
-            prices = parse_explore_prices(extract_text(http.fetch(leaflet).file_path).text)
-        except Exception as error:  # noqa: BLE001
-            on_progress(
-                f"WARNING: the Explore leaflet could not be read "
-                f"({type(error).__name__}), so no Explore is priced this run"
-            )
-        if not prices:
-            on_progress(
-                "WARNING: the leaflet published no 'Choose your vehicle base' rows this "
-                "run — the table has changed shape, not emptied"
-            )
-
-    for message in price_disagreements(prices, page_prices):
-        on_progress(f"PRICES DISAGREE — {message}")
-
-    results: list[ExtractedMotorhome] = []
-    for variant in EXPLORE:
-        price = prices.get(variant.leaflet_label)
-        if price is None and prices:
-            on_progress(
-                f"WARNING: {variant.label} — the leaflet no longer prices a "
-                f"{variant.leaflet_label!r}, so no price is proposed for it"
-            )
-        results.append(
-            _build_explore(variant, price, leaflet or f"{BASE_URL}{EXPLORE_PAGES[0]}")
-        )
-
-    for fmlv_range, fmlv_model, base_vehicle in EDITION:
-        results.append(_build_edition(fmlv_range, fmlv_model, base_vehicle))
-    on_progress(
-        f"{len(EDITION)} Edition product(s) collected by identity alone — their page "
-        f"states one on-the-road price for all three and no engine, roof or berth "
-        f"breakdown, so nothing is proposed and FMLV's figures stand"
+    """Every current Bespoke campervan, from the site's own model API."""
+    ranges_response = http.fetch(RANGES_URL)
+    if ranges_response.status_code != 200:
+        msg = f"{RANGES_URL} returned {ranges_response.status_code}"
+        raise RuntimeError(msg)
+    ranges = parse_ranges(
+        ranges_response.file_path.read_text(encoding="utf-8", errors="replace")
     )
 
+    models_response = http.fetch(MODELS_URL)
+    if models_response.status_code != 200:
+        msg = f"{MODELS_URL} returned {models_response.status_code}"
+        raise RuntimeError(msg)
+    models = parse_models(
+        models_response.file_path.read_text(encoding="utf-8", errors="replace"), ranges
+    )
+    if not models:
+        msg = (
+            f"{MODELS_URL} returned 200 and no models — the API's shape has changed "
+            f"rather than Bespoke having stopped making campervans"
+        )
+        raise RuntimeError(msg)
     on_progress(
-        f"{len(results)} product(s) collected. NO MASS IS EMITTED for any of them: "
-        f"Bespoke publish no payload, gross vehicle weight or kerb weight anywhere on "
-        f"the site or in any of their three PDFs, so FMLV's own MRO and MTPLM stand"
+        f"the site's API lists {len(models)} model(s) across {len(ranges)} range(s): "
+        f"{', '.join(sorted(ranges.values()))}"
+    )
+
+    results: list[ExtractedMotorhome] = []
+    for model in models:
+        reconciles, basis = _reconciles(model)
+        if not reconciles:
+            on_progress(f"[{model.label}] DROPPED: {basis}")
+            continue
+        results.append(build_extracted(model, basis=basis))
+        manufacturer_range, model_name = model.identity
+        on_progress(
+            f"[{model.label}] read as {manufacturer_range} / {model_name}: "
+            f"{model.berths} berths, {model.seats_raw or 'no'} seats, on the "
+            f"{model.range_name}"
+        )
+        for note in _notes(model):
+            on_progress(note)
+
+    on_progress(
+        "NO PRICE, NO MASS AND NO DIMENSION IS PROPOSED. Bespoke publish none of them: "
+        "the price leaflet the old adapter read is gone and the only figures on the site "
+        "are stock listings for individual vans; no mass of any kind has ever been "
+        "published; and the dimension fields on the new site are empty, where the old "
+        "pages stated a length and a height. FMLV's own figures carry through untouched."
+    )
+    on_progress(
+        "NO BODY TYPE IS PROPOSED. It needs a height and there is none, so each product "
+        "carries a pointer at its own exterior photograph for a person to read it off."
+    )
+    on_progress(
+        "THE RANGE HAS CHANGED, not just the website. These five are all Volkswagen; the "
+        "Ford Transit Custom that three of FMLV's rows are built on is gone from the "
+        "line-up, so those will be reported as disappeared."
     )
     if len(results) != EXPECTED_PRODUCTS:
         on_progress(
-            f"expected {EXPECTED_PRODUCTS} products and built {len(results)} — EXPLORE or "
-            f"EDITION has been edited without its count being updated"
+            f"expected {EXPECTED_PRODUCTS} models and collected {len(results)} — check "
+            f"whether Bespoke have added or withdrawn one"
         )
+    on_progress(f"collected {len(results)} Bespoke campervan(s)")
     return results

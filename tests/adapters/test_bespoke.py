@@ -1,231 +1,256 @@
-"""Bespoke NI — parsing and derivation only, no network."""
+"""Bespoke's own WordPress API, captured 27 October 2026.
+
+The fixtures are the `bl_model` and `bl_range` responses with the fields this adapter does
+not read stripped out; the trim was checked at capture time to parse identically.
+
+Rebuilt that day because Bespoke replaced their website and their range at once. Several
+of these tests exist to stop the **previous** failure recurring: that adapter read three
+pages which now 404, fell back on hardcoded variant names, and reported a passing count
+check over a roster that no longer existed.
+"""
 
 from __future__ import annotations
 
-from src.adapters import ADAPTERS, adapter_for, bespoke
+import json
+from pathlib import Path
+
+import pytest
+
 from src.adapters.bespoke import (
-    EDITION,
     EXPECTED_PRODUCTS,
-    EXPLORE,
-    leaflet_url,
-    parse_explore_prices,
-    price_disagreements,
+    IDENTITY,
+    MANUFACTURER,
+    MANUFACTURER_DISPLAY_NAME,
+    MODELS_URL,
+    RANGES_URL,
+    BespokeModel,
+    _notes,
+    _reconciles,
+    build_extracted,
+    equipment_lines,
+    identity_for,
+    parse_models,
+    parse_ranges,
+    seats_from,
 )
-from src.diff.matching import DEFAULT_THRESHOLD, _identity_tokens, _jaccard
-from src.product_model.enums import BodyType
-from src.vehicle_class import VehicleClass
+from src.product_model.enums import Refrigeration
 
-#: The leaflet's `Choose your vehicle base` table, as `fetch.pdf` extracts it. Ford on the
-#: left of each line, VW on the right — which is the trap the parser exists for.
-LEAFLET = """\
-1. Choose your vehicle base:
-Standard retail price for fully converted Bespoke Explore:
+FIXTURES = Path(__file__).parent / "fixtures"
 
-Ford Custom Trend 110PS 6 speed manual   £60,995      VW T7 Commerce Plus 110PS 6 speed manual   £64,995
-Ford Custom Limited 136PS 8 speed auto   £65,995      VW T7 Commerce Plus 150PS 8 speed auto     £69,995
-Ford Custom Tourneo 170PS 8 speed auto   £68,995      VW T7 Commerce Pro 170PS 8 speed auto      £73,995
 
-4. Choose any extras:
-Bespoke performance gloss black body kit     £1500
-"""
+def _fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
 
 
-def _explore(model: str):
-    return next(v for v in EXPLORE if v.fmlv_model == model)
+@pytest.fixture(scope="module")
+def ranges() -> dict[int, str]:
+    return parse_ranges(_fixture("bespoke_ranges.json"))
 
 
-# --- registry -------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def models(ranges: dict[int, str]) -> list[BespokeModel]:
+    return parse_models(_fixture("bespoke_models.json"), ranges)
 
 
-def test_the_adapter_is_wired_in() -> None:
-    assert bespoke.MANUFACTURER == "Bespoke NI"
-    assert bespoke.MANUFACTURER_DISPLAY_NAME == "Bespoke"
-    assert (
-        adapter_for("Bespoke NI", VehicleClass.MOTORHOME, display_name="Bespoke") is bespoke
-    )
-    assert ("Bespoke NI", "Bespoke", VehicleClass.MOTORHOME) in ADAPTERS
+def _named(models: list[BespokeModel], name: str) -> BespokeModel:
+    return next(model for model in models if model.name == name)
 
 
-# --- the leaflet ----------------------------------------------------------------------
+# --- identity ------------------------------------------------------------------------------
 
 
-def test_both_columns_of_the_price_table_are_read() -> None:
-    """**The trap this exists for.** The table prints Ford on the left of each line and VW
-    on the right, so a line-by-line read finds three variants and misses three."""
-    prices = parse_explore_prices(LEAFLET)
+def test_the_manufacturer_keeps_its_two_names() -> None:
+    """Both lists say `Bespoke NI`; the site brands itself `Bespoke`."""
+    assert MANUFACTURER == "Bespoke NI"
+    assert MANUFACTURER_DISPLAY_NAME == "Bespoke"
 
-    assert len(prices) == 6
-    assert prices["ford custom trend 110ps 6 speed manual"] == 60995
-    assert prices["vw t7 commerce pro 170ps 8 speed auto"] == 73995
 
+def test_the_api_is_the_source() -> None:
+    assert MODELS_URL.endswith("/wp-json/wp/v2/bl_model?per_page=100")
+    assert RANGES_URL.endswith("/wp-json/wp/v2/bl_range?per_page=100")
 
-def test_an_option_price_is_not_mistaken_for_a_vehicle() -> None:
-    """The same document prices a body kit at GBP1500. Only rows naming an engine count."""
-    assert 1500 not in parse_explore_prices(LEAFLET).values()
 
+def test_the_five_current_models_are_read(models: list[BespokeModel]) -> None:
+    assert sorted(model.name for model in models) == [
+        "Crafter Edition",
+        "Explore 4",
+        "Explore 4 Hybrid",
+        "Explore 5",
+        "Explore 5 Hybrid",
+    ]
+    assert EXPECTED_PRODUCTS == 5
 
-def test_the_leaflet_url_is_read_not_constructed() -> None:
-    """**Never hardcode the path.** The upload folder carries the issue month and moves on
-    every reissue; the point of rediscovering it is to follow the current one."""
-    html = (
-        '<a href="https://bespokeleisure.co.uk/wp-content/uploads/2026/02/'
-        'Bespoke-Explore-Leaflet.pdf">Download</a>'
-    )
 
-    assert leaflet_url(html) == (
-        "https://bespokeleisure.co.uk/wp-content/uploads/2026/02/Bespoke-Explore-Leaflet.pdf"
-    )
-    assert leaflet_url("<a href='/about/'>About</a>") is None
+def test_the_roster_is_never_hardcoded(models: list[BespokeModel]) -> None:
+    """The previous adapter fell back on hardcoded variant names when its pages went, and
+    reported nine products that no longer existed. `IDENTITY` only splits a name the API
+    returned; it cannot invent one."""
+    assert set(IDENTITY) == {model.name for model in models}
 
 
-def test_a_document_with_no_table_yields_nothing_rather_than_guessing() -> None:
-    assert parse_explore_prices("no table here") == {}
+def test_an_unknown_model_still_gets_an_identity() -> None:
+    """A sixth model must come through with a usable name so the count check flags it,
+    rather than being dropped and so never noticed."""
+    assert identity_for("Explore 6") == ("Explore 6", "Explore 6")
 
 
-# --- the roster -----------------------------------------------------------------------
+def test_the_identity_split_follows_bespokes_naming() -> None:
+    assert identity_for("Explore 4 Hybrid") == ("Explore", "4 Hybrid")
+    assert identity_for("Crafter Edition") == ("Crafter Edition", "Crafter Edition")
 
 
-def test_nine_products_across_the_two_halves() -> None:
-    assert len(EXPLORE) + len(EDITION) == EXPECTED_PRODUCTS == 9
-    assert len(EXPLORE) == 6
-    assert len(EDITION) == 3
+# --- the ranges name the base vehicle, not an FMLV range -------------------------------------
 
 
-def test_every_explore_variant_is_priced_by_the_leaflet() -> None:
-    """A label that drifts from the leaflet's wording silently loses that variant's price,
-    so the join is pinned here rather than discovered on a live run."""
-    prices = parse_explore_prices(LEAFLET)
+def test_both_ranges_are_volkswagen(ranges: dict[int, str]) -> None:
+    """The Ford Transit Custom that three of FMLV's rows are built on is gone."""
+    assert sorted(ranges.values()) == ["VW Crafter", "VW Transporter"]
 
-    for variant in EXPLORE:
-        assert variant.leaflet_label in prices, variant.label
 
+def test_the_base_vehicle_comes_from_the_range(models: list[BespokeModel]) -> None:
+    built = build_extracted(_named(models, "Explore 4"), basis="b")
+    assert built.motorhome.base_vehicle_manufacturer == "VW"
+    assert "VW Transporter" in built.provenance["base_vehicle_manufacturer"].snippet
 
-def test_the_products_are_named_as_fmlv_files_them() -> None:
-    """FMLV's own strings, not the leaflet's — see the rule in `docs/adapters/README.md`."""
-    assert _explore("110 Trend Elevating Roof").fmlv_range == "Explore Custom"
-    assert _explore("110 Commerce Plus Elevating Roof").fmlv_range == "Explore Transporter"
 
+def test_a_model_with_no_range_is_dropped() -> None:
+    """Its base vehicle could not be derived and nothing says which van it is."""
+    ok, basis = _reconciles(BespokeModel(name="Explore 9", slug="x", url="http://x"))
+    assert ok is False
+    assert "names no range" in basis
 
-def test_the_170ps_ford_is_named_tourneo_against_fmlvs_limited() -> None:
-    """**The one place FMLV's string is not used.** Below its price table the same leaflet
-    carries a specification table headed `Ford Custom TREND 110PS`, `Ford Custom LIMITED 136PS` and `Ford Custom
-    TOURNEO 170PS` — Custom is the family, the capitalised word is the trim. So the 170 is
-    a Tourneo and FMLV's `170 Limited` is wrong; `Limited` is the 136. The corrected name
-    is emitted with provenance so the run proposes the rename."""
-    variant = _explore("170 Tourneo Elevating Roof")
 
-    assert variant.fmlv_range == "Explore Custom"
-    assert "tourneo" in variant.leaflet_label
-    assert not any(v.fmlv_model == "170 Limited Elevating Roof" for v in EXPLORE)
+# --- berths and seats ---------------------------------------------------------------------------
 
 
-def test_the_corrected_name_still_finds_fmlvs_row_and_not_its_siblings() -> None:
-    """A rename is only safe if it still matches. `170 Tourneo` scores 0.714 against
-    FMLV's `170 Limited` — over the 0.5 threshold — and 0.000 against the 110 and the 136,
-    whose engine codes read as layout codes and disagree."""
-    corrected = _explore("170 Tourneo Elevating Roof")
+def test_berths_are_read(models: list[BespokeModel]) -> None:
+    assert _named(models, "Explore 5").berths == 4
+    assert _named(models, "Crafter Edition").berths == 2
 
-    def score(model: str) -> float:
-        return _jaccard(
-            _identity_tokens(corrected.fmlv_range, corrected.fmlv_model),
-            _identity_tokens("Explore Custom", model),
-        )
 
-    assert score("170 Limited Elevating Roof") > DEFAULT_THRESHOLD
-    assert score("136 Limited Elevating Roof") == 0.0
-    assert score("110 Trend Elevating Roof") == 0.0
+def test_the_explore_number_is_the_seat_count_not_the_berths(models: list[BespokeModel]) -> None:
+    """An Explore 5 is four berths and five seats — the name counts seats."""
+    explore_5 = _named(models, "Explore 5")
+    assert explore_5.berths == 4
+    assert explore_5.seats_raw == "5"
 
 
-def test_the_model_name_is_sourced_so_the_rename_reaches_the_reviewer() -> None:
-    """Without provenance for `model` the corrected name would match FMLV's row and then
-    sit there unproposed — `compare_fields` only examines fields the adapter sourced."""
-    extracted = bespoke._build_explore(_explore("170 Tourneo Elevating Roof"), 68995, "u")
+def test_a_plain_seat_count_is_recorded(models: list[BespokeModel]) -> None:
+    built = build_extracted(_named(models, "Explore 4"), basis="b")
+    assert built.motorhome.mh_passenger_seats_inc_driver == 4
 
-    assert "model" in extracted.provenance
-    assert "tourneo" in extracted.provenance["model"].snippet.lower()
 
+def test_up_to_four_is_a_ceiling_and_is_refused(models: list[BespokeModel]) -> None:
+    """The Bürstner rule: a "permitted" or "up to" count is a type-approval maximum, not
+    the belts fitted as standard."""
+    crafter = _named(models, "Crafter Edition")
+    assert crafter.seats_raw == "Up to 4"
+    seats, basis = seats_from(crafter.seats_raw)
+    assert seats is None
+    assert "ceiling" in basis
+    built = build_extracted(crafter, basis="b")
+    assert built.motorhome.mh_passenger_seats_inc_driver is None
+    assert "mh_passenger_seats_inc_driver" not in built.provenance
 
-def test_the_base_vehicle_is_the_marque_alone() -> None:
-    assert {v.base_vehicle for v in EXPLORE} == {"Ford", "VW"}
 
+def test_the_refused_seat_count_is_reported(models: list[BespokeModel]) -> None:
+    assert any("SEATS NOT PROPOSED" in note for note in _notes(_named(models, "Crafter Edition")))
 
-# --- what reaches the pipeline --------------------------------------------------------
 
+# --- the four fields published nowhere ----------------------------------------------------------
 
-def test_no_mass_is_ever_emitted() -> None:
-    """**The reason this adapter is partial.** Six model pages and three PDFs carry no kg
-    figure at all. FMLV holds MRO and MTPLM for all eight rows and payload reconciles on
-    every one, so emitting a blank would destroy good data."""
-    for variant in EXPLORE:
-        motorhome = bespoke._build_explore(variant, 60995, "u").motorhome
-        assert motorhome.mro_kilograms is None
-        assert motorhome.mtplm_kilograms is None
-        assert motorhome.mh_payload_kilograms is None
 
+def test_no_price_no_mass_and_no_dimension_is_proposed(models: list[BespokeModel]) -> None:
+    built = build_extracted(_named(models, "Explore 4"), basis="b")
+    motorhome = built.motorhome
+    for value in (
+        motorhome.rrp_pounds,
+        motorhome.mro_kilograms,
+        motorhome.mtplm_kilograms,
+        motorhome.mh_payload_kilograms,
+        motorhome.mh_length_mm,
+        motorhome.mh_width_mm,
+        motorhome.mh_height_mm,
+    ):
+        assert value is None
+    for refused in ("rrp_pounds", "mro_kilograms", "mh_length_mm", "mh_height_mm"):
+        assert refused not in built.provenance
 
-def test_the_width_is_not_emitted_because_the_site_measures_the_mirrors() -> None:
-    """**The trap this exists for.** The pages state `Explore Width 2.27m`. That is 2270mm
-    across the mirrors; FMLV holds 2032, the body width. Length and height, which agree to
-    the millimetre, are emitted."""
-    extracted = bespoke._build_explore(_explore("110 Trend Elevating Roof"), 60995, "u")
 
-    assert extracted.motorhome.mh_width_mm is None
-    assert "mh_width_mm" not in extracted.provenance
-    assert extracted.motorhome.mh_length_mm == 5050
-    assert extracted.motorhome.mh_height_mm == 1980
+def test_the_body_type_points_at_the_photograph(models: list[BespokeModel]) -> None:
+    """Bespoke publish no height, so the high-top rule cannot be applied and the requester
+    reads it off the picture instead."""
+    built = build_extracted(_named(models, "Explore 4"), basis="b")
+    assert built.motorhome.body_type is None
+    pointer = built.provenance["body_type"]
+    assert pointer.source_url.endswith((".png", ".jpg", ".jpeg"))
+    assert "exterior photograph" in pointer.snippet
 
 
-def test_an_explore_is_an_elevating_roof_campervan_not_a_high_top() -> None:
-    """1980mm with the roof down, under the shared 2300mm threshold."""
-    motorhome = bespoke._build_explore(_explore("110 Trend Elevating Roof"), 1, "u").motorhome
+def test_the_floorplan_answers_the_positional_fields(models: list[BespokeModel]) -> None:
+    built = build_extracted(_named(models, "Explore 4"), basis="b")
+    layout = {
+        name: p for name, p in built.provenance.items() if "layout" in p.source_url.lower()
+    }
+    assert layout
+    assert all("floorplan" in p.snippet for p in layout.values())
 
-    assert motorhome.body_type is BodyType.CAMPERVAN_ELEVATING_ROOF
 
+# --- habitation ---------------------------------------------------------------------------------
 
-def test_an_unpriced_variant_emits_nothing_rather_than_zero() -> None:
-    extracted = bespoke._build_explore(_explore("110 Trend Elevating Roof"), None, "u")
 
-    assert extracted.motorhome.rrp_pounds is None
-    assert "rrp_pounds" not in extracted.provenance
+def test_the_equipment_prose_is_gathered(models: list[BespokeModel]) -> None:
+    lines = _named(models, "Explore 4").equipment
+    assert any("Fridge" in line or "fridge" in line for line in lines)
+    assert any("Hot Water" in line for line in lines)
 
 
-def test_an_edition_is_collected_by_identity_alone() -> None:
-    """Its page prices the range once for three products and breaks out no engine, roof or
-    berth count. Emitting the identity claims the FMLV row so a run cannot report a van
-    Bespoke still sell as missing — the Carthago lesson — while proposing nothing."""
-    extracted = bespoke._build_edition("Edition 2", "140 Auto", "VW")
+def test_a_bare_fridge_is_a_fridge_freezer(models: list[BespokeModel]) -> None:
+    built = build_extracted(_named(models, "Explore 4"), basis="b")
+    assert built.motorhome.refrigeration is Refrigeration.FRIDGE_FREEZER
 
-    assert extracted.provenance == {}
-    assert extracted.motorhome.manufacturer_range == "Edition 2"
-    assert extracted.motorhome.base_vehicle_manufacturer == "VW"
-    assert extracted.motorhome.rrp_pounds is None
-    assert extracted.motorhome.mh_length_mm is None
 
+def test_the_washroom_values_are_reported_not_mapped(models: list[BespokeModel]) -> None:
+    """`portable` and `external` are Bespoke's own words for a toilet and a shower that
+    FMLV has no column shaped for, so they are stated for a person rather than forced into
+    an enum."""
+    notes = " ".join(_notes(_named(models, "Explore 4")))
+    assert "portable" in notes
+    assert "external" in notes
 
-def test_seats_are_not_proposed() -> None:
-    """Bespoke state the vehicle is M1 registered but print no belt count, and only
-    three-point belts count. FMLV's figure stands."""
-    extracted = bespoke._build_explore(_explore("110 Trend Elevating Roof"), 1, "u")
 
-    assert "mh_passenger_seats_inc_driver" not in extracted.provenance
+def test_bed_types_are_not_read_from_the_prose(models: list[BespokeModel]) -> None:
+    """Dropped as on every other adapter: the copy names beds without saying which are
+    built in and which are made up from the seating.
 
+    It still carries a **floorplan pointer**, which is the right outcome — the drawing is
+    where that question gets answered, so the entry is a reviewer reference rather than a
+    value this adapter is proposing.
+    """
+    built = build_extracted(_named(models, "Explore 4"), basis="b")
+    assert built.motorhome.bed_types == []
+    pointer = built.provenance["bed_types"]
+    assert pointer.reviewer_reference is True
+    assert "floorplan" in pointer.snippet
 
-# --- the cross-check ------------------------------------------------------------------
 
+# --- the parse refuses rubbish rather than inventing --------------------------------------------------
 
-def test_a_page_price_the_leaflet_does_not_know_is_reported() -> None:
-    """**The only cross-check here.** No mass is published, so there is no arithmetic to
-    reconcile; what is checked is that two separately-maintained documents agree."""
-    prices = parse_explore_prices(LEAFLET)
 
-    found = price_disagreements(prices, {"/a-page/": {60995, 99999}})
+def test_an_empty_response_yields_nothing() -> None:
+    assert parse_models("[]", {}) == []
+    assert parse_ranges("[]") == {}
 
-    assert len(found) == 1
-    assert "GBP99,999" in found[0]
-    assert "reissued" in found[0]
 
+def test_unparseable_json_yields_nothing() -> None:
+    assert parse_models("<html>404</html>", {}) == []
+    assert parse_ranges("<html>404</html>") == {}
 
-def test_agreeing_documents_report_nothing() -> None:
-    prices = parse_explore_prices(LEAFLET)
 
-    assert price_disagreements(prices, {"/a-page/": {60995, 73995}}) == []
+def test_equipment_lines_cope_with_an_empty_block() -> None:
+    assert equipment_lines({}) == []
+
+
+def test_a_model_without_a_title_is_skipped() -> None:
+    payload = json.dumps([{"slug": "x", "acf": {}}])
+    assert parse_models(payload, {}) == []

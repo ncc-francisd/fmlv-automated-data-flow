@@ -1,0 +1,122 @@
+[
+ {
+  "slug": "explore-4-hybrid",
+  "link": "https://bespokeleisure.co.uk/models/explore-4-hybrid/",
+  "title": {
+   "rendered": "Explore 4 Hybrid"
+  },
+  "acf": {
+   "stable_model_id": "explore-4-hybrid-v1",
+   "model_range": 82002,
+   "model_hero_path": "/models/explore-4-hybrid/bespoke-explore-4-hybrid-campervan.png",
+   "model_benefits": "4 berth\r\nHot Water\r\nFully Off Grid\t\r\n4 Seats including Isofix\r\nRIB Bed\r\nNCC and Type Approved\r\n",
+   "model_floorplan_path": "/models/explore-4-hybrid/explore-4-hybrid-day-layout.png",
+   "model_berths": 4,
+   "model_travel_seats": "4",
+   "model_toilet": "portable",
+   "model_shower": "external",
+   "model_hot_water": "yes",
+   "model_off_grid": "yes",
+   "model_spec_base_interior": "Electric Windows\r\nAir Conditioning\r\nElectric Mirrors\r\nHeated Seats\r\nSwivel Captain Seats\r\n",
+   "model_spec_conversion_interior": "Austops TUV Tested Pop Top Roof, Froli W 105cm X L 177cm Roof Bed with Mattress\r\nRIB Altair W 112cm x L 187cm Fold Out Rear Seat/Bed with Isofix\r\nRIB Front Swivel Seats\r\nExternal Mounted Refillable LPG Gas Tank\r\nDometic 50 Litre Compressor Fridge with Removeable Ice Box\r\nBolon Flooring\r\nPortable Toilet\r\nPropex Gas Fired Heating System\r\nLoc8 Free Standing Table in Sliding Door\r\nAlloy Wheels\r\nSolar Preparation\r\nHot Water System\r\nActivity Shower\r\nFull Off Grid 12v and 240v power",
+   "model_spec_conversion_exterior": "",
+   "model_spec_conversion_other": ""
+  }
+ },
+ {
+  "slug": "explore-5-hybrid",
+  "link": "https://bespokeleisure.co.uk/models/explore-5-hybrid/",
+  "title": {
+   "rendered": "Explore 5 Hybrid"
+  },
+  "acf": {
+   "stable_model_id": "explore-5-hybrid-v1",
+   "model_range": 82002,
+   "model_hero_path": "/models/explore5-hybrid/explore-5-hybrid.png",
+   "model_benefits": "4 berth\r\nHot Water\r\nFully Off Grid\r\n5 Seats including Isofix\r\nFlexible Storage\r\nNCC and Type Approved",
+   "model_floorplan_path": "https://ik.imagekit.io/bespokeimage/models/explore5-hybrid/explore-5-hybrid-layout-daytime.png",
+   "model_berths": 4,
+   "model_travel_seats": "5",
+   "model_toilet": "portable",
+   "model_shower": "external",
+   "model_hot_water": "yes",
+   "model_off_grid": "yes",
+   "model_spec_base_interior": "Electric Windows\r\nAir Conditioning\r\nElectric Mirrors\r\nHeated Seats\r\nSwivel Captain Seats",
+   "model_spec_conversion_interior": "Austops TUV Tested Pop Top Roof, Froli W 105cm X L 177cm Roof Bed with Mattress\r\nSTIDE 3 seater bed 115cm x 192cm\r\nRIB Front Swivel Seats\r\nExternal Mounted Refillable LPG Gas Tank\r\nDometic 50 Litre Compressor Fridge with Removeable Ice Box\r\nBolon Flooring\r\nPortable Toilet\r\nPropex Gas Fired Heating System\r\nLoc8 Free Standing Table in Sliding Door\r\nAlloy Wheels\r\nSolar Preparation\r\nHot Water System\r\nActivity Shower\r\nFull Off Grid 12v and 240v power",
+   "model_spec_conversion_exterior": "",
+   "model_spec_conversion_other": ""
+  }
+ },
+ {
+  "slug": "explore-5",
+  "link": "https://bespokeleisure.co.uk/models/explore-5/",
+  "title": {
+   "rendered": "Explore 5"
+  },
+  "acf": {
+   "stable_model_id": "explore-5-v1",
+   "model_range": 82002,
+   "model_hero_path": "/models/explore-5/bespoke-explore-5.png",
+   "model_benefits": "4 berth\r\nHot Water\r\n240v Hook Up\r\n5 Seats including Isofix\r\nFlexible Storage\r\nNCC and Type Approved",
+   "model_floorplan_path": "/models/explore-5/explore-5-daytime.png",
+   "model_berths": 4,
+   "model_travel_seats": "5",
+   "model_toilet": "portable",
+   "model_shower": "external",
+   "model_hot_water": "yes",
+   "model_off_grid": "optional",
+   "model_spec_base_interior": "Electric Windows\r\nAir Conditioning\r\nElectric Mirrors\r\nHeated Seats\r\nSwivel Captain Seats",
+   "model_spec_conversion_interior": "Austops TUV Tested Pop Top Roof, Froli W 105cm X L 177cm Roof Bed with Mattress\r\nSTIDE 3 seater bed 115cm x 192cm\r\nRIB Front Swivel Seats\r\nExternal Mounted Refillable LPG Gas Tank\r\nDometic 50 Litre Compressor Fridge with Removeable Ice Box\r\nBolon Flooring\r\nPortable Toilet\r\nPropex Gas Fired Heating System\r\nLithium Leisure Battery with Split Charge System\r\nDometic Two Burner Hob/Sink with Internal Water Tank\r\nLoc8 Free Standing Table in Sliding Door\r\nAlloy Wheels\r\nSolar Preparation\r\nHot Water System\r\nActivity Shower",
+   "model_spec_conversion_exterior": "",
+   "model_spec_conversion_other": ""
+  }
+ },
+ {
+  "slug": "explore-4",
+  "link": "https://bespokeleisure.co.uk/models/explore-4/",
+  "title": {
+   "rendered": "Explore 4"
+  },
+  "acf": {
+   "stable_model_id": "explore-4-v1",
+   "model_range": 82002,
+   "model_hero_path": "/models/explore-4/bespoke-explore-4-campervan-v6.png",
+   "model_benefits": "4 berth\r\nHot Water\r\n240v Hook Up\r\n4 Seats including Isofix\r\nRIB Bed\r\nNCC and Type Approved",
+   "model_floorplan_path": "/models/explore-4/explore-4-layout-daytime.png",
+   "model_berths": 4,
+   "model_travel_seats": "4",
+   "model_toilet": "portable",
+   "model_shower": "external",
+   "model_hot_water": "yes",
+   "model_off_grid": "optional",
+   "model_spec_base_interior": "Electric Windows\r\nAir Conditioning\r\nElectric Mirrors\r\nHeated Seats\r\nSwivel Captain Seats",
+   "model_spec_conversion_interior": "Austops TUV Tested Pop Top Roof, Froli W 105cm X L 177cm Roof Bed with Mattress\r\nRIB Altair W 112cm x L 187cm Fold Out Rear Seat/Bed with Isofix\r\nRIB Front Swivel Seats\r\nExternal Mounted Refillable LPG Gas Tank\r\nDometic 50 Litre Compressor Fridge with Removeable Ice Box\r\nBolon Flooring\r\nPortable Toilet\r\nPropex Gas Fired Heating System\r\nLithium Leisure Battery with Split Charge System\r\nDometic Two Burner Hob/Sink with Internal Water Tank\r\nLoc8 Free Standing Table in Sliding Door\r\nAlloy Wheels\r\nSolar Preparation\r\nHot Water System\r\nActivity Shower",
+   "model_spec_conversion_exterior": "",
+   "model_spec_conversion_other": ""
+  }
+ },
+ {
+  "slug": "crafter-edition",
+  "link": "https://bespokeleisure.co.uk/models/crafter-edition/",
+  "title": {
+   "rendered": "Crafter Edition"
+  },
+  "acf": {
+   "stable_model_id": "crafter-edition-v1",
+   "model_range": 82001,
+   "model_hero_path": "/models/crafter-edition/bespoke-crafter-edition-campervan-3.png",
+   "model_benefits": "Fixed Double Bed\r\nShower and Toilet\r\nFully Off-Grid\r\nLarge Rear Storage\r\nHot Water\r\nNCC and Type Approved",
+   "model_floorplan_path": "/models/crafter-edition/crafter-edition-4-seater-layout.png",
+   "model_berths": 2,
+   "model_travel_seats": "Up to 4",
+   "model_toilet": "built_in",
+   "model_shower": "internal_external",
+   "model_hot_water": "yes",
+   "model_off_grid": "yes",
+   "model_spec_base_interior": "Electric Windows\r\nAir Conditioning\r\nElectric Heated Mirrors\r\nHeated Seats\r\nSwivel Captain Seats\r\nHeated Windscreen",
+   "model_spec_conversion_interior": "Luxury corian solid surface worktop\r\nAmtico flooring with choice of colours\r\nLuxury fitted blinds to all windows\r\nLithium 300ah leisure battery\r\n200w slimline rigid solar panel \u2013 roof mounted\r\nVictron inverter/charger 2000w\r\n10L electric water heating system with 12v off grid functionality\r\nUnderslung 63L freshwater tank\r\nUnderslung 40L wastewater tank\r\nEberspacher Diesel heating system\r\nDometic Air Conditioning unit\r\nDometic induction hob\r\nDometic 70l compressor fridge freezer\r\nDometic air fryer/microwave combi oven\r\nThetford fixed toilet with removeable cassette\r\nFroli sprung fixed rear bed and custom mattress (W121cm x L186cm)\r\n3m Dometic windout awning with LED light\r\nCamping table & chairs neatly stored in the rear doors\r\nRear hot/cold activity shower",
+   "model_spec_conversion_exterior": "",
+   "model_spec_conversion_other": ""
+  }
+ }
+]
