@@ -1662,6 +1662,35 @@ This is the same rule as "a filtered roster must report what it filtered out", a
 the other end: the Carthago filter reported nothing because, as far as it could tell, there
 was nothing to report.
 
+### A relisted product comes back as "new", because the baseline cannot see it
+
+**The baseline is not every row FMLV holds.** It keeps a row only where it is *not archived
+and active*, and then only for this calendar year or next — `_is_current_model_year` in
+`src/cli.py`. A **deactivated** row is therefore invisible to the matcher while the
+manufacturer's page is not, so **the day a manufacturer relists something that was
+deactivated, the run proposes it as a new product** and accepting that creates a duplicate
+beside the row FMLV already has.
+
+Chausson's V691 is the worked example, 27 October 2026. The site listed 19 models against a
+baseline of 18 and the run proposed `Vans V691` as new. FMLV already held it as product
+8322, `Sport` V691 at year **2026 — a year that is in scope** — deactivated. Same price
+(£60,990), same MTPLM, same length, width, berths, seats and chassis; only MRO (3015 →
+3085) and height (2610 → 2650) had moved, which is an ordinary model-year revision. The fix
+was to rename 8322 and bring it back into scope keeping its product ID, after which the run
+matched it and proposed those two figures as ordinary changes.
+
+**The year is the wrong thing to blame, and blaming it was the mistake here.** Of Chausson's
+131 rows only 18 survive the filter, and it is tempting to read that as "only the current
+model year counts". It is not: the 2026 rows that drop out split into six *archived* trim
+twins and two merely *deactivated* products, and only the archiving is permanent.
+
+**So before accepting a new product, search the export for a deactivated row carrying the
+same model number** — and settle it on price and mass, never on length alone, since a range
+shares its chassis lengths. Reactivate that product rather than creating a second one. This
+is not specific to one brand; any manufacturer can relist a layout it dropped, and
+a deactivated product is kept Google-findable on purpose, and never archived, means these rows are kept on purpose rather than cleared
+away.
+
 ### One manufacturer, several brands
 
 **`fmlv_manufacturer` is not unique**, and neither is it meant to be: it names the *legal*
