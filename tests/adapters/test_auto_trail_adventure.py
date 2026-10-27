@@ -50,14 +50,22 @@ def _spec(model: str):
 # --- the range label ------------------------------------------------------------------
 
 
-def test_the_label_keeps_the_two_adventures_apart() -> None:
-    """**Ours, not Auto-Trail's.** They call it simply "Adventure", but they already sell
-    an Adventure campervan range and FMLV files both under one manufacturer. The suffix
-    copies the shape Auto-Trail themselves use for `Expedition Coachbuilt`."""
-    assert ADVENTURE_RANGE_LABEL == "Adventure Coachbuilt"
-    campervan_labels = {label for _path, label in auto_trail.DEFAULT_RANGES}
-    assert "Adventure" in campervan_labels
-    assert ADVENTURE_RANGE_LABEL not in campervan_labels
+def test_the_label_is_auto_trails_own_name() -> None:
+    """**Auto-Trail call it simply "Adventure"**, and so do we since 27 October 2026.
+
+    It wore `Adventure Coachbuilt` for twenty-five days, to keep it apart from the
+    Adventure campervans. Those are withdrawn, so the suffix now only hides the range
+    from anyone searching the name Auto-Trail actually publish.
+    """
+    assert ADVENTURE_RANGE_LABEL == "Adventure"
+
+
+def test_the_withdrawn_campervan_adventure_is_off_the_roster() -> None:
+    """It has to be, or two ranges would file under one name — see
+    `_campervan_adventure_returned`, which is what now watches for its return."""
+    paths = {path for path, _label in auto_trail.DEFAULT_RANGES}
+    assert "campervans-range/adventure" not in paths
+    assert ADVENTURE_RANGE_LABEL not in {label for _path, label in auto_trail.DEFAULT_RANGES}
 
 
 # --- reading the price list -----------------------------------------------------------

@@ -77,7 +77,6 @@ DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("motorhomes-range/imala", "Imala"),
     ("motorhomes-range/frontier", "Frontier"),
     ("motorhomes-range/grande-frontier", "Grande Frontier"),
-    ("campervans-range/adventure", "Adventure"),
     ("campervans-range/expedition", "Expedition"),
     ("campervans-range/v-line-se", "V-Line SE"),
     ("campervans-range/v-line-sport", "V-Line Sport"),
@@ -88,17 +87,17 @@ DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
 #: 2027 price list PDF — but `motorhomes-range-sitemap.xml` lists six ranges and Adventure
 #: is not one of them, so the ordinary roster cannot reach it. See `adventure_products`.
 #:
-#: **The label is ours, not Auto-Trail's.** They call it simply "Adventure", in the news
-#: post and in the spreadsheet. But they already sell an *Adventure campervan* range, and
-#: FMLV files both under one manufacturer, so a range filter would mix a two-model
-#: campervan range with a four-model coachbuilt one. The suffix follows Auto-Trail's own
-#: shape for the same problem — they publish `/motorhomes-range/expedition-coachbuilt/`
-#: beside a campervan `Expedition` for exactly this reason. The requester ruled on
-#: 2 October 2026 that Adventure gets the same treatment.
-#:
-#: **Switch to Auto-Trail's own name the moment they publish a range page** — see
-#: `_adventure_range_is_published`, which stops this code the day that happens.
-ADVENTURE_RANGE_LABEL = "Adventure Coachbuilt"
+#: **Auto-Trail's own name, which is simply "Adventure"** — in the price list heading, in
+#: the launch post, and in the 2027 show line-up. It carried the suffix `Adventure
+#: Coachbuilt` from 2 October to 27 October 2026, to keep it apart from the *Adventure
+#: campervans* (55 and 65) that FMLV filed under the same manufacturer. **That collision
+#: is gone:** the campervans are withdrawn on four independent sources — the range page
+#: 404s, `campervans-range-sitemap.xml` omits it, the 2027 price list has no rows for
+#: them, and the NEC line-up lists "Adventure – All New" among the motorhomes with no
+#: campervan Adventure at all. The requester could not find the suffixed name anywhere on
+#: the site, which is the point: nor can a buyer. So the range takes Auto-Trail's name,
+#: on the same footing as F-Line, Excel and Imala, which never needed a suffix.
+ADVENTURE_RANGE_LABEL = "Adventure"
 
 #: What the website's "Price from" card adds to the price list's ex-works-including-VAT
 #: figure. **Verified across 25 models** on 2 October 2026: every card in the nine ranges
@@ -1292,6 +1291,32 @@ def _adventure_range_is_published(http: Fetcher, on_progress: Callable[[str], No
     return False
 
 
+def _campervan_adventure_returned(http: Fetcher, on_progress: Callable[[str], None]) -> bool:
+    """Have the Adventure *campervans* come back after being withdrawn?
+
+    They left `DEFAULT_RANGES` on 27 October 2026, once four sources agreed they were
+    gone. Dropping a page from the roster also drops the `SKIPPED` line that would have
+    announced its return, so this asks the question the roster no longer asks — and it
+    matters more than it did, because `ADVENTURE_RANGE_LABEL` is now the bare "Adventure"
+    and a revived campervan range would file under the same name as the coachbuilts.
+    """
+    url = f"{BASE_URL}/campervans-range/adventure/"
+    try:
+        html = http.fetch(url).file_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return False
+    if _NOT_FOUND_TITLE.search(html):
+        return False
+    on_progress(
+        f"[{ADVENTURE_RANGE_LABEL}] WARNING: {url} resolves again, so the Adventure "
+        f"campervans withdrawn in October 2026 are back. They are NOT collected — the "
+        f"page left DEFAULT_RANGES — and until it is restored they would also share the "
+        f"range name {ADVENTURE_RANGE_LABEL!r} with the coachbuilts, so the suffix that "
+        f"kept the two apart has to come back with them"
+    )
+    return True
+
+
 def collect(
     http: Fetcher,
     browser: object,  # noqa: ARG001 — Auto-Trail needs no JS; see the module docstring
@@ -1410,6 +1435,7 @@ def collect(
     # The Adventure range has no range page, so the loop above cannot reach it. It is
     # collected from Auto-Trail's own 2027 price list joined to the specification
     # spreadsheet — see `adventure_products` — and retires itself the day they publish it.
+    _campervan_adventure_returned(http, on_progress)
     if not _adventure_range_is_published(http, on_progress):
         price_list_url = _price_list_pdf_url(http, on_progress)
         if price_list_url is not None:

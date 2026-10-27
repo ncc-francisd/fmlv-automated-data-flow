@@ -17,6 +17,11 @@ class of column-misalignment failure that dominates [Morelo](morelo.md),
 | Motorhomes | Expedition Coachbuilt, Excel, F-Line, Imala, Frontier, Grande Frontier | 21 |
 | Campervans | Adventure, Expedition, V-Line SE, V-Line Sport | 16 |
 
+**That was the August 2025 roster. Three of those ten ranges are withdrawn** — Expedition
+Coachbuilt, V-Line SE and the Adventure campervans, confirmed on 27 October 2026 by 404s,
+the sitemaps and the 2027 price list together. Ten products go with them, and the 2027
+Adventure coachbuilts replace them. See the Adventure section below.
+
 ## What the user brought to the survey
 
 Ben supplied the example model page and the Expedition Coachbuilt tech spec PDF, and
@@ -461,7 +466,7 @@ to find the specification PDF, but only until the first page that had it. This i
 traffic, and it buys the only source Auto-Trail has for the five positional fields — the
 documents settle none of them.
 
-## The Adventure Coachbuilt range — 2 October 2026
+## The Adventure range — 2 October 2026, renamed 27 October 2026
 
 **Auto-Trail's new 2027 coachbuilt range, which has no range page.** It is announced on a
 news post, specified in a spreadsheet sent to the NCC, and priced in the 2027 price list
@@ -469,18 +474,46 @@ PDF — but `motorhomes-range-sitemap.xml` lists six ranges and Adventure is not
 them, so the ordinary roster cannot reach it. Four models: 64, 74, 76 and 76G, on the
 Peugeot Boxer, all `coach_built_over_cab_bed`.
 
-**The range label is ours.** Auto-Trail call it simply "Adventure" — in the news post and
-in the spreadsheet — but they already sell an *Adventure campervan* range, and FMLV files
-both under one manufacturer, so a range filter would mix a two-model campervan range with
-a four-model coachbuilt one. The suffix copies the shape Auto-Trail themselves use for the
-same problem: they publish `/motorhomes-range/expedition-coachbuilt/` beside a campervan
-`Expedition`. The requester ruled on it, reasoning that F-Line, Excel and Imala are just as
-coachbuilt and carry no suffix *because they have no campervan twin*.
+**The range is called "Adventure", and that is now the label.** It carried `Adventure
+Coachbuilt` from 2 to 27 October 2026, to keep it apart from the *Adventure campervans*
+(55 and 65) that FMLV filed under the same manufacturer — the shape Auto-Trail themselves
+use in `/motorhomes-range/expedition-coachbuilt/`. **The collision has gone.** The
+campervans are withdrawn on four independent sources: `campervans-range/adventure` 404s,
+`campervans-range-sitemap.xml` omits it, the 2027 price list prices no 55 or 65, and the
+NEC 2026 line-up lists "Adventure – All New" among the motorhomes with no campervan
+Adventure at all. So the range reverts to Auto-Trail's own name, on the same footing as
+F-Line, Excel and Imala, which never needed a suffix *because they have no campervan
+twin*.
+
+The requester asked on 27 October where the suffixed name appeared on the site. **It never
+did** — that is what settled it. A range name nobody publishes is a range name nobody can
+search for.
+
+`campervans-range/adventure` left `DEFAULT_RANGES` with the rename, because two ranges
+cannot share one label. Dropping a page from the roster also drops the `SKIPPED` notice
+that would announce its return, so `_campervan_adventure_returned` now asks that question
+once a run and says the suffix has to come back if the answer is ever yes.
 
 **It retires itself.** `_adventure_range_is_published` checks both plausible range URLs
 every run; the day either resolves, the four built-in products are not emitted and the run
 says so, because keeping them would propose each Adventure twice. The label should then be
 taken from Auto-Trail's own page.
+
+### It is a coachbuilt, and Auto-Trail say so
+
+Worth recording, because the model numbers (64, 74, 76, 76G) sit in the same band as the
+campervans and the only Adventure *content* on the site is a blog post about the campervan
+55 and 65, so the range reads as a campervan to anyone searching it. The launch post
+settles it outright:
+
+> three of the four new Adventure **motorhomes** … Built on the **Peugeot Boxer chassis**
+> … A new **Luton overcab bulkhead design**, exclusive to the Adventure range, providing
+> an improved and convenient bed-making experience.
+
+A Luton overcab bulkhead *is* `coach_built_over_cab_bed`. The published figures agree —
+3041mm high and 2353mm wide, against 2680mm and 2050mm for every Auto-Trail campervan —
+and the price list files Adventure between F-Line and Imala, both coachbuilt, with the
+campervan Expedition and V-Line Sport pages elsewhere in the document.
 
 ### Where each figure comes from
 
