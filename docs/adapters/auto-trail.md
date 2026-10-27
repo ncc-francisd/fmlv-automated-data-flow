@@ -472,7 +472,7 @@ documents settle none of them.
 news post, specified in a spreadsheet sent to the NCC, and priced in the 2027 price list
 PDF — but `motorhomes-range-sitemap.xml` lists six ranges and Adventure is not one of
 them, so the ordinary roster cannot reach it. Four models: 64, 74, 76 and 76G, on the
-Peugeot Boxer, all `coach_built_over_cab_bed`.
+Peugeot Boxer, all `coach_built_low_profile` — **an estimate, see below**.
 
 **The range is called "Adventure", and that is now the label.** It carried `Adventure
 Coachbuilt` from 2 to 27 October 2026, to keep it apart from the *Adventure campervans*
@@ -504,16 +504,37 @@ taken from Auto-Trail's own page.
 Worth recording, because the model numbers (64, 74, 76, 76G) sit in the same band as the
 campervans and the only Adventure *content* on the site is a blog post about the campervan
 55 and 65, so the range reads as a campervan to anyone searching it. The launch post
-settles it outright:
+settles **that much** outright:
 
 > three of the four new Adventure **motorhomes** … Built on the **Peugeot Boxer chassis**
 > … A new **Luton overcab bulkhead design**, exclusive to the Adventure range, providing
 > an improved and convenient bed-making experience.
 
-A Luton overcab bulkhead *is* `coach_built_over_cab_bed`. The published figures agree —
-3041mm high and 2353mm wide, against 2680mm and 2050mm for every Auto-Trail campervan —
-and the price list files Adventure between F-Line and Imala, both coachbuilt, with the
-campervan Expedition and V-Line Sport pages elsewhere in the document.
+2353mm wide against 2050mm for every Auto-Trail campervan, and the price list files
+Adventure between F-Line and Imala with the campervan ranges on their own pages.
+
+### Which coachbuilt is an estimate, and the height does not decide it
+
+`coach_built_low_profile`, **estimated by the requester on 27 October 2026.** Auto-Trail
+publish no body type for this range, no floorplan and not one photograph, so there is
+nothing to derive it from; it carried `coach_built_over_cab_bed` unsourced from 2 October
+until he asked where that came from.
+
+**A height argument was offered for over-cab and withdrawn.** 3041mm proves nothing:
+FMLV holds Frontier Delaware and Comanche at **3030mm** and Grande Frontier at **3040mm**
+as low profiles, so Auto-Trail's own data puts both body types in that band. Check the
+export before reaching for a threshold.
+
+What the estimate rests on: a fixed over-cab bed is near-extinct in a new build, and the
+Luton wording above reconciles with a low profile rather than against it — the Adventure
+is the **only** coachbuilt range whose options list does not sell a drop-down bed, where
+F-Line and Imala both charge GBP1,500, yet every Adventure layout sleeps four. A
+drop-down bed fitted as standard explains the bulkhead redesign and the missing option
+together.
+
+**Overturn it on a floorplan or an interior photograph**, not on a dimension.
+`_ADVENTURE_BODY_TYPE_NOTE` carries all of this into review, so the value never arrives
+looking like something that was parsed.
 
 ### Where each figure comes from
 

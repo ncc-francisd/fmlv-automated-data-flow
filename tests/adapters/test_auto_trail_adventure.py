@@ -123,7 +123,24 @@ def test_four_products_are_built() -> None:
 
     assert [p.model for p in products] == ["64", "74", "76", "76G"]
     assert {p.range_label for p in products} == {ADVENTURE_RANGE_LABEL}
-    assert {p.body_type for p in products} == {BodyType.COACH_BUILT_OVER_CAB_BED}
+    assert {p.body_type for p in products} == {BodyType.COACH_BUILT_LOW_PROFILE}
+
+
+def test_the_body_type_is_an_estimate_and_says_so() -> None:
+    """Auto-Trail publish no body type, no floorplan and no photograph of this range, so
+    the value is the requester's judgement of 27 October 2026 and has to reach review
+    labelled as one — it carried `coach_built_over_cab_bed` unsourced before that."""
+    assert auto_trail.ADVENTURE_BODY_TYPE is BodyType.COACH_BUILT_LOW_PROFILE
+    note = auto_trail._ADVENTURE_BODY_TYPE_NOTE
+    assert "ESTIMATED by the requester" in note
+    assert "floorplan or an interior photograph" in note
+
+
+def test_the_estimate_does_not_rest_on_the_height() -> None:
+    """The argument I offered first and had to withdraw: 3041mm proves nothing, because
+    Auto-Trail's own low profiles sit at 3030mm and 3040mm in FMLV."""
+    assert "NOT on the" in auto_trail._ADVENTURE_BODY_TYPE_NOTE
+    assert "3041mm height" in auto_trail._ADVENTURE_BODY_TYPE_NOTE
 
 
 def test_the_price_list_overrules_a_spreadsheet_length_that_disagrees() -> None:

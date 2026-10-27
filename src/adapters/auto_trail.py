@@ -151,6 +151,42 @@ ADVENTURE_SPECS: tuple[_AdventureSpec, ...] = (
     _AdventureSpec("76G", 4, 4, 3000, 2353, 3041, 7288),
 )
 
+#: **The requester's estimate, not a published figure.** Auto-Trail publish no body type
+#: for the Adventure, no floorplan and not one photograph — there is nothing to derive it
+#: from, which is why the range carried `coach_built_over_cab_bed` unsourced from
+#: 2 October. The requester settled it on 27 October 2026: a fixed over-cab bed is close
+#: to extinct in a new build, and the one piece of published wording that bears on it
+#: reconciles with a low profile rather than against it. The launch post promises "a new
+#: Luton overcab bulkhead design, exclusive to the Adventure range, providing an improved
+#: and convenient bed-making experience", and the Adventure is the only coachbuilt range
+#: whose options list does **not** sell a drop-down bed — F-Line and Imala both charge
+#: GBP1,500 for one — while every Adventure layout still sleeps four. A drop-down bed
+#: fitted as standard explains both at once.
+#:
+#: **What would overturn it:** a floorplan or an interior photograph showing a fixed bed
+#: in the Luton. Height cannot, and must not be used — FMLV holds Frontier Delaware and
+#: Comanche at 3030mm and Grande Frontier at 3040mm as low profiles, against the
+#: Adventure's 3041mm, so Auto-Trail's own data puts both body types in that band.
+ADVENTURE_BODY_TYPE = BodyType.COACH_BUILT_LOW_PROFILE
+
+#: Where the berths, the belted seats, the two lengths and the Luton wording all come
+#: from. It is the only page Auto-Trail have published about the 2027 Adventure at all.
+_ADVENTURE_LAUNCH_POST_URL = (
+    f"{BASE_URL}/were-heading-to-the-motorhome-caravan-show-2026/"
+)
+
+#: Said in full on every Adventure's `body_type`, because an estimate that reaches review
+#: looking like a parsed figure is worse than no estimate at all.
+_ADVENTURE_BODY_TYPE_NOTE = (
+    "ESTIMATED by the requester on 27 October 2026, not published. Auto-Trail state no "
+    "body type for the Adventure and publish no floorplan or photograph of it. A fixed "
+    "over-cab bed is near-extinct in a new build, and the launch post's new 'Luton "
+    "overcab bulkhead design ... bed-making experience' reads as a drop-down bed fitted "
+    "as standard — the Adventure is the only coachbuilt range that does not sell one as "
+    "an option. Overturn this on a floorplan or an interior photograph, NOT on the "
+    "3041mm height: Frontier and Grande Frontier are low profiles at 3030 and 3040mm"
+)
+
 #: The spreadsheet, named in every Adventure provenance so a reviewer can see which
 #: document a figure came from. Move both on when a new one arrives.
 _ADVENTURE_SPEC_SOURCE = "the Adventure specification spreadsheet Auto-Trail sent the NCC"
@@ -293,7 +329,7 @@ def adventure_products(
                 mh_height_mm=spec.mh_height_mm,
                 mtplm_kilograms=row.mtplm_kilograms if row else None,
                 mro_kilograms=spec.mro_kilograms,
-                body_type=BodyType.COACH_BUILT_OVER_CAB_BED,
+                body_type=ADVENTURE_BODY_TYPE,
                 base_vehicle_manufacturer=(
                     row.base_vehicle_manufacturer if row else fmlv_base_vehicle("Peugeot")
                 ),
@@ -1093,6 +1129,14 @@ def _build_extracted_motorhome(
                 f"machine-readable and not refreshed by later runs — re-verify at the next "
                 f"model-year changeover"
             ),
+        )
+
+    # Every other range derives its body type from the specification table's roof rows.
+    # The Adventure has no table, so its value is the requester's estimate and says so.
+    if product.range_label == ADVENTURE_RANGE_LABEL and product.body_type is not None:
+        provenance["body_type"] = Provenance(
+            source_url=_ADVENTURE_LAUNCH_POST_URL,
+            snippet=f"{product.label} — {_ADVENTURE_BODY_TYPE_NOTE}",
         )
 
     if product.rrp_pounds is not None:
