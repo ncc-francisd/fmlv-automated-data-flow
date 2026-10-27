@@ -202,7 +202,7 @@ table is refused entirely. Each of these cost all three ranges until it was fixe
 above, leaving fourteen labels against twelve values.
 
 **2. `²` is a word character.** The slide-out areas read `5.3m²`, and a word boundary after
-the unit — `m` — fails on exactly those rows. One row lost, whole table refused. There is
+the unit — `m\\b` — fails on exactly those rows. One row lost, whole table refused. There is
 no boundary now, which is safe because no label on any brochure contains a digit.
 
 **3. A wrapped value.** `4,300kg (3,500kg if downplated` continues onto `for towing on

@@ -281,7 +281,7 @@ backwards from the next one.
 ### A bug worth recording, because it was mine and not the site's
 
 The overall length came out blank for all 18 on the first run. The cause was a stray
-**backspace character** (`0x08`) at the end of the length pattern — a `` written into a
+**backspace character** (`0x08`) at the end of the length pattern — a `\\x08` written into a
 non-raw string by the script that patched the file, so the regex demanded a literal backspace
 after `m` and could never match. Every component of the pattern matched in isolation, which
 made it look like a site problem for far longer than it should have.

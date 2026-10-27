@@ -226,7 +226,7 @@ _EQUIPMENT_HEADING = re.compile(
 #: Coachman publish no options section today. The pattern is still declared, because a
 #: section that appears later and is read as standard is how a vehicle acquires equipment
 #: it has not got — see `habitation.Equipment`.
-_OPTIONAL_HEADING = re.compile(r"(?:option|optional|extra|upgrade|pack)s?", re.I)
+_OPTIONAL_HEADING = re.compile(r"\b(?:option|optional|extra|upgrade|pack)s?\b", re.I)
 
 #: Where the equipment stops. Without it the last section runs to the end of the document
 #: and takes the footer's model lists and newsletter form with it.

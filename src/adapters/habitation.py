@@ -209,9 +209,16 @@ def refrigeration_from(lines: Iterable[str]) -> Feature | None:
 #: Air Top and Eberspächer's Airtronic are both sold as one, and Moto-Trek list a
 #: "Webasto Diesel Night heater". There is no such thing as a wet night heater: a water
 #: heater is sold as a water heater.
+#: `combi` is here for the **Truma Combi**, which is a blown-air heater and is listed by
+#: that bare name — Elddis's "Combi 4E Gas/Electric Heater" resolves on it alone. But the
+#: word is not the heater's: a *combi oven* is a kitchen appliance, and Bespoke's Crafter
+#: Edition lists a "Dometic air fryer/microwave combi oven" that was being read as the
+#: vehicle's heating system (27 October 2026). So the appliance nouns are excluded, which
+#: keeps every heater that needs the word and drops the oven that does not.
 _WARM_AIR = re.compile(
     r"\bblown[- ]air\b|\bwarm[- ]air\b|\bhot[- ]air\b|\bforced[- ]air\b"
-    r"|\bcombi\b|\bairtop\b|\bair top\b|\bnight heater\b",
+    r"|\bcombi\b(?!\s*(?:oven|microwave|grill|hob|cooker))"
+    r"|\bairtop\b|\bair top\b|\bnight heater\b",
     re.I,
 )
 

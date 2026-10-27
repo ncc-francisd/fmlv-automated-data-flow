@@ -60,6 +60,7 @@ carries a deliberate reading of Bespoke's own naming, and the run says so.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -139,6 +140,12 @@ _EQUIPMENT_FIELDS = (
     "model_spec_conversion_other",
     "model_spec_base_interior",
 )
+
+#: An appliance that heats **water**, not the van. Bespoke's Crafter Edition lists a "10L
+#: electric water heating system", which `habitation`'s "is the heating unclear" check
+#: matches because it contains the word — and reporting that as heating of an undetermined
+#: kind sends a reviewer hunting for a system that is not there.
+_WATER_HEATER = re.compile(r"\bwater heat(?:er|ing)\b|\bboiler\b|\bhot water\b", re.I)
 
 #: How each habitation reading is introduced. Findings for a person to type in.
 _FEATURE_NOTES: dict[str, str] = {
@@ -415,6 +422,28 @@ def _notes(model: BespokeModel) -> Iterable[str]:
             f"[{model.label}] washroom, for the habitation fields: toilet "
             f"{model.toilet or 'not stated'!r}, shower {model.shower or 'not stated'!r}"
         )
+    features = habitation.features_from(model.equipment)
+    if "heating" not in features:
+        unclear = habitation.heating_is_unclear(model.equipment)
+        if unclear is None:
+            yield f"[{model.label}] NO HEATING IS MENTIONED at all in its specification"
+        elif _WATER_HEATER.search(unclear):
+            # A water heater is not space heating, and calling it heating of an
+            # undetermined kind sends a reviewer looking for a system that is not there.
+            yield (
+                f"[{model.label}] NO SPACE HEATING IS STATED. The only line mentioning "
+                f"heating is {unclear!r}, which heats water"
+            )
+        else:
+            # **The vehicle has heating; what it has not got is a named kind.** Saying
+            # "none" here would be worse than saying nothing — the Explores list a
+            # "Propex Gas Fired Heating System", which is a real heater whose type the
+            # shared vocabulary does not settle.
+            yield (
+                f"[{model.label}] HEATING IS FITTED BUT ITS KIND IS NOT NAMED: "
+                f"{unclear!r}. Nothing is proposed — blown air against wet central has to "
+                f"be entered by hand"
+            )
 
 
 def collect(

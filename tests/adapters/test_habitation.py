@@ -744,3 +744,28 @@ def test_model_specific_is_not_a_layout_list() -> None:
     lines = ["Front electric drop-down bed (model specific)"]
 
     assert habitation.lines_for_layout(lines, "330") == lines
+
+
+def test_a_combi_oven_is_not_a_heating_system() -> None:
+    """`combi` is in the blown-air vocabulary for the **Truma Combi**, which is listed by
+    that bare name. But the word is not the heater's: Bespoke's Crafter Edition lists a
+    "Dometic air fryer/microwave combi oven", which was being read as the vehicle's
+    heating system until 27 October 2026."""
+    assert habitation.heating_from(["Dometic air fryer/microwave combi oven"]) is None
+    assert habitation.heating_from(["Dometic combi microwave"]) is None
+
+
+def test_the_truma_combi_still_resolves_on_its_bare_name() -> None:
+    """Which is why the fix had to be narrow — Elddis's GTV campervans state only
+    "Combi 4E Gas/Electric Heater", with no other word the vocabulary knows."""
+    found = habitation.heating_from(["Combi 4E Gas/Electric Heater"])
+    assert found is not None
+    assert found[0] is Heating.BLOWN_AIR
+    assert habitation.heating_from(["Truma Combi 6E"])[0] is Heating.BLOWN_AIR
+
+
+def test_an_alde_combi_boiler_is_still_wet() -> None:
+    """Fifth Wheel Co's "Alde Compact HE 3030 Combi Boiler" — wet wins over the combi."""
+    found = habitation.heating_from(["Alde Compact HE 3030 Combi Boiler"])
+    assert found is not None
+    assert found[0] is Heating.WET_CENTRAL
