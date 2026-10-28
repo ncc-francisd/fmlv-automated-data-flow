@@ -1,7 +1,8 @@
 # Rapido — survey, 27 October 2026
 
-**Status: surveyed, adapter not yet written.** Registry row added (`manufacturer_id` 129,
-`fmlv_manufacturer` "Rapido").
+**Status: adapter written, 28 October 2026** (`src/adapters/rapido.py`). Registry row
+`manufacturer_id` 129, `fmlv_manufacturer` "Rapido". All 29 layouts parse and reconcile
+against the fixtures; the first live run has not been made yet.
 
 Rapido is a French manufacturer (Groupe Rapido, Mayenne) building campervans, low-profile
 coachbuilts and A-class motorhomes. No caravans — the `touring-caravans` sheet of the FMLV
@@ -64,17 +65,45 @@ and here the structure makes guessing unnecessary.
 A parsed row whose cell count does not equal the page's model count must be dropped with an
 `on_progress` warning, not realigned.
 
-### The self-check: MIRO + payload = GVW
+### Binding columns to layouts, and the one page that needs help
 
-Rapido publish all three. **It holds for all 29 models**, including the two chassis weights:
+The same `dx` rule reads the column headings, which is where it is indispensable: page 3
+sets `V65 XL` and `V68` with the `XL` and the following `V` inside a single element, as
+`XLV`, and only the 86.75 jump between them says they belong to different vehicles. The
+fragments are then glued into one normalised string (`v64v65xlv68`) and partitioned against
+the comparator's roster, so the adapter never has to decide where Rapido put a space.
+
+**Page 9 is the exception, and it cannot be partitioned.** Calaméo sets two of its heading
+letters as outlines rather than as text — the `i` of `C66i` and the `C` of `C86i` are
+simply not in the SVG as characters — so the glued string is `c6686i`, which is short of a
+full set. That page falls back on the order the series is published in, and only after
+checking that what *was* read appears within the expected names in order: `c6686i` is a
+subsequence of `c66ic86i` and is not one of `c86ic66i`, so the fallback cannot silently
+transpose two layouts. It is narrated on every run.
+
+The series a page belongs to comes from the guide's own title line, which only the first
+page of each series carries; the pages after it head themselves with the chassis
+("CAMPERVANS WITH FIAT CHASSIS"), so the last title seen is carried forward.
+
+### The self-check: MIRO + payload = a gross weight printed on the page
+
+Rapido publish all three. **It holds for all 29 models**, including both chassis:
 
 - C03 — 2885 + 615 = 3500
 - i66M ALDE — 3360 + 1140 = 4500
 - i166M — 3740 + 760 = 4500
 
-Any model failing this is dropped, not proposed. The guide prints the GVW as a chassis
-*choice* (`LIGHT: 3,5 T / 3,65 T`, `HEAVY: 4,25 T*`), so take the base figure — the one the
-arithmetic lands on — per the README's "One column, so record the base vehicle".
+Any model failing this is dropped, not proposed. V55's MIRO with V62's payload is 3520,
+and no Rapido is sold at 3520, so a column slipped by one does not survive.
+
+**The GVW is not reliably a *row*, so the whole page is read for it.** On page 2 it parses
+as `Gross vehicle weight (GVW) | 3,5 T / 4,25 T | 3,5 T / 4,25 T`; on pages 12 and 24 the
+values sit in free-standing `LIGHT:` and `HEAVY:` elements that no cell split lines up
+with. What the check needs is only that the figure appears somewhere on the page, so every
+tonnage (`3,5 T`) and every `GVW … kg` on the page goes into one set and the sum has to
+land in it. The MTPLM recorded is that sum, which is the base chassis — the TRUMA
+Distinctions come out at 3500 and the ALDE ones at 4500, which is what Rapido mark
+`LIGHT`/`HEAVY`.
 
 ### The comparator is a free second opinion
 
@@ -203,10 +232,26 @@ The technical-data pages carry, per model and cleanly parseable: rear garage (wi
 height, heated, access aperture both sides), heating type, fridge type and volume, fresh and
 waste water, and bed sizes including drop-down and cab beds.
 
-Heating maps straightforwardly — `TRUMA Combi` and `WEBASTO` are blown air, `ALDE 3030+` is
-wet central. Note `TRUMA Combi 6 INET X / ALDE` on the 80dF, where ALDE is an option: take
-the standard. The existing `_WARM_AIR` combi-oven guard in `habitation.py` already handles
-the word "combi" safely.
+`TRUMA Combi` reads as blown air and `ALDE 3030+` as wet central, straight out of the
+existing vocabulary — the `_WARM_AIR` combi-oven guard in `habitation.py` already handles
+the word "combi" safely. Four layouts print `TRUMA Combi 6 INET X / ALDE as option`, where
+reading the whole cell would call a blown-air motorhome wet-central off an extra; the
+clause marked as an option is cut and the standard system stands.
+
+**Two findings come out empty, and both are right.**
+
+- **V64's heating is left unread.** The cell says `WEBASTO 4 kW DIESEL` — a make, a fuel
+  and an output, none of which settles wet against blown air, and the README is explicit
+  that neither the fuel nor the output may be inferred from. Webasto build both kinds. It
+  is narrated through `heating_is_unclear` rather than guessed, and it is worth asking
+  Rapido which system the V64 has.
+- **The 80dF has no refrigeration reading.** Its pages print `Absorption ● Compression ○`
+  as a *choice* rather than one value per column, so the row's cell count does not match
+  and nothing is asserted — the cardinality rule working as intended.
+
+Microwave and separated shower/toilet are recorded as checked-and-not-stated. The
+equipment pages hold them, but as ●/○ grids whose mark counts do not always equal the
+column count, so reading them would mean realigning by assumption.
 
 The **equipment and comfort** pages (4, 5, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27) hold the
 oven, microwave and washroom marks as ●/○/- grids, but there the label and the marks sit on
@@ -272,7 +317,7 @@ that is a correction, not drift. Expect roughly:
   4.5-tonne for 2027
 - `type_coach_built_over_cab_bed` → `type_coach_built_low_profile` on 696F
 
-### Range names: settled 28 October 2026 — rename in FMLV first
+### Range names: corrected in FMLV, 28 October 2026
 
 FMLV used eight range strings for six ranges. **Case and spacing do not matter to the
 matcher**, so four of the six already score 1.000 against Rapido's own names; only two
@@ -294,8 +339,10 @@ halves the score.
 `V65 XL`, which tokenises as `v65` against the baseline's `v65xl`; the matcher returns a hard
 zero when both sides name a code and none agree. Only a model-level correction fixes it.
 
-Francis is renaming these 12 rows in FMLV **before the first run** (export, edit the CSV,
-re-upload — a Nova-only edit does not reach the export the baseline is read from):
+**All twelve edits landed on 28 October 2026** — exported, edited in the CSV and
+re-uploaded, because a Nova-only edit does not reach the export the baseline is read from.
+The export now holds six ranges, every one of them `SERIE …`, and `V65 XL` with its space.
+The rows that changed were:
 
 | product_id | range | model |
 |---|---|---|
@@ -312,14 +359,19 @@ four ranges already read that way, and `SERIE VANS` is a string the export alrea
 last three model edits are not needed for matching (all 0.750) but retire stale names while
 nothing depends on them.
 
-**The adapter must still carry `RENAMED_RANGES` and `RENAMED_MODELS`** mapping Rapido's names
-onto the pre-rename FMLV ones. `token_similarity` takes the better of the two scores, so the
-entries match the old names while they remain and fall away by themselves once the edit
-lands — a run made before the re-upload then cannot orphan anything. Delete them when
-`stale_renames` reports them dead.
+**The adapter still carries `RENAMED_RANGES` and `RENAMED_MODELS`** mapping Rapido's names
+onto the pre-rename FMLV ones, and they are expected to be stale from the start. They are
+kept because **the review VM holds its own export**, and a run made there against the
+uncorrected one would duplicate nine live products. `token_similarity` takes the better of
+the renamed and un-renamed scores, so an entry that no longer applies costs nothing.
+Delete them once a run against the current export has reported them dead — `stale_renames`
+will say so in the run log, and `tests/adapters/test_rapido.py` pins both halves of the
+claim.
 
 ## Open questions for Rapido
 
 1. **A UK price list** — nothing is published and the dealers disagree.
 2. Whether **OPTIMUM LINE** is orderable on every model or only some; the guide marks it on
    Campervans, Serie C, 6F and 80dF.
+3. **What kind of heater the V64 has.** `WEBASTO 4 kW DIESEL` does not say whether it is
+   blown air or wet, and Webasto build both.
