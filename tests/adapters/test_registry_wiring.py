@@ -36,7 +36,10 @@ from src.vehicle_class import VehicleClass
 #: inside one of them.
 #: `marquis` is the reader for a Marquis Leisure range page, shared by Benimar, Elnagh,
 #: Mobilvetta and Panama — an importer's page template, not a brand.
-_NOT_ADAPTERS = {"base", "ehg_configurator", "habitation", "marquis"}
+#: `fleurette_florium` is the reader for one catalogue whose every technical column is
+#: headed with two brand names at once, shared by Fleurette and Florium — a company's
+#: document, not a brand.
+_NOT_ADAPTERS = {"base", "ehg_configurator", "fleurette_florium", "habitation", "marquis"}
 
 
 def _adapter_modules() -> list[ModuleType]:

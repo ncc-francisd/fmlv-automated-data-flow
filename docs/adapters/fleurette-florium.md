@@ -277,3 +277,62 @@ before a registry row can be written.
    `Wellness` and the other unlabelled layouts are priced identically.
 4. **Is `Wellness` standard on those six Fleurette layouts**, or an orderable pack? The
    price list reads as standard; the catalogue does not mention it.
+
+## Build in progress, 28 October 2026
+
+`src/adapters/fleurette_florium.py` reads the catalogue; `fleurette.py` and `florium.py`
+are still to write. The reader takes all seventeen technical columns off pages 38 and 42
+with every field correct, and rejects a row that has gained or lost a cell rather than
+shifting every vehicle's figures along one.
+
+### The model pages are not a specification source
+
+Tempting, because each layout has one and it carries a technical panel. **They mix model
+years with no warning**, and where they disagree with the catalogue the catalogue is
+current:
+
+| page | empty weight | marked |
+|---|---|---|
+| Wincester 74LJG | 3180 kg | *Photos of the 2026 collection* |
+| Discover 75LMF | 3134 kg | *2026 collection* |
+| Discover 72LMF | — | *2027 collection* |
+| Elister 73LMF | 3121 kg | *2025 collection* (the 2027 catalogue says **3122**) |
+
+The pattern is exact: **every page carrying a mass is a previous year's page, and the
+2027 pages carry none.** That corroborates Léa Timores's "the MiRO weights for the
+Discover and Wincester will not be available until next week" rather than contradicting
+it — so the eight masses genuinely are not published yet, and 3180 would have gone in
+looking entirely plausible. Specifications come from the catalogue, prices from the price
+lists, and the site from neither. This is `aura.md`'s lesson about smaller brands' sites
+lagging, met again.
+
+### Seats: 3 on the Elister and Belixter, supplied and corroborated
+
+The catalogue prints `4/3 selon configuration` for 73LMF and 73LJG, which the README's
+Bürstner rule says to leave unset without corroboration. The requester supplied it on
+28 October from the model pages' **`3/4 Travel places`** tile, reading 3 as the standard
+figure — which the base-vehicle rule gives independently.
+
+Worth recording *which* pages: the two **Elister** pages are marked 2025, but the two
+**Belixter** pages are 2027 and say the same thing, so the corroboration is current. The
+tile is drawn as an image and is not in the extracted text, so this is a human reading and
+the adapter carries it as a supplied constant, not a parse.
+
+The six layouts the catalogue bands are read by `leading_seat_counts`, which takes only
+the leading run of plain integers and leaves the rest unset — see the module docstring.
+
+### An extra layout on the site: 68LMC
+
+`migrateur-68-lmc-central-bed` and `baxter-68-lmc-central-bed` exist as pages — 6.85m,
+2929 kg, and built on a **Peugeot** where every other layout is Fiat or Mercedes. It is in
+neither the 2027 catalogue nor the 2027 price list, so it reads as a 2026 model that has
+been dropped, and it is **out of scope**. On the open-questions list for Léa.
+
+### Still to do
+
+* `fleurette.py` and `florium.py`, mapping columns to products and holding the embedded
+  price tables;
+* two registry rows — `manufacturer_id` is not in `resources/manufacturers-full-list.csv`
+  for either brand, so build on a provisional id outside the NCC range and repoint when
+  the real ones land, as `atom.py` did;
+* tests and fixtures, then a first run off an empty baseline.
