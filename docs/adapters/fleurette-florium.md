@@ -92,7 +92,110 @@ MRO, and therefore no derived payload. Nothing should be emitted for them.
 
 A **±3% tolerance** is printed against every weight and measure.
 
-## The blocker: there is no price, anywhere
+## The prices arrived, 28 October 2026 — and they are sterling
+
+Léa Timores (Responsable communication, `ltimores@fleurette.fr`) emailed four 2027 price
+lists, which between them cover **all thirty products**. They are not on the website and
+were not in the 7,252-URL sitemap, so no run can rediscover them: this is the **Pilote
+arrangement**, and `joa.py` is the pattern to copy — a module constant with a
+`PRICE_LIST_SOURCE` string, a `price_manually_sourced` flag driving the provenance
+wording, and a re-verify at the model-year changeover.
+
+| document | brand | covers | base vehicle |
+|---|---|---|---|
+| `FLEURETTE RRP GB 2027.pdf` | Fleurette | Migrateur 3, Magister 4, Discover 4 | Fiat |
+| `FLORIUM RRP GB 2027.pdf` | Florium | Baxter 3, Mayflower 4, Wincester 4 | Fiat |
+| `ELISTER BELIXTER RRP GB 2027.pdf` | both | Elister 2 + Belixter 2 | Mercedes |
+| `BLACK PEARL RRP GB 2027.pdf` | Florium | Black Pearl 4 | Fiat |
+
+**13 Fleurette + 17 Florium = 30.** The basis is as good as it gets: *"2027 Recommended
+Retail Prices (£) with VAT + Transport — OTR — valid from the 1st July 2026"*. Native
+sterling, so no conversion and `euro-prices-convert-at-1-15` never comes into it.
+
+### Two prices per layout, and which one is the base
+
+Every Fiat coachbuilt is listed twice, manual and automatic, the automatic **£2,800–£2,900**
+dearer. The base vehicle is the **manual**, by the settled rule.
+
+The exception is the A-class: Discover and Wincester are published *only* as
+`based on FIAT chassis with automatic gearbox`, so there the automatic price **is** the
+base. The 74 LJG and 75 LMF are on an **AL-KO** chassis — a chassis variant, still Fiat.
+
+The Mercedes sheet prices `ELISTER / BELIXTER 73LMF / 73LJG` at a single **£102,990**, on
+a `Sprinter Mercedes Benz - 150 hp - Manual Transmission - FWD`. One figure, four
+products. The automatic arrives inside the DELUXE PACK at £3,350, so it is an option and
+the manual remains the base.
+
+### `Wellness` — the catalogue's "same vehicle, different veneer" is not the whole story
+
+The catalogue says *"Deux marques, deux styles"* and puts the difference at walnut against
+ash. The price lists say otherwise on six layouts. **Fleurette** label 69 LJG, 70 LMF,
+70 LJG, 74 LMF, 74 LJG and 75 LMF as **Wellness**; **Florium never use the word.**
+
+The pricing corroborates it. Where there is no `Wellness` the two brands are priced
+**identically** — 60 LG £68,690 and 64 LDF £70,990 in both, 67 LO £74,390 in both. Where
+Fleurette add it they are £2,000–£3,300 dearer: 69 LJG £75,790 against Florium's £73,790,
+70 LMF £77,890 against £74,590.
+
+**It stays out of the model name.** The model is `69LJG`, not `69 LJG Wellness` — the
+catalogue spec table is where every other figure comes from and it spells them bare,
+`Wellness` is not a layout, and a word that could later be dropped would churn the
+range/model identity key. The Wellness figure is the price, said so in provenance.
+
+**Unexplained:** 72 LMF and 72 LJG carry no `Wellness` on either side yet differ by
+**£1,300** (£94,990/£95,890 against £93,690/£94,590), and 75 LMF differs by £1,700.
+
+### Two Black Pearl rows contradict the sheet's own options table
+
+Among the van prices sit two rows that do not belong to the pattern:
+
+```
+Model 63LJ - Fiat L3H2 180 hp - Automatic transmission   25 kg   £57 275
+Model 59LT - Fiat L2H2 180 hp - Automatic transmission   25 kg   £55 300
+```
+
+Both are on a **shorter body** than that model's other rows (the 63s are otherwise L4H2,
+the 59 otherwise L3H2), both are out of sequence in the list, and both are **£10,000 to
+£12,000 cheaper** than the same layout's 140 hp manual. The same sheet's Fiat Options
+price `180 HP Engine (On base price 140 HP Automatic gearbox)` at **+£2,160** — so a 59LT
+180 hp automatic should be £67,190 + £2,160 = £69,350, not £55,300. The two cannot both be
+right, and the arithmetic says it is not these rows.
+
+**Record the 140 hp manual** for all four — 59LT £64,390, 63LJ £66,990, 63LD £67,690,
+63KS £68,690 — and query the pair.
+
+The Black Pearl sheet also footnotes *"exclude factory charge of €330.00"*: a euro charge
+excluded from a sterling OTR price. Record the printed sterling figure and note the
+exclusion. Nothing is added to it.
+
+### Habitation, free with the price lists
+
+The standard-fittings blocks are unusually full, and two settled rules bite immediately:
+Black Pearl's *"rear shower with hot and cold water"* and the Elister's *"cold-water
+shower in the garage"* are **outdoor showers, not washrooms**. Likewise the Elister's
+Serenity Pack carries the `Combi 4000ED` as an **option**, so it must not set the base
+heating, and the built-in oven is £560 extra.
+
+What is standard and readable: Black Pearl `157-litre compressor refrigerator` and
+`Truma 4000 Diesel heating system`; Elister/Belixter `150-litre compressor refrigerator`,
+`Height-adjustable garage with electric operation` (rear garage) and a `2-berth drop-down
+bed`.
+
+### Still missing
+
+* **MIRO for Discover and Wincester** — eight products. Léa: *"The MiRO weights for the
+  Discover and Wincester models will not be available until next week. Testing is
+  currently underway."*
+* **MIRO for the Black Pearl 63LD**, which the catalogue also prints as `NC` and the email
+  does not mention.
+
+### Not in scope
+
+The same email carried four **Westfalia** lists (Kelsey, Kipling, Nansen 600 L, Nansen
+640 LS) and a Westfalia dealer link. Westfalia is a separate brand and is out of scope
+here; the requester struck them out on 28 October 2026.
+
+## Why it was blocked until then
 
 This is the whole finding, and it is not a near miss.
 
@@ -139,24 +242,38 @@ settled rule gives the importer authority over what exists and what it costs; wi
 independent dealers and no distributor, there is no single UK price to record and no one
 deciding which of the thirty products reach the UK.
 
-## Verdict
 
-**Not buildable yet, and the reason is commercial rather than technical.** The
-specification is as good as any surveyed: one document, both brands, mirrors already
-excluded, a real mass in running order, berths marked standard against optional. Every
-core field is there **except the price**, which is required.
+## Verdict — buildable, once the masses land
 
-If a price list arrives, this is a straightforward build — one column reader over one PDF,
-registered twice.
+**The commercial blocker is gone.** All thirty products have a UK on-the-road price in
+sterling, and the specification was never the problem. What is left is the eight Discover
+and Wincester masses (due the week of 2 November 2026) and the Black Pearl 63LD.
+
+The build is one column reader over the catalogue for the specification, a manually
+sourced price table per `joa.py` for the money, and **two registrations** — the Swift
+arrangement, one `fmlv_manufacturer` carrying two brands:
+
+| manufacturer | display name | NCC supplier | products |
+|---|---|---|---|
+| Fleurette Constructeur | Fleurette | Fleurette | 13 |
+| Fleurette Constructeur | Florium | Florium | 17 |
+
+Both rows were created on the NCC side on 28 October 2026 with **one seed product each**,
+so the baseline is *not* empty and `fmlv empty-baseline` is not wanted. The seed row's
+`manufacturer_range` and `model` must name a real layout, or the first run matches it
+against nothing, reports it as disappeared and proposes all thirty as new.
+
+`manufacturer_id` for each still has to reach `resources/manufacturers-full-list.csv`
+before a registry row can be written.
 
 ## To ask
 
-1. **Is anyone actually importing them?** Four dealers are mapped — three of them River
-   Motorhomes — but none lists either brand on its own website, so the map may be stale.
-   River are already the Mink importer, which makes them the obvious person to ask.
-2. **Is there a UK or export price list?** The dealer portal implies tariffs exist; they
-   are just not public.
-3. **Are all thirty products coming to the UK**, or a subset? Thirteen of the thirty are
-   Fleurette trim of a vehicle Florium also sells.
-4. **The ten missing `NC` masses** — the entire Discover and Wincester ranges plus the
-   Black Pearl 63LD.
+1. **The two Black Pearl 180 hp rows** — 63LJ at £57,275 on an L3H2 and 59LT at £55,300 on
+   an L2H2, both cheaper than the 140 hp manual while the options table prices 180 hp as a
+   £2,160 *extra*. Are these a different, shorter vehicle, or an error?
+2. **The Black Pearl 63LD mass**, still `NC` and not covered by the Discover/Wincester
+   testing.
+3. **Why 72 LMF and 72 LJG differ by £1,300 between the brands** when neither carries
+   `Wellness` and the other unlabelled layouts are priced identically.
+4. **Is `Wellness` standard on those six Fleurette layouts**, or an orderable pack? The
+   price list reads as standard; the catalogue does not mention it.
