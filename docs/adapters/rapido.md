@@ -272,21 +272,51 @@ that is a correction, not drift. Expect roughly:
   4.5-tonne for 2027
 - `type_coach_built_over_cab_bed` → `type_coach_built_low_profile` on 696F
 
-### Range names need settling
+### Range names: settled 28 October 2026 — rename in FMLV first
 
-FMLV uses eight range strings for six ranges, and none match Rapido's own:
+FMLV used eight range strings for six ranges. **Case and spacing do not matter to the
+matcher**, so four of the six already score 1.000 against Rapido's own names; only two
+groups fail.
 
-| FMLV | count | Rapido |
+| FMLV holds | Rapido | score | |
+|---|---|---|---|
+| `SERIE 6F` / `SERIE 8F` / `SERIE 80dF` | Serie 6F / 8F / 80dF | 1.000 | safe |
+| `SERIE DISTINCTION` | Serie Distinction | 1.000 | safe |
+| `SERIE VANS` (V62 only) | Vans | 0.667 | safe |
+| `COMPACT` / `COMPACT i` | Serie C | **0.250** / **0.200** | orphaned |
+| `VAN` (V55, V68, V65XL) | Vans | **0.333** | orphaned |
+
+`COMPACT i` is the Wingamm Brownie defect — a body type in the range column splitting one
+Rapido range in two. `VAN` fails because a one-word range is half a short bag, so losing it
+halves the score.
+
+**`V65XL` is the hard case: 0.000, and fixing the range does not rescue it.** Rapido write
+`V65 XL`, which tokenises as `v65` against the baseline's `v65xl`; the matcher returns a hard
+zero when both sides name a code and none agree. Only a model-level correction fixes it.
+
+Francis is renaming these 12 rows in FMLV **before the first run** (export, edit the CSV,
+re-upload — a Nova-only edit does not reach the export the baseline is read from):
+
+| product_id | range | model |
 |---|---|---|
-| COMPACT / COMPACT i | 4 / 2 | Serie C |
-| SERIE 6F / SERIE 8F / SERIE 80dF | 4 / 4 / 3 | Serie 6F / 8F / 80dF |
-| SERIE DISTINCTION | 6 | Serie Distinction |
-| **SERIE VANS** / **VAN** | 1 / 3 | Vans |
+| 8238, 7090, 7091, 7093 | `COMPACT` → `SERIE C` | — |
+| 8239, 8240 | `COMPACT i` → `SERIE C` | — |
+| 8243, 8244 | `VAN` → `SERIE VANS` | — |
+| 8245 | `VAN` → `SERIE VANS` | `V65XL` → `V65 XL` |
+| 7105 | — | `8066dF ULTIMATE` → `8066dF` |
+| 7107 | — | `8096dF ULTIMATE` → `8096dF` |
+| 7109 | — | `I96M` → `i96M TRUMA` |
 
-`SERIE VANS` and `VAN` are the same range spelt two ways, and `COMPACT` / `COMPACT i` splits
-one Rapido range in two on body type — the Wingamm Brownie defect the README describes. Per
-"Let the FMLV export decide the range and model strings", the adapter should not propose a
-`manufacturer_range` change unless we decide to tidy these, and that is Francis's call.
+FMLV's all-caps `SERIE` is kept rather than Rapido's `Serie`: case is irrelevant to matching,
+four ranges already read that way, and `SERIE VANS` is a string the export already holds. The
+last three model edits are not needed for matching (all 0.750) but retire stale names while
+nothing depends on them.
+
+**The adapter must still carry `RENAMED_RANGES` and `RENAMED_MODELS`** mapping Rapido's names
+onto the pre-rename FMLV ones. `token_similarity` takes the better of the two scores, so the
+entries match the old names while they remain and fall away by themselves once the edit
+lands — a run made before the re-upload then cannot orphan anything. Delete them when
+`stale_renames` reports them dead.
 
 ## Open questions for Rapido
 
