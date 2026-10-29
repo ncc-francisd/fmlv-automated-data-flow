@@ -526,3 +526,48 @@ Expression layouts to 9.
 * **Model year changeover.** The price list is dated 27 May 2026 and effective 1 June 2026,
   and the brochure 5 June 2026 — so Pilote move at the same time as Joa, months before the
   NEC-driven British brands. Not yet observed across a rollover.
+
+## The summary strip was removed, 29 October 2026
+
+Pilote took the `Length … Width … Height … Berth … Meal place … Sleeping place … Payload`
+strip off **every body type** — checked on a panel van, an A-class, a low profile and a
+compact low profile, all four of which carried it on 11 September. Nothing replaced it.
+
+Only one field depended on it alone, and that field is **berths**.
+
+| field | was | now |
+|---|---|---|
+| length, height, width, MAM, payload, seats | popup first, strip as fallback | popup — unaffected |
+| **berths** | **strip only** | **popup's `Sleeping berths`** (panel vans) |
+
+### The panel vans are fixed, and the new source is the better one
+
+Their 23-row popup has carried `Sleeping berths` all along, with **`Optional sleeping
+places` on the row beneath it**. The strip published one number that folded the two
+together, which is why run #81 proposed raising three Evidence vans from 2 berths to 3, 3
+and 4 — all of them layouts whose standard count is 2 with `1+2` or `3` optional. Those
+proposals were never accepted, and on the popup's figure they do not arise.
+
+`_BERTHS_LABEL` is anchored at both ends for exactly that reason. The popup's figure
+agrees with FMLV on all nine vans.
+
+### The coachbuilts have no berth count, and it is not obvious what it should be
+
+Their 50-row popup has no `Sleeping berths` row. It splits the question five ways:
+
+    Permanent sleeping space                          2
+    Extra sleeping spaces                             -
+    Optional sleeping berths with drop-down bed       -
+    Optional extra sleeping berths with drop-down bed 2
+    Optional extra sleeping spaces                    1
+
+Taking the non-optional rows would give the A690G **2**, where FMLV holds **4** — and the
+missing 2 is an `Optional … drop-down bed`. So either FMLV's 4 counts a paid bed, or
+Pilote's "optional" means something narrower here than it does elsewhere. The README's own
+rule says an asterisked bed is not a berth, and `atlas.md`'s drop-down note says a range
+that *sells* a drop-down is telling you it has no fixed one.
+
+**Nothing is proposed for the 34 coachbuilt layouts until that is settled.** Each narrates
+why, FMLV's figure carries through untouched, and the question is one for the requester
+rather than for a parser.
+

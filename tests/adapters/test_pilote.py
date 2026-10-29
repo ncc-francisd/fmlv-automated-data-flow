@@ -13,6 +13,13 @@ state in which this source has any numbers at all. Four of the 43, one per body 
 * **A630G Atlas** — the Ford-based compact low profile, whose length is the evidence that
   no Atlas exemption is needed.
 
+A fifth was added on **29 October 2026**, and it is a different page from the other four:
+
+* **V630B Pilote** — a layout FMLV does not hold, captured after Pilote **removed the
+  summary strip** from every body type. It is the regression fixture: the strip that three
+  of the four others still carry is simply absent here, so anything still read from it
+  comes back empty.
+
 No network here.
 """
 
@@ -53,6 +60,9 @@ PAGES: dict[str, str] = {
     "pilote_g690gj_expression.html": "https://www.pilote-motorhome.uk/a-class/g690gj-expression/",
     "pilote_p720u_evidence.html": "https://www.pilote-motorhome.uk/low-profile/p720u-evidence/",
     "pilote_a630g_atlas.html": "https://www.pilote-motorhome.uk/compact-low-profile/a630g-atlas/",
+    "pilote_v630b_pilote_no_strip.html": (
+        "https://www.pilote-motorhome.uk/panel-van/v630b-pilote/"
+    ),
 }
 
 ALL_KEYS = tuple(key for key, _label in DEFAULT_RANGES)
@@ -243,9 +253,52 @@ def test_the_optional_fifth_belt_is_not_counted() -> None:
         ("pilote_a630g_atlas.html", 2),
     ],
 )
-def test_berths_come_from_the_strips_sleeping_place_row(name: str, expected: int) -> None:
-    """The P720U's 2 disagrees with the brochure's 4; the requester ruled the site wins."""
+def test_berths_are_read_for_every_sampled_layout(name: str, expected: int) -> None:
+    """The P720U's 2 disagrees with the brochure's 4; the requester ruled the site wins.
+
+    The van answers from the popup's `Sleeping berths`, the three coachbuilts from the
+    summary strip their pages still carried in September. Both routes are live.
+    """
     assert _parse(name).berths == expected
+
+
+def test_pilote_removed_the_summary_strip(): 
+    """The whole reason berths moved to the popup. Captured 29 October 2026."""
+    page = _page("pilote_v630b_pilote_no_strip.html")
+    assert pilote._SUMMARY_STRIP.search(pilote.plain_text(page)) is None
+    assert "Meal place" not in pilote.plain_text(page)
+
+
+def test_berths_survive_the_strips_removal(): 
+    """2, from the popup — and run #81 read the same 2 off the strip before it went."""
+    product = _parse("pilote_v630b_pilote_no_strip.html")
+    assert product.berths == 2
+    assert product.berths_source == "popup table, 'Sleeping berths'"
+
+
+def test_an_optional_sleeping_place_is_never_counted_as_a_berth(): 
+    """`Optional sleeping places` sits right beneath `Sleeping berths` and is a paid bed.
+
+    The V630B offers `1+2` of them. A loose `sleeping` pattern takes that row instead —
+    which is how the old summary strip came to propose 3 and 4 berths on Evidence vans
+    whose standard count is 2.
+    """
+    rows = pilote.popup_rows(_page("pilote_v630b_pilote_no_strip.html"))
+    assert rows["Sleeping berths"] == "2"
+    assert rows["Optional sleeping places"] == "1+2"
+    assert pilote._BERTHS_LABEL.search("Optional sleeping places") is None
+
+
+def test_the_rest_of_the_van_still_reads_without_a_strip(): 
+    """Everything but berths already came from the popup, so nothing else was lost."""
+    product = _parse("pilote_v630b_pilote_no_strip.html")
+    assert product.mh_length_mm == 6360
+    assert product.mh_width_mm == 2050
+    assert product.mh_height_mm == 2670
+    assert product.mh_passenger_seats_inc_driver == 4
+    assert product.mtplm_kilograms == 3500
+    assert product.mh_payload_kilograms == 555
+    assert product.seats_source == "popup table, 'Seats with safety belts'"
 
 
 # --------------------------------------------------------------------------- #
@@ -489,7 +542,7 @@ def test_the_width_is_the_mislabelled_interior_row() -> None:
     It matches the stored figure on all four body types, and it cannot be an interior
     measurement: 2.05 m is a Fiat Ducato's body width, leaving nothing for the walls.
     """
-    expected = {"V540G": 2050, "G690GJ": 2300, "P720U": 2300, "A630G": 2200}
+    expected = {"V540G": 2050, "G690GJ": 2300, "P720U": 2300, "A630G": 2200, "V630B": 2050}
     for name in PAGES:
         product = _parse(name)
         extracted = _build_extracted_motorhome(product)

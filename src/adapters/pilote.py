@@ -331,6 +331,20 @@ _SUMMARY_STRIP = re.compile(
 #: count.
 _SEATS_LABEL = re.compile(r"^Seats with safety belts$", re.I)
 
+#: The popup's berth row, and the one berths are read from.
+#:
+#: **Anchored at both ends, because `Optional sleeping places` sits directly beneath it**
+#: and a loose `sleeping` pattern takes that instead. The two are different questions:
+#: the V633M Evidence is `Sleeping berths 2` with `Optional sleeping places 3`, and the
+#: optional row is a paid bed, which `docs/adapters/README.md` says is not a berth.
+#:
+#: This replaced the summary strip, which Pilote removed from the panel-van pages between
+#: 11 September and 29 October 2026 — see the module docstring. It is the better source
+#: anyway: the strip published one `Sleeping place` figure that folded the optional beds
+#: in, and proposed 2 to 3 on two Evidence vans and 2 to 4 on a third in run #81. This
+#: row agrees with FMLV on all nine vans.
+_BERTHS_LABEL = re.compile(r"^Sleeping berths$", re.I)
+
 #: A row of the popup's technical table, once the click has filled it.
 _TABLE_ROW = re.compile(r"<tr>\s*<td>(?P<label>.*?)</td>\s*<td>(?P<value>.*?)</td>\s*</tr>", re.S)
 
@@ -461,6 +475,12 @@ class PiloteProduct:
     berths: int | None = None
     mtplm_kilograms: int | None = None
     mh_payload_kilograms: int | None = None
+    #: Where the berths and the seats came from. Both have a popup row and a summary
+    #: strip field, and which answered is worth saying: Pilote removed the strip from the
+    #: panel-van pages in October 2026, so a run that still cites it is reading a page
+    #: that has one.
+    berths_source: str = ""
+    seats_source: str = ""
     #: Where the payload came from, for the provenance — the two body types differ.
     payload_source: str = ""
     #: The strip's own length, kept as a cross-check on the popup's.
@@ -558,6 +578,22 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
     if seats is None and strip is not None:
         seats = int(strip.group("seats"))
 
+    # **Berths from the popup's own labelled row, not the strip.** Pilote dropped the
+    # strip from the panel-van pages, which left berths unreadable on all nine; the popup
+    # has carried `Sleeping berths` throughout and separates it from the optional beds the
+    # strip's single figure folded in. The strip stays as the fallback for a page whose
+    # popup never opens, where it is the only figure there is.
+    berths = _first_int(_matching(rows, _BERTHS_LABEL))
+    berths_source = "popup table, 'Sleeping berths'"
+    if berths is None and strip is not None:
+        berths = int(strip.group("berths"))
+        berths_source = "summary strip, 'Sleeping place'"
+    seats_source = (
+        "popup table, 'Seats with safety belts'"
+        if _matching(rows, _SEATS_LABEL) is not None
+        else "summary strip, 'Berth'"
+    )
+
     return PiloteProduct(
         source_url=source_url,
         manufacturer_range=manufacturer_range,
@@ -573,7 +609,9 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
         # `Berth` where there is not; berths always from the strip's `Sleeping place`,
         # which is the figure Pilote lead with and the one the brochure agrees with.
         mh_passenger_seats_inc_driver=seats,
-        berths=int(strip.group("berths")) if strip else None,
+        berths=berths,
+        berths_source=berths_source,
+        seats_source=seats_source,
         # MAM is the one field that exists only in the popup, so the two pages without
         # one legitimately have no MTPLM and therefore no derived MRO.
         mtplm_kilograms=_first_int(_matching(rows, _MAM_LABEL)),
@@ -700,15 +738,15 @@ def _build_extracted_motorhome(
     if product.mh_passenger_seats_inc_driver is not None:
         record(
             "mh_passenger_seats_inc_driver",
-            f"summary strip, 'Berth {product.mh_passenger_seats_inc_driver}' — Pilote use "
-            f"the word Berth for a seat with a safety belt, and 'Sleeping place' for a "
-            f"berth",
+            f"{product.seats_source}: {product.mh_passenger_seats_inc_driver}. Pilote "
+            f"use the word Berth for a seat with a safety belt and 'Sleeping place' for a "
+            f"berth, so the strip's 'Berth' row is the seat count",
         )
     if product.berths is not None:
         record(
             "berths",
-            f"summary strip, 'Sleeping place {product.berths}' — not its 'Berth' row, "
-            f"which is the belted-seat count",
+            f"{product.berths_source}: {product.berths}. The standard figure — the row "
+            f"beneath it, 'Optional sleeping places', is a paid bed and is never counted",
         )
     if product.mtplm_kilograms is not None:
         record(
@@ -825,6 +863,18 @@ def collect(
                     else f"WARNING: this is new — check {CLICK_SELECTOR!r} still matches "
                     f"the button, because every other layout has one"
                 )
+            )
+
+        if product.berths is None:
+            on_progress(
+                f"[{product.label}] NO BERTH COUNT, so FMLV's own figure stands. Pilote "
+                f"removed the summary strip — the 'Berth / Meal place / Sleeping place' "
+                f"row — from every body type between 11 September and 29 October 2026. "
+                f"The panel vans are unaffected because their popup carries 'Sleeping "
+                f"berths'; the coachbuilts' popup does not, and splits the question across "
+                f"five rows instead ('Permanent sleeping space', 'Extra sleeping spaces' "
+                f"and three 'Optional ...' ones). Which of those is the standard count is "
+                f"not settled, so nothing is proposed rather than guessed"
             )
 
         reconciles, why_not = _reconciles(product)
