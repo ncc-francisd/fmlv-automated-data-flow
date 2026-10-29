@@ -109,13 +109,15 @@ Discover/Wincester without a seat count until someone confirms one.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
-from ..product_model.enums import BodyType
+from ..product_model.enums import BodyType, Heating, Refrigeration
+from ..product_model.model import Motorhome
+from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 __all__ = [
     "BLACK_PEARL_CODES",
@@ -139,13 +141,71 @@ BASE_URL = "https://www.fleurette-florium.fr"
 #: `catalogue_url`.
 CATALOGUE_PAGE_URL = f"{BASE_URL}/le-catalogue-camping-cars/"
 
-#: `(Fleurette range, Florium range, layout codes)`, in the catalogue's own column order.
-#: The pairing is the catalogue's, printed in its column headings as `MIGRATEUR / BAXTER`.
-RANGE_PAIRS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("Migrateur", "Baxter", ("60LG", "64LDF", "69LJG")),
-    ("Magister", "Mayflower", ("67LO", "70LMF", "70LJG", "74LMF")),
-    ("Elister", "Belixter", ("73LMF", "73LJG")),
-    ("Discover", "Wincester", ("72LMF", "72LJG", "74LJG", "75LMF")),
+#: `(Fleurette range, Florium range, layout codes, body type)`, in the catalogue's own
+#: column order. The pairing is the catalogue's, printed in its column headings as
+#: `MIGRATEUR / BAXTER`.
+#:
+#: **The body type is read off the document, not inferred from a height.** Page 38 prints
+#: `PROFILÉS` and `INTÉGRAUX` as two banners above the columns, and their x positions
+#: centre over columns 1–9 and 10–13 exactly. Three further sources agree: the price lists
+#: head their blocks `Profile MIGRATEUR` / `Profile MAGISTER` against `A-Class DISCOVER`
+#: and `A-Class WINCESTER`, and the Elister and Belixter pages banner themselves "The
+#: ultra-spacious low-profile" and "The prestigious XXL low-profile".
+#:
+#: That matters most for the Elister and Belixter, which are the tallest coachbuilts here
+#: at 2.92m and carry a drop-down bed — so a height would have argued for an over-cab bed
+#: and been wrong. `height-does-not-decide-coachbuilt-profile` is the rule; the
+#: manufacturer's own section heading is better evidence than either.
+RANGE_PAIRS: tuple[tuple[str, str, tuple[str, ...], BodyType], ...] = (
+    ("Migrateur", "Baxter", ("60LG", "64LDF", "69LJG"), BodyType.COACH_BUILT_LOW_PROFILE),
+    (
+        "Magister",
+        "Mayflower",
+        ("67LO", "70LMF", "70LJG", "74LMF"),
+        BodyType.COACH_BUILT_LOW_PROFILE,
+    ),
+    ("Elister", "Belixter", ("73LMF", "73LJG"), BodyType.COACH_BUILT_LOW_PROFILE),
+    (
+        "Discover",
+        "Wincester",
+        ("72LMF", "72LJG", "74LJG", "75LMF"),
+        BodyType.A_CLASS,
+    ),
+)
+
+#: The base vehicle each range is built on, as `fmlv_base_vehicle` spells it. Page 38's
+#: chassis rows mark `FIAT Ducato` standard on every column but the Elister/Belixter pair,
+#: where `MERCEDES-BENZ Sprinter` is standard instead and Fiat is unavailable — so this is
+#: read from the document rather than assumed. The AL-KO chassis under the 74LJG and 75LMF
+#: is a chassis variant, not another base vehicle: those are still Fiat.
+BASE_VEHICLES: dict[str, str] = {
+    "Migrateur": "Fiat",
+    "Baxter": "Fiat",
+    "Magister": "Fiat",
+    "Mayflower": "Fiat",
+    "Elister": "Mercedes",
+    "Belixter": "Mercedes",
+    "Discover": "Fiat",
+    "Wincester": "Fiat",
+    "Black Pearl": "Fiat",
+}
+
+#: Seat counts the catalogue publishes as a configuration band and the requester supplied
+#: instead, keyed by layout code. Read on 28 October 2026 off the model pages' `3/4 Travel
+#: places` tile, which is drawn as an image and so cannot be parsed; corroborated on the
+#: 2027 Belixter pages, and 3 is the base figure by the settled base-vehicle rule.
+#:
+#: The catalogue's own row says `4/3 selon configuration`, which `docs/adapters/README.md`
+#: forbids recording uncorroborated — this is that corroboration, and it is why these four
+#: can be uploaded at all. Re-verify at the model-year changeover.
+SUPPLIED_SEATS: dict[str, int] = {"73LMF": 3, "73LJG": 3}
+
+#: Said in provenance wherever `SUPPLIED_SEATS` is used.
+SUPPLIED_SEATS_SOURCE = (
+    "MANUALLY SOURCED from the model pages' '3/4 Travel places' panel, read by the "
+    "requester on 28 October 2026 and corroborated on the 2027 Belixter pages. 3 is the "
+    "standard figure; the catalogue prints only the band '4/3 selon configuration', which "
+    "is a type-approval ceiling. Not machine-readable and not refreshed by later runs"
 )
 
 #: Florium's van conversions, which Fleurette do not sell. Their own technical page, four
@@ -155,7 +215,15 @@ BLACK_PEARL_CODES: tuple[str, ...] = ("59LT", "63LJ", "63LD", "63KS")
 
 #: Every shared layout, flat, in column order — thirteen of them.
 SHARED_CODES: tuple[str, ...] = tuple(
-    code for _fleurette, _florium, codes in RANGE_PAIRS for code in codes
+    code for _fleurette, _florium, codes, _body in RANGE_PAIRS for code in codes
+)
+
+#: Which range each shared layout belongs to, by column index. The code alone cannot say —
+#: `70LMF` is a Magister *and* a Mayflower — so this is indexed, never looked up by name.
+SHARED_RANGE_AT: tuple[tuple[str, str, BodyType], ...] = tuple(
+    (fleurette, florium, body)
+    for fleurette, florium, codes, body in RANGE_PAIRS
+    for _code in codes
 )
 
 #: How far a length may sit from the one its layout code implies, before the row is treated
@@ -192,12 +260,45 @@ MRO_ROW = ("Masse", "vide")
 SEATS_ROW = ("Places carte grise", "")
 BERTHS_ROW = ("Places couchage", "")
 
+#: The equipment rows worth reading, as `(prefix, words that must also appear)`. Accented
+#: letters do not survive extraction — `Réfrigérateur` arrives as `R�frig�rateur`
+#: — so every one of these is matched on an unaccented fragment.
+#:
+#: The two heating rows are both `Chauffage air pulsé`, which is blown air whichever is
+#: fitted, so they are read together. The `Combi 4 ED` and `Combi 6ED` rows beside them are
+#: the electric-and-diesel **options** and are deliberately not matched: an option must
+#: never set the base specification.
+#:
+#: **Alde is on this document too and is not standard on anything.** Page 39 prices it as
+#: `OPTION INTEGRAUX FIAT : Pack Optimum : Chauffage Alde`, and the site gives it a whole
+#: "our expertise" page, so it reads at a glance as though some of these were wet central
+#: heating. Every one of the thirteen carries a Truma Combi as standard, so every one is
+#: blown air; Alde is an upgrade and changes nothing recorded here.
+HEATING_ROWS = (
+    ("Chauffage air puls", ("Combi 4 D (",)),
+    ("Chauffage air puls", ("Combi 6 D (",)),
+)
+
+#: The two fridge rows. Both are compression with a freezer compartment, so either one
+#: means the same thing — but between them they carry **exactly one `S` per column**, which
+#: is an independent reading of the same thirteen columns and so a free alignment check.
+#: The vans' page spells it `compession`, their typo, which is why neither entry matches on
+#: that word.
+FRIDGE_ROWS = (
+    ("R", ("frig", "157 L")),
+    ("R", ("frig", "149 L")),
+)
+
 #: What a value in each row must look like, so that a row which lost a cell and pulled a
 #: label word in from the left is rejected instead of silently shifting every vehicle's
 #: figures one place. See `split_row`.
 METRES_VALUE = re.compile(r"\d+,\d+")
 MASS_VALUE = re.compile(r"\d{4}|NC")
 BERTHS_VALUE = re.compile(r"[1-9]")
+
+#: `S` standard, `O` optional, `-` unavailable. The hyphen arrives space-padded, so it is
+#: its own token.
+MARKER_VALUE = re.compile(r"[SO]|-")
 
 #: *Non communiqué* — the catalogue's own marker for a figure it does not publish. It
 #: stands against the whole Discover/Wincester mass row and the Black Pearl 63LD, and
@@ -429,3 +530,384 @@ def fetch_catalogue_pages(
         message = f"the catalogue at {url} extracted no text at all"
         raise RuntimeError(message)
     return [page.text for page in extracted.pages]
+
+
+def find_row(lines: list[str], prefix: str, contains: tuple[str, ...] = ()) -> str | None:
+    """The first line opening with `prefix` and holding every word in `contains`.
+
+    Two mass rows both open `Masse`, and the accented letter that would tell them apart
+    does not survive extraction, so the second half is how they are separated.
+    """
+    for line in lines:
+        if line.startswith(prefix) and all(word in line for word in contains):
+            return line
+    return None
+
+
+def _marker_row(
+    lines: list[str], specs: tuple[tuple[str, tuple[str, ...]], ...], count: int
+) -> tuple[tuple[str, ...], ...]:
+    """Every `S`/`O`/`-` row among `specs` that reads cleanly, dropping those that do not."""
+    found = []
+    for prefix, contains in specs:
+        # **Every** matching line, not the first. The motorhome and van tables repeat the
+        # same equipment labels at different widths, and the motorhome row comes first in
+        # the document — so taking the first match would hand the vans a thirteen-column
+        # row, which `split_row` rightly refuses, and the vans would end up with no
+        # equipment read at all rather than their own four-column row.
+        for line in lines:
+            if not line.startswith(prefix) or not all(word in line for word in contains):
+                continue
+            values = split_row(line, prefix, count, value=MARKER_VALUE)
+            if values is not None:
+                found.append(values)
+                break
+    return tuple(found)
+
+
+def _standard_anywhere(rows: tuple[tuple[str, ...], ...], index: int) -> bool:
+    """Whether any of these rows marks this column standard."""
+    return any(row[index] == "S" for row in rows)
+
+
+def find_table_page(pages: list[str], codes: tuple[str, ...]) -> tuple[int, tuple[str, ...]]:
+    """`(index of the page holding this table, its length row)`.
+
+    **The page is found rather than numbered.** The dimensions table is on page 38 for the
+    motorhomes and 42 for the vans today, and a catalogue that gains a spread moves both.
+    So this walks the pages looking for the one whose length row splits into exactly
+    `len(codes)` values *and* whose text names every layout — two conditions a page of
+    marketing prose cannot satisfy by accident.
+    """
+    for index, page in enumerate(pages):
+        lines = page.splitlines()
+        length_line = find_row(lines, LENGTH_ROW[0], (LENGTH_ROW[1],))
+        if length_line is None:
+            continue
+        lengths = split_row(length_line, LENGTH_ROW[0], len(codes), value=METRES_VALUE)
+        # **Whitespace-insensitive**, because the vans' page heads its first column
+        # `59 LT` while the price list, the Black Pearl's own page and FMLV all spell it
+        # `59LT`. The catalogue is inconsistent with itself here — `63LJ` beside it has no
+        # space — so matching on the literal would have found the motorhome table and
+        # declared the van one missing.
+        squashed = re.sub(r"\s+", "", page)
+        if lengths is None or not all(code in squashed for code in codes):
+            continue
+        return index, lengths
+
+    message = (
+        f"no catalogue page carries a dimensions table of {len(codes)} columns naming "
+        f"{', '.join(codes)}. The catalogue has changed shape and nothing can be read "
+        f"from it"
+    )
+    raise RuntimeError(message)
+
+
+def read_table(
+    lines: list[str],
+    codes: tuple[str, ...],
+    lengths: tuple[str, ...],
+    equipment: list[str],
+    *,
+    on_progress: Callable[[str], None],
+    what: str,
+) -> tuple[Column, ...]:
+    """Every column of one technical table, dropping any the checks cannot vouch for.
+
+    `equipment` is the lines of **this table's own spread only**. The two tables repeat
+    the same equipment labels at different widths — `Chauffage air pulsé Truma Combi 4 D`
+    heads a thirteen-column row for the motorhomes and does not appear at all for the
+    vans — so a search across the whole document hands the vans a row belonging to
+    somebody else. It found one, too: before this was scoped, all four Black Pearls were
+    credited with a heater read off the motorhome spread.
+    """
+    count = len(codes)
+
+    def row(spec: tuple[str, str], value: re.Pattern[str]) -> tuple[str, ...] | None:
+        line = find_row(lines, spec[0], (spec[1],))
+        return split_row(line, spec[0], count, value=value) if line else None
+
+    widths = row(WIDTH_ROW, METRES_VALUE)
+    heights = row(HEIGHT_ROW, METRES_VALUE)
+    masses = row(MRO_ROW, MASS_VALUE)
+    berths = row(BERTHS_ROW, BERTHS_VALUE)
+    for name, values in (("width", widths), ("height", heights), ("berths", berths)):
+        if values is None:
+            message = (
+                f"the {what} table's {name} row did not read as {count} values. Every "
+                f"product needs it, so nothing is collected rather than part of it"
+            )
+            raise RuntimeError(message)
+    if masses is None:
+        on_progress(
+            f"the {what} table's mass row did not read as {count} values — no mass in "
+            f"running order is proposed for any of them, and FMLV's own figures stand"
+        )
+        masses = (_NOT_PUBLISHED,) * count
+
+    # The seats row wraps onto the lines after it and arrives out of column order, so its
+    # whole region is handed over and only its leading plain integers are read. Four lines
+    # is enough to reach the next labelled row on both pages.
+    seats_line = find_row(lines, SEATS_ROW[0])
+    if seats_line is None:
+        seats: tuple[int | None, ...] = (None,) * count
+    else:
+        start = lines.index(seats_line)
+        seats = leading_seat_counts(" ".join(lines[start : start + 4]), count)
+
+    # The equipment rows run onto the pages after the dimensions, so they are searched for
+    # across this table's whole spread — and no further. See the docstring.
+    heating = _marker_row(equipment, HEATING_ROWS, count)
+    fridges = _marker_row(equipment, FRIDGE_ROWS, count)
+    if len(fridges) == 2:
+        confused = [
+            codes[i] for i in range(count) if sum(row[i] == "S" for row in fridges) != 1
+        ]
+        if confused:
+            on_progress(
+                f"the two {what} fridge rows should carry exactly one 'S' per column and "
+                f"do not for {', '.join(confused)} — the equipment rows are misaligned, so "
+                f"no refrigeration is stated for any of them"
+            )
+            fridges = ()
+
+    columns = []
+    for index, code in enumerate(codes):
+        length_mm = metres_to_mm(lengths[index])
+        if not reconciles(code, length_mm):
+            on_progress(
+                f"dropping {code}: its length reads {length_mm}mm where its own name "
+                f"implies {implied_length_mm(code)}mm, more than {LENGTH_TOLERANCE_MM}mm "
+                f"apart. A column has been read out of step"
+            )
+            continue
+        width_mm = metres_to_mm(widths[index])
+        height_mm = metres_to_mm(heights[index])
+        berth_count = lower_berths(berths[index])
+        if width_mm is None or height_mm is None or berth_count is None:
+            on_progress(f"dropping {code}: a dimension or berth count did not parse")
+            continue
+        mass = masses[index]
+        columns.append(
+            Column(
+                code=code,
+                length_mm=length_mm,
+                width_mm=width_mm,
+                height_mm=height_mm,
+                mro_kilograms=None if mass == _NOT_PUBLISHED else int(mass),
+                berths=berth_count,
+                seats=seats[index] if seats[index] is not None else SUPPLIED_SEATS.get(code),
+                body_type=BodyType.CAMPERVAN_HIGH_TOP,  # replaced by the caller for shared columns
+                heating_note=(
+                    "'Chauffage air pulsé Truma Combi', standard"
+                    if _standard_anywhere(heating, index)
+                    else ""
+                ),
+                fridge_note=(
+                    "'Réfrigérateur à compression … avec congélateur', standard"
+                    if _standard_anywhere(fridges, index)
+                    else ""
+                ),
+            )
+        )
+    return tuple(columns)
+
+
+def build_product(
+    column: Column,
+    *,
+    manufacturer: str,
+    display_name: str,
+    manufacturer_range: str,
+    price: int | None,
+    price_source: str,
+) -> ExtractedMotorhome:
+    """One column as one brand's product, with the provenance a reviewer reads beside it.
+
+    The **heating and refrigeration are set from the rows this module verified**, not put
+    through `habitation.features_from`. That vocabulary reads English spec prose and this
+    catalogue is in French: `Chauffage air pulsé` and `Réfrigérateur à compression … avec
+    congélateur` are unambiguous, already checked for alignment, and translating them into
+    a matcher's idiom only to match them back would add a way to be wrong without adding
+    anything. They still reach the reviewer as **findings** rather than proposals, which
+    is the settled treatment of every habitation field.
+    """
+    payload = (
+        MTPLM_KILOGRAMS - column.mro_kilograms if column.mro_kilograms is not None else None
+    )
+    motorhome = Motorhome(
+        manufacturer=manufacturer,
+        manufacturer_display_name=display_name,
+        manufacturer_range=manufacturer_range,
+        model=column.code,
+        base_vehicle_manufacturer=fmlv_base_vehicle(BASE_VEHICLES[manufacturer_range]),
+        rrp_pounds=price,
+        mro_kilograms=column.mro_kilograms,
+        mtplm_kilograms=MTPLM_KILOGRAMS,
+        mh_payload_kilograms=payload,
+        mh_length_mm=column.length_mm,
+        mh_width_mm=column.width_mm,
+        mh_height_mm=column.height_mm,
+        mh_passenger_seats_inc_driver=column.seats,
+        berths=column.berths,
+        body_type=column.body_type,
+        heating=Heating.BLOWN_AIR if column.heating_note else None,
+        refrigeration=Refrigeration.FRIDGE_FREEZER if column.fridge_note else None,
+    )
+
+    provenance: dict[str, Provenance] = {}
+
+    def record(field_name: str, snippet: str) -> None:
+        provenance[field_name] = Provenance(source_url=CATALOGUE_PAGE_URL, snippet=snippet)
+
+    label = f"{manufacturer_range} {column.code}"
+    record(
+        "manufacturer_range",
+        f"'{manufacturer_range}'. The catalogue heads this column with both brands at "
+        f"once, and this is the half of that pair belonging to {display_name}. Paired "
+        f"with the model below — accept or reject the two together",
+    )
+    record("model", f"'{column.code}', the layout code heading its column")
+    record(
+        "base_vehicle_manufacturer",
+        f"{BASE_VEHICLES[manufacturer_range]}, from the chassis rows: "
+        f"{'MERCEDES-BENZ Sprinter is standard and FIAT unavailable' if BASE_VEHICLES[manufacturer_range] == 'Mercedes' else 'FIAT Ducato is standard'} "
+        f"on this column",
+    )
+    record("mh_length_mm", f"'Longueur hors tout' {column.length_mm / 1000:.2f}m")
+    record(
+        "mh_width_mm",
+        f"'Largeur hors tout (sans rétroviseurs)' {column.width_mm / 1000:.2f}m — "
+        f"published excluding mirrors, which is the figure FMLV wants",
+    )
+    record("mh_height_mm", f"'Hauteur hors tout' {column.height_mm / 1000:.2f}m")
+    record("mtplm_kilograms", f"{MTPLM_KILOGRAMS}kg, from {MTPLM_SOURCE}")
+    if column.mro_kilograms is not None:
+        record(
+            "mro_kilograms",
+            f"'Masse à vide en ordre de marche' {column.mro_kilograms}kg. Their footnote "
+            f"makes it a real mass in running order — 'Avec 1 conducteur, 90% d'eau "
+            f"propre, 90% 1 bte gaz, 90% gasoil et outillage, sans options et sans "
+            f"attelage' — so no driver allowance is added back",
+        )
+        record(
+            "mh_payload_kilograms",
+            f"derived: {MTPLM_KILOGRAMS}kg maximum authorised mass - "
+            f"{column.mro_kilograms}kg mass in running order = {payload}kg. Fleurette "
+            f"publish no payload of their own",
+        )
+    record("berths", f"'Places couchage' {column.berths}, the standard figure")
+    if column.seats is not None:
+        record(
+            "mh_passenger_seats_inc_driver",
+            f"'Places carte grise et nombre de ceinture' {column.seats}"
+            if column.code not in SUPPLIED_SEATS
+            else f"{column.seats}. {SUPPLIED_SEATS_SOURCE}",
+        )
+    if price is not None:
+        record(
+            "rrp_pounds",
+            f"£{price:,}, MANUALLY SOURCED from {price_source}, because Fleurette publish "
+            f"no price on any website. Their list is headed 'with VAT + Transport - OTR', "
+            f"so it is a UK on-the-road price in sterling and nothing is converted. Not "
+            f"machine-readable and not refreshed by later runs — re-verify at the next "
+            f"model-year changeover",
+        )
+    record(
+        "body_type",
+        f"{column.body_type.value}. Page 38 banners its columns 'PROFILÉS' and "
+        f"'INTÉGRAUX' and this column falls under "
+        f"{'INTÉGRAUX' if column.body_type is BodyType.A_CLASS else 'PROFILÉS'}; the "
+        f"price list agrees, heading its blocks 'Profile' and 'A-Class'"
+        if manufacturer_range != "Black Pearl"
+        else f"{column.height_mm}mm tall, above the {HIGH_TOP_ABOVE_MM}mm high-top "
+        f"threshold, and a panel-van conversion",
+    )
+    if column.heating_note:
+        record("heating", f"{label}: {column.heating_note} — blown air")
+    if column.fridge_note:
+        record("refrigeration", f"{label}: {column.fridge_note} — a compressor fridge")
+
+    return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
+
+
+def narrate_unpublished(
+    products: list[ExtractedMotorhome], *, on_progress: Callable[[str], None]
+) -> None:
+    """Say which products are short a required field, and why, every run.
+
+    These are collected deliberately rather than dropped — an adapter that returns nine of
+    thirteen tells a reviewer the other four are discontinued — but a product with no mass
+    cannot be uploaded, so the reason has to be in front of whoever is looking at the run
+    rather than inferred from a blank cell.
+    """
+    no_mass = [
+        p.motorhome for p in products if p.motorhome.mro_kilograms is None
+    ]
+    no_seats = [
+        p.motorhome for p in products if p.motorhome.mh_passenger_seats_inc_driver is None
+    ]
+    if no_mass:
+        names = ", ".join(f"{m.manufacturer_range} {m.model}" for m in no_mass)
+        on_progress(
+            f"NO MASS IN RUNNING ORDER, so no payload either and these cannot be "
+            f"uploaded: {names}. The catalogue prints 'NC' against them and Fleurette "
+            f"said on 28 October 2026 that the Discover and Wincester weights were still "
+            f"being tested. The model pages do publish figures for some of them, but "
+            f"every page that carries one is a previous model year's — do not use them"
+        )
+    if no_seats:
+        names = ", ".join(f"{m.manufacturer_range} {m.model}" for m in no_seats)
+        on_progress(
+            f"NO SEAT COUNT, so these cannot be uploaded either: {names}. The catalogue "
+            f"gives a band — '4/3 selon configuration' — under a footnote making the row "
+            f"a type-approval maximum, which is a ceiling and not a fitment claim"
+        )
+
+
+def collect_columns(
+    http: Fetcher, *, on_progress: Callable[[str], None] = lambda message: None
+) -> tuple[tuple[Column, ...], tuple[Column, ...]]:
+    """`(the thirteen shared columns, the four Black Pearl columns)`.
+
+    The shared columns carry their range's body type; the vans are campervans, which their
+    2590mm roof puts above `HIGH_TOP_ABOVE_MM` and so high tops.
+    """
+    pages = fetch_catalogue_pages(http, on_progress=on_progress)
+    shared_at, shared_lengths = find_table_page(pages, SHARED_CODES)
+    van_at, van_lengths = find_table_page(pages, BLACK_PEARL_CODES)
+    on_progress(
+        f"the motorhome table is on catalogue page {shared_at + 1} and the van table on "
+        f"page {van_at + 1}"
+    )
+
+    # Each table's spread runs from its own page up to the next table's, so neither can
+    # read the other's equipment rows. Computed from the two positions rather than written
+    # down, so a catalogue that gains a spread between them still divides correctly.
+    boundaries = sorted((shared_at, van_at)) + [len(pages)]
+    spread = {
+        start: [line for page in pages[start : boundaries[i + 1]] for line in page.splitlines()]
+        for i, start in enumerate(boundaries[:-1])
+    }
+
+    shared = read_table(
+        pages[shared_at].splitlines(),
+        SHARED_CODES,
+        shared_lengths,
+        spread[shared_at],
+        on_progress=on_progress,
+        what="motorhome",
+    )
+    vans = read_table(
+        pages[van_at].splitlines(),
+        BLACK_PEARL_CODES,
+        van_lengths,
+        spread[van_at],
+        on_progress=on_progress,
+        what="van",
+    )
+    placed = tuple(
+        replace(column, body_type=SHARED_RANGE_AT[SHARED_CODES.index(column.code)][2])
+        for column in shared
+    )
+    return placed, vans
