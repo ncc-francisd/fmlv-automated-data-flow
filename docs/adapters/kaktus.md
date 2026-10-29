@@ -107,6 +107,54 @@ at **5,000–5,350 kg MAM**, far above the 3,500kg the rest of the range sits at
 An adapter must therefore exclude it by name, or it arrives as a new product carrying a
 provisional price.
 
+### Re-checked 29 October 2026: launched, but still not a product
+
+Kaktus showed the Mojave at an **October 2026 show** and the page now carries a `New`
+badge, a `View specifications` button and a tabbed **Specifications** panel. It reads as a
+launch, and it was reported here as one. **The verdict does not change**, and the page's
+own words are why:
+
+* *"Production planned from April 2027"* — unchanged;
+* *"The Mojave on display at the October 2026 show is a **prototype**. It will undergo
+  further testing and development before production. The final vehicle may differ from the
+  show model, and equipment, specifications, finishes, weights and availability may
+  change"* — new wording, and more explicit than what it replaced;
+* *"Specification is for the prototype show vehicle and may change before production.
+  Items marked provisional are still being confirmed"* — still verbatim, so the exclusion
+  message in `kaktus.py` still quotes the live page;
+* *"Deposits for future build slots are now being accepted"* — a deposit list, not an
+  order book.
+
+It is also **still absent from `/configure`**, which carries two `basePrice` keys and
+always has. The configurator is this adapter's data source, so the Mojave has no price
+there to read even if it were wanted.
+
+#### What the Specifications tab actually publishes
+
+Three rows, and only one of them is a figure:
+
+| row | value |
+|---|---|
+| Base vehicle | Mercedes-Benz Sprinter 519, all-wheel drive |
+| Wheels & weight | 5,000 kg MAM super-single, or up to 5,350 kg dual rear wheel — badged **`Provisional`** |
+| Habitation structure | 54mm fibreglass sandwich panels, 50mm foam core |
+
+So the tab adds a confirmed base vehicle and a provisional MAM. **There is still no mass in
+running order, no payload, no length, width or height, and no berth or seat count** — the
+same gap the rest of this document describes, and none of it is fixed by the new tab.
+
+#### What it will be when it is a product
+
+Worth writing down now, because none of it matches the four live Kaktus:
+
+* **Two products, not one.** *"Fixed rear bed or a rear U-shaped lounge that converts into
+  a double bed"* — two layouts, which is how FMLV would carry them.
+* **Mercedes, not MAN**, so `base_vehicle_manufacturer` differs from every existing row.
+* **5,000–5,350 kg**, against 3,500 for the rest. That is a C1-licence vehicle and a
+  composite habitation body on a chassis cab, not a van conversion — so it is very unlikely
+  to be `campervan_high_top` like the others. Decide its body type from a floorplan or a
+  photograph when there is one, never from the weight.
+
 ## What is still missing everywhere
 
 **No mass and no dimension is published anywhere on the site** — not on the model pages,
