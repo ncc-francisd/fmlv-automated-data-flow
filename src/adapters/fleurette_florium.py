@@ -236,6 +236,13 @@ LENGTH_TOLERANCE_MM = 150
 #: vehicle is the lightest by the settled rule, the heavier plates being upgrades. The
 #: Black Pearl page prints a bare `3500`. One figure for all thirty, so it is asserted here
 #: rather than parsed out of a row that extraction breaks across three lines.
+#:
+#: **The Mercedes pair's payload looks far too low and is correct anyway.** 3500 against
+#: the Elister and Belixter's 3122 and 3161 kg leaves 378 and 339 kg on the range's
+#: longest vehicles, and their price list prices an *"Upgrade from 4T1 GVW"* that reads as
+#: 4100 already being the plate. Ruled 29 October 2026: 3500 is standard and 4100 is what
+#: options buy, so recomputing these from 4100 would record an optioned variant. See
+#: `docs/adapters/fleurette-florium.md`.
 MTPLM_KILOGRAMS = 3500
 
 #: Said in provenance wherever `MTPLM_KILOGRAMS` is recorded.

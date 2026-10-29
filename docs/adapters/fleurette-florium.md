@@ -321,6 +321,31 @@ the adapter carries it as a supplied constant, not a parse.
 The six layouts the catalogue bands are read by `leading_seat_counts`, which takes only
 the leading run of plain integers and leaves the rest unset — see the module docstring.
 
+### The Elister and Belixter MTPLM is 3500, and the low payload is real
+
+These two are the only layouts whose maximum mass is printed as a pair. The catalogue's
+technical table gives:
+
+    Masse en ordre de marche (kg)    3122   3161
+    MTPLM / PTAC (kg)                3500 / 4100
+
+Taking 3500 leaves a payload of **378 kg** on the 73LMF and **339 kg** on the 73LJG —
+the two lowest figures in the range, on its longest and most expensive vehicles, where
+the 5.99m Migrateur 60LG gets 807 kg. That looks wrong, and the Elister/Belixter price
+list makes it look wronger still by pricing an option as *"Upgrade from 4T1 GVW with 5T5
+autorised rolling weight £300"*, which reads as 4.1 tonnes already being on the plate.
+
+**It is nonetheless 3500, and that is settled — do not change it on the arithmetic.**
+The requester ruled on 29 October 2026: 3500 is the standard weight and 4100 is what
+certain optional extras buy, which is the README's own rule that an option never sets the
+base specification. The catalogue prints 3500 first for exactly that reason, and the
+price list's own header reads `3T5 - 5T5`, 3.5 tonnes laden against a 5.5 tonne train
+weight — so the £300 upgrade is a *towing* upgrade, not a replating.
+
+The implausible-looking payload is therefore the correct figure for the base vehicle, and
+a future session that recomputes it from 4100 would be recording an optioned variant. The
+question is with Fleurette for confirmation, and nothing changes until they answer.
+
 ### An extra layout on the site: 68LMC
 
 `migrateur-68-lmc-central-bed` and `baxter-68-lmc-central-bed` exist as pages — 6.85m,
@@ -328,11 +353,28 @@ the leading run of plain integers and leaves the rest unset — see the module d
 neither the 2027 catalogue nor the 2027 price list, so it reads as a 2026 model that has
 been dropped, and it is **out of scope**. On the open-questions list for Léa.
 
-### Still to do
+### Built, 29 October 2026 — and what is still open
 
-* `fleurette.py` and `florium.py`, mapping columns to products and holding the embedded
-  price tables;
-* two registry rows — `manufacturer_id` is not in `resources/manufacturers-full-list.csv`
-  for either brand, so build on a provisional id outside the NCC range and repoint when
-  the real ones land, as `atom.py` did;
-* tests and fixtures, then a first run off an empty baseline.
+`fleurette.py` (13 layouts) and `florium.py` (17) both read `fleurette_florium.py`, are
+registered on provisional ids 9001 and 9002, and have 51 tests over seven catalogue
+fixtures. Runs #201 and #202 built all thirty products off an empty baseline.
+
+**Twenty-one of the thirty can be uploaded.** Nine cannot, and are collected anyway with
+a pointer rather than dropped, because an adapter that returns 21 of 30 reads to a
+reviewer as nine discontinuations — the `vantage.py` mistake:
+
+| blocked | missing |
+|---|---|
+| Discover + Wincester 72LMF, 72LJG, 74LJG, 75LMF | mass and seats |
+| Black Pearl 63LD | mass |
+
+Still open with Fleurette, and all of it with Léa Timores:
+
+* the eight Discover and Wincester masses, promised for the week of 3 November 2026;
+* the Black Pearl 63LD mass;
+* the two Black Pearl price rows the arithmetic rejects (63LJ £57,275, 59LT £55,300);
+* whether `68LMC` is dropped for 2027;
+* confirmation of the Elister and Belixter MTPLM, MRO and payload — see above.
+
+Still open on our side: the provisional ids 9001 and 9002 want repointing once the NCC
+issues real ones.
