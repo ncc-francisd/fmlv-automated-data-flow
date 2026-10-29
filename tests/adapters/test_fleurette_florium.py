@@ -221,17 +221,44 @@ def test_the_vans_optional_berth_is_written_differently_and_still_not_counted():
 # --- Seats ---------------------------------------------------------------------------
 
 
-def test_only_the_leading_run_of_plain_seat_counts_is_read():
-    """A banded cell is a type-approval ceiling, so everything from it on is left unset."""
+def test_the_whole_wrapped_seats_row_is_read_in_column_order():
+    """Every cell, not just the run before the first band.
+
+    The bands wrap onto lines of their own and the label's own `configuration` sits
+    before any digit, so the region reads cleanly end to end. This is the real page 38
+    row, rejoined.
+    """
     region = (
         "Places carte grise et nombre de ceinture suivant la configuration * * * "
-        "4 4 4 4 4 4 4 4/3 selon configuration"
+        "4 4 4 4 4 4 4 4/3 selon configuration 4/3 selon configuration 4 4 "
+        "3/2/4 selon configuration 4/3 selon configuration"
     )
-    assert shared.leading_seat_counts(region, 13) == (4,) * 7 + (None,) * 6
+    assert shared.seat_counts(region, 13) == (
+        4, 4, 4, 4, 4, 4, 4, None, None, 4, 4, None, None,
+    )
+
+
+def test_a_three_way_band_is_one_cell_and_is_never_recorded():
+    """`3/2/4` must not read as three columns, and must not record its own 2."""
+    region = "Places carte grise * * * 3/2/4 selon configuration 4"
+    assert shared.seat_counts(region, 2) == (None, 4)
+
+
+def test_a_band_that_lost_its_phrase_makes_the_row_refuse():
+    """Falling back to bare integers splits `4/3` in two, so the count no longer fits."""
+    region = "Places carte grise * * * 4 4/3 4"
+    assert shared.seat_counts(region, 3) == (None, None, None)
+
+
+def test_a_seats_row_of_the_wrong_width_is_refused_entirely():
+    """A gained or lost cell would shift every vehicle along a place — so nothing is."""
+    region = "Places carte grise * * * 4 4 4 4"
+    assert shared.seat_counts(region, 13) == (None,) * 13
+    assert shared.seat_counts(region, 3) == (None, None, None)
 
 
 def test_neither_seats_label_contains_a_digit():
-    """`leading_seat_counts` takes the first digits it sees, which relies on this."""
+    """`seat_counts` scans the whole region, which relies on the label holding no cell."""
     for page in _pages():
         for line in page.splitlines():
             if line.startswith(shared.SEATS_ROW[0]):
@@ -239,23 +266,64 @@ def test_neither_seats_label_contains_a_digit():
                 assert not re.search(r"\d", label), label
 
 
-def test_a_banded_seats_cell_is_never_recorded(columns):
+def test_the_seats_region_stops_before_the_footnote():
+    """The page footnote's `3%` and `16''` are digits that would count as columns."""
+    assert shared.SEATS_END_ROW == "Places repas"
+    for page in _pages():
+        lines = [line.strip() for line in page.splitlines()]
+        if not any(line.startswith(shared.SEATS_ROW[0]) for line in lines):
+            continue
+        start = next(
+            i for i, line in enumerate(lines) if line.startswith(shared.SEATS_ROW[0])
+        )
+        assert any(
+            line.startswith(shared.SEATS_END_ROW) for line in lines[start:]
+        ), "no terminator after the seats row"
+
+
+def test_the_two_72s_are_read_from_the_catalogue_not_supplied(columns):
+    """The catalogue states these plainly; the old parser simply never reached them."""
     coachbuilts, _vans = columns
-    banded = _by_code(coachbuilts)
-    for code in ("72LMF", "72LJG", "74LJG", "75LMF"):
-        assert banded[code].seats is None
+    by_code = _by_code(coachbuilts)
+    for code in ("72LMF", "72LJG"):
+        assert by_code[code].seats == 4
+        assert code not in shared.SUPPLIED_SEATS
 
 
-def test_the_elister_seats_come_from_the_requesters_reading(columns):
-    """Supplied on 28 October 2026 from the pages' `3/4 Travel places` tile.
+def test_a_banded_seats_cell_is_never_recorded_by_the_parser():
+    """The parse leaves all four bands unset. `read_table` then supplies them."""
+    region = (
+        "Places carte grise et nombre de ceinture suivant la configuration * * * "
+        "4 4 4 4 4 4 4 4/3 selon configuration 4/3 selon configuration 4 4 "
+        "3/2/4 selon configuration 4/3 selon configuration"
+    )
+    codes = shared.SHARED_CODES
+    parsed = dict(zip(codes, shared.seat_counts(region, len(codes))))
+    for code in ("73LMF", "73LJG", "74LJG", "75LMF"):
+        assert parsed[code] is None
+        assert code in shared.SUPPLIED_SEATS
 
-    The catalogue prints only `4/3 selon configuration`, which the README forbids
-    recording uncorroborated — this corroboration is why these four upload at all.
+
+def test_the_supplied_seats_reach_the_four_banded_columns(columns):
+    coachbuilts, _vans = columns
+    by_code = _by_code(coachbuilts)
+    for code in ("73LMF", "73LJG", "74LJG", "75LMF"):
+        assert by_code[code].seats == 3
+
+
+def test_the_banded_seats_come_from_the_manufacturers_own_picto(columns):
+    """Read off the model pages' travel-seats tile, whose figure is in the filename.
+
+    `pictos-3-4-carte-grise-...png`, and `carte grise` is what the catalogue calls the
+    same row. Checked across all seventeen columns on 29 October 2026: the picto agrees
+    wherever the catalogue is plain, and bands exactly where the catalogue bands.
     """
-    coachbuilts, _vans = columns
-    assert shared.SUPPLIED_SEATS == {"73LMF": 3, "73LJG": 3}
-    for code in ("73LMF", "73LJG"):
-        assert _by_code(coachbuilts)[code].seats == 3
+    assert shared.SUPPLIED_SEATS == {"73LMF": 3, "73LJG": 3, "74LJG": 3, "75LMF": 3}
+
+
+def test_every_van_seat_count_is_read_from_its_own_row(columns):
+    _coachbuilts, vans = columns
+    assert [column.seats for column in vans] == [4, 4, 4, 4]
 
 
 # --- The checks ----------------------------------------------------------------------

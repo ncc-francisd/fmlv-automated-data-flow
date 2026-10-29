@@ -190,22 +190,34 @@ BASE_VEHICLES: dict[str, str] = {
     "Black Pearl": "Fiat",
 }
 
-#: Seat counts the catalogue publishes as a configuration band and the requester supplied
-#: instead, keyed by layout code. Read on 28 October 2026 off the model pages' `3/4 Travel
-#: places` tile, which is drawn as an image and so cannot be parsed; corroborated on the
-#: 2027 Belixter pages, and 3 is the base figure by the settled base-vehicle rule.
+#: Seat counts for the four layouts the catalogue bands, keyed by layout code. The
+#: catalogue gives `4/3 selon configuration` for the Mercedes pair and for 75LMF, and
+#: `3/2/4` for 74LJG, which `docs/adapters/README.md` forbids recording uncorroborated —
+#: a type-approval ceiling is not a standard fitment. These are that corroboration.
 #:
-#: The catalogue's own row says `4/3 selon configuration`, which `docs/adapters/README.md`
-#: forbids recording uncorroborated — this is that corroboration, and it is why these four
-#: can be uploaded at all. Re-verify at the model-year changeover.
-SUPPLIED_SEATS: dict[str, int] = {"73LMF": 3, "73LJG": 3}
+#: **The corroboration is the manufacturer's own picto, and it is the same field.** Every
+#: model page carries a travel-seats tile whose number lives in the image *filename* —
+#: `pictos-4-carte-grise-fleurette-florium-GB.png` — and `carte grise` is precisely what
+#: the catalogue's row is called. Checked against all seventeen columns on 29 October
+#: 2026: the picto agrees with the catalogue on every column it states plainly, and
+#: prints `3-4` on exactly the four it bands. The requester read the rendered tile as 3
+#: standard on 28 October and ruled the same way on 29 October.
+#:
+#: Not read by the adapter. The pages mix model years with no warning — see the survey —
+#: so the site stays out of the run and these stay constants. **Re-verify at the
+#: model-year changeover.** Each of the four has at least one 2027-marked page, so the
+#: reading is current: Belixter 73LMF/73LJG and Wincester 75LMF are 2027, Discover 74LJG
+#: is 2027, and their twins agree from 2025 and 2026 pages.
+SUPPLIED_SEATS: dict[str, int] = {"73LMF": 3, "73LJG": 3, "74LJG": 3, "75LMF": 3}
 
 #: Said in provenance wherever `SUPPLIED_SEATS` is used.
 SUPPLIED_SEATS_SOURCE = (
-    "MANUALLY SOURCED from the model pages' '3/4 Travel places' panel, read by the "
-    "requester on 28 October 2026 and corroborated on the 2027 Belixter pages. 3 is the "
-    "standard figure; the catalogue prints only the band '4/3 selon configuration', which "
-    "is a type-approval ceiling. Not machine-readable and not refreshed by later runs"
+    "MANUALLY SOURCED from the model pages' travel-seats picto, whose figure is in the "
+    "image filename ('pictos-3-4-carte-grise-...'), read by the requester on 28 October "
+    "2026 and checked across all seventeen columns on 29 October. 3 is the standard "
+    "figure; the catalogue prints only a band — the same 'places carte grise' field — "
+    "which is a type-approval ceiling. The site is not read by the run, because its "
+    "model pages mix model years, so this is not refreshed by later runs"
 )
 
 #: Florium's van conversions, which Fleurette do not sell. Their own technical page, four
@@ -265,6 +277,12 @@ WIDTH_ROW = ("Largeur hors tout", "")
 HEIGHT_ROW = ("Hauteur hors tout", "")
 MRO_ROW = ("Masse", "vide")
 SEATS_ROW = ("Places carte grise", "")
+
+#: Where the seats row stops. Its cells wrap onto their own lines, so the row is read as a
+#: region rather than a line, and the region has to end somewhere: at the next labelled
+#: row. Running on instead would reach the page footnote, whose `+/- 3%` and `16''` are
+#: digits that would be counted as columns.
+SEATS_END_ROW = "Places repas"
 BERTHS_ROW = ("Places couchage", "")
 
 #: The equipment rows worth reading, as `(prefix, words that must also appear)`. Accented
@@ -301,6 +319,13 @@ FRIDGE_ROWS = (
 #: figures one place. See `split_row`.
 METRES_VALUE = re.compile(r"\d+,\d+")
 MASS_VALUE = re.compile(r"\d{4}|NC")
+#: One cell of the seats row: a band such as `4/3 selon configuration` or `3/2/4 selon
+#: configuration`, or a plain integer. The band is matched first, so `4/3` is one cell and
+#: never two. A band that has lost its `selon configuration` falls through to the integer
+#: branch and splits in two, which throws the count out and makes the row refuse — the
+#: right answer, because its layout has changed.
+_SEAT_CELL = re.compile(r"(\d+(?:/\d+)+)\s+selon\s+configuration|(\d+)")
+
 BERTHS_VALUE = re.compile(r"[1-9]")
 
 #: `S` standard, `O` optional, `-` unavailable. The hyphen arrives space-padded, so it is
@@ -432,35 +457,30 @@ def split_row(line: str, label: str, count: int, *, value: re.Pattern[str]) -> t
     return values
 
 
-def leading_seat_counts(region: str, count: int) -> tuple[int | None, ...]:
-    """Seat counts for as many columns as the row states plainly, then `None`.
+def seat_counts(region: str, count: int) -> tuple[int | None, ...]:
+    """One seat count per column, with `None` where the catalogue gives a band.
 
-    The seats row is the one the extraction cannot lay out, because its awkward cells are
-    phrases — `4/3 selon configuration` — that wrap onto their own lines and arrive out of
-    column order. Reconstructing it would mean guessing, and a guessed seat count is the
-    Bürstner mistake exactly.
+    The seats row is the one the extraction cannot lay out as a line, because its awkward
+    cells are phrases — `4/3 selon configuration`, `3/2/4 selon configuration` — that wrap
+    onto lines of their own. They do however wrap **in column order**, so the row can be
+    read from its whole region as a run of cells, each either a bare integer or a band.
 
-    So this reads only the **leading run of bare integers** and leaves every column after
-    it unset. On the motorhome page that is the seven columns printed as a plain `4`,
-    stopping at the first `4/3`; on the vans' page it is all four. Columns left `None` are
-    the ones the footnote makes a type-approval ceiling anyway, which
-    `docs/adapters/README.md` says not to record without corroboration — so the cautious
-    reading and the settled rule want the same thing here, and the two 72s lost along the
-    way have no published mass either and cannot be uploaded regardless.
+    A band is returned as `None`, never as one of its own numbers. The catalogue footnotes
+    the row as *"Nombre de places carte grise maximum ... variable selon configuration"* —
+    a type-approval ceiling, which `docs/adapters/README.md` says not to record without
+    corroboration. `SUPPLIED_SEATS` is that corroboration and fills them in afterwards.
+
+    **The count must come out exact or nothing is returned.** A row that gained or lost a
+    cell would otherwise shift every vehicle along a place with thirteen plausible seat
+    counts still in hand, which is the alignment failure the whole module is built to
+    refuse. The label holds no digits on either page, so it cannot contribute a cell.
     """
-    tokens = region.replace("*", " ").split()
-    # The label itself holds no digits on either page, so the first digit found is the
-    # first column — asserted by `test_neither_seats_label_contains_a_digit`.
-    seats: list[int | None] = []
-    for token in tokens:
-        if token.isdigit():
-            seats.append(int(token))
-            if len(seats) == count:
-                break
-        elif seats:
-            break
-    return tuple(seats) + (None,) * (count - len(seats))
-
+    cells: list[int | None] = [
+        None if banded else int(plain) for banded, plain in _SEAT_CELL.findall(region)
+    ]
+    if len(cells) != count:
+        return (None,) * count
+    return tuple(cells)
 
 def metres_to_mm(text: str) -> int | None:
     """`5,99` to 5990. French decimal comma, three significant figures, metres."""
@@ -652,15 +672,27 @@ def read_table(
         )
         masses = (_NOT_PUBLISHED,) * count
 
-    # The seats row wraps onto the lines after it and arrives out of column order, so its
-    # whole region is handed over and only its leading plain integers are read. Four lines
-    # is enough to reach the next labelled row on both pages.
+    # The seats row wraps onto the lines after it, in column order, so its whole region is
+    # handed over rather than one line. The region runs to the next labelled row, because
+    # the page footnote beyond it holds digits that would be counted as columns.
     seats_line = find_row(lines, SEATS_ROW[0])
     if seats_line is None:
         seats: tuple[int | None, ...] = (None,) * count
+        on_progress(
+            f"the {what} table has no '{SEATS_ROW[0]}' row — no seat count is proposed "
+            f"for any of them, and FMLV's own figures stand"
+        )
     else:
         start = lines.index(seats_line)
-        seats = leading_seat_counts(" ".join(lines[start : start + 4]), count)
+        end = start + 1
+        while end < len(lines) and not lines[end].startswith(SEATS_END_ROW):
+            end += 1
+        seats = seat_counts(" ".join(lines[start:end]), count)
+        if all(seat is None for seat in seats):
+            on_progress(
+                f"the {what} table's seats row did not read as {count} cells — no seat "
+                f"count is proposed for any of them, and FMLV's own figures stand"
+            )
 
     # The equipment rows run onto the pages after the dimensions, so they are searched for
     # across this table's whole spread — and no further. See the docstring.

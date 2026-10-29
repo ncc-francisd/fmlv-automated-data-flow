@@ -761,6 +761,40 @@ labelled "permitted", the lower bound is a homologation minimum, not a fitment c
 corroborate it before recording it, and leave the field unset (and *unregistered*) if you
 cannot. See [`burstner.md`](burstner.md).
 
+### A number drawn as a picture may still be readable, in the filename
+
+Fleurette Florium, 29 October 2026. Their catalogue bands the seats row on four of
+seventeen layouts — `4/3 selon configuration` — and footnotes it as a **maximum**, so the
+ceiling rule above says leave it unset unless something corroborates it. The corroborating
+figure was on their website, inside a graphic: a tile showing a number over a seat icon,
+nowhere in the page's text.
+
+It was machine-readable anyway, because the number is in the **image filename**:
+
+    pictos-4-carte-grise-fleurette-florium-GB.png
+    pictos-3-4-carte-grise-fleurette-florium-GB.png
+
+So before concluding a figure is locked in an image, read the `src` attributes. A CMS
+names picto assets after what they depict, and a brand that publishes one tile per value
+has to name them distinctly. The same goes for `alt` text and `title`.
+
+Two things made it worth trusting here rather than merely convenient:
+
+- **It was the same field, not a lookalike.** `carte grise` is the French registration
+  document, and the catalogue's own row is called `Places carte grise`. A picto that
+  happened to show a number would prove nothing; one that names the same field is a second
+  publication of it.
+- **It was checked where the answer was already known.** Across all seventeen columns the
+  picto agreed with the catalogue on every column the catalogue states plainly, and banded
+  on precisely the four it bands. Corroboration that only ever appears where nothing can
+  contradict it has not been tested.
+
+**Reading it in an adapter is a separate decision from reading it once.** Here the site was
+already disqualified as a specification source — its model pages mix model years without
+saying so — so the figure is carried as a documented constant, re-verified at the model-year
+changeover, rather than fetched every run from pages that are wrong about everything else.
+See [`fleurette-florium.md`](fleurette-florium.md).
+
 ### An MTPLM can be a band, and a unit's plate sits somewhere inside it
 
 Airstream, 14 October 2026. Their European owner's manual publishes **two** MTPLMs per

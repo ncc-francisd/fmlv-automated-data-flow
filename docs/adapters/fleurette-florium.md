@@ -306,20 +306,49 @@ looking entirely plausible. Specifications come from the catalogue, prices from 
 lists, and the site from neither. This is `aura.md`'s lesson about smaller brands' sites
 lagging, met again.
 
-### Seats: 3 on the Elister and Belixter, supplied and corroborated
+### Seats: the catalogue states all seventeen, and the pictos confirm them
 
-The catalogue prints `4/3 selon configuration` for 73LMF and 73LJG, which the README's
-Bürstner rule says to leave unset without corroboration. The requester supplied it on
-28 October from the model pages' **`3/4 Travel places`** tile, reading 3 as the standard
-figure — which the base-vehicle rule gives independently.
+The seats row — `Places carte grise et nombre de ceinture suivant la configuration` —
+is the one the extraction cannot lay out as a single line, because four of its cells are
+phrases that wrap onto lines of their own. Rejoined, page 38 reads:
 
-Worth recording *which* pages: the two **Elister** pages are marked 2025, but the two
-**Belixter** pages are 2027 and say the same thing, so the corroboration is current. The
-tile is drawn as an image and is not in the extracted text, so this is a human reading and
-the adapter carries it as a supplied constant, not a parse.
+    4 4 4 4 4 4 4  4/3 selon configuration  4/3 selon configuration  4 4
+    3/2/4 selon configuration  4/3 selon configuration
 
-The six layouts the catalogue bands are read by `leading_seat_counts`, which takes only
-the leading run of plain integers and leaves the rest unset — see the module docstring.
+Thirteen cells for thirteen columns: nine plain, four banded. Page 42 gives the four
+vans a plain `4` each. **Nothing is missing** — the first parser read only the leading
+run of plain integers and so stopped at column 8, losing `72LMF` and `72LJG`, which the
+catalogue states as plainly as the rest. `seat_counts` now reads the whole region in
+column order and refuses the row outright unless the cell count comes out exact.
+
+The four banded cells stay unset, because the row's own footnote calls it *"Nombre de
+places carte grise **maximum** ... variable selon configuration"* — a type-approval
+ceiling, which the README says not to record uncorroborated.
+
+#### The corroboration is the manufacturer's own picto, and it is the same field
+
+Every model page carries a travel-seats tile, and **the figure is in the image
+filename**, not the pixels:
+
+    pictos-4-carte-grise-fleurette-florium-GB.png
+    pictos-3-4-carte-grise-fleurette-florium-GB.png
+
+`carte grise` is exactly what the catalogue calls its row. Checked against all seventeen
+columns on 29 October 2026, the two sources agree completely: the picto prints a plain
+number on every column the catalogue states plainly, and prints `3-4` on precisely the
+four it bands. That is a genuine second reading of the same field, and it is the reason
+the four banded layouts can be recorded at all.
+
+Banded reads **3**, the requester's reading of the rendered tile on 28 October and his
+ruling on 29 October, which the base-vehicle rule gives independently. Each of the four
+has at least one 2027-marked page — Belixter 73LMF/73LJG, Discover 74LJG and Wincester
+75LMF — so the corroboration is current even though some twins' pages are 2025 or 2026.
+
+**The adapter does not read the site.** The pages mix model years with no warning, as the
+table above shows, so the picto is carried as a `SUPPLIED_SEATS` constant with its source
+in provenance, and re-verified at the model-year changeover. Automating it would mean
+fetching thirty-two pages a run to re-read a figure that changes once a year, from a
+source this document has just finished disqualifying for masses.
 
 ### The Elister and Belixter MTPLM is 3500, and the low payload is real
 
@@ -365,8 +394,12 @@ reviewer as nine discontinuations — the `vantage.py` mistake:
 
 | blocked | missing |
 |---|---|
-| Discover + Wincester 72LMF, 72LJG, 74LJG, 75LMF | mass and seats |
+| Discover + Wincester 72LMF, 72LJG, 74LJG, 75LMF | mass |
 | Black Pearl 63LD | mass |
+
+Mass is now the **only** thing holding any of them back: every one of the thirty has a
+seat count as of 29 October 2026. When Léa's weights arrive, the nine go straight
+through.
 
 Still open with Fleurette, and all of it with Léa Timores:
 
