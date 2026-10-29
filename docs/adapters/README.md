@@ -193,6 +193,35 @@ stay derived** from the published height and the standard-fit wording. `wingamm.
 reasoning from its construction paragraph — they can point opposite ways, and the picture
 wins.
 
+### Campervan or coachbuilt is decided by the body, not the silhouette
+
+The 2×2 above answers *which* campervan. It assumes the prior question is settled, and that
+question has caught this project out twice: **is it a van conversion at all?**
+
+A campervan is a **converted van** — the donor vehicle's own body, cut about inside. A
+coachbuilt has a habitation body **built onto a chassis**, whatever shape that body ends up.
+So the test is what the walls are, and a manufacturer who builds them says so, because
+sandwich panel is a selling point:
+
+> *"54 mm fibreglass sandwich panels: 50 mm insulation foam core and approximately 2 mm
+> fibreglass skin per side"* — Kaktus Mojave, on a Mercedes-Benz Sprinter **chassis**
+
+That is a coachbuilt, and it stays one however van-like it looks and whatever the maker
+calls it. Two places this goes wrong:
+
+- **Expedition vehicles.** Boxy, van-proportioned, sold beside van conversions and often
+  named like them. Kaktus sell the Mojave under `/vans/`, alongside two genuine conversions.
+  Requester's ruling, 29 October 2026: *"technically an off-road expedition motorhome,
+  rather than a panel van"* — `coach_built_low_profile`.
+- **A range whose name says van.** Auto-Trail's Adventure reads as a campervan and is a
+  Luton over-cab coachbuilt.
+
+Having established it is a coachbuilt, **low profile against over-cab is a floorplan
+question and never a dimension** — see the Imala, which holds both at 3060 mm. The Mojave's
+two layouts both bed at the rear with no over-cab bed mentioned, which is what makes it low
+profile. Its 5,000 kg plays no part: a weight no more decides coachbuilt-or-campervan than a
+height decides low-profile-or-over-cab.
+
 ### Price is a guide price, so a consistent basis is preferred but not required
 
 `rrp_pounds` is the **on-the-road price** where a manufacturer publishes one — the figure a

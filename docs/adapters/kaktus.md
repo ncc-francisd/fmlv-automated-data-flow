@@ -150,10 +150,16 @@ Worth writing down now, because none of it matches the four live Kaktus:
 * **Two products, not one.** *"Fixed rear bed or a rear U-shaped lounge that converts into
   a double bed"* — two layouts, which is how FMLV would carry them.
 * **Mercedes, not MAN**, so `base_vehicle_manufacturer` differs from every existing row.
-* **5,000–5,350 kg**, against 3,500 for the rest. That is a C1-licence vehicle and a
-  composite habitation body on a chassis cab, not a van conversion — so it is very unlikely
-  to be `campervan_high_top` like the others. Decide its body type from a floorplan or a
-  photograph when there is one, never from the weight.
+* **`coach_built_low_profile`**, settled by the requester on 29 October 2026 — *"technically
+  an off-road expedition motorhome, rather than a panel van"*. The page corroborates both
+  halves of the question. It is **built, not converted**: *"54 mm fibreglass sandwich
+  panels"* on a Sprinter **chassis**, which rules out every campervan type, while the
+  retained Sprinter cab rules out A-class. And **both layouts put the bed at the rear** —
+  *"fixed rear bed or a rear U-shaped lounge that converts into a double bed"* — with no
+  over-cab bed anywhere on the page, which is the floorplan-level evidence the low-profile
+  rule asks for. Its weight played no part in either half.
+* **5,000–5,350 kg**, against 3,500 for the rest — a C1-licence vehicle, which is worth
+  knowing but decided nothing above.
 
 ## What is still missing everywhere
 
