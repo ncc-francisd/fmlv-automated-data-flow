@@ -151,6 +151,12 @@ allocate — and the **supplier/exhibitor record**, which no upload can create.
 
 # Addendum — the catalogue and price list, 30 October 2026
 
+> **Read the correction at the foot of this file first.** This section concluded there was
+> no usable price. That was wrong: it was written from the PDF behind the flipbook's
+> download link, which is a superseded euro edition of a book whose displayed pages are a
+> sterling UK list. The reasoning below about mass and roster still stands; everything it
+> says about price does not.
+
 The requester supplied two FlipHTML5 flipbooks. **Both are machine-readable**, and between
 them they close one of the three holes, half-close a second and answer the open question —
 but they do **not** make the brand buildable, because the price they publish is the wrong
@@ -333,3 +339,87 @@ this file.
 
 **That leaves exactly one thing outstanding: a sterling price list.** The id and the
 supplier record are no longer blockers — they are written down and waiting.
+
+---
+
+# Correction — there *is* a sterling price list, 30 October 2026
+
+**Everything above about the price being unusable is wrong, and the registry note that
+repeated it has been rewritten.** The requester opened `/books/pyci/#p=3` in a browser and
+found sterling prices on the page. He was right.
+
+## What happened
+
+The flipbook's own config offers the source PDF, and that PDF is a **different edition from
+the pages the viewer displays**:
+
+    "downloadconfig":{"pdf":{"isOriginPath":true, …, "type":"originalFiles"}}
+
+`originalFiles` is the file *first uploaded*. Globe-Traveller have since replaced the
+book's contents with a UK edition, and FlipHTML5 still serves the superseded euro one
+behind the download link. The two have **no pound sign and 92 euro signs** versus a page
+headed `GBP` throughout — so this was not a near-miss that careful reading would have
+caught. The only thing that catches it is checking the download against the live pages,
+which is now written up in `docs/adapters/README.md`.
+
+The other `type=` values return the literal string `NOT_DOWNLOAD`, so there is no second
+URL. The displayed pages are hashed `.webp` images whose filenames sit in an obfuscated
+`fliphtml5_pages` blob.
+
+## What the UK list actually says
+
+Page 3, Fiat Ducato | 180 Hp | 2.2 l | AT8 | **RHD**, prices in **GBP**:
+
+| series | models and prices | series MRO |
+|---|---|---|
+| **Explorer** | XS `95 1xx`*, X `95 671`, Z `95 671`, Z EVO `104 013`, Z Bike `96 018` | 3 060 kg |
+| **Pathfinder** | X `101 580`, Z `101 580`, Z Bike `101 927` | 3 160 kg |
+| **Voyager** | XS `110 181`, X `110 733`, Z `110 733` | 3 170 kg |
+
+\* obscured by the requester's highlighter in the screenshot; to be read off the page.
+
+And the footer gives the basis outright:
+
+> **Prices are on the road, collected from dealer premises.**
+> **They include — Full UK specification, righthand drive, transport to dealer premises,
+> VAT @ 20% and 1st registration and road fund licence.**
+
+That is **exactly** the basis FMLV records — the same one Auto-Trail and Dethleffs publish.
+No conversion, no provenance caveat, nothing to explain away.
+
+## What this changes
+
+**The Ducato-versus-Boxer question is answered the other way, and the roster shrinks.** The
+UK page is headed `Fiat Ducato … RHD` and carries **no Peugeot Boxer table**. The euro list
+prices both because the EU gets both; the UK list is Fiat, right-hand drive, only. So the
+roster is **not** 21 — it is the eleven models on this page, and the three Falcons.
+
+**The two Bike variants are real UK models.** `Explorer Z Bike` and `Pathfinder Z Bike` are
+priced here, which settles the earlier doubt: they are not an artefact of the options list.
+They have no website page, so their specifications would have to come from the catalogue or
+be asked for.
+
+**The sterling figures confirm why the euro ones could never have been converted.** Explorer
+X is €78,470 ex-works and £95,671 on the road — the sterling figure is *higher* than the
+euro one, because VAT at 20%, transport and registration all land on top. A conversion would
+have put it at £68,235, roughly £27,000 light.
+
+## What is still outstanding
+
+Much less than before, and none of it is the price:
+
+1. **A machine-readable copy of the UK list.** The download link serves the wrong edition
+   and the displayed pages are images, so an adapter cannot read it per run. Ask
+   Globe-Traveller to email the UK price list PDF — the Fleurette precedent — and carry it
+   as a `joa.py`-style constant, re-verified at the model-year changeover.
+2. **Mass in running order per model.** Still the one unsolved data problem: the UK list
+   repeats the euro list's *per-series* figure, footnoted *"the heaviest model variant in
+   the series"*. The three Falcons have per-model masses in the catalogue; the other eleven
+   have none.
+3. **The Falcon's UK price.** The list is titled *"Voyager | Pathfinder | Explorer"* and
+   the Falcon is absent from it, so the three VW models have a mass and no price while the
+   eleven Fiat ones have a price and no per-model mass.
+4. **The Explorer XS figure**, obscured in the screenshot.
+5. Whether the catalogue's download is **also** a superseded edition. Its contents matched
+   the website on all twelve models, so it is probably current, but it has not been
+   spot-checked against the live viewer and should be before anything is built from it.

@@ -436,10 +436,42 @@ So when a brand's documents are behind a flipbook, **look for the viewer's confi
 concluding the text is unreachable**, and before reaching for a browser or OCR. The hosts
 differ — FlipHTML5, Heyzine (WildAx), Publuu, FlippingBook, Issuu — but the shape is the
 same: a small JSON or JS manifest beside the viewer, naming a page count, a title and often
-a download URL. Finding it turns a hand-typed constant into something a run can re-read,
-which is the difference between the `joa.py` arrangement and an ordinary adapter.
+a download URL.
 
-Two cautions:
+### But that PDF may not be the document on the screen
+
+**Corrected 30 October 2026, the same day it was written, after the requester read the
+live viewer and found it said something else entirely.** The key is in the config, spelled
+out:
+
+    "downloadconfig":{"pdf":{"isOriginPath":true, …, "type":"originalFiles"}}
+
+`originalFiles` means **the file first uploaded**, not the pages being displayed. A
+publisher who replaces a book's contents — a new edition, a different market — leaves the
+superseded upload sitting behind that download link, and nothing in the viewer says so.
+
+Globe-Traveller's price list is the worked example, and the difference was not subtle. The
+book is titled *"UK … Pricelist"*; the pages on screen are **sterling, right-hand drive,
+on the road, VAT at 20% included**; and the PDF behind the download link is the **euro,
+ex-VAT, ex-works** edition, with zero pound signs in it. Reading the download and
+reporting on it produced a confident and wholly wrong conclusion — that the brand had no
+usable price and could not be built.
+
+So the rule has two halves, and the second matters more:
+
+1. Look for the config; it often hands over a real PDF with its text layer, which turns a
+   hand-typed constant into something a run can re-read.
+2. **Then check that PDF against the live pages before trusting a word of it.** A page
+   number, a currency symbol, a column heading — one spot-check is enough. If the two
+   disagree, the screen wins and the download is a previous edition.
+
+`isOriginPath: false`, or a `type` other than `originalFiles`, is the reassuring case. On
+FlipHTML5 the other `type=` values return the string `NOT_DOWNLOAD`, so there is no second
+URL to try: when the original is stale the displayed pages are hashed `.webp` images whose
+filenames sit in an obfuscated `fliphtml5_pages` blob, and the practical route is to ask
+the brand for the document rather than to decode it.
+
+Two further cautions:
 
 - **A download URL is not permission to republish.** Fetch it as the adapter's source and
   snapshot it like any other document; do not commit the PDF into the repo.
