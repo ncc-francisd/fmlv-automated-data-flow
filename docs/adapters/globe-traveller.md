@@ -309,11 +309,27 @@ the no-baseline case, and seeding dummy products has now gone wrong twice — Be
 was `active: No` and never reached the baseline, and Fleurette's two seed rows had to be
 deleted afterwards.
 
-What is needed before a build, and only before a build:
+### The names, settled 30 October 2026, and the registry row
 
-* a **manufacturer id** — the NCC's to allocate; `resources/manufacturers-full-list.csv`
-  has no Globe-Traveller row, so the registry would start on a provisional id outside the
-  NCC range as Fleurette did on 9001/9002;
-* the exact **`ncc_supplier_name`** string, which no upload can invent.
+The requester gave both strings, and they split the way `KAKTUS` does:
 
-Neither blocks the survey, and both are moot until there is a sterling price.
+| field | value |
+|---|---|
+| `fmlv_manufacturer` | **`GLOBE-TRAVELLER`** — capitals, hyphen, two `L`s |
+| `fmlv_display_name` | `Globe-Traveller` |
+| `ncc_supplier_name` | `Globe-Traveller` |
+
+Neither is a typo of the other and neither should be "fixed".
+
+**Row written on provisional id `9003`**, because the brand is in no NCC list — the same
+arrangement Fleurette and Florium have on 9001/9002, to be repointed when a real id is
+allocated. `status` is **`paused`**, which the registry README defines as *"skip in
+scheduled sweeps but still runnable manually"*: there is no adapter, and there should be no
+sweep until there is a price. `fmlv run 9003` says so plainly rather than failing oddly.
+
+The row carries the catalogue and price-list flipbook URLs in `brochure_url` and
+`price_list_url`, so the documents are findable from the registry rather than only from
+this file.
+
+**That leaves exactly one thing outstanding: a sterling price list.** The id and the
+supplier record are no longer blockers — they are written down and waiting.
