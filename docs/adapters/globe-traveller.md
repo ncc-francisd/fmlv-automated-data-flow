@@ -146,3 +146,174 @@ regardless. `fmlv empty-baseline <manufacturer>` covers the no-baseline case by 
 
 What *is* needed, per the three-things rule, is the **manufacturer id** — the NCC's to
 allocate — and the **supplier/exhibitor record**, which no upload can create.
+
+---
+
+# Addendum — the catalogue and price list, 30 October 2026
+
+The requester supplied two FlipHTML5 flipbooks. **Both are machine-readable**, and between
+them they close one of the three holes, half-close a second and answer the open question —
+but they do **not** make the brand buildable, because the price they publish is the wrong
+kind of price.
+
+## Getting at them: FlipHTML5 hands over the original PDF
+
+The viewers are at `public.globe-traveller.eu/books/<id>/`, and fetching that path
+redirects to the site's home page. The route in is three steps, all plain HTTP:
+
+1. `/<id>/index.html` — the directory redirects, the file does not;
+2. `/<id>/javascript/config.js` — 50-60 KB, holding `pageCount`, the title, and
+3. `"downloadconfig":{"pdf":{"isOriginPath":true,"url":"https://fliphtml5.com/api/download/download-file?bookId=<n>&type=1"}}`
+
+That URL returns the **original PDF**, text and all — `%PDF-1.4`, no OCR, no browser.
+Page images are hashed `.webp` under `files/large/` and are not needed.
+
+| document | book id | pages | bytes |
+|---|---|---|---|
+| EN Globe-Traveller Catalogue 2026/2027 | 75073062 | 32 | 4.7 MB |
+| UK Voyager / Pathfinder / Explorer Pricelist 2026/2027 | 18168864 | 8 | 350 KB |
+
+So an adapter could **rediscover both per run** rather than carrying constants, which is
+better than the `joa.py` arrangement Fleurette needed. The book ids would be the hardcoded
+part, and `config.js` is the thing to re-read.
+
+## The catalogue: every dimension, and the mass for three models only
+
+Pages 6-29 are one spread per model, twelve in all — the same twelve as the website.
+
+    Total length 636 cm
+    Total width 206 cm
+    Total height 280 cm
+    Internal height 195 cm
+    Technically permissible weight 3 500 / 3 820 (Fiat) / 4 200 (Fiat) kg
+    Number of seats 2 / 3
+    Number of berths 2
+
+**The `Weight in running order ±5%` row appears on the three Falcons and nowhere else:**
+
+| model | MRO | base PMM | derived payload |
+|---|---|---|---|
+| Falcon XS | 2 980 kg | 3 500 | 520 |
+| Falcon YS | 3 000 kg | 3 500 | 500 |
+| Falcon Z | 3 300 kg | **3 820** | 520 |
+
+Note **Falcon Z offers no 3 500 kg plate at all** — `3 820 / 4 000 kg`. Its base is 3.82 t,
+which is a C1-licence vehicle and the only one in the range.
+
+## The price list: euros, ex-VAT, ex-works — and no Falcon
+
+Despite a flipbook titled *"UK ... Pricelist"*, page 1 reads **"Prices in euros. Valid from
+27 August 2026."** and **"UE ex. VAT"**, with every page footed *"All prices are in Euro net
+ex works."* There is no sterling figure in either document.
+
+It covers **Explorer, Pathfinder and Voyager only**. The Falcon series is absent, so the
+three models with a published mass are the three with no published price, and the nine with
+a price have no per-model mass. The two documents cover opposite halves of the range.
+
+### It does publish a mass in running order, but one per *series*
+
+    Mass in running order: 3 060 kg.
+    The value refers to the heaviest model variant in the series, in running order
+    and with standard equipment.
+
+Explorer 3 060, Pathfinder 3 160, Voyager 3 170 — **one figure for a whole series, and
+explicitly another model's.** Spreading it across the series would record the Explorer Z
+EVO's mass against the 37 cm shorter Explorer XS. That is the Airstream mistake (a unit's
+plate is not the model's) and the WildAx one (a copied figure that the self-check cannot
+see), so it must not be done. It is **not** the `one-qualified-mass-is-still-the-mass` case
+either: that rule covers a figure qualified as options-dependent *for the model it is
+printed against*, not a figure belonging to a sibling.
+
+### Why the euro price cannot simply be converted
+
+The settled euro rule covers a **domestic VAT-inclusive retail** price. This is neither: it
+is net of VAT *and* ex works, so it excludes VAT, transport to the UK, registration and
+PDI. Converting the Explorer X's EUR 78,470 gives GBP 68,235, while ES Hartley advertise an
+Explorer 2X at **GBP 84,995 and call that a sale price**. A converted figure would
+understate the real UK price by a quarter and would not be comparable with any other
+product on FMLV.
+
+## The open question is answered: Ducato and Boxer are two products
+
+The price list settles it, because it **prices them separately**:
+
+    Fiat Ducato | 180 Hp | 2.2 l | AT8     Explorer X  78 470 EUR
+    Peugeot Boxer | 140 Hp | 2.2 l | AT8   Explorer X  74 193 EUR
+
+Different engine, different output, EUR 4,277 apart. Under the settled rule a different
+base vehicle is a different product, so the nine Fiat/Peugeot models are **eighteen**, and
+with the three VW Falcons the roster is **21 products, not 12**. Worth confirming with the
+brand that both are genuinely offered in the UK before doubling the roster.
+
+## Two models exist only in the price list
+
+**Explorer Z Bike** and **Pathfinder Z Bike** are priced (EUR 78,806 and 80,241 on Fiat)
+but have no page on the website and no catalogue spread. On the website-overrules-the-PDF
+rule they are out of scope, but they look like a real variant rather than an error — the
+options list prices a *"Preparation for a Thule Lift V16 bike rack"* separately, so the
+Bike is something more than that option. Ask.
+
+## The UK dealer is ES Hartley, and their prices are not list prices
+
+Page 8 lists dealers by country. The United Kingdom has one, at two sites:
+
+    UNITED KINGDOM  ES HARTLEY  Ings Kendal; Cumbria, LA8 9PY                 +441539 822 450
+    UNITED KINGDOM  ES HARTLEY  Rossmore Road East; Ellesmere Port, CH65 3DD  +441513 506 870
+
+`eshartleygroup.co.uk/globe-traveller-motorhomes` states *"Country Poland - Established
+2012 - Dealer Since 2023 - Pricing GBP 85,000 to GBP 130,000"* and lists stock. **Those
+stock figures are not model prices**: every one is discounted and optioned —
+
+    NEW GLOBE-TRAVELLER EXPLORER 2X  EX DISPLAY SALE!   GBP 84,995
+    NEW GLOBE-TRAVELLER VOYAGER Z    SPECIAL PRICING    GBP 96,995
+    NEW GLOBE-TRAVELLER FALCON 2Z    EX DISPLAY SALE!   Was GBP 121,254  Now GBP 114,995
+    NEW GLOBE-TRAVELLER FALCON 2XS   EX DISPLAY SALE!   Was GBP 117,205  Now GBP 98,990
+
+The `Was` figures are nearer a list price but are still one unit's build. Their lengths do
+corroborate the catalogue exactly (6,360 / 6,840 / 5,990 mm), which is a useful check on
+the parse but not a source of price.
+
+## Where this leaves the build
+
+| field | before | now |
+|---|---|---|
+| length, width, height | site yes | site yes, catalogue agrees |
+| MTPLM | site yes | site yes, catalogue agrees |
+| seats, berths | site yes | site yes, catalogue agrees |
+| **mass in running order** | no | **Falcon only**; series-level for the rest |
+| **payload** | no | **Falcon only**, derived |
+| **price** | no | euro ex-works ex-VAT, and no Falcon — **still unusable** |
+
+**Still not buildable, and now for one reason rather than three.** The single thing that
+would unblock it is a **sterling retail price list**, per model, on the same on-the-road
+basis FMLV holds for everything else. Globe-Traveller plainly produce market-specific lists
+— this one is headed UE — so a GB edition is a thing to ask for rather than invent, and it
+would most likely carry the per-model masses too, as other brands' market lists do.
+
+### What to ask Globe-Traveller for
+
+1. A **GB price list in sterling**, on-the-road, per model — including the Falcon.
+2. **Mass in running order per model**, not per series, for Explorer, Pathfinder and
+   Voyager.
+3. Whether **Boxer and Ducato are both sold in the UK**, which decides 12 products or 21.
+4. What the **Z Bike** variants are, and whether they are UK models.
+
+## On the Nova record, re-answered 30 October 2026
+
+The requester asked whether to add a couple of models on a template so the supplier appears
+in the export dropdown, or to hand over a file of what they have.
+
+**Neither, yet.** There are no existing products, so there is nothing to diff against and
+nothing a file would tell a run that the catalogue does not. `fmlv empty-baseline` covers
+the no-baseline case, and seeding dummy products has now gone wrong twice — Beauer's mock
+was `active: No` and never reached the baseline, and Fleurette's two seed rows had to be
+deleted afterwards.
+
+What is needed before a build, and only before a build:
+
+* a **manufacturer id** — the NCC's to allocate; `resources/manufacturers-full-list.csv`
+  has no Globe-Traveller row, so the registry would start on a provisional id outside the
+  NCC range as Fleurette did on 9001/9002;
+* the exact **`ncc_supplier_name`** string, which no upload can invent.
+
+Neither blocks the survey, and both are moot until there is a sterling price.
