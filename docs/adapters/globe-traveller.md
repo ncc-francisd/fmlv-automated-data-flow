@@ -372,11 +372,11 @@ Page 3, Fiat Ducato | 180 Hp | 2.2 l | AT8 | **RHD**, prices in **GBP**:
 
 | series | models and prices | series MRO |
 |---|---|---|
-| **Explorer** | XS `95 1xx`*, X `95 671`, Z `95 671`, Z EVO `104 013`, Z Bike `96 018` | 3 060 kg |
+| **Explorer** | XS `95 119`, X `95 671`, Z `95 671`, Z EVO `104 013`, Z Bike `96 018` | 3 060 kg |
 | **Pathfinder** | X `101 580`, Z `101 580`, Z Bike `101 927` | 3 160 kg |
 | **Voyager** | XS `110 181`, X `110 733`, Z `110 733` | 3 170 kg |
 
-\* obscured by the requester's highlighter in the screenshot; to be read off the page.
+All eleven read off the page by the requester, 30 October 2026.
 
 And the footer gives the basis outright:
 
@@ -419,7 +419,6 @@ Much less than before, and none of it is the price:
 3. **The Falcon's UK price.** The list is titled *"Voyager | Pathfinder | Explorer"* and
    the Falcon is absent from it, so the three VW models have a mass and no price while the
    eleven Fiat ones have a price and no per-model mass.
-4. **The Explorer XS figure**, obscured in the screenshot.
-5. Whether the catalogue's download is **also** a superseded edition. Its contents matched
+4. Whether the catalogue's download is **also** a superseded edition. Its contents matched
    the website on all twelve models, so it is probably current, but it has not been
    spot-checked against the live viewer and should be before anything is built from it.
