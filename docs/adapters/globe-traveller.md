@@ -124,6 +124,12 @@ before a build, because it doubles or halves the whole roster. The Falcon series
 
 ## Verdict
 
+> **Superseded, 30 October 2026 — the adapter is built.** Two of the three holes closed:
+> the UK price list supplies nine of the twelve prices and the catalogue supplies the
+> three Falcon masses. Read "Built, 30 October 2026" at the foot of this file. The
+> verdict below is kept because its reasoning about the site is still the reasoning the
+> adapter follows.
+
 **The website is a good source and the adapter would be straightforward — but it cannot be
 built yet**, because three of FMLV's required fields are unpublished and there are no
 existing products for them to carry over from.
@@ -394,10 +400,12 @@ UK page is headed `Fiat Ducato … RHD` and carries **no Peugeot Boxer table**. 
 prices both because the EU gets both; the UK list is Fiat, right-hand drive, only. So the
 roster is **not** 21 — it is the eleven models on this page, and the three Falcons.
 
-**The two Bike variants are real UK models.** `Explorer Z Bike` and `Pathfinder Z Bike` are
-priced here, which settles the earlier doubt: they are not an artefact of the options list.
-They have no website page, so their specifications would have to come from the catalogue or
-be asked for.
+**The two Bike variants looked like real UK models here, and they are not** — see
+"Built, 30 October 2026" below. `Explorer Z Bike` and `Pathfinder Z Bike` are priced in
+this list, which at the time settled the earlier doubt the wrong way. The catalogue says
+outright that Bike Version is an **option**, and the uplift is £347 on both, which is one
+option at one price. They have no website page and no catalogue spec block because there
+is nothing to specify: they are the Z with a box ticked.
 
 **The sterling figures confirm why the euro ones could never have been converted.** Explorer
 X is €78,470 ex-works and £95,671 on the road — the sterling figure is *higher* than the
@@ -422,3 +430,179 @@ Much less than before, and none of it is the price:
 4. Whether the catalogue's download is **also** a superseded edition. Its contents matched
    the website on all twelve models, so it is probably current, but it has not been
    spot-checked against the live viewer and should be before anything is built from it.
+
+---
+
+# Built, 30 October 2026
+
+`src/adapters/globe_traveller.py`, 60 tests, run #211 locally: **twelve products, nothing
+dropped, sixteen seconds, thirteen plain HTTP fetches and no browser.**
+
+The requester asked whether to build now or wait for the brand to answer. Build: nothing
+being asked for changes how the site is read, and the site is where most of the fields come
+from. What is being waited on is two numbers.
+
+## The roster is twelve, not fourteen — the Bike Versions are an option
+
+The UK price list has fourteen priced lines; the website has twelve pages. The two extra
+lines are `Explorer Z Bike` and `Pathfinder Z Bike`, and they are not models. The catalogue
+says so on page 31:
+
+> The Explorer Z and Pathfinder Z can be ordered in **Bike Version**, with the garage
+> adapted to carry two bicycles inside the vehicle.
+
+And the prices corroborate it without needing the prose at all:
+
+| | base | Bike | uplift |
+|---|---|---|---|
+| Explorer Z | £95,671 | £96,018 | **£347** |
+| Pathfinder Z | £101,580 | £101,927 | **£347** |
+
+**One option costs one price wherever it is fitted.** Two different vehicles differing by
+the same £347 is an option line in a price list, not two products — a genuinely new model
+would not land on its sibling's figure to the pound. By the base-vehicle rule what gets
+recorded is the base, so the Bikes are out and the ask to the brand loses an item.
+
+Globe-Traveller's own photography agrees: the Explorer Z's gallery images are all named
+`Globe-Traveller-Explorer-Z-Bike-…`, because it is the same van.
+
+## The seats notation is the opposite of what it looks like
+
+Every page prints `No. of seats` as a plain figure with a second in brackets:
+
+| series | printed | records |
+|---|---|---|
+| Explorer | `2(3)` | **2** |
+| Falcon | `2` | **2** |
+| Pathfinder, Voyager | `4(3)` | **4** |
+
+The instinct from the berth-range rule is to take the lower. On the Explorers that happens
+to be right; on the six Pathfinders and Voyagers it would record **three seats against a
+stated four**. The pair is not a range, because it is not ordered: **the plain figure is
+the fitment and the bracket is the option, in both directions.**
+
+The catalogue says it three separate times, in prose, and that is what settled it:
+
+> **Four travel seats are standard**, while an optional three seat configuration provides
+> more room in the living area without reducing the number of berths
+
+> Four travel seats are standard, with an optional three seat configuration available for
+> those who prefer more living space
+
+> an **optional three seat layout**, removable bedroom wall and Bike Version
+
+and for the Explorers, the other direction: *"an optional third travel seat available
+depending on the model"*. It also confirms these are belted — *"An additional single travel
+seat with a seat belt"* — which is what the seat count is for.
+
+This is the README's own warning arriving in the field: the lower-figure rule is safe for
+berths because that row is labelled `standard / max`, and it does not transfer to a seats
+row by analogy. **Worth asking the brand to confirm the belts are three-point**, since they
+never say so.
+
+## `2+2` berths is four, and the second two are not optional
+
+Six layouts state `No. of berths 2+2`, and those same six carry an `Additional bed` with a
+size — `187 cm x 134 cm` — where the other six read `N/A`. The berth-range rule takes the
+lower figure *where the upper needs options*; here it does not. The catalogue describes the
+extra bed as part of the layout, in a cabinet above the dinette, *"providing four berths
+without giving up the use of the seating"*, and says the optional three-seat configuration
+is *"without reducing the number of berths"* — so the berths stand independently of it.
+
+The catalogue calls it *"sleeping space for two kids or teenagers"*, which is a real
+qualification and worth putting to the brand, but it is a bed the vehicle has.
+
+## What is recorded, and what is deliberately not
+
+| | nine Fiat models | three Falcons |
+|---|---|---|
+| price | ✓ UK price list | ✗ **asked for** |
+| MTPLM, length, width, height, seats, berths, base vehicle, body type | ✓ the model page | ✓ the model page |
+| mass in running order | ✗ **asked for** | ✓ catalogue, ±5% |
+| payload | ✗ follows the mass | ✓ derived |
+
+**The per-series mass is not used and the numbers are not in the code.** Both documents
+print Explorer 3 060, Pathfinder 3 160, Voyager 3 170, footnoted *"the heaviest model
+variant in the series"* — a sibling's figure. Spreading it across the four Explorers would
+put a heavier vehicle's mass on three lighter ones, which is the Airstream unit-plate
+mistake wearing a different hat. A test asserts those three figures appear nowhere.
+
+**So no product yet has both a price and a mass**, and the run says so on every pass rather
+than only at build time. The brand is left at `status: paused`, which is exactly what that
+value is for — runnable by hand, skipped by scheduled sweeps — until the answers land.
+
+## Why the two constants are constants
+
+Both documents are FlipHTML5 flipbooks whose config hands over a downloadable PDF, so an
+adapter *could* fetch them every run. It must not. That download is
+`"type":"originalFiles"` — the file first uploaded — and on the price list it is **already**
+serving a superseded euro edition while the pages on screen are sterling. A fetch that
+looks live but quietly returns last season's document is worse than a constant that says
+what it is and carries a re-verify date.
+
+The catalogue's download was spot-checked and **is** current: 32 pages matching the viewer,
+created 16 August 2026, its title agreeing with the viewer's, and its contents agreeing
+with the website on all twelve models. Note what did *not* discriminate — **page count**.
+The euro and the UK price list both have eight.
+
+## The self-check is structural, and the drawings are why it had to be
+
+`payload == MTPLM - MRO` is unavailable: nine models have no MRO, and on the three that do,
+the payload is derived from that identity and so cannot also test it.
+
+What the pages support instead is **the identity stated twice**: the roster supplies a URL,
+and the table restates its own `Model Series` and `Model`. A page served for the wrong
+vehicle breaks that agreement, and a failure drops the product rather than a field — the
+disagreement is about *which vehicle this is*, so nothing on the page can be trusted. A
+third check catches the two height rows being read the wrong way round.
+
+That the check is needed is not theoretical, because **the layout filenames lie**:
+
+| page | drawing it carries |
+|---|---|
+| `explorer-z-evo` | `voyager_z_layout-3.png` |
+| `falcon-ys` | `falcon_2XS_SE_layout-3.png` |
+| `pathfinder-x` *and* `voyager-x` | `voyager_pathfinder_x_layout-1.png` |
+
+So the drawing is taken **from the page** and never matched by name — one URL is one
+vehicle, and the page is the attribution. A filename naming a different model still warns,
+because it may mean the wrong drawing was uploaded; the shared one and the version-numbered
+`falcon_2XS` do not, because they name the model they are on. Two of the twelve warn, and
+both are genuine.
+
+## Smaller things worth knowing
+
+* **`Lenght` is their spelling** and the label set keeps it. Correcting it loses the row.
+* **The footer re-uses the table's span class** and its headings include all four series
+  names, so the cells are bounded at `Model Series` and `Models` rather than filtered.
+* **`Extended PMM` arrives as six ragged cells** — `(*Fiat only)`, `3820`, `or`, `4200`,
+  `kg` — which is why the parser pairs cells rather than flattening the page to one line.
+  It is skipped: those are the optional heavier plates, and the base-vehicle rule records
+  `Permissible Max. Mass (PMM)`.
+* **`Falcon Z` has no 3 500 kg plate** — `3 820` — and is the only C1 vehicle here.
+* **The Falcons are `VW`, not `Volkswagen`.** The page says Volkswagen; the base-vehicle
+  column says VW. `fmlv_base_vehicle` deliberately does not map one onto the other, so the
+  adapter translates before handing it over.
+* **`Fiat/Peugeot` is one UK product.** The euro list prices the Boxer separately, but the
+  UK list is headed `Fiat Ducato … RHD` and has no Peugeot table, so it never arises.
+* **Their `Seperate shower` is handled by the shared vocabulary** — `habitation` already
+  spells it both ways. Their opposite value, `Integrated with toilet`, has no phrase there
+  and is read in the adapter, because "the page did not say" would be wrong when it does.
+* **No heating anywhere.** No row, no equipment list, so nothing is recorded and nothing is
+  claimed to have been looked at.
+* **Ranges are set, not matched.** FMLV holds no Globe-Traveller products, so `Explorer` /
+  `X` is a convention being chosen rather than an export being followed — the `Series`
+  suffix is dropped so the display name does not read "Explorer Explorer X". Redirectable.
+
+## Still outstanding
+
+Three, down from five, and the first is the only one blocking an upload:
+
+1. **Mass in running order, per model, for the nine Fiat models.** Everything else about
+   them is in hand.
+2. **UK prices for the three Falcons.** The price list omits the range.
+3. **A machine-readable copy of the UK price list** — email the PDF — so the nine prices
+   stop being a constant. Not blocking; a convenience and a safeguard.
+
+And two confirmations worth having: that the travel-seat belts are three-point, and that
+Bike Version is an option rather than a model.

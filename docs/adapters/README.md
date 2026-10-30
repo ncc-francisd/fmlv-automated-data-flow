@@ -471,6 +471,18 @@ URL to try: when the original is stale the displayed pages are hashed `.webp` im
 filenames sit in an obfuscated `fliphtml5_pages` blob, and the practical route is to ask
 the brand for the document rather than to decode it.
 
+**Page count is no help, so do not reach for it.** Checked on the Globe-Traveller pair
+30 October 2026: the superseded euro price list and the UK one the viewer displays are
+*both* eight pages, and the config's `pageCount` agrees with each. A replacement edition
+of a document is usually the same document re-set, so its structure matches. The spot-check
+has to be on **content** — a currency symbol, a column heading, a price — and one is enough.
+
+The reassuring case is a title that cannot contradict anything. Globe-Traveller's catalogue
+download passes because its own cover reads `2026/2027 EN` against a viewer titled
+*"EN Globe-Traveller Catalogue 2026/2027"*, and it claims no market it might have lost. The
+price list gave itself away by being titled *"UK … Pricelist"* while its first page read
+*"Prices in euros … UE ex. VAT"*.
+
 Two further cautions:
 
 - **A download URL is not permission to republish.** Fetch it as the adapter's source and
@@ -853,6 +865,57 @@ for berths because that row is explicitly labelled `standard / max`. Where a sea
 labelled "permitted", the lower bound is a homologation minimum, not a fitment claim —
 corroborate it before recording it, and leave the field unset (and *unregistered*) if you
 cannot. See [`burstner.md`](burstner.md).
+
+### A pair of figures is only a range if something says which end is the vehicle
+
+Globe-Traveller, 30 October 2026. Their model pages print `No. of seats` as a plain figure
+with a second in brackets, and the pair runs **both ways**:
+
+| series | printed | records |
+|---|---|---|
+| Explorer | `2(3)` | **2** |
+| Pathfinder, Voyager | `4(3)` | **4** |
+
+Read as a range and resolved by the berths habit, the six Pathfinders and Voyagers would
+have recorded **three seats against a stated four**. The pair is not ordered at all: the
+plain figure is the fitment and the bracket is the alternative configuration, which on one
+series is more seats and on the other is fewer.
+
+What settled it was their catalogue saying so in prose, three times — *"Four travel seats
+are standard, while an optional three seat configuration provides more room in the living
+area"* — and, for the Explorers, the other direction: *"an optional third travel seat
+available depending on the model"*.
+
+So the rule the ceiling case states for "permitted" generalises: **`a (b)`, `a / b` and
+`a - b` are notation, not meaning.** Before taking either end, find the sentence that says
+which one the vehicle leaves the factory with. Where the source is silent, the field stays
+unset rather than guessed — and where a second document explains the first, that is worth
+more than any convention about which figure comes first.
+
+### A priced line is not always a product, and an identical uplift proves it
+
+Globe-Traveller again, the same day. Their UK price list has **fourteen** lines where the
+website has **twelve** model pages. The two extra are `Explorer Z Bike` and
+`Pathfinder Z Bike`, which read as two more models nobody had a specification for.
+
+The prices answered it without needing anything else:
+
+| | base | "Bike" | uplift |
+|---|---|---|---|
+| Explorer Z | £95,671 | £96,018 | **£347** |
+| Pathfinder Z | £101,580 | £101,927 | **£347** |
+
+**One option costs one price wherever it is fitted.** Two different vehicles — different
+lengths, different layouts, £6,000 apart — separated from their siblings by the same £347
+is an option line, not a product. A genuinely new model does not land on another model's
+figure to the pound. The catalogue confirmed it afterwards: *"The Explorer Z and Pathfinder
+Z can be ordered in Bike Version, with the garage adapted to carry two bicycles inside the
+vehicle."*
+
+So when a price list carries a line the model pages do not, **difference the prices across
+the range before treating it as a product**. A constant uplift is an option; a figure that
+moves with the vehicle is a model. This is the same question as "what makes two vehicles
+two products", approached from the only document that prices both.
 
 ### A number drawn as a picture may still be readable, in the filename
 
