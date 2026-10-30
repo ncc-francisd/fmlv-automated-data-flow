@@ -414,6 +414,38 @@ This is the roster lesson applied to assets: **an absence you cannot explain is 
 the search.** Eriba's configurator, immediately below, is the same mistake reached by a
 different route.
 
+### A flipbook is a PDF wearing a costume
+
+Globe-Traveller, 30 October 2026. Their catalogue and price list are "published" only as
+page-turning web viewers — `public.globe-traveller.eu/books/<id>/#p=1` — which look like
+the end of the road: fetching that path redirects to the home page, the pages render client
+side, and the page images are hashed `.webp` files that would need OCR.
+
+**The original PDF was three plain fetches away.** These viewers are FlipHTML5, and its
+config file names the source document:
+
+    /books/<id>/index.html            the directory redirects; the file does not
+    /books/<id>/javascript/config.js  50-60 KB, holding pageCount, title, and:
+    "downloadconfig":{"pdf":{"isOriginPath":true,
+      "url":"https://fliphtml5.com/api/download/download-file?bookId=<n>&type=1"}}
+
+That URL returns `%PDF-1.4` with its text layer intact. `isOriginPath: true` is the viewer
+saying the file behind it is the publisher's own upload rather than a re-render.
+
+So when a brand's documents are behind a flipbook, **look for the viewer's config before
+concluding the text is unreachable**, and before reaching for a browser or OCR. The hosts
+differ — FlipHTML5, Heyzine (WildAx), Publuu, FlippingBook, Issuu — but the shape is the
+same: a small JSON or JS manifest beside the viewer, naming a page count, a title and often
+a download URL. Finding it turns a hand-typed constant into something a run can re-read,
+which is the difference between the `joa.py` arrangement and an ordinary adapter.
+
+Two cautions:
+
+- **A download URL is not permission to republish.** Fetch it as the adapter's source and
+  snapshot it like any other document; do not commit the PDF into the repo.
+- **Check the text layer before celebrating.** A flipbook built from scanned pages yields a
+  PDF with no text, and then it really is OCR or nothing.
+
 ### A configurator is a data source, not a dead end
 
 A "needs JavaScript" page is not the same as unreachable data. Eriba's configurator renders
