@@ -345,6 +345,32 @@ _SEATS_LABEL = re.compile(r"^Seats with safety belts$", re.I)
 #: row agrees with FMLV on all nine vans.
 _BERTHS_LABEL = re.compile(r"^Sleeping berths$", re.I)
 
+#: One tile of the **headline block**, which is server-rendered and needs no click.
+#:
+#: Pilote rebuilt the pages again between 29 and 30 October 2026, and this replaced the
+#: `Berth / Meal place / Sleeping place` strip that `_SUMMARY_STRIP` matches. The new
+#: block is a plain run of `<div class="tile_option"><p>label</p><p>value</p></div>`
+#: under a `Technical information` heading, and it is unambiguous where the old strip was
+#: not — it uses the brochure's own words:
+#:
+#:     Length 7,00 m   Body width 2,20 m   Height 2,88 m
+#:     Seats with safety belt 4   Dining seats 5   Sleeping berths 2   Payload 575 kg
+#:
+#: **This is what settles the coachbuilt berth count.** The five-row split that blocked
+#: run #212 — `Permanent sleeping space`, `Extra sleeping spaces` and three `Optional …`
+#: rows — is gone from every page; the word now appears nowhere on the site. The
+#: requester, 30 October 2026, on the A690G Atlas: *"Pilote is the 690G is a two-berth and
+#: here's the evidence. The four-berth is an optional extra."* The page says
+#: `Sleeping berths 2`, and the drop-down that makes it four is a cost option, which
+#: `docs/adapters/README.md` says is not a berth.
+#:
+#: The value `<p>` often wraps its figure in schema.org `<span>`s, so the text is
+#: flattened rather than read directly.
+_TILE_OPTION = re.compile(
+    r'<div class="tile_option[^"]*">(?P<inner>.*?)</div>', re.S
+)
+_TILE_PARAGRAPH = re.compile(r"<p\b[^>]*>(?P<text>.*?)</p>", re.S)
+
 #: A row of the popup's technical table, once the click has filled it.
 _TABLE_ROW = re.compile(r"<tr>\s*<td>(?P<label>.*?)</td>\s*<td>(?P<value>.*?)</td>\s*</tr>", re.S)
 
@@ -418,6 +444,30 @@ def popup_rows(page: str) -> dict[str, str]:
         if label and label not in rows:
             rows[label] = _clean(match.group("value"))
     return rows
+
+
+def headline_tiles(page: str) -> dict[str, str]:
+    """Every `label -> value` tile of the server-rendered headline block, in page order.
+
+    **No click is needed for these**, which is what makes them the dependable source: the
+    popup has to be opened by a browser and the open can fail — it did on the A650D in
+    run #212, and that page then had no berth count at all despite printing one.
+
+    A tile with no value, such as the `Find all the technical characteristics` button
+    that closes the block, is skipped rather than recorded with an empty string.
+    """
+    tiles: dict[str, str] = {}
+    for match in _TILE_OPTION.finditer(page):
+        paragraphs = [
+            _clean(html.unescape(part.group("text")))
+            for part in _TILE_PARAGRAPH.finditer(match.group("inner"))
+        ]
+        if len(paragraphs) < 2:
+            continue
+        label, value = paragraphs[0], " ".join(paragraphs[1:]).strip()
+        if label and value and label not in tiles:
+            tiles[label] = value
+    return tiles
 
 
 #: One opened `Standard fittings` section, with its group code and its inner list.
@@ -550,6 +600,7 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
 
     text = plain_text(page)
     rows = popup_rows(page)
+    tiles = headline_tiles(page)
     strip = _SUMMARY_STRIP.search(text)
     strip_payload = int(strip.group("payload")) if strip and strip.group("payload") else None
     payload, payload_source = _payload_for(rows, strip_payload)
@@ -573,26 +624,35 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
     height_mm = (
         popup_height_cm * 10 if popup_height_cm is not None else from_strip("hm", "hcm")
     )
-    # `Berth` is the strip's word for a belted seat — see `_SUMMARY_STRIP`.
+    # Three sources now, in descending order of how specific they are, and the middle one
+    # is new: the server-rendered headline block. `Berth` is the old strip's word for a
+    # belted seat — see `_SUMMARY_STRIP` — and the strip itself is gone from the live
+    # site, kept only so an archived page still parses.
     seats = _first_int(_matching(rows, _SEATS_LABEL))
+    seats_source = "popup table, 'Seats with safety belts'"
+    if seats is None and (tile := tiles.get("Seats with safety belt")) is not None:
+        seats, seats_source = _first_int(tile), "headline block, 'Seats with safety belt'"
     if seats is None and strip is not None:
-        seats = int(strip.group("seats"))
+        seats, seats_source = int(strip.group("seats")), "summary strip, 'Berth'"
 
-    # **Berths from the popup's own labelled row, not the strip.** Pilote dropped the
-    # strip from the panel-van pages, which left berths unreadable on all nine; the popup
-    # has carried `Sleeping berths` throughout and separates it from the optional beds the
-    # strip's single figure folded in. The strip stays as the fallback for a page whose
-    # popup never opens, where it is the only figure there is.
+    # **Berths: the popup's labelled row, then the headline block, then the old strip.**
+    #
+    # The headline block is what unblocks the coachbuilts. Their popup has never carried
+    # `Sleeping berths` — it split the question across five rows instead — so run #212
+    # proposed nothing on all 34 and left FMLV's figure standing. Pilote have since
+    # rebuilt the pages and the block states it outright, which the requester confirmed
+    # against the A690G Atlas on 30 October 2026: the page says two, and the bed that
+    # makes it four is a cost option rather than a berth.
+    #
+    # It is also the more robust source, because it needs no click. The A650D's popup
+    # failed to open in run #212 and its berth count went missing although the page was
+    # printing one the whole time.
     berths = _first_int(_matching(rows, _BERTHS_LABEL))
     berths_source = "popup table, 'Sleeping berths'"
+    if berths is None and (tile := tiles.get("Sleeping berths")) is not None:
+        berths, berths_source = _first_int(tile), "headline block, 'Sleeping berths'"
     if berths is None and strip is not None:
-        berths = int(strip.group("berths"))
-        berths_source = "summary strip, 'Sleeping place'"
-    seats_source = (
-        "popup table, 'Seats with safety belts'"
-        if _matching(rows, _SEATS_LABEL) is not None
-        else "summary strip, 'Berth'"
-    )
+        berths, berths_source = int(strip.group("berths")), "summary strip, 'Sleeping place'"
 
     return PiloteProduct(
         source_url=source_url,
@@ -867,14 +927,12 @@ def collect(
 
         if product.berths is None:
             on_progress(
-                f"[{product.label}] NO BERTH COUNT, so FMLV's own figure stands. Pilote "
-                f"removed the summary strip — the 'Berth / Meal place / Sleeping place' "
-                f"row — from every body type between 11 September and 29 October 2026. "
-                f"The panel vans are unaffected because their popup carries 'Sleeping "
-                f"berths'; the coachbuilts' popup does not, and splits the question across "
-                f"five rows instead ('Permanent sleeping space', 'Extra sleeping spaces' "
-                f"and three 'Optional ...' ones). Which of those is the standard count is "
-                f"not settled, so nothing is proposed rather than guessed"
+                f"[{product.label}] NO BERTH COUNT, so FMLV's own figure stands. Neither "
+                f"the popup's 'Sleeping berths' row nor the headline block's tile of the "
+                f"same name is on this page, and the old 'Berth / Meal place / Sleeping "
+                f"place' strip is gone from the site. That is now unexpected rather than "
+                f"routine — every layout carried the block on 30 October 2026 — so check "
+                f"the page before assuming the vehicle changed"
             )
 
         reconciles, why_not = _reconciles(product)
