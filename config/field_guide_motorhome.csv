@@ -64,6 +64,7 @@ automatic_mro_kilograms,Auto MRO (kg),"INSTRUCTIONS IF AUTOMATIC OPTION, COMPLET
 automatic_mh_payload_kilograms,Auto Payload (kg),"INSTRUCTIONS IF AUTOMATIC OPTION, COMPLETE THESE EXTRA COLUMNS TO FEATURE IN AUTOMATIC FILTER RESULTS (otherwise leave blank)",
 automatic_rrp_pounds,Auto RRP (£),"INSTRUCTIONS IF AUTOMATIC OPTION, COMPLETE THESE EXTRA COLUMNS TO FEATURE IN AUTOMATIC FILTER RESULTS (otherwise leave blank) ",
 automatic_price_min_range_pounds,Auto min price,"INSTRUCTIONS IF AUTOMATIC OPTION, COMPLETE THESE EXTRA COLUMNS TO FEATURE IN AUTOMATIC FILTER RESULTS (otherwise leave blank)",
+automatic_available,Automatic available,"Yes where the source cites an automatic version (standard or optional), No where it rules one out, blank where it does not say",
 latest_model_id,Latest Model ID,PLEASE Leave as is!,
 images,Link to Images,PLEASE Leave as is!,
 archived,Archived,PLEASE Leave as is!,

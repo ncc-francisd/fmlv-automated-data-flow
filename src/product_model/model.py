@@ -161,6 +161,28 @@ class Motorhome(BaseModel):
 
     automatic: AutomaticVariant | None = None
 
+    #: Whether an automatic-gearbox version of this model is offered at all.
+    #:
+    #: **Three states, and the third is the point.** `True` where the source cites an
+    #: automatic, `False` where it rules one out, and `None` where nothing was said —
+    #: which writes a *blank* column, not `No`. The requester, 3 November 2026: *"where
+    #: you'd find that it definitely is not available, you'd put no. And where you can't
+    #: tell, you would leave it blank."*
+    #:
+    #: It is deliberately **not** part of `AutomaticVariant`. That group is the automatic's
+    #: own weights and prices, which the requester explicitly does not want collected here
+    #: — "not weights or dimensions of automatic, simply if an automatic version is cited".
+    #: A model can be known to offer one without a single figure being published for it,
+    #: and on Rimor's first export under the new template all 39 rows say `Yes` while four
+    #: carry no `automatic_mro_kilograms` at all.
+    #:
+    #: Silence stays blank for the same reason it does everywhere else in the pipeline: a
+    #: page that never mentions a gearbox is not a page saying there is no automatic. Most
+    #: manufacturers' sites say nothing, so a blanket `No` would assert a negative about
+    #: the whole industry on the strength of nobody having looked. See
+    #: `adapters.habitation.automatic_available_from`.
+    automatic_available: bool | None = None
+
     @property
     def key(self) -> str:
         """Human-readable identity for logs and the review UI."""

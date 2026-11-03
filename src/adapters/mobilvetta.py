@@ -32,6 +32,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import gearbox
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.marquisleisure.co.uk"
@@ -206,6 +207,10 @@ class MobilvettaProduct:
     mtplm_kilograms: int | None = None
     mh_payload_kilograms: int | None = None
     rrp_pounds: int | None = None
+    #: `(available, the line that said so)`, or `None` where neither the layout's own
+    #: block nor the range page around it says. Marquis name the gearbox in the chassis
+    #: line above the figures, so the block is read first and the page second.
+    automatic_available: tuple[bool, str] | None = None
 
     @property
     def label(self) -> str:
@@ -255,6 +260,10 @@ def layout_blocks(page: str, source_url: str) -> list[MobilvettaProduct]:
                 mtplm_kilograms=_field(body, "mtplm"),
                 mh_payload_kilograms=_field(body, "payload"),
                 rrp_pounds=int(price.group("price").replace(",", "")) if price else None,
+                automatic_available=(
+                    gearbox.automatic_available_from(body.splitlines())
+                    or gearbox.automatic_available_from(text.splitlines())
+                ),
             )
         )
     return products
@@ -314,6 +323,9 @@ def _build_extracted_motorhome(product: MobilvettaProduct) -> ExtractedMotorhome
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         berths=product.berths,
         body_type=product.body_type,
+        automatic_available=(
+            product.automatic_available[0] if product.automatic_available else None
+        ),
     )
 
     provenance: dict[str, Provenance] = {}
@@ -323,6 +335,9 @@ def _build_extracted_motorhome(product: MobilvettaProduct) -> ExtractedMotorhome
             source_url=source_url,
             snippet=f"{product.label} — Marquis Leisure's own range page, {snippet}",
         )
+
+    if product.automatic_available is not None:
+        record("automatic_available", gearbox.provenance_note(product.automatic_available))
 
     if product.mh_length_mm is not None:
         record("mh_length_mm", f"'OVERALL LENGTH {product.mh_length_mm}mm'")

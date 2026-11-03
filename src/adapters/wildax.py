@@ -110,7 +110,7 @@ from ..product_model.enums import (
     SleepingArea,
 )
 from ..product_model.model import Motorhome
-from . import habitation
+from . import gearbox, habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 __all__ = [
@@ -731,6 +731,7 @@ def build_extracted(product: WildaxCampervan, *, payload_basis: str) -> Extracte
     body_type, body_reason = body_type_for(product.value("Bodystyle"), height_mm)
     sleeping_area, sleeping_reason = sleeping_area_for(panel.sleeping_areas)
     features = habitation.features_from(panel.equipment)
+    automatic = gearbox.automatic_available_from(panel.equipment)
 
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -769,6 +770,7 @@ def build_extracted(product: WildaxCampervan, *, payload_basis: str) -> Extracte
             if "shower_toilet_separated" in features
             else None
         ),
+        automatic_available=automatic[0] if automatic else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -777,6 +779,9 @@ def build_extracted(product: WildaxCampervan, *, payload_basis: str) -> Extracte
         provenance[field_name] = Provenance(
             source_url=source_url, snippet=f"{spec.label} — {snippet}"
         )
+
+    if automatic is not None:
+        record("automatic_available", gearbox.provenance_note(automatic))
 
     # Both halves of the identity, always: `compare_fields` walks only fields carrying
     # provenance, and accepting a range change without its model corrupts the name.

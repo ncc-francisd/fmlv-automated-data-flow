@@ -83,7 +83,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from . import habitation
+from . import gearbox, habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://moto-trek.co.uk"
@@ -763,6 +763,7 @@ def _build_extracted_motorhome(
     `product_model.findings`.
     """
     features = habitation.features_from(equipment.standard if equipment else ())
+    automatic = gearbox.automatic_available_from((*equipment.standard, *equipment.optional) if equipment else ())
     published = dict(block.pairs)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -800,6 +801,7 @@ def _build_extracted_motorhome(
                 else None
             )
         ),
+        automatic_available=automatic[0] if automatic else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -808,6 +810,9 @@ def _build_extracted_motorhome(
         provenance[field] = Provenance(
             source_url=source_url, snippet=f"{product.label} — {snippet}"
         )
+
+    if automatic is not None:
+        record("automatic_available", gearbox.provenance_note(automatic))
 
     def label_for(field: str) -> str | None:
         """The label whose value fed `field` on *this* page — the vocabulary varies."""

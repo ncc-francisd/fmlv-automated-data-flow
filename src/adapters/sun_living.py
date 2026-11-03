@@ -59,7 +59,7 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from . import habitation
+from . import gearbox, habitation
 from .adria import (
     _LIVEWIRE_UPDATE_MARKER,
     LivewireProduct,
@@ -287,6 +287,7 @@ def build_extracted(
 ) -> ExtractedMotorhome:
     """One configuration as a `Motorhome` plus the provenance a reviewer sees beside it."""
     features = habitation.features_from(fitted)
+    automatic = gearbox.automatic_available_from(fitted)
     features.pop("bed_types", None)
 
     body_type, body_reason = body_type_for(product.config.fmlv_range, product.model)
@@ -307,6 +308,7 @@ def build_extracted(
         base_vehicle_manufacturer=product.base_vehicle,
         rrp_pounds=product.rrp_pounds,
         body_type=body_type,
+        automatic_available=automatic[0] if automatic else None,
     )
     for name, feature in features.items():
         setattr(motorhome, name, feature.value)
@@ -317,6 +319,9 @@ def build_extracted(
         provenance[field_name] = Provenance(
             source_url=product.pdf_url, snippet=f"{product.label} — {snippet}"
         )
+
+    if automatic is not None:
+        record("automatic_available", gearbox.provenance_note(automatic))
 
     trim_note = (
         f'; the trim is "{product.product.trim_label}", and what it adds beyond the '

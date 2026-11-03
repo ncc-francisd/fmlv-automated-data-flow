@@ -64,6 +64,7 @@ from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType, Refrigeration
 from ..product_model.model import Motorhome
 from . import ehg_configurator
+from . import gearbox
 from . import habitation
 from .base import (
     ExtractedMotorhome,
@@ -787,6 +788,7 @@ def _build_extracted_motorhome(
     product: BurstnerProduct, source_url: str, floorplan_url: str | None = None
 ) -> ExtractedMotorhome:
     features, heating_unclear = _habitation_findings(product.document_lines)
+    automatic = gearbox.automatic_available_from(product.document_lines)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -810,6 +812,7 @@ def _build_extracted_motorhome(
         refrigeration=(
             features["refrigeration"].value if "refrigeration" in features else None
         ),
+        automatic_available=automatic[0] if automatic else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -937,6 +940,12 @@ def _build_extracted_motorhome(
         provenance["berths"] = Provenance(
             source_url=source_url,
             snippet=f"{product.label} — Sleeping berths standard / max.: {product.berths_published}",
+        )
+
+    if automatic is not None:
+        provenance["automatic_available"] = Provenance(
+            source_url=source_url,
+            snippet=f"{product.label} — {gearbox.provenance_note(automatic)}",
         )
 
     for name, feature in features.items():

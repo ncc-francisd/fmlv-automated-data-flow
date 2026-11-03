@@ -93,7 +93,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from . import habitation
+from . import gearbox, habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 __all__ = [
@@ -560,6 +560,7 @@ def build_extracted(product: CarthagoMotorhome, *, mass_basis: str) -> Extracted
     body_type, body_reason = body_type_for(construction)
     price = parse_price(product.lines)
     features = habitation.features_from(product.lines)
+    automatic = gearbox.automatic_available_from(product.lines)
 
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -581,6 +582,7 @@ def build_extracted(product: CarthagoMotorhome, *, mass_basis: str) -> Extracted
         heating=features["heating"].value if "heating" in features else None,
         refrigeration=features["refrigeration"].value if "refrigeration" in features else None,
         microwave=features["microwave"].value if "microwave" in features else None,
+        automatic_available=automatic[0] if automatic else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -589,6 +591,9 @@ def build_extracted(product: CarthagoMotorhome, *, mass_basis: str) -> Extracted
         provenance[field_name] = Provenance(
             source_url=product.url, snippet=f"{product.label} — {snippet}"
         )
+
+    if automatic is not None:
+        record("automatic_available", gearbox.provenance_note(automatic))
 
     # Both halves of the identity, always: `compare_fields` walks only fields carrying
     # provenance, and accepting a range change without its model corrupts the name.

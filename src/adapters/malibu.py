@@ -108,7 +108,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from . import habitation
+from . import gearbox, habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 __all__ = [
@@ -888,6 +888,7 @@ def _reconciles(product: MalibuProduct) -> tuple[bool, str]:
 def build_extracted(product: MalibuProduct, *, mass_basis: str) -> ExtractedMotorhome:
     """The product and a provenance line for every field it proposes."""
     features = habitation.features_from(product.lines)
+    automatic = gearbox.automatic_available_from(product.lines)
     garage = product.fields.get("garage")
 
     motorhome = Motorhome(
@@ -910,6 +911,7 @@ def build_extracted(product: MalibuProduct, *, mass_basis: str) -> ExtractedMoto
         heating=features["heating"].value if "heating" in features else None,
         refrigeration=features["refrigeration"].value if "refrigeration" in features else None,
         microwave=features["microwave"].value if "microwave" in features else None,
+        automatic_available=automatic[0] if automatic else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -918,6 +920,9 @@ def build_extracted(product: MalibuProduct, *, mass_basis: str) -> ExtractedMoto
         provenance[field_name] = Provenance(
             source_url=product.url, snippet=f"{product.label} — {snippet}"
         )
+
+    if automatic is not None:
+        record("automatic_available", gearbox.provenance_note(automatic))
 
     record(
         "manufacturer_range",

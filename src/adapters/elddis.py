@@ -69,6 +69,7 @@ from pathlib import Path
 from typing import Any
 
 from . import ehg_configurator as ehg
+from . import gearbox
 from . import habitation
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
@@ -557,6 +558,17 @@ def build_extracted(
     # equipment at all. Absent where the layout's page could not be matched or read, which
     # `collect` narrates; a missing page costs the findings, never the product.
     if equipment is not None:
+        # Both halves, unlike the habitation features: Elddis sell the automatic as an
+        # optional extra, and the question asked is whether one can be had at all.
+        automatic = gearbox.automatic_available_from(
+            (*equipment.standard, *equipment.optional)
+        )
+        if automatic is not None:
+            motorhome.automatic_available = automatic[0]
+            provenance["automatic_available"] = Provenance(
+                source_url=equipment_url or source_url,
+                snippet=f"{layout.label} — {gearbox.provenance_note(automatic)}",
+            )
         features = habitation.features_from(equipment.standard)
         # Dropped as on every other adapter: the copy names beds without saying which are
         # built in and which are made up out of the seating.

@@ -32,7 +32,7 @@ from pathlib import Path
 from ..fetch.browser import BrowserFetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from . import habitation
+from . import gearbox, habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 #: Trigano own the brand; Auto-Trail build it. The NCC list already files a brand this way —
@@ -366,6 +366,7 @@ def _reconciles(product: AtomProduct) -> tuple[bool, str]:
 def _build_extracted_motorhome(product: AtomProduct) -> ExtractedMotorhome:
     """One layout as a `Motorhome`, plus the provenance a reviewer sees beside each field."""
     features = habitation.features_from(product.copy_lines)
+    automatic = gearbox.automatic_available_from(product.copy_lines)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -394,6 +395,7 @@ def _build_extracted_motorhome(product: AtomProduct) -> ExtractedMotorhome:
         ),
         bed_types=features["bed_types"].value if "bed_types" in features else [],
         microwave=features["microwave"].value if "microwave" in features else None,
+        automatic_available=automatic[0] if automatic else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -402,6 +404,9 @@ def _build_extracted_motorhome(product: AtomProduct) -> ExtractedMotorhome:
         provenance[field] = Provenance(
             source_url=url, snippet=f"{product.label} — {snippet}"
         )
+
+    if automatic is not None:
+        record("automatic_available", gearbox.provenance_note(automatic))
 
     if product.mh_length_mm is not None:
         record("mh_length_mm", f"the comparison table's 'Length {product.mh_length_mm}mm'")

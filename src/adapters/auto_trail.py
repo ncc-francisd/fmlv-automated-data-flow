@@ -53,7 +53,7 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from . import habitation
+from . import gearbox, habitation
 from .base import ExtractedMotorhome, Provenance, floorplan_provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.auto-trail.co.uk"
@@ -1063,6 +1063,7 @@ def _build_extracted_motorhome(
     `product_model.findings`.
     """
     features = habitation.features_from(product.spec_lines)
+    automatic = gearbox.automatic_available_from(product.spec_lines)
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
@@ -1092,6 +1093,7 @@ def _build_extracted_motorhome(
         ),
         bed_types=features["bed_types"].value if "bed_types" in features else [],
         microwave=features["microwave"].value if "microwave" in features else None,
+        automatic_available=automatic[0] if automatic else None,
     )
 
     # `berths` records the standard figure, so the snippet carries Auto-Trail's own
@@ -1163,6 +1165,9 @@ def _build_extracted_motorhome(
         provenance[field] = Provenance(
             source_url=spec_url, snippet=f"{product.label} — {snippet}"
         )
+
+    if automatic is not None:
+        record("automatic_available", gearbox.provenance_note(automatic))
 
     for name, feature in features.items():
         note = feature.note or _FEATURE_NOTES.get(name, "the specification table")

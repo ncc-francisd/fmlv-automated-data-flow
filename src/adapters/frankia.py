@@ -66,6 +66,7 @@ from ..fetch.http import Fetcher
 from ..fetch.pdf import extract_text
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import gearbox
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 __all__ = [
@@ -499,6 +500,10 @@ class FrankiaMotorhome:
     figures: _Figures
     body_type: BodyType | None = None
     body_reason: str = ""
+    #: `(available, the line that said so)`, or `None` where the page never says. Read
+    #: from the layout page's whole text, not the figure block: Frankia state the
+    #: automatic in the chassis paragraph.
+    automatic_available: tuple[bool, str] | None = None
 
     @property
     def label(self) -> str:
@@ -606,6 +611,9 @@ def build_extracted(product: FrankiaMotorhome, basis: str) -> ExtractedMotorhome
         base_vehicle_manufacturer=figures.base_vehicle,
         rrp_pounds=product.rrp_pounds,
         body_type=product.body_type,
+        automatic_available=(
+            product.automatic_available[0] if product.automatic_available else None
+        ),
     )
 
     provenance: dict[str, Provenance] = {}
@@ -614,6 +622,9 @@ def build_extracted(product: FrankiaMotorhome, basis: str) -> ExtractedMotorhome
         provenance[field_name] = Provenance(
             source_url=source_url, snippet=f"{product.label} — {snippet}"
         )
+
+    if product.automatic_available is not None:
+        record("automatic_available", gearbox.provenance_note(product.automatic_available))
 
     renamed = RENAMED_MODELS.get((product.layout.range_name, product.layout.model))
     identity_note = (
@@ -730,7 +741,11 @@ def collect(
 
         body_type, body_reason = body_type_from(lines, layout.heading)
         product = FrankiaMotorhome(
-            layout=layout, figures=figures, body_type=body_type, body_reason=body_reason
+            layout=layout,
+            figures=figures,
+            body_type=body_type,
+            body_reason=body_reason,
+            automatic_available=gearbox.automatic_available_from(lines),
         )
         reconciles, reason = _reconciles(product)
         if not reconciles:

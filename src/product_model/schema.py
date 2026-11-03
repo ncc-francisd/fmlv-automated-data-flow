@@ -72,6 +72,11 @@ COLUMNS: tuple[str, ...] = (
     "automatic_mh_payload_kilograms",
     "automatic_rrp_pounds",
     "automatic_price_min_range_pounds",
+    # Added by Steadfast on 3 November 2026, and **inserted here rather than appended**:
+    # everything below it moved one column to the right. Keeping our order identical to
+    # theirs is what makes the upload safe whether the site matches the header by name or
+    # by position, which we have never established. See `Motorhome.automatic_available`.
+    "automatic_available",
     "latest_model_id",
     "images",
     "archived",

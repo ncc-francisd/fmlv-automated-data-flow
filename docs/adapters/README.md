@@ -2695,6 +2695,48 @@ And **the manufacturer's naming can live at range level** rather than on each la
 Rookie L's own page never says "mini caravan" and the range index says it of both, so an
 adapter looking only at the layout page would have got one of the pair wrong.
 
+### `automatic_available`: an option counts, and silence is blank
+
+FMLV added column **BN, `automatic_available`**, on 3 November 2026. It records whether an
+automatic-gearbox version of the model can be had at all. It is **not** part of the
+`automatic_*` group beside it: those four columns are the automatic's own weights and
+prices, and the requester asked specifically that this be collected without them —
+*"not weights or dimensions, of automatic, simply if an automatic version is cited"*.
+
+Three states, and all three are used:
+
+| Source says | Record |
+|---|---|
+| An automatic is offered — standard **or** as a paid option | `Yes` |
+| An automatic is explicitly ruled out | `No` |
+| Nothing either way | **blank** |
+
+`adapters/gearbox.py` holds the vocabulary; an adapter passes its lines in and gets back
+`(available, the line that said so)` or `None`. Three things about it are worth knowing
+before you wire a new manufacturer in.
+
+**A paid option is a `Yes`.** This is the one rule that runs opposite to `habitation`,
+where reading an extra as fitted is the classic error. An automatic is a factory option
+on nearly every chassis FMLV holds, so filtering option lines out would discard almost
+every true answer. `gearbox` therefore reads its lines **unfiltered**, and must never be
+handed `habitation.usable_lines`.
+
+**Silence is blank, not `No`.** Most manufacturers' sites never raise the subject. A
+blanket `No` on silence would put an unevidenced negative on roughly sixty brands, and
+FMLV's own data argues against it: Rimor's first export under the new template carries
+`Yes` on all 39 rows and `No` on none. A `No` needs a sentence that actually denies it —
+and note that *"6-speed manual gearbox"* is **not** one, because naming the standard
+gearbox says nothing about the options list.
+
+**Read the whole page, not the specification table.** The gearbox belongs to the base
+vehicle, so it is rarely in the table describing the conversion: Globe-Traveller print
+`Automatic gearbox` twelve times on a model page and not once in the spec table.
+`gearbox.lines_from_page` exists for this. Reading a whole page is only safe because the
+vocabulary is narrow — the word `automatic` on its own is never matched, since a
+specification is full of automatic energy selection, automatic ignition, automatic gas
+changeover and automatic levelling. Every pattern demands a gearbox word beside it or a
+chassis maker's trade name (`Hi-Matic`, `9G-Tronic`, `EAT8`, `PowerShift`, `DSG`).
+
 ### A lifting roof does not change a caravan's body type
 
 **Rule from the NCC side, 7 September 2026: the type is rigid even where the manufacturer's

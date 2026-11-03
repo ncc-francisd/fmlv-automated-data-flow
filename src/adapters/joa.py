@@ -66,7 +66,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from . import habitation
+from . import gearbox, habitation
 from .base import ExtractedMotorhome, Provenance, floorplan_provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.joabypilote.fr"
@@ -472,6 +472,7 @@ def _build_extracted_motorhome(
         if line
     )
     features = habitation.features_from(labelled + equipment)
+    automatic = gearbox.automatic_available_from(labelled + equipment)
 
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -502,6 +503,7 @@ def _build_extracted_motorhome(
         ),
         bed_types=features["bed_types"].value if "bed_types" in features else [],
         microwave=features["microwave"].value if "microwave" in features else None,
+        automatic_available=automatic[0] if automatic else None,
     )
 
     provenance: dict[str, Provenance] = {}
@@ -510,6 +512,9 @@ def _build_extracted_motorhome(
         provenance[field] = Provenance(
             source_url=source_url, snippet=f"{product.label} — {snippet}"
         )
+
+    if automatic is not None:
+        record("automatic_available", gearbox.provenance_note(automatic))
 
     if product.mh_length_mm is not None:
         record(

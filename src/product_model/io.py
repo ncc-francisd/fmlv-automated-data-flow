@@ -116,6 +116,23 @@ def is_active(value: Any) -> bool:
     return value is None or str(value).strip().lower() != schema.NO.lower()
 
 
+def _to_yes_no_blank(value: Any) -> bool | None:
+    """`Yes` -> True, `No` -> False, anything else -> `None`.
+
+    The three-state counterpart of `_is_yes`, for a column where blank is a real answer
+    rather than a negative — see `Motorhome.automatic_available`. An unrecognised value
+    reads as `None` rather than `False` for the same reason: it means nobody has said.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text == schema.YES.lower():
+        return True
+    if text == schema.NO.lower():
+        return False
+    return None
+
+
 def _to_int(value: Any) -> int | None:
     if value is None or value == "":
         return None
@@ -242,6 +259,7 @@ def row_to_motorhome(row: dict[str, Any]) -> tuple[Motorhome, list[Issue]]:
         rear_garage=_is_yes(row.get("rear_garage")),
         microwave=_is_yes(row.get("microwave")),
         automatic=automatic,
+        automatic_available=_to_yes_no_blank(row.get("automatic_available")),
         **selected,
     )
     return motorhome, issues
@@ -325,6 +343,13 @@ def motorhome_to_row(motorhome: Motorhome) -> dict[str, str]:
     set_int("automatic_mh_payload_kilograms", automatic.payload_kilograms)
     set_int("automatic_rrp_pounds", automatic.rrp_pounds)
     set_int("automatic_price_min_range_pounds", automatic.price_min_range_pounds)
+
+    # Not `set_yes_no`: that writes `No` for `None`, and here `None` means nobody has
+    # established it either way, which FMLV holds as an empty cell.
+    row["automatic_available"] = (
+        "" if motorhome.automatic_available is None
+        else (schema.YES if motorhome.automatic_available else schema.NO)
+    )
 
     set_int("latest_model_id", motorhome.latest_model_id)
     set_str(

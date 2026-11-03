@@ -85,7 +85,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
-from . import habitation
+from . import gearbox, habitation
 from .base import ExtractedMotorhome, Provenance, floorplan_provenance, fmlv_base_vehicle
 
 BASE_URL = "https://globe-traveller.eu"
@@ -379,6 +379,11 @@ class GlobeTravellerProduct:
     bathroom: str | None = None
     shower_tray: str | None = None
     toilet: str | None = None
+    #: `(available, the line that said so)`, or `None` where the page never says. Read
+    #: from the **whole page**, not from the specification table: Globe-Traveller print
+    #: `Automatic gearbox` in the equipment list and the table never mentions a gearbox at
+    #: all, which is the general case rather than a quirk of theirs.
+    automatic_available: tuple[bool, str] | None = None
 
     @property
     def label(self) -> str:
@@ -475,6 +480,7 @@ def parse_model_page(
         bathroom=rows.get("Bathroom"),
         shower_tray=rows.get("Shower tray"),
         toilet=rows.get("Toilet"),
+        automatic_available=gearbox.automatic_available_from(gearbox.lines_from_page(page)),
     )
 
 
@@ -633,6 +639,9 @@ def _build_extracted_motorhome(
         refrigeration=features["refrigeration"].value if "refrigeration" in features else None,
         shower_toilet_separated=separated,
         bed_types=features["bed_types"].value if "bed_types" in features else [],
+        automatic_available=(
+            product.automatic_available[0] if product.automatic_available else None
+        ),
     )
 
     provenance: dict[str, Provenance] = {}
@@ -655,6 +664,8 @@ def _build_extracted_motorhome(
         f"series name removed so it is not repeated in the display name. Paired with the "
         f"range above: together they name this vehicle",
     )
+    if product.automatic_available is not None:
+        record("automatic_available", gearbox.provenance_note(product.automatic_available))
     if product.mh_length_mm is not None:
         record("mh_length_mm", f"Dimensions, 'Lenght' (their spelling): {product.mh_length_mm / 10:.0f} cm")
     if product.mh_width_mm is not None:
