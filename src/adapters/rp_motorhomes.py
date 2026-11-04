@@ -431,6 +431,16 @@ def build_extracted(product: Product, *, basis: str) -> ExtractedMotorhome:
             source_url=product.url, snippet=f"{product.label} — {snippet}"
         )
 
+    # Recorded so the field is proposed rather than only set. Without provenance
+    # `compare_fields` never visits it and an FMLV row holding the cell empty stays
+    # empty — see the same fix in `pilote.py`.
+    if motorhome.base_vehicle_manufacturer is not None:
+        record(
+            "base_vehicle_manufacturer",
+            f"RP build on the Mercedes Sprinter alone, so every layout is "
+            f"{motorhome.base_vehicle_manufacturer}",
+        )
+
     record(
         "manufacturer_range",
         f'range "{product.manufacturer_range}", the brochure this came from',

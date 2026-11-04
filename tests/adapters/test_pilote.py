@@ -666,3 +666,50 @@ def test_a_section_that_never_opened_is_not_read_as_an_absence() -> None:
     page = _page("pilote_g690gj_expression.html").replace('data-loaded="1"', 'data-loaded="0"')
 
     assert fittings_lines(page) == ()
+
+
+def test_the_base_vehicle_is_proposed_and_not_only_set() -> None:
+    """Without provenance the field is never visited, so a blank FMLV cell stays blank.
+
+    That is how the G690GJ and the G720FGJ sat in FMLV with an empty base vehicle
+    through every run until the requester found them in an export on 4 November 2026.
+    """
+    built = _build_extracted_motorhome(_parse("pilote_g690gj_expression.html"))
+
+    assert built.motorhome.base_vehicle_manufacturer == "Fiat"
+    assert "base_vehicle_manufacturer" in built.provenance
+
+
+def test_the_chassis_row_checks_the_base_vehicle_without_becoming_it() -> None:
+    """The coachbuilt popup says `Fiat CCS`, which is a Fiat on a camping-car chassis.
+
+    Writing the row verbatim would proposed a rename on all 34 coachbuilts, against the
+    settled rule that the column holds one abbreviated make per company.
+    """
+    product = _parse("pilote_g690gj_expression.html")
+    built = _build_extracted_motorhome(product)
+
+    assert product.chassis_published == "Fiat CCS"
+    assert built.motorhome.base_vehicle_manufacturer == "Fiat"
+    assert "confirmed by" in built.provenance["base_vehicle_manufacturer"].snippet
+
+
+def test_a_chassis_row_naming_another_make_is_flagged_rather_than_recorded() -> None:
+    """If Pilote move a range to another chassis, the map goes stale silently."""
+    product = replace(_parse("pilote_g690gj_expression.html"), chassis_published="Ford Transit")
+    built = _build_extracted_motorhome(product)
+
+    snippet = built.provenance["base_vehicle_manufacturer"].snippet
+    assert built.motorhome.base_vehicle_manufacturer == "Fiat"
+    assert "BUT" in snippet
+    assert "another chassis" in snippet
+
+
+def test_the_make_is_taken_from_the_front_of_a_chassis_row() -> None:
+    assert pilote._chassis_make("Fiat CCS") == "Fiat"
+    assert pilote._chassis_make("FIAT") == "Fiat"
+    assert pilote._chassis_make("Fiat AL-KO") == "Fiat"
+    assert pilote._chassis_make("Ford") == "Ford"
+    assert pilote._chassis_make("") is None
+    assert pilote._chassis_make(None) is None
+

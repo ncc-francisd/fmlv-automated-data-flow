@@ -212,3 +212,35 @@ def test_active_is_never_written_back(tmp_path) -> None:
     text = export.read_text(encoding="utf-8-sig")
 
     assert "active" not in text.splitlines()[0].split(",")
+
+
+def test_the_upload_holds_back_columns_the_live_template_has_not_got(tmp_path) -> None:
+    """`automatic_available` is column BN of a template Steadfast have not released.
+
+    An upload carrying a column the site does not expect is rejected, so the reviewer
+    was deleting BN out of every file by hand. The column is still read, proposed and
+    reviewed — it is only held out of the written file.
+    """
+    path = tmp_path / "upload.csv"
+    io.write_csv([Motorhome(manufacturer="X")], path, columns=schema.UPLOAD_COLUMNS)
+
+    header = path.read_text(encoding="utf-8-sig").splitlines()[0].split(",")
+
+    assert "automatic_available" not in header
+    assert len(header) == len(schema.COLUMNS) - 1
+    assert header == [c for c in schema.COLUMNS if c != "automatic_available"]
+
+
+def test_the_full_column_set_is_still_what_round_trips(tmp_path) -> None:
+    """Only the upload is narrowed. Everything else keeps every column.
+
+    When Steadfast go live, `NOT_YET_IN_UPLOAD_TEMPLATE` is emptied and the two sets
+    become identical — that is the whole switch.
+    """
+    path = tmp_path / "all.csv"
+    io.write_csv([Motorhome(manufacturer="X")], path)
+
+    header = path.read_text(encoding="utf-8-sig").splitlines()[0].split(",")
+
+    assert header == list(schema.COLUMNS)
+    assert "automatic_available" in header

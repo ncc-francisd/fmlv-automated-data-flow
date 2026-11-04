@@ -48,6 +48,7 @@ from ..product_model.io import columns_for_field as motorhome_columns_for_field
 from ..product_model.io import write_csv as write_fmlv_csv
 from ..product_model.model import AutomaticVariant, Motorhome
 from ..product_model.product import Product
+from ..product_model import schema
 from ..product_model.validation import (
     Issue,
     format_issues,
@@ -481,8 +482,14 @@ def write_upload_csv(
         motorhomes = [p for p in products if isinstance(p, Motorhome)]
         assert len(motorhomes) == len(products), "a motorhome upload cannot carry caravan rows"
         issues = validate_all(motorhomes)
-        write_fmlv_csv(motorhomes, path, leading_blank_rows=2)
-        write_fmlv_csv(motorhomes, readable_path)
+        # `UPLOAD_COLUMNS`, not every column: see `schema.NOT_YET_IN_UPLOAD_TEMPLATE`.
+        # The readable copy matches the upload exactly, because a reviewer checking one
+        # against the other should not find a column in one that is missing from the
+        # other.
+        write_fmlv_csv(
+            motorhomes, path, leading_blank_rows=2, columns=schema.UPLOAD_COLUMNS
+        )
+        write_fmlv_csv(motorhomes, readable_path, columns=schema.UPLOAD_COLUMNS)
 
     issues_path: Path | None = None
     if issues:

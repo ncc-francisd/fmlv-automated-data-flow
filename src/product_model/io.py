@@ -431,7 +431,11 @@ def read_export(path: Path | str) -> ReadResult:
 
 
 def write_csv(
-    motorhomes: Iterable[Motorhome], path: Path | str, *, leading_blank_rows: int = 0
+    motorhomes: Iterable[Motorhome],
+    path: Path | str,
+    *,
+    leading_blank_rows: int = 0,
+    columns: tuple[str, ...] = schema.COLUMNS,
 ) -> None:
     """Write motorhomes as a CSV in the exact FMLV upload column order.
 
@@ -442,6 +446,10 @@ def write_csv(
     other caller (round-tripping, tests) still gets a plain CSV with the header on
     row 1.
 
+    `columns` is the column set and order to write, defaulting to the whole schema.
+    `write_upload_csv` passes `schema.UPLOAD_COLUMNS`, which holds back any column the
+    live FMLV template does not carry yet.
+
     **Written UTF-8 with a byte-order mark.** Without one, Excel on a UK Windows machine
     opens a `.csv` as Windows-1252, so `Citroën` shows as `CitroÃ«n`; save from there and
     the damage is real, and an upload carrying it creates a *second* base vehicle
@@ -451,7 +459,10 @@ def write_csv(
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8-sig") as handle:
-        writer = csv.DictWriter(handle, fieldnames=schema.COLUMNS)
+        # `extrasaction="ignore"` so a narrower `columns` simply drops what it leaves
+        # out: `schema.UPLOAD_COLUMNS` holds back a column FMLV's live template has not
+        # got yet, and the row dict is always built for the full set.
+        writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
         for _ in range(leading_blank_rows):
             # Written through the csv writer rather than `handle.write`, so these rows end
             # CRLF like every other row. Writing them with a bare "\n" left the upload with

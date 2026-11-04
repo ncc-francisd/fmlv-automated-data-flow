@@ -633,6 +633,23 @@ def _build_extracted_motorhome(
             source_url=source_url, snippet=f"{product.label} — {snippet}"
         )
 
+    # Recorded so the field is actually proposed. Setting it on the `Motorhome` without
+    # provenance leaves `compare_fields` nothing to iterate, so an FMLV row holding the
+    # cell empty stays empty for ever — which is how two Pilote products kept a blank
+    # base vehicle until 4 November 2026.
+    if motorhome.base_vehicle_manufacturer is not None:
+        record(
+            "base_vehicle_manufacturer",
+            (
+                f"the page's chassis row: {product.chassis_published!r}"
+                if product.chassis_published
+                else (
+                    f"the {product.manufacturer_range} range is built on "
+                    f"{motorhome.base_vehicle_manufacturer}"
+                )
+            ),
+        )
+
     if product.mh_length_mm is not None:
         record("mh_length_mm", f"summary block, 'Length : {product.mh_length_mm / 1000:g} m'")
     record(

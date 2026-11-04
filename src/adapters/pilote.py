@@ -210,6 +210,34 @@ LENGTH_TOLERANCE_MM = 300
 _BASE_VEHICLES = {"compact-low-profile": "Ford"}
 _DEFAULT_BASE_VEHICLE = "Fiat"
 
+#: The popup's own chassis row, which **corroborates the map above rather than replacing
+#: it**.
+#:
+#: The map was the only source until 4 November 2026, and because nothing recorded
+#: provenance for it the field was never proposed — so two Galaxy products that reached
+#: FMLV with the cell empty stayed empty through every run, and the requester found them
+#: in an export rather than in a review.
+#:
+#: The row is **not** written into the column. It reads `Ford` on the Atlas and `FIAT` on
+#: the vans, but `Fiat CCS` on every coachbuilt — CCS being Fiat's camping-car chassis,
+#: not a make — and recording that verbatim would propose a rename on all 34 of them
+#: against the settled rule that the column holds one abbreviated make per company. So
+#: the map supplies the value and the row is read only to check it, and to say so in the
+#: provenance where a reviewer can see it.
+_CHASSIS_LABEL = re.compile(r"^Chassis$", re.I)
+
+
+def _chassis_make(published: str | None) -> str | None:
+    """The make at the front of a chassis row, as FMLV spells it.
+
+    `Fiat CCS` is a Fiat; `Fiat AL-KO` on the Le Voyageur Eterna is too. Taking the
+    leading word and normalising it is enough for every value either site publishes.
+    """
+    if not published:
+        return None
+    head = published.strip().split()
+    return fmlv_base_vehicle(head[0]) if head else None
+
 #: A campervan taller than this is a high top — the shared NCC threshold. Every Pilote
 #: panel van is 2670mm, so all six clear it.
 HIGH_TOP_ABOVE_MM = 2300
@@ -554,6 +582,8 @@ class PiloteProduct:
     mh_width_mm: int | None = None
     mh_passenger_seats_inc_driver: int | None = None
     berths: int | None = None
+    #: The popup's `Chassis` row, verbatim. `None` where the popup did not open.
+    chassis_published: str | None = None
     mtplm_kilograms: int | None = None
     mh_payload_kilograms: int | None = None
     #: Where the berths and the seats came from. Both have a popup row and a summary
@@ -730,6 +760,7 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
         mh_passenger_seats_inc_driver=seats,
         berths=berths,
         berths_source=berths_source,
+        chassis_published=_matching(rows, _CHASSIS_LABEL),
         seats_source=seats_source,
         # MAM is the one field that exists only in the popup, so the two pages without
         # one legitimately have no MTPLM and therefore no derived MRO.
@@ -866,6 +897,22 @@ def _build_extracted_motorhome(
             f"use the word Berth for a seat with a safety belt and 'Sleeping place' for a "
             f"berth, so the strip's 'Berth' row is the seat count",
         )
+    if motorhome.base_vehicle_manufacturer is not None:
+        expected = motorhome.base_vehicle_manufacturer
+        published_make = _chassis_make(product.chassis_published)
+        if published_make is None:
+            evidence = "this page carries no 'Chassis' row to check it against"
+        elif published_make == expected:
+            evidence = (
+                f"confirmed by the popup table's 'Chassis' row, {product.chassis_published!r}"
+            )
+        else:
+            evidence = (
+                f"BUT the popup table's 'Chassis' row reads "
+                f"{product.chassis_published!r}, which is not a {expected} — check "
+                f"whether Pilote have moved this range to another chassis"
+            )
+        record("base_vehicle_manufacturer", f"base vehicle {expected}; {evidence}")
     if product.berths is not None:
         record(
             "berths",

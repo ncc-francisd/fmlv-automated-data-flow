@@ -139,6 +139,25 @@ def _load_in_scope() -> frozenset[str]:
 #: rather than silently left unchecked. See `diff.compare.compare_fields`.
 IN_SCOPE: frozenset[str] = _load_in_scope()
 
+
+#: Columns this schema knows but the **live** FMLV upload template does not carry yet.
+#:
+#: `automatic_available` is column BN of the template Steadfast have built but not yet
+#: released. Until they do, an upload carrying it has one column too many and the site
+#: rejects the file, so the reviewer was deleting column BN out of every upload by hand
+#: before sending it — a step that has to be done exactly right on a 69-column sheet.
+#:
+#: Holding it back here instead means the column is read from an export the moment one
+#: carries it, is proposed and reviewed as normal, and is simply not written out. **When
+#: Steadfast go live, empty this set** — that is the whole switch, and the tests in
+#: `tests/product_model/test_io.py` describe both states.
+NOT_YET_IN_UPLOAD_TEMPLATE: frozenset[str] = frozenset({"automatic_available"})
+
+#: The columns an upload actually carries, in `COLUMNS` order.
+UPLOAD_COLUMNS: tuple[str, ...] = tuple(
+    column for column in COLUMNS if column not in NOT_YET_IN_UPLOAD_TEMPLATE
+)
+
 #: The Yes/No layout columns, all of which map into an enum group.
 LAYOUT: frozenset[str] = frozenset(
     [
