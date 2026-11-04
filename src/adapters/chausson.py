@@ -48,6 +48,7 @@ from pathlib import Path
 from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
+from . import gearbox
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 BASE_URL = "https://www.motorhomes-chausson.co.uk"
@@ -234,6 +235,14 @@ class ChaussonProduct:
     mh_height_mm: int | None = None
     mtplm_kilograms: int | None = None
     mro_kilograms: int | None = None
+    #: Whether the model page offers an automatic, and the line that says so.
+    #:
+    #: Chausson name the chassis maker and the box together — *"FORD 8-speed automatic
+    #: transmission - 165 hp engine required"* — in a list of engine choices rather than
+    #: in the specification rows, so this is read from the whole page. The trailing
+    #: condition is why it is read unfiltered: an automatic that needs a bigger engine is
+    #: still an automatic that can be bought.
+    automatic_available: tuple[bool, str] | None = None
 
     @property
     def label(self) -> str:
@@ -467,6 +476,13 @@ def _build_extracted_motorhome(
         )
     if product.body_type is not None:
         record("body_type", model_url, f"line '{product.range_label}' from the page heading")
+    if product.automatic_available is not None:
+        motorhome.automatic_available = product.automatic_available[0]
+        record(
+            "automatic_available",
+            model_url,
+            gearbox.provenance_note(product.automatic_available),
+        )
     record(
         "manufacturer_range",
         model_url,
@@ -547,6 +563,9 @@ def collect(
             mh_height_mm=_millimetres(find_row(rows, LABEL_HEIGHT) or ""),
             mtplm_kilograms=_kilograms(find_row(rows, LABEL_MTPLM) or ""),
             mro_kilograms=_kilograms(find_row(rows, LABEL_MRO) or ""),
+            automatic_available=gearbox.automatic_available_from(
+                gearbox.lines_from_page(model_html)
+            ),
         )
 
         if not _reconciles(product):

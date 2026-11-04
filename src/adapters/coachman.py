@@ -50,7 +50,7 @@ from decimal import Decimal
 from html import unescape
 from pathlib import Path
 
-from . import habitation
+from . import gearbox, habitation
 from ..fetch.http import Fetcher
 from ..product_model.model import Motorhome
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
@@ -348,6 +348,13 @@ class CoachmanProduct:
     range_slug: str = ""
     #: The range's equipment, for the habitation findings. Shared by its models.
     equipment: habitation.Equipment | None = None
+    #: Whether the range page states an automatic, and the line that says so.
+    #:
+    #: Read from the **whole range page**, not the equipment list: Coachman put it in
+    #: prose — *"Based on the Fiat Ducato 180 HP engine with an 8-speed automatic gear
+    #: box"* — and never in a specification row. Shared by the range's models like the
+    #: equipment, because the page is.
+    automatic_available: tuple[bool, str] | None = None
 
     @property
     def label(self) -> str:
@@ -663,6 +670,17 @@ def _build_extracted_motorhome(
                 ),
             )
 
+    if product.automatic_available is not None:
+        motorhome.automatic_available = product.automatic_available[0]
+        provenance["automatic_available"] = Provenance(
+            source_url=f"{BASE_URL}/{product.range_slug}/",
+            snippet=(
+                f"{product.title} — "
+                f"{gearbox.provenance_note(product.automatic_available)}. Stated on the "
+                f"{product.range_label} range page, so it is shared by every model in it"
+            ),
+        )
+
     provenance["manufacturer_range"] = Provenance(
         source_url=api_url,
         snippet=(
@@ -736,6 +754,7 @@ def collect(
         # that checks the two masses. See `parse_specification_panels`.
         panels: dict[int, dict[str, dict[str, str]]] = {}
         equipment: dict[int, habitation.Equipment] = {}
+        automatics: dict[int, tuple[bool, str] | None] = {}
         for term, slug in slugs_by_id.items():
             if term not in {p.term_id for p in products}:
                 continue
@@ -750,11 +769,15 @@ def collect(
             range_html = page.file_path.read_text(encoding="utf-8", errors="replace")
             panels[term] = parse_specification_panels(range_html)
             equipment[term] = parse_equipment(range_html)
+            automatics[term] = gearbox.automatic_available_from(
+                gearbox.lines_from_page(range_html)
+            )
         products = [
             replace(
                 product,
                 range_slug=slugs_by_id.get(product.term_id, ""),
                 equipment=equipment.get(product.term_id),
+                automatic_available=automatics.get(product.term_id),
                 spec=(
                     spec_from_panel(panels[product.term_id][product.model])
                     if product.term_id in panels and product.model in panels[product.term_id]

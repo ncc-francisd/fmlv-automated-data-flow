@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from src.adapters import coachman
+from src.adapters import coachman, gearbox
 from src.adapters.coachman import RENAMED_MODELS, CoachmanCard, CoachmanProduct
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -586,3 +586,19 @@ def test_bed_types_are_dropped_because_the_list_is_per_range(
         "https://example.invalid/api",
     )
     assert "bed_types" not in built.provenance  # …and the adapter does not keep it
+
+
+def test_the_automatic_is_read_from_the_range_page_prose() -> None:
+    """Coachman state the gearbox in a sentence, never in a specification row.
+
+    The range page carries *"8 - Speed automatic gear box"*, so the whole page is read.
+    Like the equipment list it is published per range, which is why the provenance says
+    the figure is shared by every model in that range.
+    """
+    page = _read("coachman_veloce_panels.html")
+
+    found = gearbox.automatic_available_from(gearbox.lines_from_page(page))
+
+    assert found is not None
+    assert found[0] is True
+    assert "automatic gear box" in found[1].lower()

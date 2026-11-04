@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from src.adapters import chausson
+from src.adapters import chausson, gearbox
 from src.adapters.chausson import ChaussonCard, ChaussonProduct
 from src.product_model.enums import BodyType
 
@@ -331,3 +331,27 @@ def test_caravans_are_not_a_concern_and_all_five_lines_are_covered() -> None:
     labels = [label for _slug, label in chausson.DEFAULT_RANGES]
     assert labels == ["Low profiles", "S Low Profiles", "Overcab", "Vans", "X"]
     assert len(labels) == len(set(labels))
+
+
+def test_the_automatic_is_read_from_the_chassis_option_list() -> None:
+    """Chausson never name a gearbox in the specification rows.
+
+    It is in a `Chassis option prices` accordion instead, which is why the whole page is
+    read rather than the rows. The line carries its own condition — *165 hp engine
+    required* — and that does not make it a No: an automatic you can buy is a Yes, per
+    `docs/adapters/README.md`.
+    """
+    page = _read("chausson_model_650.html")
+
+    found = gearbox.automatic_available_from(gearbox.lines_from_page(page))
+
+    assert found is not None
+    assert found[0] is True
+    assert "8-speed automatic transmission" in found[1]
+
+
+def test_a_page_with_no_gearbox_line_leaves_the_field_blank() -> None:
+    """Silence is not a No. The other captures predate the chassis-option accordion."""
+    page = _read("chausson_model_v594.html")
+
+    assert gearbox.automatic_available_from(gearbox.lines_from_page(page)) is None
