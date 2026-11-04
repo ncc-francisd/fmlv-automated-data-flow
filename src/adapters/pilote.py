@@ -345,6 +345,29 @@ _SEATS_LABEL = re.compile(r"^Seats with safety belts$", re.I)
 #: row agrees with FMLV on all nine vans.
 _BERTHS_LABEL = re.compile(r"^Sleeping berths$", re.I)
 
+#: The coachbuilt popup's berth rows. Coachbuilts have no `Sleeping berths` row at all —
+#: they split the question across five, and **the split is the answer**:
+#:
+#:     Permanent sleeping space                          berths the vehicle has
+#:     Extra sleeping spaces                             berths the vehicle has
+#:     Optional sleeping berths with drop-down bed       a bed you buy
+#:     Optional extra sleeping berths with drop-down bed a bed you buy
+#:     Optional extra sleeping spaces                    a bed you buy
+#:
+#: Everything labelled `Optional` is a cost option, which `docs/adapters/README.md` says
+#: is not a berth. Run #212 read none of these and proposed nothing on all 34 coachbuilts;
+#: the run after it read the headline tile instead and overstated the A-class.
+#:
+#: The drop-down row is the fallback for the handful of layouts — the G690D and the P690D
+#: Expression — that list no standard row at all because the drop-down *is* their only
+#: bed. Taking it gives them 2 rather than nothing, and matches what the tile says for
+#: the low-profiles.
+_PERMANENT_BERTHS_LABEL = re.compile(r"^Permanent sleeping space$", re.I)
+_EXTRA_BERTHS_LABEL = re.compile(r"^Extra sleeping spaces$", re.I)
+_DROP_DOWN_BERTHS_LABEL = re.compile(
+    r"^Optional sleeping berths with drop-down bed$", re.I
+)
+
 #: One tile of the **headline block**, which is server-rendered and needs no click.
 #:
 #: Pilote rebuilt the pages again between 29 and 30 October 2026, and this replaced the
@@ -356,13 +379,21 @@ _BERTHS_LABEL = re.compile(r"^Sleeping berths$", re.I)
 #:     Length 7,00 m   Body width 2,20 m   Height 2,88 m
 #:     Seats with safety belt 4   Dining seats 5   Sleeping berths 2   Payload 575 kg
 #:
-#: **This is what settles the coachbuilt berth count.** The five-row split that blocked
-#: run #212 — `Permanent sleeping space`, `Extra sleeping spaces` and three `Optional …`
-#: rows — is gone from every page; the word now appears nowhere on the site. The
-#: requester, 30 October 2026, on the A690G Atlas: *"Pilote is the 690G is a two-berth and
-#: here's the evidence. The four-berth is an optional extra."* The page says
-#: `Sleeping berths 2`, and the drop-down that makes it four is a cost option, which
-#: `docs/adapters/README.md` says is not a berth.
+#: **The tile folds optional beds in, so it is the last resort for berths, not the
+#: first.** It was briefly read as the coachbuilt berth count, and on 4 November 2026 the
+#: requester caught it: the V630J Evidence tile says `3 Sleeping berths` where the popup
+#: on the same page says `Sleeping berths 2` with `Optional sleeping places 1+2`. Checked
+#: across all thirteen layouts in that run's berth proposals, the tile overstated four of
+#: them — every A-class among them, because an A-class leans on a drop-down bed that
+#: Pilote sell as an option:
+#:
+#:     A690G  tile 2, permanent 2          G690GJ  tile 4, permanent 2
+#:     P690D  tile 2, extra 2              G720FGJ tile 4, permanent 2
+#:     P740FC tile 2, permanent 2          G690D   tile 4, no standard row at all
+#:
+#: So berths come from the popup's own rows — see `_PERMANENT_BERTHS_LABEL` — and reach
+#: the tile only on a page whose popup never opened, where an overstated figure still
+#: beats no figure and the provenance says which it was.
 #:
 #: The value `<p>` often wraps its figure in schema.org `<span>`s, so the text is
 #: flattened rather than read directly.
@@ -572,6 +603,33 @@ class PiloteProduct:
         )
 
 
+def _coachbuilt_berths(rows: dict[str, str]) -> tuple[int | None, str]:
+    """`(berths, where it came from)` from the coachbuilt popup's five-row split.
+
+    The standard rows are summed because a layout can carry both: a permanent rear bed
+    and a lounge that makes up without being bought. A `-` reads as absent, not zero, so
+    a page carrying neither standard row falls through to the drop-down bed rather than
+    claiming the vehicle sleeps nobody.
+    """
+    permanent = _first_int(_matching(rows, _PERMANENT_BERTHS_LABEL))
+    extra = _first_int(_matching(rows, _EXTRA_BERTHS_LABEL))
+    if permanent is not None or extra is not None:
+        total = (permanent or 0) + (extra or 0)
+        parts = []
+        if permanent is not None:
+            parts.append(f"'Permanent sleeping space' {permanent}")
+        if extra is not None:
+            parts.append(f"'Extra sleeping spaces' {extra}")
+        return total, "popup table, " + " plus ".join(parts)
+    drop_down = _first_int(_matching(rows, _DROP_DOWN_BERTHS_LABEL))
+    if drop_down is not None:
+        return drop_down, (
+            "popup table, 'Optional sleeping berths with drop-down bed' — the layout "
+            "lists no standard sleeping row, the drop-down being its only bed"
+        )
+    return None, ""
+
+
 def _payload_for(rows: dict[str, str], strip_payload: int | None) -> tuple[int | None, str]:
     """`(payload, where it came from)`. The two body types publish it in different places.
 
@@ -635,22 +693,23 @@ def parse_model_page(page: str, source_url: str) -> PiloteProduct | None:
     if seats is None and strip is not None:
         seats, seats_source = int(strip.group("seats")), "summary strip, 'Berth'"
 
-    # **Berths: the popup's labelled row, then the headline block, then the old strip.**
+    # **Berths: the van row, then the coachbuilt rows, then the tile, then the strip.**
     #
-    # The headline block is what unblocks the coachbuilts. Their popup has never carried
-    # `Sleeping berths` — it split the question across five rows instead — so run #212
-    # proposed nothing on all 34 and left FMLV's figure standing. Pilote have since
-    # rebuilt the pages and the block states it outright, which the requester confirmed
-    # against the A690G Atlas on 30 October 2026: the page says two, and the bed that
-    # makes it four is a cost option rather than a berth.
-    #
-    # It is also the more robust source, because it needs no click. The A650D's popup
-    # failed to open in run #212 and its berth count went missing although the page was
-    # printing one the whole time.
+    # Both body types answer this in the popup, in different words — `Sleeping berths`
+    # on a van, a five-row split on a coachbuilt — and both separate the beds the
+    # vehicle has from the beds you buy. The headline tile does not: it adds the
+    # optional ones, which is why it sits below both and carries a caveat in its
+    # provenance when it is used at all. See `_TILE_OPTION` for the counts that showed it.
     berths = _first_int(_matching(rows, _BERTHS_LABEL))
     berths_source = "popup table, 'Sleeping berths'"
+    if berths is None:
+        berths, berths_source = _coachbuilt_berths(rows)
     if berths is None and (tile := tiles.get("Sleeping berths")) is not None:
-        berths, berths_source = _first_int(tile), "headline block, 'Sleeping berths'"
+        berths, berths_source = (
+            _first_int(tile),
+            "headline block, 'Sleeping berths' — no popup opened, and this tile counts "
+            "optional beds, so the figure may be high",
+        )
     if berths is None and strip is not None:
         berths, berths_source = int(strip.group("berths")), "summary strip, 'Sleeping place'"
 

@@ -79,6 +79,38 @@ two berths. And **the asterisk count varies by page** — Malibu use `**` on the
 `***` on the Relax for the same caveat — so match a run of them rather than a particular
 number.
 
+### The summary tile is marketing; the technical table is the data
+
+**Rule from the NCC side, 4 November 2026, found on Pilote's V630J Evidence.** Where a
+page states the same quantity twice — once in the headline strip a visitor sees first, and
+once in the specification table behind a click — **take the table**. The strip is written
+to sell the vehicle at its best and quietly counts beds that have to be bought.
+
+Pilote print both on the same page:
+
+| where | says |
+|---|---|
+| headline tile, above the fold | `3 Sleeping berths` |
+| technical table, behind `Technical information` | `Sleeping berths 2`, then `Optional sleeping places 1+2` |
+
+The requester, seeing the tile: *"a consumer coming to this site is immediately going to
+think there are 3 standard sleeping berths."* They will — and FMLV still records **2**,
+because the third is the lounge bed the same table lists as optional. This is the
+asterisked-bed rule and the berth-range rule arriving a third time: the vehicle as built,
+not the vehicle as configured.
+
+Checked across thirteen Pilote layouts, the tile matched the table on nine and overstated
+four, every one of them an A-class, because an A-class leans on a drop-down bed sold as an
+option. **An agreement on most of the range is not evidence the tile is the right source**
+— it is why the disagreement is so easy to miss.
+
+Two things to carry to the next adapter. The tile is still worth reading, because it needs
+no click and a page whose popup fails to open is otherwise blank — but record *which*
+source answered, so a reviewer can see when the weaker one was used. And where a technical
+table splits a quantity across several rows, **the split is the answer**: Pilote's
+coachbuilts give `Permanent sleeping space` and `Extra sleeping spaces` against three rows
+beginning `Optional`, and summing the first two is the whole rule.
+
 ### "Mirrors folded" is recorded; "including mirrors" never is
 
 A common label, and it does not mean the same thing on the two body shapes:

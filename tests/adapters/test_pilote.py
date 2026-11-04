@@ -204,7 +204,7 @@ def test_a_coachbuilt_yields_every_field() -> None:
     assert product.mh_length_mm == 7070
     assert product.mh_height_mm == 2850
     assert product.mh_passenger_seats_inc_driver == 4
-    assert product.berths == 4
+    assert product.berths == 2
     assert product.mtplm_kilograms == 3500
     assert product.mh_payload_kilograms == 485
     assert product.mro_kilograms == 3015
@@ -245,21 +245,46 @@ def test_the_optional_fifth_belt_is_not_counted() -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "expected"),
+    ("name", "expected", "expected_source"),
     [
-        ("pilote_v540g_pilote.html", 2),
-        ("pilote_g690gj_expression.html", 4),
-        ("pilote_p720u_evidence.html", 2),
-        ("pilote_a630g_atlas.html", 2),
+        ("pilote_v540g_pilote.html", 2, "'Sleeping berths'"),
+        ("pilote_g690gj_expression.html", 2, "'Permanent sleeping space' 2"),
+        ("pilote_p720u_evidence.html", 2, "'Extra sleeping spaces' 2"),
+        ("pilote_a630g_atlas.html", 2, "'Permanent sleeping space' 2"),
     ],
 )
-def test_berths_are_read_for_every_sampled_layout(name: str, expected: int) -> None:
-    """The P720U's 2 disagrees with the brochure's 4; the requester ruled the site wins.
+def test_berths_are_read_for_every_sampled_layout(
+    name: str, expected: int, expected_source: str
+) -> None:
+    """Every sampled layout sleeps two, and every figure comes from the popup.
 
-    The van answers from the popup's `Sleeping berths`, the three coachbuilts from the
-    summary strip their pages still carried in September. Both routes are live.
+    The G690GJ was read as 4 until 4 November 2026, from the summary strip's `Sleeping
+    place`. This same archived page carries `Permanent sleeping space 2` beside
+    `Optional sleeping berths with drop-down bed 2`, which is what the strip was adding
+    together — so the strip folded a paid bed in on the coachbuilts exactly as it already
+    did on the vans. The source is asserted as well as the figure, because the two wrong
+    routes both produce plausible numbers.
     """
-    assert _parse(name).berths == expected
+    product = _parse(name)
+
+    assert product.berths == expected
+    assert expected_source in product.berths_source
+    assert "headline block" not in product.berths_source
+
+
+def test_the_headline_tile_counts_optional_beds_and_is_not_the_berth_source() -> None:
+    """The V630J Evidence says `3 Sleeping berths` in its tile and 2 in its popup.
+
+    The requester spotted the gap on 4 November 2026: a consumer landing on the page is
+    shown three. Pilote's own technical table says `Sleeping berths 2` with `Optional
+    sleeping places 1+2`, and a bed that has to be bought is not a berth.
+    """
+    page = _page("pilote_g690gj_expression.html")
+    rows = popup_rows(page)
+
+    assert rows["Permanent sleeping space"] == "2"
+    assert rows["Optional sleeping berths with drop-down bed"] == "2"
+    assert _parse("pilote_g690gj_expression.html").berths == 2
 
 
 def test_pilote_removed_the_summary_strip(): 
