@@ -145,7 +145,7 @@ def field_choices(
         # options are enums all the same, and the form needs them to render tick boxes.
         return [("", [(member.value, label_for(member.value)) for member in multi_cls])]
 
-    if field in profile.bool_fields:
+    if field in profile.bool_fields or field in profile.tristate_bool_fields:
         # A yes/no field is as much a choice as an enum, and offering it as one is what
         # lets a reviewer answer a question the copy left open — the requester,
         # 9 September 2026: *"if bed types or indeed separated shower and toilet are not
@@ -154,6 +154,9 @@ def field_choices(
         # picture of the inside […] whether the shower and toilet are separated."*
         # Without this the row fell back to a free-text box, where "yes" would have been
         # stored verbatim and read back as `False` by `apply_field`.
+        #
+        # The tri-state fields are offered the same two options. Their third state is not
+        # an option here but the "blank" action, which `can_be_blanked` allows them.
         return [("", [("True", label_for("True")), ("False", label_for("False"))])]
 
     enum_cls = profile.enum_fields.get(field)
@@ -257,8 +260,13 @@ def can_be_blanked(field: str, vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLA
       unknown; a vehicle's name cannot.
 
     What is left is exactly what a reviewer means by "we don't know this": the numeric
-    measurements, the layout and body-type enums, and the automatic-variant weights. All
-    three map cleanly to an empty column in `apply_field`.
+    measurements, the layout and body-type enums, the automatic-variant weights, and
+    `automatic_available`. All map cleanly to an empty column in `apply_field`.
+
+    `automatic_available` is the one yes/no field here, and it is here because its column
+    holds three states rather than two: blank says nobody has established whether an
+    automatic is offered, which is what the pipeline records when a manufacturer is
+    silent. Blanking it is how a reviewer withdraws a `Yes` without asserting a `No`.
 
     `bed_types` is excluded too. It is a list, so its empty state is `[]` rather than
     `None`, and "no bed types recorded" and "this vehicle has no beds" would serialise
@@ -269,6 +277,7 @@ def can_be_blanked(field: str, vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLA
         field in profile.int_fields
         or field in profile.enum_fields
         or field in profile.automatic_fields
+        or field in profile.tristate_bool_fields
     )
 
 

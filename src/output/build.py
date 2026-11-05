@@ -101,6 +101,17 @@ _BOOL_FIELDS: frozenset[str] = frozenset(
     {"rear_garage", "microwave", "shower_toilet_separated"}
 )
 
+#: Yes/No fields where **blank is a real third answer**, not a No.
+#:
+#: Kept apart from `_BOOL_FIELDS` rather than added to it, because those three write to
+#: FMLV columns that genuinely have two states: `io.set_yes_no` writes `No` for `None`
+#: deliberately, so collapsing the two there loses nothing. `automatic_available` is
+#: written `""` for `None` instead, and the distinction is the point of the field — a
+#: manufacturer saying nothing about a gearbox is not a manufacturer saying there is no
+#: automatic. Routing it through the plain bool branch would read that silence back as
+#: an explicit `No` and assert the negative on their behalf.
+_TRISTATE_BOOL_FIELDS: frozenset[str] = frozenset({"automatic_available"})
+
 #: Single-select layout groups (DESIGN.md §4.3), field name -> enum class.
 _ENUM_FIELDS: dict[str, type[ColumnEnum]] = {
     "body_type": BodyType,
@@ -183,6 +194,8 @@ class UploadProfile:
     int_fields: frozenset[str]
     str_fields: frozenset[str]
     bool_fields: frozenset[str]
+    #: Yes/No/blank fields — see `_TRISTATE_BOOL_FIELDS`. Empty for caravans.
+    tristate_bool_fields: frozenset[str]
     enum_fields: dict[str, type[ColumnEnum]]
     #: Groups holding a list rather than one member — see `_MULTI_ENUM_FIELDS`.
     multi_enum_fields: dict[str, type[ColumnEnum]]
@@ -194,6 +207,7 @@ MOTORHOME_UPLOAD = UploadProfile(
     int_fields=_INT_FIELDS,
     str_fields=_STR_FIELDS,
     bool_fields=_BOOL_FIELDS,
+    tristate_bool_fields=_TRISTATE_BOOL_FIELDS,
     enum_fields=_ENUM_FIELDS,
     multi_enum_fields=_MULTI_ENUM_FIELDS,
     automatic_fields=_AUTOMATIC_FIELDS,
@@ -203,6 +217,8 @@ CARAVAN_UPLOAD = UploadProfile(
     int_fields=_CARAVAN_INT_FIELDS,
     str_fields=_CARAVAN_STR_FIELDS,
     bool_fields=_CARAVAN_BOOL_FIELDS,
+    # A towed vehicle has no gearbox, so there is nothing tri-state about it.
+    tristate_bool_fields=frozenset(),
     enum_fields=_CARAVAN_ENUM_FIELDS,
     multi_enum_fields=_MULTI_ENUM_FIELDS,
     automatic_fields={},
@@ -246,6 +262,13 @@ def apply_field(product: Product, field_name: str, raw_value: str | None) -> Pro
 
     if field_name in profile.bool_fields:
         return product.model_copy(update={field_name: raw_value == "True"})
+
+    if field_name in profile.tristate_bool_fields:
+        # Absent stays absent. A reviewer blanking `automatic_available` means "nobody
+        # has established this", which is a different answer from "there is no
+        # automatic", and the column is written `""` rather than `No` for it.
+        value = None if raw_value in (None, "") else raw_value == "True"
+        return product.model_copy(update={field_name: value})
 
     if field_name in profile.enum_fields:
         enum_cls = profile.enum_fields[field_name]

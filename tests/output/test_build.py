@@ -719,3 +719,138 @@ def test_an_existing_products_habitation_columns_are_never_blanked(
 
     assert row["fridge_freezer"] == "Yes"
     assert row["fridge"] == "No"
+
+
+# --- The automatic-gearbox column's three states ----------------------------------------
+
+
+def test_an_accepted_automatic_available_reaches_the_upload() -> None:
+    """Run 237 crashed here: `apply_field` knew nothing of the field and raised.
+
+    `automatic_available` was added to the model, the schema and the diff but never to
+    the upload profile, so every decision on it was fine until the moment a reviewer
+    pressed Generate upload CSV — which raised `ValueError` inside the route, returned a
+    500 whose body is not JSON, and reached the reviewer as "Could not reach the server".
+    """
+    from src.output.build import apply_field
+
+    pilote = Motorhome(manufacturer="Pilote", model="CV507SC")
+
+    assert apply_field(pilote, "automatic_available", "True").automatic_available is True
+    assert apply_field(pilote, "automatic_available", "False").automatic_available is False
+
+
+@pytest.mark.parametrize("raw", [None, ""])
+def test_blanking_automatic_available_is_not_a_no(raw: str | None) -> None:
+    """The third state has to survive, or silence becomes a denial.
+
+    A reviewer withdrawing a `Yes` means "nobody has established this", not "there is no
+    automatic". The plain bool branch maps an absent value to `False`, which is right for
+    `rear_garage` — FMLV's column there holds two states — and wrong here, where the
+    column is written empty for `None`.
+    """
+    from src.output.build import apply_field
+    from src.product_model.io import motorhome_to_row
+
+    offered = Motorhome(manufacturer="Pilote", model="CV507SC", automatic_available=True)
+    blanked = apply_field(offered, "automatic_available", raw)
+
+    assert blanked.automatic_available is None
+    assert motorhome_to_row(blanked)["automatic_available"] == ""
+    assert motorhome_to_row(offered)["automatic_available"] == "Yes"
+
+
+def test_every_proposable_model_field_can_be_applied() -> None:
+    """The guard that would have caught this before a reviewer did.
+
+    A proposal names a `Motorhome` field, so any field an adapter can record provenance
+    for has to be a field `apply_field` can write. The two drifted apart once, silently,
+    when `automatic_available` was added to the model and the diff but not to the upload
+    profile; the only symptom was a failed upload a run and a half later.
+
+    Deliberately **not** keyed on `schema.IN_SCOPE`, which is 13 fields and governs the
+    separate "missing field" flag, nor on `schema.COLUMNS`, most of which are the
+    expanded yes/no columns an enum group writes rather than fields anything proposes.
+    """
+    from src.output.build import MOTORHOME_UPLOAD
+    from src.product_model.model import Motorhome
+
+    #: Fields no proposal ever names, each for a reason that is not "we forgot".
+    never_proposed = {
+        # FMLV's own, carried through untouched.
+        "product_id",
+        "latest_model_id",
+        "images",
+        "archived",
+        "active",
+        "manufacturing_release_date",
+        # Set at upload by hand, never collected.
+        "dealer_specials_range",
+        "dealer",
+        "dealer_model_variant",
+        # Written by the upload builder itself, not decided on.
+        "extra_column_flags",
+        "unanswered_columns",
+        # The nested variant, reached by its dotted paths in `automatic_fields`.
+        "automatic",
+    }
+    known = (
+        MOTORHOME_UPLOAD.int_fields
+        | MOTORHOME_UPLOAD.str_fields
+        | MOTORHOME_UPLOAD.bool_fields
+        | MOTORHOME_UPLOAD.tristate_bool_fields
+        | frozenset(MOTORHOME_UPLOAD.enum_fields)
+        | frozenset(MOTORHOME_UPLOAD.multi_enum_fields)
+        | frozenset(MOTORHOME_UPLOAD.automatic_fields)
+    )
+
+    unappliable = set(Motorhome.model_fields) - known - never_proposed
+    assert not unappliable, (
+        f"these fields can be proposed but not written to an upload row, so accepting "
+        f"one and generating the CSV raises: {sorted(unappliable)}"
+    )
+
+
+def test_a_whole_run_carrying_a_gearbox_decision_generates_its_csv(
+    connection: sqlite3.Connection, run_id: int, tmp_path: Path
+) -> None:
+    """The end-to-end shape of run 237: propose, accept, generate.
+
+    `apply_field` is where it broke, but the failure a reviewer met was the whole
+    pipeline refusing to produce a file, so the test that matters goes the whole way.
+    """
+    extracted = make_extracted(rrp_pounds=93950, automatic_available=True)
+    extracted.provenance["automatic_available"] = Provenance(
+        source_url="https://www.adria.co.uk/motorhomes/matrix",
+        snippet="'9-speed automatic transmission' is listed as an option",
+    )
+    baseline = make_baseline()
+    store.persist_diff(
+        connection,
+        run_id=run_id,
+        manufacturer_id=3,
+        diffs=diff_products([extracted], [baseline]),
+    )
+    entry = next(
+        e
+        for e in store.list_change_queue(connection, run_id)
+        if e.change.field == "automatic_available"
+    )
+    store.record_decision(
+        connection, proposed_change_id=entry.change.id, action="accept", decided_by="ben"
+    )
+
+    result = generate_upload(
+        connection,
+        run_id=run_id,
+        manufacturer=make_manufacturer(),
+        baseline=[baseline],
+        path=tmp_path / "upload.csv",
+    )
+
+    [product] = result.motorhomes
+    assert product.automatic_available is True
+    # Held back from the upload itself until FMLV's template carries column BN, so the
+    # proof it was applied is the readable copy plus the model. See
+    # `schema.NOT_YET_IN_UPLOAD_TEMPLATE`.
+    assert result.path.exists()

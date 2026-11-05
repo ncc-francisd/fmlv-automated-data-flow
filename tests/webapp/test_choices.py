@@ -163,3 +163,27 @@ def test_a_blankable_field_is_not_always_required() -> None:
 def test_required_is_read_per_product_area() -> None:
     assert choices.is_required_field("shipping_length_mm", VehicleClass.CARAVAN)
     assert not choices.is_required_field("shipping_length_mm", VehicleClass.MOTORHOME)
+
+
+def test_the_gearbox_field_is_a_yes_no_choice_not_a_text_box() -> None:
+    """Otherwise a reviewer types "Yes" and `apply_field` reads it back as `False`.
+
+    The same trap the habitation yes/no fields were given options to avoid.
+    """
+    assert choices.field_choices("automatic_available") == [
+        ("", [("True", "Yes"), ("False", "No")])
+    ]
+    assert choices.is_valid_choice("automatic_available", "True")
+    assert not choices.is_valid_choice("automatic_available", "Yes")
+
+
+def test_the_gearbox_field_can_be_blanked_where_the_habitation_ones_cannot() -> None:
+    """Its column holds three states; `rear_garage`'s holds two.
+
+    Blanking `automatic_available` says nobody has established whether an automatic is
+    offered. Blanking `rear_garage` would write `No` and assert there is no garage, which
+    is why it is not offered there.
+    """
+    assert choices.can_be_blanked("automatic_available")
+    assert not choices.can_be_blanked("rear_garage")
+    assert not choices.can_be_blanked("microwave")

@@ -490,7 +490,23 @@
           method: "POST",
           headers: { "Accept": "application/json" },
         });
-        data = await response.json();
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          // A crash inside the route returns a 500 whose body is plain text, not JSON,
+          // so parsing it throws in here rather than in the outer catch. Reporting that
+          // as "could not reach the server" sent a reviewer looking for a network fault
+          // when the connection was fine and the bug was ours — run 237, 5 November
+          // 2026, where an accepted `automatic_available` reached `apply_field`, which
+          // had no case for it. Name the real fault and where the detail is.
+          showToast(
+            `The server failed while building the upload CSV (HTTP ${response.status}). ` +
+            `The connection is fine — this is a fault in the app itself, and the ` +
+            `reason will be in the service log on the machine serving this page.`,
+            true
+          );
+          return;
+        }
       } catch (err) {
         showToast("Could not reach the server to generate the upload CSV.", true);
         return;
