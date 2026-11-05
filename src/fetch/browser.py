@@ -46,6 +46,12 @@ SCROLL_STEP_VIEWPORT_FRACTION = 0.5
 #: timeout multiplies across the whole run.
 DEFAULT_CLICK_TIMEOUT_MS = 5000
 
+#: How long to wait when dispatching a click to an element a real click could not reach.
+#:
+#: Short on purpose: the element has already been found on the page by the time this is
+#: used, so the only thing left to wait for is the dispatch itself. See `_click`.
+DISPATCH_TIMEOUT_MS = 2000
+
 #: Pause between consecutive clicks, so an opening section does not swallow the next one.
 CLICK_GAP_MS = 400
 
@@ -294,12 +300,40 @@ class BrowserFetcher:
         """
         try:
             page.locator(selector).first.click(timeout=timeout_ms)  # type: ignore[attr-defined]
+            return True
         except PlaywrightTimeoutError:
+            pass
+
+        # **A real click that times out is not the same as a missing element.** A control
+        # can be on the page, visible and perfectly functional, and still refuse a click
+        # because something decorative lies over it — Pilote's European site puts a sticky
+        # summary bar across the bottom of every model page, and it covers the very button
+        # that opens the specification panel. Playwright is right to refuse: a human would
+        # scroll before pressing. Dispatching the event to the element does what the
+        # scroll would have achieved, and only ever runs where the honest click has
+        # already failed.
+        #
+        # `count()` is immediate, so an absent selector still costs one timeout and not
+        # two — which matters on a sweep that clicks five selectors on each of 43 pages.
+        locator = page.locator(selector)  # type: ignore[attr-defined]
+        if not locator.count():
             on_progress(
                 f"no element matching {selector!r} became clickable within "
                 f"{timeout_ms}ms, so whatever it reveals is not in this snapshot"
             )
             return False
+        try:
+            locator.first.dispatch_event("click", timeout=DISPATCH_TIMEOUT_MS)
+        except PlaywrightTimeoutError:
+            on_progress(
+                f"{selector!r} is on the page but would take no click, by pointer or by "
+                f"event, so whatever it reveals is not in this snapshot"
+            )
+            return False
+        on_progress(
+            f"{selector!r} was covered by something on the page, so the click was "
+            f"dispatched to it directly"
+        )
         return True
 
     @staticmethod

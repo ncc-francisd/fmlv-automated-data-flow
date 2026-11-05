@@ -47,6 +47,7 @@ from src.adapters.pilote import (
     plain_text,
     popup_rows,
 )
+from src.adapters.base import ExtractedMotorhome
 from src.product_model.enums import BodyType
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -713,3 +714,97 @@ def test_the_make_is_taken_from_the_front_of_a_chassis_row() -> None:
     assert pilote._chassis_make("") is None
     assert pilote._chassis_make(None) is None
 
+
+
+# --- The one European campervan the UK importer sells -----------------------------------
+
+
+def _cv507sc() -> ExtractedMotorhome:
+    offer = pilote.UK_OFFERED_CAMPERVANS[0]
+    parsed = pilote.parse_european_campervan(_page("pilote_cv507sc_campervan.html"), offer)
+    assert parsed is not None
+    return parsed
+
+
+def test_the_european_campervan_yields_every_field() -> None:
+    """Pilote's European site carries ranges the UK one does not.
+
+    The UK importer agreed in November 2026 to offer the CV507SC and nothing else from
+    it, so the adapter reads that one page rather than transcribing an emailed sheet.
+    Every figure here was checked against the sheet and agrees.
+    """
+    motorhome = _cv507sc().motorhome
+
+    assert motorhome.model == "CV507SC"
+    assert motorhome.manufacturer_range == "Campervan"
+    assert motorhome.mh_length_mm == 5100
+    assert motorhome.mh_height_mm == 2000
+    assert motorhome.mtplm_kilograms == 3010
+    assert motorhome.mh_payload_kilograms == 760
+    assert motorhome.mro_kilograms == 3010 - 760 == 2250
+    assert motorhome.mh_passenger_seats_inc_driver == 4
+    assert motorhome.berths == 2
+
+
+def test_the_european_width_row_is_the_body_and_not_the_mirrors() -> None:
+    """`Overall width with wing mirrors open` reads 228 directly beneath the 195.
+
+    The European popup calls the body width `Vehicle width`, where the UK one says
+    `Vehicle interior width`, so the UK pattern matches nothing here — and a loose
+    pattern takes the mirrors row instead, which is the one thing the width rule exists
+    to prevent.
+    """
+    rows = popup_rows(_page("pilote_cv507sc_campervan.html"))
+
+    assert rows["Vehicle width (cm)"] == "195"
+    assert rows["Overall width with wing mirrors open (cm)"] == "228"
+    assert _cv507sc().motorhome.mh_width_mm == 1950
+
+
+def test_the_european_berth_row_gives_the_standard_count() -> None:
+    """The row reads `2 / 4*`: two as built, four with beds the same table prices."""
+    rows = popup_rows(_page("pilote_cv507sc_campervan.html"))
+
+    assert rows["Sleeping berths"] == "2 / 4*"
+    assert _cv507sc().motorhome.berths == 2
+
+
+def test_the_european_chassis_is_a_renault_and_loses_its_model_name() -> None:
+    """`Type of chassis` reads `Renault Trafic`; the column holds the make alone."""
+    rows = popup_rows(_page("pilote_cv507sc_campervan.html"))
+
+    assert rows["Type of chassis"] == "Renault Trafic"
+    assert _cv507sc().motorhome.base_vehicle_manufacturer == "Renault"
+
+
+def test_the_price_and_the_gearbox_come_from_the_importer_not_the_page() -> None:
+    """The European page carries no price and specifies a continental base vehicle.
+
+    Its own equipment list reads `2.0-litre 130 hp engine - manual transmission`, where
+    the UK offer includes a 150 hp automatic — so the page is not evidence either way on
+    the gearbox, and the figure comes from the importer with the reason recorded.
+    """
+    built = _cv507sc()
+
+    assert built.motorhome.rrp_pounds == 49_900
+    assert built.motorhome.automatic_available is True
+    assert "49,900" in built.provenance["rrp_pounds"].snippet
+    assert "150 hp" in built.provenance["automatic_available"].snippet
+
+
+def test_the_campervan_has_an_elevating_roof_and_is_not_a_high_top() -> None:
+    """2000mm is well under the 2300mm threshold, and the rising roof is standard."""
+    assert _cv507sc().motorhome.body_type is BodyType.CAMPERVAN_ELEVATING_ROOF
+
+
+def test_a_page_whose_popup_never_opened_yields_nothing_rather_than_half_a_product() -> None:
+    """Without the popup there are no masses, no chassis and no dimensions."""
+    offer = pilote.UK_OFFERED_CAMPERVANS[0]
+
+    assert pilote.parse_european_campervan("<html><body>nothing</body></html>", offer) is None
+
+
+def test_only_the_agreed_campervan_is_read_from_the_european_site() -> None:
+    """Pilote list six campervans there. The importer sells one, so the list is one."""
+    assert [offer.model for offer in pilote.UK_OFFERED_CAMPERVANS] == ["CV507SC"]
+    assert all(offer.url.startswith(pilote.EU_BASE_URL) for offer in pilote.UK_OFFERED_CAMPERVANS)

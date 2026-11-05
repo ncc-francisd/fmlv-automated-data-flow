@@ -1,4 +1,4 @@
-"""Pilote — 43 layouts across seven ranges, from a specification behind a button.
+"""Pilote — 43 UK layouts across seven ranges, plus one campervan from the European site.
 
 `docs/adapters/pilote.md` is the survey; this is what it decided.
 
@@ -8,7 +8,7 @@ popup that Pilote's own JavaScript fills from Airtable when a visitor presses *T
 information*. `BrowserFetcher`'s `click_selector` exists for this — see
 `docs/adapters/README.md`.
 
-Five things drive the whole module:
+Six things drive the whole module:
 
 * **The slug carries the FMLV range name, in two halves.** The site navigates by body
   type and never shows a range name; `/<body-type>/<layout>-<offer>/` gives both. See
@@ -26,6 +26,11 @@ Five things drive the whole module:
   accordion sections and ten are empty until opened, each fetching its own content. See
   `HABITATION_SECTIONS` — and note that the sections are clicked **before** the popup,
   because the popup is a modal that covers them.
+* **One vehicle comes from a different site.** Pilote run `pilote-motorhomes.com`
+  alongside the UK site, carrying ranges the UK one does not list, and the UK importer
+  sells exactly one of them — the CV507SC campervan. Same CMS, different row labels, no
+  price and a different base engine, so it has its own parser rather than a branch in
+  `parse_model_page`. See `UK_OFFERED_CAMPERVANS`.
 * **The width row is mislabelled, and it is the one to use.** Pilote's `Vehicle interior
   width` is the body width — it matches FMLV exactly on all four body types, and 2.05 m
   *is* a Ducato's body. The `Overall width with wing mirrors open` row beside it is 40 to
@@ -470,6 +475,97 @@ _HEIGHT_LABEL = re.compile(r"^Vehicle height \(cm\)$", re.I)
 #: van (2,05 m). One label, two meanings, and no way to tell them apart without the popup
 #: that is missing on precisely the pages that would need it.
 _INTERIOR_WIDTH_LABEL = re.compile(r"^Vehicle interior width \(cm\)$", re.I)
+
+
+# --- The European site, for the one campervan the UK importer sells ---------------------
+#
+# Pilote run a second site, `pilote-motorhomes.com`, carrying ranges the UK site does not
+# list. The UK importer agreed in November 2026 to offer **one** of its six campervans,
+# the CV507SC, and nothing else from that site — so this is a named list of one rather
+# than a second sweep. Miles Storey, Groupe Pilote, 5 November 2026.
+#
+# Reading their page beats transcribing the emailed sheet: the sheet is a snapshot of one
+# show vehicle and the site is maintained. Every figure on the two agrees — 510/195/200 cm,
+# 3010 kg MAM, 760 kg payload, 4 belted seats, 2 berths — which is the self-check that
+# made it safe to prefer the page.
+EU_BASE_URL = "https://pilote-motorhomes.com"
+
+#: The European popup names three rows differently from the UK one. Same CMS, same table,
+#: different wording, so the UK patterns above match nothing and every field would come
+#: back empty without these.
+#:
+#: `Vehicle width (cm)` is **anchored at both ends** for the same reason
+#: `_INTERIOR_WIDTH_LABEL` is: `Overall width with wing mirrors open (cm)` sits directly
+#: beneath it and reads 228 against the body's 195. Recording the mirrors figure is the
+#: one mistake the width rule exists to prevent.
+_EU_WIDTH_LABEL = re.compile(r"^Vehicle width \(cm\)$", re.I)
+_EU_CHASSIS_LABEL = re.compile(r"^Type of chassis$", re.I)
+_EU_PAYLOAD_LABEL = re.compile(r"^Payload in kg", re.I)
+
+#: The European van pages prefix their accordion groups `OD_VAN_`, and carry five sections
+#: rather than eleven. Only `ENERGAUTON` of the four habitation sections exists at all, so
+#: the CV507SC yields a heating finding and no fridge, washroom or bed ones — a gap in the
+#: source rather than a failed click, and `collect` says so rather than staying quiet.
+EU_CLICK_SELECTORS: tuple[str, ...] = (
+    'div.group_option[data-group$="_ENERGAUTON"]',
+    CLICK_SELECTOR,
+)
+
+
+@dataclass(frozen=True)
+class UkOfferedCampervan:
+    """One European campervan the UK importer has agreed to sell, and what only they know.
+
+    The page supplies every number. These are the facts the factory's site cannot carry,
+    because they are the importer's decisions — which is the settled division in
+    `docs/adapters/README.md`: the importer decides what exists and what it costs, the
+    factory decides every figure.
+    """
+
+    url: str
+    model: str
+    manufacturer_range: str
+    body_type: BodyType
+    rrp_pounds: int
+    #: Whether a UK buyer can have an automatic. Not readable from the European page: it
+    #: specifies the base vehicle for Europe, and the UK offer is a different engine.
+    automatic_available: bool
+    automatic_note: str
+    price_note: str
+    body_type_note: str
+
+
+#: Every European campervan the UK importer sells. One, as of 5 November 2026.
+UK_OFFERED_CAMPERVANS: tuple[UkOfferedCampervan, ...] = (
+    UkOfferedCampervan(
+        url=f"{EU_BASE_URL}/campervans/cv507sc-pilote-campervan/",
+        model="CV507SC",
+        manufacturer_range="Campervan",
+        # Height 2000mm, so not a high top — the threshold is 2300mm. The rising roof is
+        # in the included-equipment list on both the European page ("Large rising roof
+        # with sleeping room for two") and the UK sheet, not among the priced options, so
+        # it is part of the vehicle and the elevating-roof type is the right one.
+        body_type=BodyType.CAMPERVAN_ELEVATING_ROOF,
+        rrp_pounds=49_900,
+        automatic_available=True,
+        automatic_note=(
+            "the UK offer's included equipment reads '2.0-litre 150 hp engine - "
+            "automatic transmission'. The European page is not evidence either way here: "
+            "it specifies the continental base vehicle, a 130 hp manual"
+        ),
+        price_note=(
+            "GBP 49,900, the standard UK price. Groupe Pilote, 5 November 2026: 'This is "
+            "the offer we will run as standard in the UK following on from the NEC show "
+            "(so the NEC exclusives are included as standard)'. The GBP 53,640 on the "
+            "same sheet is that figure plus GBP 3,740 of packs, struck through on the "
+            "sheet itself and not a price anyone pays"
+        ),
+        body_type_note=(
+            "rising roof listed as included equipment, not as a priced option, on a "
+            "2000mm body — below the 2300mm high-top threshold"
+        ),
+    ),
+)
 
 
 def _clean(fragment: str) -> str:
@@ -970,6 +1066,159 @@ def _build_extracted_motorhome(
     return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
 
 
+def parse_european_campervan(
+    page: str, offer: UkOfferedCampervan
+) -> ExtractedMotorhome | None:
+    """The one European campervan the UK importer sells, as a `Motorhome`.
+
+    Kept apart from `parse_model_page` rather than folded into it. The two share a CMS
+    and nothing else that matters: the URL carries no length code, three popup rows are
+    named differently, the width row is the plain one rather than the "interior" one,
+    there is no belted-seats row at all, and the price and the gearbox come from the
+    importer instead of the page. Teaching one function both shapes would put a branch
+    on every line of it to serve a single vehicle.
+
+    `None` when the popup did not open, because then the page has no masses and no
+    chassis, and half a product is worse than none — the UK sheet would have to be
+    trusted blind for the rest.
+    """
+    rows = popup_rows(page)
+    tiles = headline_tiles(page)
+    if not rows:
+        return None
+
+    mtplm = _first_int(_matching(rows, _MAM_LABEL))
+    payload = _first_int(_matching(rows, _EU_PAYLOAD_LABEL))
+    length_cm = _first_int(_matching(rows, _LENGTH_LABEL))
+    width_cm = _first_int(_matching(rows, _EU_WIDTH_LABEL))
+    height_cm = _first_int(_matching(rows, _HEIGHT_LABEL))
+    # `2 / 4*` on this page: two as it stands, four with the beds the same table lists as
+    # optional. `_first_int` takes the leading figure, which is both the standard count
+    # and the lower one — the two rules agree here.
+    berths = _first_int(_matching(rows, _BERTHS_LABEL))
+    # No `Seats with safety belts` row in this popup at all. The headline tile carries it,
+    # and the importer's own sheet says `4 + 3 in option`, so four is the standard count
+    # the three-point-belt rule wants.
+    seats = _first_int(tiles.get("Seats with safety belt"))
+    chassis = _matching(rows, _EU_CHASSIS_LABEL)
+
+    motorhome = Motorhome(
+        manufacturer=MANUFACTURER,
+        manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
+        manufacturer_range=offer.manufacturer_range,
+        model=offer.model,
+        base_vehicle_manufacturer=fmlv_base_vehicle(_chassis_make(chassis)),
+        rrp_pounds=offer.rrp_pounds,
+        price_min_range_pounds=offer.rrp_pounds,
+        mtplm_kilograms=mtplm,
+        mh_payload_kilograms=payload,
+        mro_kilograms=(mtplm - payload) if mtplm and payload else None,
+        mh_length_mm=length_cm * 10 if length_cm else None,
+        mh_width_mm=width_cm * 10 if width_cm else None,
+        mh_height_mm=height_cm * 10 if height_cm else None,
+        mh_passenger_seats_inc_driver=seats,
+        berths=berths,
+        body_type=offer.body_type,
+        automatic_available=offer.automatic_available,
+    )
+
+    provenance: dict[str, Provenance] = {}
+
+    def record(field: str, snippet: str) -> None:
+        provenance[field] = Provenance(
+            source_url=offer.url, snippet=f"{offer.model} — {snippet}"
+        )
+
+    for field, value, label in (
+        ("mtplm_kilograms", mtplm, "Maximum authorised mass (MAM) (kg) - base models"),
+        ("mh_payload_kilograms", payload, "Payload in kg (basic configuration with driver)"),
+        ("mh_length_mm", length_cm, "Vehicle length (cm)"),
+        ("mh_height_mm", height_cm, "Vehicle height (cm)"),
+        ("berths", berths, "Sleeping berths"),
+    ):
+        if value is not None:
+            record(field, f"the popup table's {label!r} row: {value}")
+    if width_cm is not None:
+        record(
+            "mh_width_mm",
+            f"the popup table's 'Vehicle width (cm)' row: {width_cm}. The "
+            f"'Overall width with wing mirrors open (cm)' row beside it reads "
+            f"{_first_int(_matching(rows, re.compile(r'^Overall width', re.I)))} and is "
+            f"never the recorded width",
+        )
+    if seats is not None:
+        record(
+            "mh_passenger_seats_inc_driver",
+            f"the headline block's 'Seats with safety belt' tile: {seats}. This popup has "
+            f"no belted-seats row; the importer's sheet reads '4 + 3 in option', and the "
+            f"three extra belts are a paid option rather than standard seats",
+        )
+    if motorhome.mro_kilograms is not None:
+        record(
+            "mro_kilograms",
+            f"derived: {mtplm}kg maximum authorised mass - {payload}kg payload = "
+            f"{motorhome.mro_kilograms}kg (Pilote publish no running-order figure)",
+        )
+    if motorhome.base_vehicle_manufacturer is not None:
+        record(
+            "base_vehicle_manufacturer",
+            f"the popup table's 'Type of chassis' row: {chassis!r}",
+        )
+    record("rrp_pounds", offer.price_note)
+    record("automatic_available", offer.automatic_note)
+    record("body_type", offer.body_type_note)
+    record(
+        "manufacturer_range",
+        f"range {offer.manufacturer_range!r}. Pilote head this vehicle's own "
+        f"specification sheet 'SPECIFICATIONS - CAMPERVAN', and the UK importer offers "
+        f"this one layout from that range and no other",
+    )
+    return ExtractedMotorhome(motorhome=motorhome, provenance=provenance)
+
+
+def collect_uk_offered_campervans(
+    browser: BrowserFetcher,
+    on_progress: Callable[[str], None] = lambda message: None,
+) -> list[ExtractedMotorhome]:
+    """The European campervans the UK importer sells — see `UK_OFFERED_CAMPERVANS`."""
+    results: list[ExtractedMotorhome] = []
+    for offer in UK_OFFERED_CAMPERVANS:
+        on_progress(
+            f"[{offer.model}] reading Pilote's European site, which carries this "
+            f"campervan and the UK site does not: {offer.url}"
+        )
+        page_result = browser.fetch(
+            offer.url,
+            click_selector=EU_CLICK_SELECTORS,
+            click_timeout_ms=CLICK_TIMEOUT_MS,
+            settle_ms=SETTLE_MS,
+            on_progress=lambda message, url=offer.url: on_progress(f"{url}: {message}"),
+        )
+        if page_result.status_code != 200:
+            on_progress(
+                f"SKIPPED: {offer.url} returned {page_result.status_code}, so the "
+                f"{offer.model} is left to FMLV's own figures this run"
+            )
+            continue
+        page = page_result.file_path.read_text(encoding="utf-8", errors="replace")
+
+        extracted = parse_european_campervan(page, offer)
+        if extracted is None:
+            on_progress(
+                f"SKIPPED: [{offer.model}] the technical popup did not open, so the page "
+                f"carries no masses, no chassis and no dimensions. Check "
+                f"{CLICK_SELECTOR!r} still matches the button on {EU_BASE_URL}"
+            )
+            continue
+        on_progress(
+            f"[{offer.model}] this page has only the 'ENERGAUTON' habitation section, so "
+            f"heating is the one habitation finding it can answer — a gap in Pilote's "
+            f"European pages, not a failed click"
+        )
+        results.append(extracted)
+    return results
+
+
 # --- The run ---------------------------------------------------------------------------
 
 
@@ -1063,6 +1312,8 @@ def collect(
             )
 
         results.append(_build_extracted_motorhome(product, fittings_lines(page)))
+
+    results.extend(collect_uk_offered_campervans(browser, on_progress))
 
     on_progress(f"collected {len(results)} product(s)")
     return results

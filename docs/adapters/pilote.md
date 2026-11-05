@@ -571,3 +571,52 @@ that *sells* a drop-down is telling you it has no fixed one.
 why, FMLV's figure carries through untouched, and the question is one for the requester
 rather than for a parser.
 
+## The European site, and the one campervan on it
+
+**Added 5 November 2026.** Pilote run a second site, `pilote-motorhomes.com`, listing
+ranges the UK site does not — among them six campervans. Groupe Pilote told the NCC that
+the UK importer has agreed to offer **one** of them, the **CV507SC**, following the NEC
+show. So the adapter reads that single page and nothing else from that site.
+
+Reading the page rather than transcribing the emailed sheet was the point of the exercise.
+Every figure on the two agrees, which is what made it safe:
+
+| | sheet | page |
+|---|---|---|
+| length / width / height | 510 / 195 / 200 cm | 510 / 195 / 200 cm |
+| MAM | 3010 kg | 3010 kg |
+| payload | 760 kg | 760 kg |
+| belted seats | 4 (+3 optional) | 4 |
+| berths | 2 (+2 optional) | `2 / 4*` |
+
+Four things differ from the UK pages and each one would have produced an empty field:
+
+- **The popup row labels.** `Type of chassis` rather than `Chassis`, `Vehicle width (cm)`
+  rather than `Vehicle interior width (cm)`, `Payload in kg (basic configuration with
+  driver)` rather than `Load capacity in kg`. The width one matters most — `Overall width
+  with wing mirrors open (cm)` reads 228 directly beneath the 195.
+- **No belted-seats row at all.** It comes from the headline tile instead.
+- **The accordion prefix is `OD_VAN_`**, and only five sections exist against the UK's
+  eleven. Of the four habitation sections only `ENERGAUTON` is there, so heating is the
+  one habitation finding this vehicle can answer.
+- **Every control is covered by a sticky summary bar**, so an ordinary click times out
+  although the button is visible and working. `BrowserFetcher` now falls back to
+  dispatching the event, and narrates when it does.
+
+Two facts are the importer's and are not on the page:
+
+- **Price, GBP 49,900.** The European site publishes none. This is the standard UK price,
+  not a show offer — *"This is the offer we will run as standard in the UK following on
+  from the NEC show (so the NEC exclusives are included as standard)"*. The GBP 53,640
+  on the same sheet is that price plus GBP 3,740 of packs, struck through on the sheet.
+- **Automatic transmission.** The UK offer includes a 2.0-litre 150 hp automatic. The
+  European page specifies the continental base vehicle, a 130 hp **manual**, so it is not
+  evidence either way and the flag comes from the importer.
+
+**Body type is `campervan_elevating_roof`**: 2000 mm is well below the 2300 mm high-top
+threshold, and the rising roof is in the included-equipment list on both documents rather
+than among the priced options.
+
+If the importer takes on more of the six, add them to `UK_OFFERED_CAMPERVANS` — the
+parser is already general across that site.
+
