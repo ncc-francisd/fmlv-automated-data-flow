@@ -2309,6 +2309,16 @@ Two follow-on questions the later surveys added:
   often exactly the roster or comparison view an adapter wants, and nobody links to them
   because they are not part of the sales funnel.
 
+- **On WordPress, ask the site's own media library.** Where the sitemap holds pages,
+  `/wp-json/wp/v2/media?per_page=100&media_type=application` holds *files* — every
+  non-image upload, with its title and upload date, and it needs no authentication. RS
+  Motorhomes is the case that proves it: not one PDF is linked from any page on that site,
+  both the price list and the brochure sit behind an email form, and the endpoint returns
+  three current specification documents regardless. **Take the date from the listing and
+  never from the path**, which lies in both directions there — the 2027 documents are filed
+  under `/2026/02/` and a 2026 brochure under `/2024/01/`. Asking costs one fetch, and a
+  WordPress site announces itself in any page's `/wp-json/` or `wp-content` links.
+
 ### The maximum nose weight is collected, and never carried over
 
 **Added 9 November 2026, caravans only.** TowCheck — FMLV's sister site — tells an owner
