@@ -18,8 +18,8 @@ from src.adapters.mini_freestyle import (
     EXPECTED_LAYOUTS,
     FMLV_RANGE,
     HOME_PATH,
-    SILVER_HELD_BACK,
-    SILVER_MODELS,
+    RANGE_BY_MODEL,
+    SILVER_RANGE,
     WITHDRAWN,
     Specification,
     _reconciles,
@@ -313,9 +313,31 @@ def _built(catalogue: str, model: str):
     return build_extracted(spec, "https://www.mini-freestyle.com/files/2027/cat.pdf", basis)
 
 
-def test_every_model_files_under_one_range(catalogue: str) -> None:
+def test_the_minis_and_the_silvers_are_two_ranges_of_one_brand(catalogue: str) -> None:
+    """Settled 9 November 2026. Mini Freestyle's "Our caravans" page offers two range
+    tiles, each captioned MINI FREESTYLE above its name, and the 2027 catalogue heads its
+    second table "Les SILVER". The display name stays `Mini Freestyle` for both.
+
+    This reverses the reading of 7 October, when `Silver` looked like a navigation heading
+    that would collide with NCC id 187 (`Trigano` / `Silver`). It does not: that id holds
+    an older, separately branded Trend range, which nothing here touches.
+    """
     for model in ("270", "290", "320"):
         assert _built(catalogue, model).caravan.manufacturer_range == FMLV_RANGE
+    assert _built(catalogue, "380").caravan.manufacturer_range == SILVER_RANGE
+    assert RANGE_BY_MODEL["442"] == SILVER_RANGE
+    assert {
+        _built(catalogue, m).caravan.manufacturer_display_name
+        for m in ("270", "380")
+    } == {"Mini Freestyle"}
+
+
+def test_a_silver_is_not_labelled_a_mini_in_its_provenance(catalogue: str) -> None:
+    """The prefix was hardcoded to "Mini", which would name a vehicle they do not sell."""
+    built = _built(catalogue, "380")
+
+    assert built.provenance["mro_kilograms"].snippet.startswith("Silver 380")
+    assert "Range available while stocks last" in built.provenance["model"].snippet
 
 
 def test_a_pop_top_is_filed_as_rigid(catalogue: str) -> None:
@@ -368,16 +390,18 @@ def test_the_provenance_quotes_the_french_row_a_reader_will_find(catalogue: str)
 
 
 def test_the_roster_size_is_pinned() -> None:
-    """Three Minis. The SILVER pair is read and held back, so it is not counted here."""
-    assert EXPECTED_LAYOUTS == 3
+    """Three Minis and the Silver 380. The Silver 442 is read and held back, so it is not
+    counted here."""
+    assert EXPECTED_LAYOUTS == 4
 
 
-def test_the_silver_line_is_held_back_with_its_reason() -> None:
-    """Both of the open questions are the requester's, and a model sitting in the catalogue
-    and not in the output looks like a parsing failure unless the reason is said out loud."""
-    assert SILVER_MODELS == frozenset({"380", "442"})
-    assert "NCC id 187" in SILVER_HELD_BACK
-    assert "7238" in SILVER_HELD_BACK
+def test_the_442_is_held_back_and_says_the_ruling_may_be_stale() -> None:
+    """A model sitting in the catalogue and not in the output looks like a parsing failure
+    unless the reason is said out loud — and here the reason is a ruling that newer
+    evidence may overturn, which is the requester's call and not the adapter's."""
+    assert "MAY OVERTURN" in WITHDRAWN["442"]
+    assert "2027 catalogue" in WITHDRAWN["442"]
+    assert "Silver 442" in WITHDRAWN["442"]
 
 
 def test_the_withdrawn_model_is_still_in_the_catalogue(catalogue: str) -> None:
@@ -388,4 +412,4 @@ def test_the_withdrawn_model_is_still_in_the_catalogue(catalogue: str) -> None:
 
 
 def test_the_reason_for_withdrawing_it_is_recorded() -> None:
-    assert "9 October 2026" in WITHDRAWN["442"]
+    assert "9 october 2026" in WITHDRAWN["442"].lower()

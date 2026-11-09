@@ -358,3 +358,42 @@ its only masses are `mtplm_kilograms`, `mro_kilograms` and the two payloads.
 The live run on 9 November 2026 collected the three Minis with every figure matching the
 printed table, held the Silver pair back with both reasons narrated, and reported that no
 price and no nose weight are published.
+
+## Silver is a range, not a brand — settled 9 November 2026
+
+The requester asked why a run had not picked the Silver line up. It had not missed it: the
+adapter parsed both Silver models and held them back, pending the two questions above. His
+screenshot answered the larger one.
+
+**Mini Freestyle's "Our caravans" page offers two range tiles, each captioned MINI
+FREESTYLE above its name — `Mini` and `Silver`.** So Silver is this brand's second range
+and nothing to do with **NCC id 187** (`Trigano` / `Silver`), whose archived `Trend` 350,
+380 and 442 are an older, separately branded range. The 7 October reading — that borrowing
+the word would collide with id 187 — was wrong, and the collision it feared does not exist.
+
+The caption is rendered artwork, so it is not in the extracted page text; the page source
+carries the two range names and the model names `Silver 380` and `Silver 442`, and the 2027
+catalogue heads its second specification table *"Les SILVER…"* inside a Mini Freestyle
+document. Three sources, one answer.
+
+So `RANGE_BY_MODEL` now files 270/290/320 under `Mini` and 380/442 under `Silver`, the
+display name stays `Mini Freestyle` for all of them, and **`EXPECTED_LAYOUTS` is 4** — the
+three Minis plus the Silver 380.
+
+**A note that reaches review on every Silver product:** both their English pages read
+*"Range available while stocks last"*. A line being sold out is not a line being sold, and
+that is worth a reviewer's eye before the range is listed.
+
+### The 442 is still held back, and the ruling behind it may be stale
+
+The requester ruled on 9 October 2026, on Mini Freestyle's own word, that the 442 had left
+the range and was not to be uploaded as a 2027 model. On the evidence then — their email
+against a 2026 catalogue that still listed it — that was right.
+
+Since then they have published a **2027 catalogue specifying the 442 in full** and their
+site lists it as `Silver 442` in the current navigation. That is newer and more specific
+than the email. It is **his ruling to revisit, not this adapter's**, so `WITHDRAWN` keeps
+the model out and now says in terms that new evidence may overturn it. The figures are
+parsed and narrated every run, so nothing is lost by waiting, and deleting one dict entry
+collects it.
+

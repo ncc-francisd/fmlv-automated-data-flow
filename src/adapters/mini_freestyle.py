@@ -75,8 +75,8 @@ __all__ = [
     "WITHDRAWN",
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
-    "SILVER_HELD_BACK",
-    "SILVER_MODELS",
+    "RANGE_BY_MODEL",
+    "SILVER_RANGE",
     "VEHICLE_CLASS",
     "Specification",
     "catalogue_url",
@@ -89,54 +89,78 @@ MANUFACTURER = "Trigano"
 MANUFACTURER_DISPLAY_NAME = "Mini Freestyle"
 VEHICLE_CLASS = VehicleClass.CARAVAN
 
-#: FMLV files all four under one range. The site groups them as `Minis` and `Silver`, but
-#: those are navigation headings — and `Silver` is a *different manufacturer* in the NCC
-#: list (id 187), so borrowing the word would be worse than unhelpful.
-FMLV_RANGE = "Mini"
-
 #: The page that links the catalogue. **French, deliberately** — see the module docstring.
 HOME_PATH = "/fr/"
 
-#: The second table's models. Read like any other and then held back, so that the figures
-#: are in the snapshot and the narration when the questions below are answered.
-SILVER_MODELS: frozenset[str] = frozenset({"380", "442"})
+#: The Minis: 270, 290, 320.
+FMLV_RANGE = "Mini"
 
-#: Why the Silver line is not collected. Narrated on every run, because a model sitting in
-#: the catalogue and not in the output looks like a parsing failure unless the reason is
-#: said out loud.
-SILVER_HELD_BACK = (
-    "the 2027 catalogue's second table, the SILVER line, is read but not collected. Two "
-    "questions are open and both are the requester's: (1) Mini Freestyle said on 9 October "
-    "2026 that the 442 had left the range, and it is back in this catalogue with its "
-    "English page reading 'Range available while stocks last'; (2) `Silver` is NCC id 187, "
-    "a separate display name under this same manufacturer, holding the archived Trend 350, "
-    "380 and 442 — the Silver 380's MTPLM of 1000 matches archived product 7238 exactly, "
-    "so these may be those rows returning rather than new products, which is a "
-    "cross-manufacturer call this adapter cannot make"
-)
-
-#: A model the maker says is **out of the range, while still publishing it**. Mapped to
-#: the reason, which is narrated on every run — because the evidence for dropping it is a
-#: sentence in an email and the evidence against it is right there in the catalogue, so
-#: the next person to look will see a model being thrown away for no visible cause.
+#: The Silver line, which **is a range of Mini Freestyle and not a separate brand** —
+#: settled 9 November 2026 on the requester's screenshot of `/en/exclusives.html` and
+#: confirmed in the page source.
 #:
-#: `docs/adapters/README.md`: the manufacturer's own word outranks their website.
+#: This reverses the reading of 7 October, when `Silver` looked like a navigation heading
+#: that would collide with NCC id 187 (`Trigano` / `Silver`, holding the archived Trend
+#: 350, 380 and 442). It is not a collision. The site's "Our caravans" page offers two
+#: range tiles, each captioned **MINI FREESTYLE** above its name — `Mini` and `Silver` —
+#: and the 2027 catalogue heads its second table *"Les SILVER…"* inside a Mini Freestyle
+#: document. The display name stays `Mini Freestyle`; this is its second range.
+#:
+#: The archived id 187 rows are an older, separately-branded thing and are not touched.
+SILVER_RANGE = "Silver"
+
+#: Which range each model belongs to. The 290 moved from the Silver line into the Minis
+#: for 2027, keeping its dimensions, so this cannot be derived from the model number.
+RANGE_BY_MODEL: dict[str, str] = {
+    "270": FMLV_RANGE,
+    "290": FMLV_RANGE,
+    "320": FMLV_RANGE,
+    "380": SILVER_RANGE,
+    "442": SILVER_RANGE,
+}
+
+#: A model held back from collection, mapped to the reason, which is narrated on every run
+#: — because a model sitting in the catalogue and not in the output looks like a parsing
+#: failure unless the reason is said out loud.
 WITHDRAWN: dict[str, str] = {
     "442": (
-        "Mini Freestyle told the requester on 9 October 2026 that the 442 is no longer in "
-        "the range. It is still on their website and still in the catalogue this adapter "
-        "reads, so the contradiction is theirs — but what they say about their own range "
-        "settles it, and it is not to be uploaded as a 2027 model"
+        "HELD BACK ON THE REQUESTER'S RULING OF 9 OCTOBER 2026, WHICH NEW EVIDENCE MAY "
+        "OVERTURN. Mini Freestyle told him the 442 was no longer in the range, and on the "
+        "evidence then — their word against a 2026 catalogue that still listed it "
+        "— that settled it. Since then they have published a 2027 catalogue that "
+        "specifies the 442 in full, and their site lists it as 'Silver 442' in the current "
+        "navigation. That is newer and more specific than the email, and it is the "
+        "requester's ruling to revisit, not this adapter's. The figures are parsed and "
+        "narrated every run, so nothing is lost by waiting. Delete this entry to collect it"
     ),
 }
 
-#: The Minis: 270, 290, 320. The 300 of the 2026 edition is gone and the 320 stands in its
-#: column, on the same product page and over the same floorplan but 170mm longer — so the
-#: diff is left to match it to FMLV's 300 on its own evidence rather than being told to.
-EXPECTED_LAYOUTS = 3
+#: Said on every Silver product, because the range name is a judgement a reviewer should
+#: see the basis for rather than take on trust.
+_SILVER_RANGE_NOTE = (
+    "range 'Silver'. Mini Freestyle sell two ranges under this one brand: their 'Our "
+    "caravans' page offers a 'Mini' tile and a 'Silver' tile, each captioned MINI "
+    "FREESTYLE, and the 2027 catalogue heads its second specification table 'Les SILVER'. "
+    "This is NOT NCC id 187 ('Trigano' / 'Silver'), whose archived Trend 350, 380 and 442 "
+    "are an older and separately branded range, and nothing here touches them"
+)
+
+#: Both Silver models' pages carry this, and it is worth a reviewer's eye before the range
+#: is listed: a line being sold out is not a line being sold.
+_SILVER_RUN_OUT_NOTE = (
+    "Mini Freestyle's English pages for both Silver models read 'Range available while "
+    "stocks last', so the whole Silver line may be a run-out rather than a 2027 range"
+)
+
+#: Four collected: the three Minis and the Silver 380. The Silver 442 is parsed and then
+#: held back by `WITHDRAWN`, so it is not counted here.
+EXPECTED_LAYOUTS = 4
 
 #: One range, so `--range` still works the way every other adapter allows.
-DEFAULT_RANGES: tuple[tuple[str, str], ...] = (("mini", FMLV_RANGE),)
+DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
+    ("mini", FMLV_RANGE),
+    ("silver", SILVER_RANGE),
+)
 
 
 def catalogue_url(home_html: str) -> str | None:
@@ -331,7 +355,7 @@ def build_extracted(spec: Specification, source_url: str, basis: str) -> Extract
     caravan = Caravan(
         manufacturer=MANUFACTURER,
         manufacturer_display_name=MANUFACTURER_DISPLAY_NAME,
-        manufacturer_range=FMLV_RANGE,
+        manufacturer_range=RANGE_BY_MODEL[spec.model],
         model=spec.model,
         berths=spec.berths,
         # Published nowhere — not in the catalogue, not on the site.
@@ -355,13 +379,20 @@ def build_extracted(spec: Specification, source_url: str, basis: str) -> Extract
 
     def record(field: str, snippet: str) -> None:
         provenance[field] = Provenance(
-            source_url=source_url, snippet=f"Mini {spec.model} — {snippet}"
+            source_url=source_url,
+            # The range, not a hardcoded "Mini": a Silver 380 labelled "Mini 380" names a
+            # vehicle Mini Freestyle do not sell.
+            snippet=f"{RANGE_BY_MODEL[spec.model]} {spec.model} — {snippet}",
         )
 
-    record(
-        "manufacturer_range",
-        f'range "{FMLV_RANGE}", which is how FMLV files the Minis',
-    )
+    if caravan.manufacturer_range == SILVER_RANGE:
+        record("manufacturer_range", _SILVER_RANGE_NOTE)
+        record("model", f"{spec.model} \u2014 {_SILVER_RUN_OUT_NOTE}")
+    else:
+        record(
+            "manufacturer_range",
+            f'range "{FMLV_RANGE}", which is how FMLV files the Minis',
+        )
     # The catalogue is French, so each snippet quotes the row a reader will actually find
     # in it. Translating the label into English would send the next person looking for a
     # row that is not there.
@@ -471,15 +502,6 @@ def collect(
                     announced.add(spec.model)
                     on_progress(f"{spec.model} — NOT COLLECTED: {WITHDRAWN[spec.model]}")
                 continue
-            if spec.model in SILVER_MODELS:
-                if spec.model not in announced:
-                    announced.add(spec.model)
-                    on_progress(
-                        f"{spec.model} — NOT COLLECTED: {SILVER_HELD_BACK}. Read as "
-                        f"{spec.shipping_length_mm}mm over the hitch, "
-                        f"{spec.mtplm_kilograms}kg maximum, {spec.berths} berth"
-                    )
-                continue
             reconciles, basis = _reconciles(spec)
             if not reconciles:
                 on_progress(f"{spec.model} — DROPPED: {basis}")
@@ -500,6 +522,10 @@ def collect(
         "NO MAXIMUM NOSE WEIGHT IS PUBLISHED, in this catalogue or anywhere on the site, so "
         "the column is left blank rather than carried over."
     )
+    on_progress(
+        f"THE SILVER LINE IS A RANGE OF MINI FREESTYLE, not NCC id 187. {_SILVER_RANGE_NOTE}"
+    )
+    on_progress(f"NOTE ON THE SILVER LINE: {_SILVER_RUN_OUT_NOTE}.")
     on_progress(
         "THE SELF-CHECK IS WEAK AND THAT IS WORTH KNOWING. The catalogue publishes no "
         "payload, so there is no arithmetic to test a parse against — only that the empty "
