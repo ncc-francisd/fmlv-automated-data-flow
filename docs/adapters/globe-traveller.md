@@ -606,3 +606,67 @@ Three, down from five, and the first is the only one blocking an upload:
 
 And two confirmations worth having: that the travel-seat belts are three-point, and that
 Bike Version is an option rather than a model.
+
+# Re-checked, 9 November 2026 — the gap is one number, not a half of the range
+
+Francis found the downloadable euro catalogue and asked whether it changes anything. It
+does not, and the check turned up something better than the answer he expected.
+
+## Neither document has been reissued
+
+Both flipbooks carry the same book ids recorded on 30 October — catalogue `75073062`
+("EN Globe-Traveller Catalogue 2026/2027", 32pp), price list `18168864` ("UK Voyager |
+Pathfinder | Explorer Pricelist 2026/2027", 8pp). Checked on content and not on structure,
+per the lesson above. The catalogue, re-downloaded (4,682,225 bytes), still prints
+`Weight in running order ±5%` on the three Falcons and on none of the nine Fiat models.
+
+**The euro prices are the stale download, again.** 350,489 bytes, *"Prices in euros. Valid
+from 27 August 2026"*, *"UE ex. VAT"*, *"All prices are in Euro net ex works"* — the
+`originalFiles` edition sitting behind the flipbook whose displayed pages are the sterling
+list. It prints a mass in running order per **series** (3 060 / 3 160 / 3 170 kg), each
+footnoted *"the heaviest model variant in the series"*, and it has **no Falcon in it at
+all** — zero occurrences, so it closes neither hole.
+
+## Every one of the twelve has an MTPLM
+
+This is the correction worth having. "The two documents cover opposite halves of the range"
+describes the **price against the mass in running order**; it was never true of the MTPLM,
+which comes off each model's own page via `Permissible Max. Mass (PMM)`. Run #216:
+
+| range | models | MTPLM | MRO | payload | price |
+|---|---|---|---|---|---|
+| Explorer | X, XS, Z, Z EVO | 3500 | — | — | ✓ |
+| Pathfinder | X, Z | 3500 | — | — | ✓ |
+| Voyager | X, XS, Z | 3500 | — | — | ✓ |
+| Falcon | XS, YS | 3500 | 2980, 3000 | 520, 500 | — |
+| Falcon | Z | 3820 | 3300 | 520 | — |
+
+So the nine Fiat models are short of exactly **one published figure**, and because payload
+is derived as `MTPLM − MRO` that one answer fills two columns. The three Falcons are short
+of a price and nothing else.
+
+The Falcon payloads landing at 500–520 kg across all three is mild corroboration that both
+masses are being read correctly — a 3500 plate on the Z would have left 200 kg, which no
+manufacturer would print.
+
+## A blank MRO does not block the upload
+
+Worth stating because it changes what "blocking" means above. `mro_kilograms`,
+`mh_payload_kilograms` and `rrp_pounds` are all in `schema.REQUIRED`, but:
+
+* **61 live FMLV products** held a blank `mro_kilograms` and `mh_payload_kilograms` before
+  this pipeline proposed one, and 56 held a blank `rrp_pounds` — across Chausson, Coachman,
+  Etrusco, Sun Living, Sunlight, Malibu, Wingamm and Bailey. FMLV stores the blank.
+* `product_model/validation.py` reports `Issue` objects rather than raising, and
+  `output/build.py` writes every row and then dumps the issues to a file beside the upload.
+  `missing_required` has never dropped a row.
+
+Unproven: whether Nova accepts a blank in that column when **creating** a product, as
+against holding one on a row that already exists. One upload answers it.
+
+## What to ask for
+
+**A mass in running order per model, and say "per model" in the letter.** They plainly
+compute it — they publish it per model for the Falcons and per series for everything else —
+so the request is reasonable and the per-series answer is the one to pre-empt. Ask for the
+three Falcons' sterling prices in the same breath, since a GB price list would carry both.
