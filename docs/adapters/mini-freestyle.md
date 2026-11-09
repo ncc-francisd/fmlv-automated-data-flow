@@ -377,23 +377,37 @@ catalogue heads its second specification table *"Les SILVER…"* inside a Mini F
 document. Three sources, one answer.
 
 So `RANGE_BY_MODEL` now files 270/290/320 under `Mini` and 380/442 under `Silver`, the
-display name stays `Mini Freestyle` for all of them, and **`EXPECTED_LAYOUTS` is 4** — the
-three Minis plus the Silver 380.
+display name stays `Mini Freestyle` for all of them, and **`EXPECTED_LAYOUTS` is 5**.
+
+| range | model | over the hitch | body | internal | MTPLM | MiRO | berths |
+|---|---|---|---|---|---|---|---|
+| Mini | 270 | 3950 | 2990 | 2500 | 750 | 594 | 2 |
+| Mini | 290 | 4420 | 3470 | 2970 | 750 | 679 | 2 |
+| Mini | 320 | 4590 | 3640 | 3200 | 750 | 692 | 2 |
+| Silver | 380 | 5310 | 4280 | 3800 | 1000 | 897 | 3 |
+| Silver | 442 | 5910 | 4880 | 4400 | 1050 | 961 | 3 |
 
 **A note that reaches review on every Silver product:** both their English pages read
 *"Range available while stocks last"*. A line being sold out is not a line being sold, and
 that is worth a reviewer's eye before the range is listed.
 
-### The 442 is still held back, and the ruling behind it may be stale
+### The 442 is collected — the October ruling was overtaken, 9 November 2026
 
 The requester ruled on 9 October 2026, on Mini Freestyle's own word, that the 442 had left
 the range and was not to be uploaded as a 2027 model. On the evidence then — their email
 against a 2026 catalogue that still listed it — that was right.
 
-Since then they have published a **2027 catalogue specifying the 442 in full** and their
-site lists it as `Silver 442` in the current navigation. That is newer and more specific
-than the email. It is **his ruling to revisit, not this adapter's**, so `WITHDRAWN` keeps
-the model out and now says in terms that new evidence may overturn it. The figures are
-parsed and narrated every run, so nothing is lost by waiting, and deleting one dict entry
-collects it.
+They then published a **2027 catalogue specifying the 442 in full** and listed it on the
+site as `Silver 442`. The requester, 9 November 2026: *"We should go with the most recent
+information, and if the website's changed, then we should go with that. So a change if we
+stated otherwise earlier in October."*
+
+So **`WITHDRAWN` is empty** and all five models are collected. The email was not wrong; it
+was overtaken. The general form of this is in `docs/adapters/README.md` under "What a
+manufacturer says about their own range outranks their website — until they publish again".
+
+`WITHDRAWN` stays in the module as the mechanism, with the 442's history in its docstring.
+Releasing the model was deleting one dict entry, which is the shape to keep: a held-back
+model goes on being parsed, reconciled and narrated every run, so the figures are already
+there when the ruling changes.
 

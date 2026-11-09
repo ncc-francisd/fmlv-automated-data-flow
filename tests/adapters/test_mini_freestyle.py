@@ -390,26 +390,43 @@ def test_the_provenance_quotes_the_french_row_a_reader_will_find(catalogue: str)
 
 
 def test_the_roster_size_is_pinned() -> None:
-    """Three Minis and the Silver 380. The Silver 442 is read and held back, so it is not
-    counted here."""
-    assert EXPECTED_LAYOUTS == 4
+    """The whole roster: three Minis and two Silvers."""
+    assert EXPECTED_LAYOUTS == 5
 
 
-def test_the_442_is_held_back_and_says_the_ruling_may_be_stale() -> None:
-    """A model sitting in the catalogue and not in the output looks like a parsing failure
-    unless the reason is said out loud — and here the reason is a ruling that newer
-    evidence may overturn, which is the requester's call and not the adapter's."""
-    assert "MAY OVERTURN" in WITHDRAWN["442"]
-    assert "2027 catalogue" in WITHDRAWN["442"]
-    assert "Silver 442" in WITHDRAWN["442"]
+def test_nothing_is_withdrawn_and_the_442_is_collected(catalogue: str) -> None:
+    """The requester, 9 November 2026: *"We should go with the most recent information, and
+    if the website's changed, then we should go with that."*
+
+    The 442 sat in `WITHDRAWN` from 9 October, when Mini Freestyle told him it had left the
+    range. They then published a 2027 catalogue specifying it in full and listed it on the
+    site as `Silver 442`. A maker's word beats their stale page; a maker publishing again
+    beats their earlier word. See `docs/adapters/README.md`.
+    """
+    assert WITHDRAWN == {}
+
+    built = _built(catalogue, "442")
+
+    assert built.caravan.manufacturer_range == SILVER_RANGE
+    assert built.caravan.mtplm_kilograms == 1050
+    assert built.caravan.mro_kilograms == 961
+    assert built.caravan.berths == 3
 
 
-def test_the_withdrawn_model_is_still_in_the_catalogue(catalogue: str) -> None:
-    """The contradiction is the maker's, and the adapter has to show it rather than hide
-    it: they said the 442 had left the range and then published it again."""
-    assert "442" in WITHDRAWN
-    assert "442" in _by_model(parse_specifications(catalogue))
+def test_the_withdrawal_mechanism_still_works_for_the_next_one(catalogue: str) -> None:
+    """`WITHDRAWN` is empty, not gone. Holding a model back has to stay one dict entry, and
+    a held-back model has to keep being parsed — that is what made releasing the 442 a
+    one-line change rather than a rebuilt parse."""
+    import src.adapters.mini_freestyle as module
 
-
-def test_the_reason_for_withdrawing_it_is_recorded() -> None:
-    assert "9 october 2026" in WITHDRAWN["442"].lower()
+    original = module.WITHDRAWN
+    module.WITHDRAWN = {"320": "held back for a test"}
+    try:
+        messages: list[str] = []
+        specs = {s.model: s for s in parse_specifications(catalogue)}
+        assert "320" in specs, "a held-back model is still parsed"
+        built = build_extracted(specs["320"], "https://example/cat.pdf", "basis")
+        assert built.caravan.model == "320"
+        assert not messages
+    finally:
+        module.WITHDRAWN = original

@@ -30,22 +30,47 @@ Whenever a single number cannot express the whole truth, carry the manufacturer'
 published wording into the `Provenance` snippet** — a reviewer needs to see `4-6` even
 though `berths` records `4`. Sunlight and Rimor already do this.
 
-### What a manufacturer says about their own range outranks their website
+### What a manufacturer says about their own range outranks their website — until they publish again
 
-**Mini Freestyle, 9 October 2026.** They told the requester the **442 is no longer in the
-range** — while it sits on their website and in the catalogue the adapter reads. The
-contradiction is theirs, and their word settles it: the 442 is not collected and not
-uploaded as a 2027 model.
+**Two rules, and the second one bites the first.**
 
-A site is evidence of what a maker publishes, not of what they sell. Catalogues outlive
-the models in them, a page costs nothing to leave up, and the person who told you is the
-person who decides.
+**A maker's word about their own range beats their site.** A site is evidence of what a
+maker publishes, not of what they sell. Catalogues outlive the models in them, a page costs
+nothing to leave up, and the person who told you is the person who decides.
 
-**Write it into the adapter, with the reason and the date, and narrate it every run.** The
-evidence for dropping a model is a sentence in an email; the evidence against it is right
-there in the source. Left as a silent exclusion, the next person sees a model being thrown
-away for no visible cause and puts it back — see `mini_freestyle.WITHDRAWN`, and
-`malibu`'s Van Charming note for the same shape of problem.
+**But a later published document outranks an earlier private word.** The requester,
+9 November 2026: *"We should go with the most recent information, and if the website's
+changed, then we should go with that."*
+
+**Mini Freestyle's 442 is the worked example of both.** On 9 October 2026 they told the
+requester the 442 had left the range, while it sat in their website and their catalogue.
+Their word settled it and the model was held back, with the reason and the date written
+into `WITHDRAWN` and narrated on every run. A month later they published a **2027 catalogue
+specifying the 442 in full** and listed it on the site as `Silver 442`. That is not the
+stale page the first rule is about — it is the maker publishing again, more recently and
+more specifically than the email. So the 442 is collected, and `WITHDRAWN` is empty.
+
+So when an exclusion rests on something a maker *said*, **date it, and re-read it whenever
+they publish**. The email was not wrong; it was overtaken. An exclusion with a date on it
+can be reviewed; one without becomes permanent by accident.
+
+Two consequences for how an exclusion is written:
+
+* **Write it into the adapter, with the reason and the date, and narrate it every run.**
+  The evidence for dropping a model is a sentence in an email; the evidence against it is
+  right there in the source. Left as a silent exclusion, the next person sees a model being
+  thrown away for no visible cause and puts it back — see `malibu`'s Van Charming note for
+  the same shape of problem.
+* **Keep parsing it while it is held back.** Mini Freestyle's 442 was read, reconciled and
+  logged with its figures on every run it was excluded from, so releasing it was deleting
+  one dict entry rather than rebuilding a parse. An exclusion should cost one line to undo.
+
+**This is not the same as recency beating arithmetic.** Where two *published figures* for
+the same spec disagree, the standing rule is to take the set that **adds up** — the masses
+that reconcile — rather than whichever document is newer. That still holds. This rule is
+about something else: whether a model is in the range at all, which is not a figure to
+check against anything and is a fact only the maker holds, so their most recent statement
+of it is the best evidence there is.
 
 The reverse case needs the same care and is more dangerous: a model **absent** from the
 site that the maker still sells. That is `rolling_homes`' empty pages, where collecting

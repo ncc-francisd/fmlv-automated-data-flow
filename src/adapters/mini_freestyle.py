@@ -122,18 +122,14 @@ RANGE_BY_MODEL: dict[str, str] = {
 #: A model held back from collection, mapped to the reason, which is narrated on every run
 #: — because a model sitting in the catalogue and not in the output looks like a parsing
 #: failure unless the reason is said out loud.
-WITHDRAWN: dict[str, str] = {
-    "442": (
-        "HELD BACK ON THE REQUESTER'S RULING OF 9 OCTOBER 2026, WHICH NEW EVIDENCE MAY "
-        "OVERTURN. Mini Freestyle told him the 442 was no longer in the range, and on the "
-        "evidence then — their word against a 2026 catalogue that still listed it "
-        "— that settled it. Since then they have published a 2027 catalogue that "
-        "specifies the 442 in full, and their site lists it as 'Silver 442' in the current "
-        "navigation. That is newer and more specific than the email, and it is the "
-        "requester's ruling to revisit, not this adapter's. The figures are parsed and "
-        "narrated every run, so nothing is lost by waiting. Delete this entry to collect it"
-    ),
-}
+#:
+#: **Empty, and the emptying is the point.** The 442 sat here from 9 October 2026, when
+#: Mini Freestyle told the requester it had left the range. They then published a 2027
+#: catalogue specifying it in full and listed it on their site as `Silver 442`. The
+#: requester ruled on 9 November 2026: *"We should go with the most recent information, and
+#: if the website's changed, then we should go with that."* See
+#: `docs/adapters/README.md`, "A later published document outranks an earlier private word".
+WITHDRAWN: dict[str, str] = {}
 
 #: Said on every Silver product, because the range name is a judgement a reviewer should
 #: see the basis for rather than take on trust.
@@ -152,9 +148,8 @@ _SILVER_RUN_OUT_NOTE = (
     "stocks last', so the whole Silver line may be a run-out rather than a 2027 range"
 )
 
-#: Four collected: the three Minis and the Silver 380. The Silver 442 is parsed and then
-#: held back by `WITHDRAWN`, so it is not counted here.
-EXPECTED_LAYOUTS = 4
+#: The whole roster: three Minis and two Silvers.
+EXPECTED_LAYOUTS = 5
 
 #: One range, so `--range` still works the way every other adapter allows.
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
