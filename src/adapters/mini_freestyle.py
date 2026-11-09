@@ -10,24 +10,41 @@ Trigano/Atom, the last of which is already an adapter here. They coexist because
 `(manufacturer, display name, vehicle class)`, but a registry row saying `Mini Freestyle`
 would find an empty baseline and propose every product as new.
 
+**The home page read is the FRENCH one, and that is not an accident.** On 9 November 2026
+the English home page stopped linking any catalogue: the 2026 English edition is still
+served at its old address but is unlinked and superseded, and the 2027 edition is linked
+from `/fr/` alone. French is also the edition the document itself makes authoritative —
+*"en cas de version multilingue, c'est la langue française qui fait foi"* — so this reads
+French labels by choice rather than as a stopgap, and an English edition appearing later
+is no reason to switch.
+
 **These are rigid caravans, not pop-ups**, settled by the requester on 7 October 2026. The
 site calls them *pop top caravans* and describes a *pop-up roof*, and FMLV held
 `type_pop_up` on all four rows — but FMLV's `Pop Up` means a folding camper, where a pop
 *top* is a rigid caravan whose roof raises. Micro was considered and fails the naming half
 of the two-part test: the word appears nowhere on the site.
 
-**The catalogue's columns carry no heading.** Each spec table lays two models side by side
-under photographs, and nothing in the text says which is which — so they are identified by
-their overall length, which is unique across the range. FMLV's own figures confirm every
-pairing to the millimetre.
+**Each table names its own columns, which the 2026 edition did not.** A line of model
+numbers sits immediately above `NOMBRE DE PLACES`, so a model is identified by its heading
+rather than by matching its overall length against a table of known lengths. That removed
+the single most fragile thing in this adapter — but the discriminator is *position*, not
+shape: `380 442` and `270 320290` both appear earlier on the page as artwork captions, and
+only the line directly above `NOMBRE DE PLACES` is a real heading.
 
-**Four parsing traps, all real:**
+**The Silver line is read and then held back**, pending two questions the requester owns —
+see `SILVER_HELD_BACK`.
 
-* **`LInternal length`** — a stray `L` prefixes that row, and only that row.
-* **`695/807`** — one model states two masses in running order where the others state one.
-  The lower is taken, which is the base-vehicle rule.
-* **`925*`** — the Silver page marks its masses *"values subject to confirmation"*.
+**Three parsing traps, all real:**
+
+* **`Poids à vide` is a prefix of `Poids à vide en ordre de marche`**, and `PTAC` of
+  `Modification Administrative PTAC`. Both are safe only because a row matches a label
+  followed by *numbers*: `en ordre de marche` is not a number, so the short label cannot
+  swallow the long row. Do not relax the cell pattern to accept any non-space.
 * **Decimal commas** throughout, French-fashion: `3,95` is 3.95 m.
+* **`695/807`** — a model may state two masses where the others state one. The lower is
+  taken, which is the base-vehicle rule. `Modification Administrative PTAC` carries the
+  same shape and is deliberately not read: the settled rule takes the standard mass, never
+  the chassis upgrade.
 
 **No price is ever proposed.** There is none in the catalogue and none on the site; FMLV's
 three prices came from somewhere else and this adapter cannot maintain them.
@@ -54,10 +71,12 @@ __all__ = [
     "DEFAULT_RANGES",
     "EXPECTED_LAYOUTS",
     "FMLV_RANGE",
+    "HOME_PATH",
     "WITHDRAWN",
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
-    "MODELS_BY_LENGTH",
+    "SILVER_HELD_BACK",
+    "SILVER_MODELS",
     "VEHICLE_CLASS",
     "Specification",
     "catalogue_url",
@@ -75,18 +94,26 @@ VEHICLE_CLASS = VehicleClass.CARAVAN
 #: list (id 187), so borrowing the word would be worse than unhelpful.
 FMLV_RANGE = "Mini"
 
-#: The catalogue's columns are unlabelled, so a model is identified by its overall length
-#: in metres, which is unique across the range. Confirmed against FMLV's own figures:
-#: shipping, body, internal, width, berths and MTPLM all match on the three live products.
-MODELS_BY_LENGTH: dict[str, str] = {
-    "3,95": "270",
-    "4,42": "300",   # on the Minis page
-    "5,91": "442",
-}
+#: The page that links the catalogue. **French, deliberately** — see the module docstring.
+HOME_PATH = "/fr/"
 
-#: `4,42` appears on both pages — the 300 among the Minis and the 290 on the Silver page —
-#: so the page decides, and only for that length.
-SILVER_PAGE_LENGTHS: dict[str, str] = {"4,42": "290"}
+#: The second table's models. Read like any other and then held back, so that the figures
+#: are in the snapshot and the narration when the questions below are answered.
+SILVER_MODELS: frozenset[str] = frozenset({"380", "442"})
+
+#: Why the Silver line is not collected. Narrated on every run, because a model sitting in
+#: the catalogue and not in the output looks like a parsing failure unless the reason is
+#: said out loud.
+SILVER_HELD_BACK = (
+    "the 2027 catalogue's second table, the SILVER line, is read but not collected. Two "
+    "questions are open and both are the requester's: (1) Mini Freestyle said on 9 October "
+    "2026 that the 442 had left the range, and it is back in this catalogue with its "
+    "English page reading 'Range available while stocks last'; (2) `Silver` is NCC id 187, "
+    "a separate display name under this same manufacturer, holding the archived Trend 350, "
+    "380 and 442 — the Silver 380's MTPLM of 1000 matches archived product 7238 exactly, "
+    "so these may be those rows returning rather than new products, which is a "
+    "cross-manufacturer call this adapter cannot make"
+)
 
 #: A model the maker says is **out of the range, while still publishing it**. Mapped to
 #: the reason, which is narrated on every run — because the evidence for dropping it is a
@@ -103,6 +130,9 @@ WITHDRAWN: dict[str, str] = {
     ),
 }
 
+#: The Minis: 270, 290, 320. The 300 of the 2026 edition is gone and the 320 stands in its
+#: column, on the same product page and over the same floorplan but 170mm longer — so the
+#: diff is left to match it to FMLV's 300 on its own evidence rather than being told to.
 EXPECTED_LAYOUTS = 3
 
 #: One range, so `--range` still works the way every other adapter allows.
@@ -156,21 +186,39 @@ class Specification:
         return self.mtplm_kilograms - self.mro_kilograms
 
 
-#: `(label, field, unit)`. The `LInternal` row really does carry a stray `L`.
+#: `(label pattern, field, unit)`, in the French edition's own wording.
+#:
+#: Order does not matter — each row is found by its own anchored search — but two pairs
+#: only stay apart because a value must be a **number**: `Poids à vide` would otherwise
+#: swallow `Poids à vide en ordre de marche`, and `PTAC` would swallow
+#: `Modification Administrative PTAC`, which is the chassis upgrade and never the mass.
+#:
+#: `Hauteur hors tout` is the towing height. The 2026 edition published a roof-open height
+#: beside it and FMLV has been holding that figure; the 2027 edition publishes only the
+#: one, and it is the roof-closed figure (1,98 m against the old pair of 1,98 and 2,33).
 _ROWS: tuple[tuple[str, str, str], ...] = (
-    (r"BERTHS", "berths", "count"),
-    (r"Overall length", "shipping_length_mm", "m"),
-    (r"External body length", "exterior_body_length_mm", "m"),
-    (r"L?Internal length", "internal_length_mm", "m"),
-    (r"Internal height", "headroom_mm", "m"),
-    (r"Overall width", "overall_width_mm", "m"),
-    (r"Overall height \(roof closed\)", "height_mm", "m"),
-    (r"Awning length [^\n]*?", "awning_length_mm", "m"),
-    (r"Empty weight", "empty_weight_kilograms", "kg"),
-    (r"Mass in running order", "mro_kilograms", "kg"),
-    (r"Max authori[sz]ed weight", "mtplm_kilograms", "kg"),
+    (r"Nombre de places", "berths", "count"),
+    # The apostrophe survives extraction as a straight quote in this row and a curly one in
+    # the prose on the same page, so it is matched as "any single character".
+    (r"Longueur hors tout avec l.attelage", "shipping_length_mm", "m"),
+    (r"Longueur extérieure carrosserie", "exterior_body_length_mm", "m"),
+    (r"Longueur intérieure", "internal_length_mm", "m"),
+    (r"Hauteur hors tout", "height_mm", "m"),
+    (r"Hauteur intérieure", "headroom_mm", "m"),
+    (r"Largeur hors tout", "overall_width_mm", "m"),
+    (r"Poids à vide en ordre de marche", "mro_kilograms", "kg"),
+    (r"Poids à vide", "empty_weight_kilograms", "kg"),
+    (r"PTAC", "mtplm_kilograms", "kg"),
+    # The label carries its own tolerance, `Développé auvent + -5%`, and that
+    # tolerance contains a digit — so the label has to swallow it explicitly rather than
+    # being separated from its cells by "everything up to the first number". The group is
+    # optional so that dropping the tolerance leaves the row readable.
+    (r"Développé auvent(?:.*?%)?", "awning_length_mm", "m"),
 )
 
+#: One cell: `3,95`, `925*`, `695/807`. Anchored to a digit so a label cannot match a row
+#: whose values are prose — which is what keeps the two prefix pairs above apart.
+_CELL = r"[0-9][0-9,./]*\*?"
 
 def _value(raw: str, unit: str) -> int | None:
     """One cell. `3,95` is metres; `925*` is kilograms; `695/807` takes the lower."""
@@ -190,37 +238,63 @@ def _value(raw: str, unit: str) -> int | None:
     return round(number)
 
 
-def parse_specifications(page_text: str, *, silver: bool) -> list[Specification]:
-    """The two models on one catalogue page, read column by column.
+#: The line that starts a specification table. The line **immediately above** it carries
+#: that table's model numbers, and that position is the only reliable discriminator: the
+#: same digits appear earlier on the page as artwork captions (`380 442`, `270 320290`).
+_TABLE_MARKER = "NOMBRE DE PLACES"
 
-    `silver` tells the `4,42` column apart: it is the 300 on the Minis page and the 290 on
-    the Silver one, and nothing in the text distinguishes them.
+
+def _models_above(lines: list[str], index: int) -> tuple[str, ...]:
+    """The model numbers heading the table whose marker is at `index`."""
+    if index == 0:
+        return ()
+    heading = lines[index - 1].strip()
+    if not re.fullmatch(r"(?:\d{3}\s*)+", heading):
+        return ()
+    return tuple(re.findall(r"\d{3}", heading))
+
+
+def parse_specifications(page_text: str) -> list[Specification]:
+    """Every model in every specification table on the page.
+
+    The 2027 edition puts both tables — the Minis and the SILVER line — on one page, where
+    the 2026 edition had one per page. So tables are split on their own marker rather than
+    by page, and each one's columns are named by the line above that marker.
+
+    **A row whose cell count disagrees with its heading is not read at all**, because the
+    pattern demands exactly as many cells as the heading has models. That is the cardinality
+    failure `docs/adapters/README.md` warns about: a short row silently shifts every value
+    one model to the left, and the result is a set of caravans carrying each other's weights
+    that reconciles perfectly.
     """
-    cells: dict[str, list[str]] = {}
-    for label, field, unit in _ROWS:
-        match = re.search(rf"^\s*{label}\s+(\S+)\s+(\S+)\s*$", page_text, re.M)
-        if match:
-            cells[field] = [match.group(1), match.group(2)]
-
-    lengths = cells.get("shipping_length_mm")
-    if not lengths:
-        return []
+    lines = page_text.splitlines()
+    markers = [i for i, line in enumerate(lines) if line.strip() == _TABLE_MARKER]
 
     found: list[Specification] = []
-    for column, raw_length in enumerate(lengths):
-        key = raw_length.strip()
-        model = (SILVER_PAGE_LENGTHS if silver else {}).get(key) or MODELS_BY_LENGTH.get(key)
-        if model is None:
+    for position, index in enumerate(markers):
+        models = _models_above(lines, index)
+        if not models:
             continue
-        values: dict[str, int] = {}
-        for _label, field, unit in _ROWS:
-            raw = cells.get(field, [None, None])[column]
-            if raw is None:
-                continue
-            value = _value(raw, unit)
-            if value is not None:
-                values[field] = value
-        found.append(Specification(model=model, **values))
+        stop = markers[position + 1] - 1 if position + 1 < len(markers) else len(lines)
+        body = "\n".join(lines[index:stop])
+
+        cells: dict[str, list[str]] = {}
+        for label, field, _unit in _ROWS:
+            pattern = rf"^\s*{label}\s+({_CELL}(?:\s+{_CELL}){{{len(models) - 1}}})\s*$"
+            match = re.search(pattern, body, re.M)
+            if match:
+                cells[field] = match.group(1).split()
+
+        for column, model in enumerate(models):
+            values: dict[str, int] = {}
+            for _label, field, unit in _ROWS:
+                raw = cells.get(field)
+                if raw is None:
+                    continue
+                value = _value(raw[column], unit)
+                if value is not None:
+                    values[field] = value
+            found.append(Specification(model=model, **values))
     return found
 
 
@@ -284,32 +358,52 @@ def build_extracted(spec: Specification, source_url: str, basis: str) -> Extract
             source_url=source_url, snippet=f"Mini {spec.model} — {snippet}"
         )
 
-    record("manufacturer_range", f'range "{FMLV_RANGE}", which is how FMLV files all four')
+    record(
+        "manufacturer_range",
+        f'range "{FMLV_RANGE}", which is how FMLV files the Minis',
+    )
+    # The catalogue is French, so each snippet quotes the row a reader will actually find
+    # in it. Translating the label into English would send the next person looking for a
+    # row that is not there.
     for field, label in (
-        ("berths", "BERTHS"),
-        ("shipping_length_mm", "Overall length"),
-        ("exterior_body_length_mm", "External body length"),
-        ("internal_length_mm", "Internal length"),
-        ("overall_width_mm", "Overall width"),
-        ("awning_length_mm", "Awning length"),
-        ("mtplm_kilograms", "Max authorized weight"),
-        ("mro_kilograms", "Mass in running order"),
+        ("berths", "Nombre de places"),
+        ("shipping_length_mm", "Longueur hors tout avec l'attelage"),
+        ("exterior_body_length_mm", "Longueur extérieure carrosserie"),
+        ("internal_length_mm", "Longueur intérieure"),
+        ("overall_width_mm", "Largeur hors tout"),
+        ("mtplm_kilograms", "PTAC"),
+        ("mro_kilograms", "Poids à vide en ordre de marche"),
     ):
         value = getattr(caravan, field)
         if value is not None:
-            record(field, f"{value} from the catalogue's '{label}'")
+            record(field, f"{value} from the catalogue's {label!r} row")
+    if caravan.mtplm_kilograms is not None:
+        record(
+            "mtplm_kilograms",
+            f"{caravan.mtplm_kilograms}kg from the catalogue's 'PTAC' row. **Not** the "
+            f"'Modification Administrative PTAC' row beside it, which offers an upgrade to "
+            f"1200kg or 1300kg: the settled rule takes the standard mass, never the "
+            f"chassis upgrade",
+        )
+    if caravan.awning_length_mm is not None:
+        record(
+            "awning_length_mm",
+            f"{caravan.awning_length_mm}mm from the catalogue's "
+            f"'Développé auvent + -5%' row, stated by the maker to that tolerance",
+        )
     if spec.height_mm is not None:
         record(
             "height_mm",
-            f"{spec.height_mm}mm — the catalogue's 'Overall height (roof closed)', the "
-            f"towing height. It also states a roof-open height of 2330mm, which is a "
-            f"different measurement",
+            f"{spec.height_mm}mm — the catalogue's 'Hauteur hors tout', the towing "
+            f"height. The 2026 edition published a roof-open height of 2330mm beside it "
+            f"and FMLV has been holding that figure; the 2027 edition publishes this one "
+            f"alone",
         )
     if spec.headroom_mm is not None:
         record(
             "headroom_mm",
-            f"{spec.headroom_mm}mm — the catalogue's 'Internal height'. **Not** the "
-            f"roof-open height, which FMLV has been holding in this field",
+            f"{spec.headroom_mm}mm — the catalogue's 'Hauteur intérieure'. "
+            f"**Not** the roof-open height, which FMLV has been holding in this field",
         )
     if payload is not None:
         record(
@@ -341,10 +435,18 @@ def collect(
     on_progress: Callable[[str], None] = lambda message: None,
 ) -> list[ExtractedCaravan]:
     """Every Mini Freestyle caravan, from the catalogue linked on the home page."""
-    home = http.fetch(f"{BASE_URL}/en/").file_path.read_text(encoding="utf-8", errors="replace")
+    home_url = f"{BASE_URL}{HOME_PATH}"
+    home = http.fetch(home_url).file_path.read_text(encoding="utf-8", errors="replace")
     url = catalogue_url(home)
     if url is None:
-        msg = f"no catalogue PDF linked from {BASE_URL}/en/ — the only source is gone"
+        # Worth being precise about, because this exact sentence appeared once when the
+        # document had not gone anywhere: on 9 November 2026 the *English* home page
+        # stopped linking one while `/fr/` still did. If this fires, check the other
+        # language homepages before believing it.
+        msg = (
+            f"no catalogue PDF linked from {home_url} — the only source is gone. Check the "
+            f"other language homepages before concluding it has been withdrawn"
+        )
         raise RuntimeError(msg)
     on_progress(f"reading the catalogue: {url}")
 
@@ -352,27 +454,31 @@ def collect(
     if result.status_code != 200:
         msg = f"the catalogue at {url} returned {result.status_code}"
         raise RuntimeError(msg)
-    # **Page by page, never the whole document.** The two spec tables share every row
-    # label, so a search across the joined text finds only the first table's — which
-    # silently gave the 290 the 300's masses and lost two models entirely.
+    # Page by page still, although the 2027 edition puts both tables on one page: a table
+    # is now split on its own `NOMBRE DE PLACES` marker, so one page carrying two costs
+    # nothing, and a future edition going back to one per page needs no change here.
     extracted = extract_text(result.file_path)
 
     results: list[ExtractedCaravan] = []
     seen: set[str] = set()
-    withdrawn_seen: set[str] = set()
+    announced: set[str] = set()
     for page in (p.text for p in extracted.pages):
-        if "Max authorized weight" not in page and "Max authorised weight" not in page:
-            continue
-        # Only the Silver page carries an awning row, and it is what tells the two `4,42`
-        # columns apart — the 300 among the Minis, the 290 here.
-        silver = "Awning length" in page
-        for spec in parse_specifications(page, silver=silver):
+        for spec in parse_specifications(page):
             if spec.model in seen:
                 continue
             if spec.model in WITHDRAWN:
-                if spec.model not in withdrawn_seen:
-                    withdrawn_seen.add(spec.model)
+                if spec.model not in announced:
+                    announced.add(spec.model)
                     on_progress(f"{spec.model} — NOT COLLECTED: {WITHDRAWN[spec.model]}")
+                continue
+            if spec.model in SILVER_MODELS:
+                if spec.model not in announced:
+                    announced.add(spec.model)
+                    on_progress(
+                        f"{spec.model} — NOT COLLECTED: {SILVER_HELD_BACK}. Read as "
+                        f"{spec.shipping_length_mm}mm over the hitch, "
+                        f"{spec.mtplm_kilograms}kg maximum, {spec.berths} berth"
+                    )
                 continue
             reconciles, basis = _reconciles(spec)
             if not reconciles:
@@ -389,6 +495,10 @@ def collect(
     on_progress(
         "NO PRICE IS PROPOSED. There is none in the catalogue and none on the site; FMLV's "
         "figures came from somewhere else and this adapter cannot maintain them."
+    )
+    on_progress(
+        "NO MAXIMUM NOSE WEIGHT IS PUBLISHED, in this catalogue or anywhere on the site, so "
+        "the column is left blank rather than carried over."
     )
     on_progress(
         "THE SELF-CHECK IS WEAK AND THAT IS WORTH KNOWING. The catalogue publishes no "

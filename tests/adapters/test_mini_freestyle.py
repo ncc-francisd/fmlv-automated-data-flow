@@ -1,7 +1,10 @@
 """Mini Freestyle — parsing and derivation only, no network.
 
-The fixtures are the two spec pages of the catalogue of 8 October 2026, as
-`fetch.pdf.extract_text` returns them. The source PDF is deliberately not committed.
+The fixture is page 2 of the **2027 French catalogue**, as `fetch.pdf.extract_text` returns
+it, carrying both specification tables. The source PDF is deliberately not committed.
+
+The 2026 English edition the first version of this adapter read is gone from the site's
+navigation and superseded by this one; see `docs/adapters/mini-freestyle.md`.
 """
 
 from __future__ import annotations
@@ -13,9 +16,11 @@ import pytest
 from src.adapters import ADAPTERS, adapter_for, mini_freestyle
 from src.adapters.mini_freestyle import (
     EXPECTED_LAYOUTS,
-    MODELS_BY_LENGTH,
-    WITHDRAWN,
     FMLV_RANGE,
+    HOME_PATH,
+    SILVER_HELD_BACK,
+    SILVER_MODELS,
+    WITHDRAWN,
     Specification,
     _reconciles,
     _value,
@@ -30,18 +35,12 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
-def minis() -> str:
-    """Page 2: the 270 and the 300."""
-    return (FIXTURES / "mini-freestyle-catalogue-page2.txt").read_text(encoding="utf-8")
+def catalogue() -> str:
+    """Page 2 of the 2027 catalogue: the Minis table and the SILVER table, on one page."""
+    return (FIXTURES / "mini-freestyle-catalogue-2027-page2.txt").read_text(encoding="utf-8")
 
 
-@pytest.fixture
-def silver() -> str:
-    """Page 4: the 290 and the 442."""
-    return (FIXTURES / "mini-freestyle-catalogue-page4.txt").read_text(encoding="utf-8")
-
-
-def _by_model(specs):
+def _by_model(specs: list[Specification]) -> dict[str, Specification]:
     return {spec.model: spec for spec in specs}
 
 
@@ -73,13 +72,20 @@ def test_atom_still_resolves_on_the_same_manufacturer() -> None:
 # --- finding the catalogue ------------------------------------------------------------
 
 
+def test_the_catalogue_is_sought_on_the_french_home_page() -> None:
+    """**Not an oversight.** On 9 November 2026 the English home page stopped linking any
+    catalogue while `/fr/` linked the 2027 edition, and the catalogue itself makes the
+    French edition the authoritative one."""
+    assert HOME_PATH == "/fr/"
+
+
 def test_the_catalogue_url_is_read_not_constructed() -> None:
-    """**Never hardcode it.** Its folder carries one year and its filename another, so the
-    two already disagree and both will move."""
-    html = '<a class="lien-catalogue" href="files/2026/Minifreestyle_catalogue_2025_EN.pdf">'
+    """**Never hardcode it.** Its folder carries a year and its filename another, so the
+    two have already disagreed once and both will move."""
+    html = '<a class="lien-catalogue" href="files/2027/Minifreestyle_catalogue_2027.pdf">'
 
     assert catalogue_url(html) == (
-        "https://www.mini-freestyle.com/files/2026/Minifreestyle_catalogue_2025_EN.pdf"
+        "https://www.mini-freestyle.com/files/2027/Minifreestyle_catalogue_2027.pdf"
     )
 
 
@@ -87,13 +93,21 @@ def test_the_relative_href_keeps_its_files_prefix() -> None:
     """**The trap this exists for.** The hrefs on this site are relative; dropping the
     `files/` segment gives a URL that returns a 404 *page*, not a PDF, and the first
     attempt at this survey did exactly that."""
-    url = catalogue_url('<a href="files/2026/cat.pdf">')
+    url = catalogue_url('<a href="files/2027/cat.pdf">')
 
     assert url is not None and "/files/" in url
 
 
 def test_a_page_with_no_catalogue_yields_nothing() -> None:
-    assert catalogue_url('<a href="/en/about-us.html">About</a>') is None
+    assert catalogue_url('<a href="/fr/about-us.html">About</a>') is None
+
+
+def test_a_named_catalogue_wins_where_several_pdfs_are_linked() -> None:
+    html = '<a href="files/2027/notice.pdf"> <a href="files/2027/catalogue_2027.pdf">'
+
+    url = catalogue_url(html)
+
+    assert url is not None and url.endswith("catalogue_2027.pdf")
 
 
 # --- reading one cell -----------------------------------------------------------------
@@ -105,7 +119,7 @@ def test_a_decimal_comma_is_metres() -> None:
 
 
 def test_an_asterisk_is_stripped() -> None:
-    """The Silver page marks its masses *values subject to confirmation*."""
+    """The 2026 edition marked the Silver masses *values subject to confirmation*."""
     assert _value("925*", "kg") == 925
 
 
@@ -124,169 +138,254 @@ def test_an_empty_cell_is_not_a_zero() -> None:
 # --- the spec tables ------------------------------------------------------------------
 
 
-def test_the_minis_page_yields_the_270_and_the_300(minis: str) -> None:
-    specs = _by_model(parse_specifications(minis, silver=False))
+def test_both_tables_are_read_from_the_one_page(catalogue: str) -> None:
+    """The 2027 edition puts the Minis and the SILVER line on a single page, where the 2026
+    edition had one per page. Splitting on the page would now find only the first."""
+    specs = _by_model(parse_specifications(catalogue))
 
-    assert sorted(specs) == ["270", "300"]
-    assert specs["270"].shipping_length_mm == 3950
-    assert specs["270"].exterior_body_length_mm == 2990
-    assert specs["270"].internal_length_mm == 2500
-    assert specs["270"].overall_width_mm == 2030
-    assert specs["270"].mtplm_kilograms == 750
-    assert specs["270"].mro_kilograms == 641
-    assert specs["270"].berths == 2
+    assert sorted(specs) == ["270", "290", "320", "380", "442"]
 
 
-def test_the_silver_page_yields_the_290_and_the_442(silver: str) -> None:
-    specs = _by_model(parse_specifications(silver, silver=True))
+@pytest.mark.parametrize(
+    ("model", "berths", "shipping", "body", "internal", "height", "headroom", "miro", "mtplm"),
+    [
+        ("270", 2, 3950, 2990, 2500, 1980, 1870, 594, 750),
+        ("290", 2, 4420, 3470, 2970, 1980, 1870, 679, 750),
+        ("320", 2, 4590, 3640, 3200, 1980, 1870, 692, 750),
+        ("380", 3, 5310, 4280, 3800, 2000, 1950, 897, 1000),
+        ("442", 3, 5910, 4880, 4400, 2000, 1950, 961, 1050),
+    ],
+)
+def test_every_figure_matches_the_printed_table(  # noqa: PLR0913
+    catalogue: str,
+    model: str,
+    berths: int,
+    shipping: int,
+    body: int,
+    internal: int,
+    height: int,
+    headroom: int,
+    miro: int,
+    mtplm: int,
+) -> None:
+    """Read off the printed page, column by column. The whole range in one test because a
+    column shifted by one is the failure that matters, and it only shows as a set."""
+    spec = _by_model(parse_specifications(catalogue))[model]
 
-    assert sorted(specs) == ["290", "442"]
-    assert specs["442"].shipping_length_mm == 5910
-    assert specs["442"].exterior_body_length_mm == 4880
-    assert specs["442"].internal_length_mm == 4400
+    assert spec.berths == berths
+    assert spec.shipping_length_mm == shipping
+    assert spec.exterior_body_length_mm == body
+    assert spec.internal_length_mm == internal
+    assert spec.height_mm == height
+    assert spec.headroom_mm == headroom
+    assert spec.mro_kilograms == miro
+    assert spec.mtplm_kilograms == mtplm
+
+
+def test_the_320_is_longer_than_the_300_it_replaced(catalogue: str) -> None:
+    """Worth pinning, because it is the thing that makes the 320 more than a rename.
+
+    FMLV holds a `Mini / 300` at 4420mm over the hitch and 2970mm internally — the figures
+    the 290 now carries. The 320 is a longer vehicle on the same product page, so a diff
+    matching it to the 300 is matching a respec, not a relabel.
+    """
+    specs = _by_model(parse_specifications(catalogue))
+
+    assert specs["320"].shipping_length_mm == 4590
+    assert specs["290"].shipping_length_mm == 4420
+    assert "300" not in specs
+
+
+def test_the_awning_tolerance_does_not_swallow_the_figures(catalogue: str) -> None:
+    """`Développé auvent + -5%` carries a digit inside the label itself, so separating it
+    from its cells with "everything up to the first number" silently loses the row."""
+    specs = _by_model(parse_specifications(catalogue))
+
+    assert specs["270"].awning_length_mm == 8740
+    assert specs["320"].awning_length_mm == 9140
+    assert specs["442"].awning_length_mm == 9940
+
+
+def test_the_standard_mass_is_taken_and_not_the_chassis_upgrade(catalogue: str) -> None:
+    """`PTAC 750` sits directly above `Modification Administrative PTAC 750/1200`. The
+    settled rule takes the standard figure, and the label is a prefix of the other."""
+    specs = _by_model(parse_specifications(catalogue))
+
+    assert specs["320"].mtplm_kilograms == 750
     assert specs["442"].mtplm_kilograms == 1050
-    assert specs["442"].mro_kilograms == 942
-    assert specs["442"].berths == 3
-    assert specs["442"].awning_length_mm == 7280
 
 
-def test_the_two_4420mm_models_are_told_apart_by_their_page(minis: str, silver: str) -> None:
-    """**The trap this exists for.** The 300 and the 290 are both 4,42 m long, and the
-    catalogue's columns carry no heading at all — so only the page distinguishes them. They
-    differ in the one figure that matters: the mass in running order, 695 against 693."""
-    on_minis = _by_model(parse_specifications(minis, silver=False))
-    on_silver = _by_model(parse_specifications(silver, silver=True))
+def test_the_empty_weight_label_does_not_swallow_the_running_order_row(
+    catalogue: str,
+) -> None:
+    """`Poids à vide` is a prefix of `Poids à vide en ordre de marche`. They stay apart
+    only because a cell must begin with a digit, and `en` does not."""
+    specs = _by_model(parse_specifications(catalogue))
 
-    assert on_minis["300"].shipping_length_mm == on_silver["290"].shipping_length_mm == 4420
-    assert on_minis["300"].mro_kilograms == 695
-    assert on_silver["290"].mro_kilograms == 693
-
-
-def test_the_stray_l_on_the_internal_length_row_is_tolerated(minis: str) -> None:
-    """The catalogue really does print `LInternal length`, on that row and no other."""
-    assert "LInternal length" in minis
-
-    assert _by_model(parse_specifications(minis, silver=False))["270"].internal_length_mm == 2500
+    assert specs["270"].empty_weight_kilograms == 590
+    assert specs["270"].mro_kilograms == 594
 
 
-def test_the_height_is_the_roof_closed_figure(minis: str) -> None:
-    """**Both height fields were wrong in FMLV**, which held 2330 — the roof-*open* height
-    — in `height_mm` and `headroom_mm` alike. The towing height is the roof closed, which
-    is what Freedom settled, and the headroom is the internal height."""
-    spec = _by_model(parse_specifications(minis, silver=False))["270"]
+def test_an_artwork_caption_is_not_read_as_a_table_heading() -> None:
+    """`380 442` and `270 320290` both appear on the page as captions above the
+    photographs. Only the line directly above `NOMBRE DE PLACES` is a real heading."""
+    page = "\n".join(
+        [
+            "380 442",
+            "LIT TRANSVERSAL LITS JUMEAUX",
+            "270 320290",
+            "LIT TRANSVERSAL LIT CENTRAL",
+            "270 290 320",
+            "NOMBRE DE PLACES",
+            "Nombre de places 2 2 2",
+            "PTAC 750 750 750",
+        ]
+    )
 
-    assert spec.height_mm == 1980, "roof closed"
-    assert spec.headroom_mm == 1870, "internal height"
-    assert "2,33" in minis, "the roof-open height is published too, and is not used"
+    specs = _by_model(parse_specifications(page))
+
+    assert sorted(specs) == ["270", "290", "320"]
+    assert specs["320"].mtplm_kilograms == 750
+
+
+def test_a_row_with_the_wrong_number_of_cells_is_not_read() -> None:
+    """The cardinality failure: a short row shifts every value one model to the left, and
+    the result reconciles perfectly while every caravan carries another's weight."""
+    page = "\n".join(
+        [
+            "270 290 320",
+            "NOMBRE DE PLACES",
+            "Nombre de places 2 2 2",
+            "PTAC 750 750",
+        ]
+    )
+
+    specs = _by_model(parse_specifications(page))
+
+    assert sorted(specs) == ["270", "290", "320"]
+    assert all(spec.mtplm_kilograms is None for spec in specs.values())
+    assert all(spec.berths == 2 for spec in specs.values())
 
 
 def test_a_page_with_no_table_yields_nothing() -> None:
-    assert parse_specifications("just some prose", silver=False) == []
+    assert parse_specifications("Nos caravanes surbaissées, plus de détails en ligne.") == []
 
 
 # --- the self-check -------------------------------------------------------------------
 
 
 def test_the_three_masses_must_be_in_order() -> None:
-    ok, reason = _reconciles(
-        Specification("270", empty_weight_kilograms=600, mro_kilograms=641, mtplm_kilograms=750)
+    spec = Specification(
+        model="320", empty_weight_kilograms=675, mro_kilograms=692, mtplm_kilograms=750
     )
 
-    assert ok
-    assert "109kg" in reason
+    reconciles, basis = _reconciles(spec)
+
+    assert reconciles
+    assert "58kg" in basis
 
 
 def test_a_mass_in_running_order_above_the_maximum_is_refused() -> None:
-    """A column read off by one breaks the ordering immediately, which is the only thing
-    this catalogue lets us check — it publishes no payload."""
-    ok, reason = _reconciles(
-        Specification("270", empty_weight_kilograms=600, mro_kilograms=800, mtplm_kilograms=750)
-    )
+    spec = Specification(model="320", mro_kilograms=800, mtplm_kilograms=750)
 
-    assert not ok
-    assert "not above" in reason
+    reconciles, basis = _reconciles(spec)
+
+    assert not reconciles
+    assert "750" in basis
 
 
 def test_an_empty_weight_above_the_running_order_is_refused() -> None:
-    ok, _ = _reconciles(
-        Specification("270", empty_weight_kilograms=700, mro_kilograms=641, mtplm_kilograms=750)
+    spec = Specification(
+        model="320", empty_weight_kilograms=900, mro_kilograms=692, mtplm_kilograms=750
     )
 
-    assert not ok
+    reconciles, _basis = _reconciles(spec)
+
+    assert not reconciles
 
 
-# --- what reaches the pipeline --------------------------------------------------------
+# --- what gets built --------------------------------------------------------------------
 
 
-def _built(page: str, *, silver: bool, model: str):
-    spec = _by_model(parse_specifications(page, silver=silver))[model]
-    ok, basis = _reconciles(spec)
-    assert ok
-    return build_extracted(spec, "https://example.invalid/cat.pdf", basis)
+def _built(catalogue: str, model: str):
+    spec = _by_model(parse_specifications(catalogue))[model]
+    _reconciles_ok, basis = _reconciles(spec)
+    return build_extracted(spec, "https://www.mini-freestyle.com/files/2027/cat.pdf", basis)
 
 
-def test_every_model_files_under_one_range(minis: str, silver: str) -> None:
-    """The site groups them as `Minis` and `Silver`, but those are navigation headings —
-    and `Silver` is a different manufacturer in the NCC list, id 187."""
-    for page, is_silver, model in ((minis, False, "270"), (silver, True, "442")):
-        assert _built(page, silver=is_silver, model=model).caravan.manufacturer_range == FMLV_RANGE
-    assert FMLV_RANGE == "Mini"
+def test_every_model_files_under_one_range(catalogue: str) -> None:
+    for model in ("270", "290", "320"):
+        assert _built(catalogue, model).caravan.manufacturer_range == FMLV_RANGE
 
 
-def test_a_pop_top_is_filed_as_rigid(minis: str) -> None:
-    """**Settled by the requester, 7 October 2026.** The maker calls these pop top
-    caravans and the roof does raise, but FMLV's `Pop Up` means a folding camper — a
-    different vehicle. Micro fails the naming half of the two-part test, since the word
-    appears nowhere on the site."""
-    extracted = _built(minis, silver=False, model="270")
+def test_a_pop_top_is_filed_as_rigid(catalogue: str) -> None:
+    """FMLV's `Pop Up` means a folding camper; a pop *top* is a rigid caravan whose roof
+    raises. Settled by the requester, 7 October 2026."""
+    built = _built(catalogue, "270")
 
-    assert extracted.caravan.body_type is CaravanBodyType.RIGID
-    assert "folding camper" in extracted.provenance["body_type"].snippet
+    assert built.caravan.body_type is CaravanBodyType.RIGID
+    assert "folding camper" in built.provenance["body_type"].snippet
 
 
-def test_the_payload_is_derived_into_personal_effects(silver: str) -> None:
-    extracted = _built(silver, silver=True, model="442")
+def test_the_payload_is_derived_into_personal_effects(catalogue: str) -> None:
+    """No payload is published, so it is MTPLM minus the mass in running order, and the
+    whole of it goes to personal effects because no optional-equipment allowance exists."""
+    built = _built(catalogue, "320")
 
-    assert extracted.caravan.personal_effects_payload_kilograms == 1050 - 942
-    assert extracted.caravan.optional_equipment_payload_kilograms is None
-    assert "optional_equipment_payload_kilograms" in extracted.provenance
+    assert built.caravan.personal_effects_payload_kilograms == 58
+    assert built.caravan.optional_equipment_payload_kilograms is None
+    assert "arithmetic" in built.provenance["personal_effects_payload_kilograms"].snippet
 
 
-def test_no_price_is_ever_proposed(minis: str) -> None:
-    """There is none in the catalogue and none on the site."""
-    extracted = _built(minis, silver=False, model="270")
+def test_no_price_is_ever_proposed(catalogue: str) -> None:
+    """There is none in the catalogue and none on the site. FMLV's three came from
+    somewhere else and this adapter cannot maintain them."""
+    built = _built(catalogue, "270")
 
-    assert extracted.caravan.rrp_pounds is None
-    assert "rrp_pounds" not in extracted.provenance
+    assert built.caravan.rrp_pounds is None
+    assert "rrp_pounds" not in built.provenance
+
+
+def test_no_nose_weight_is_proposed(catalogue: str) -> None:
+    """Asked for TowCheck, 9 November 2026. Neither catalogue edition publishes one and
+    nor does any page of the site, so the column stays blank rather than carried over."""
+    built = _built(catalogue, "270")
+
+    assert not any("nose" in snippet.lower() for snippet in
+                   (p.snippet for p in built.provenance.values()))
+
+
+def test_the_provenance_quotes_the_french_row_a_reader_will_find(catalogue: str) -> None:
+    """Translating the label would send the next person looking for a row that is not in
+    the document."""
+    built = _built(catalogue, "320")
+
+    assert "Poids à vide en ordre de marche" in built.provenance["mro_kilograms"].snippet
+    assert "Hauteur hors tout" in built.provenance["height_mm"].snippet
+
+
+# --- the roster -------------------------------------------------------------------------
 
 
 def test_the_roster_size_is_pinned() -> None:
-    """Three since 9 October 2026, when Mini Freestyle withdrew the 442."""
+    """Three Minis. The SILVER pair is read and held back, so it is not counted here."""
     assert EXPECTED_LAYOUTS == 3
 
 
-def test_the_withdrawn_model_is_still_in_the_catalogue() -> None:
-    """Which is the whole difficulty: the source still publishes what the maker has dropped.
+def test_the_silver_line_is_held_back_with_its_reason() -> None:
+    """Both of the open questions are the requester's, and a model sitting in the catalogue
+    and not in the output looks like a parsing failure unless the reason is said out loud."""
+    assert SILVER_MODELS == frozenset({"380", "442"})
+    assert "NCC id 187" in SILVER_HELD_BACK
+    assert "7238" in SILVER_HELD_BACK
 
-    The 442 parses perfectly from the catalogue — it is excluded on Mini Freestyle's own
-    word, not because anything failed to read.
-    """
+
+def test_the_withdrawn_model_is_still_in_the_catalogue(catalogue: str) -> None:
+    """The contradiction is the maker's, and the adapter has to show it rather than hide
+    it: they said the 442 had left the range and then published it again."""
     assert "442" in WITHDRAWN
-    assert "5,91" in MODELS_BY_LENGTH and MODELS_BY_LENGTH["5,91"] == "442"
+    assert "442" in _by_model(parse_specifications(catalogue))
 
 
 def test_the_reason_for_withdrawing_it_is_recorded() -> None:
-    """A silent exclusion gets undone by the next person who looks at the catalogue."""
-    reason = WITHDRAWN["442"]
-    assert "9 October 2026" in reason
-    assert "2027" in reason
-
-
-def test_a_named_catalogue_wins_where_several_pdfs_are_linked() -> None:
-    """The site links one PDF today. If it ever links more, the one that says what it is
-    should win rather than whichever came first in the markup."""
-    html = '<a href="/files/terms.pdf"></a><a href="files/2026/x_catalogue_EN.pdf"></a>'
-
-    url = catalogue_url(html)
-
-    assert url is not None and url.endswith("x_catalogue_EN.pdf")
+    assert "9 October 2026" in WITHDRAWN["442"]

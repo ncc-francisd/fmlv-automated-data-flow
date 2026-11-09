@@ -218,11 +218,12 @@ This reverses the plan of 7 October, when the intention was to bring the deactiv
 back by reusing product 7239. `EXPECTED_LAYOUTS` is **3**, and `WITHDRAWN` carries the
 reason so a run says out loud why a model in the source is being passed over.
 
-## The 2027 range — checked 9 November 2026, nothing yet changed in code
+## The 2027 range — checked 9 November 2026, adapter rebuilt the same day
 
-Checked at the requester's request before a rerun. **A rerun today fails**, and most of
-what this survey records above has been overtaken. Nothing has been changed in the adapter:
-the open questions at the bottom are the requester's, not an adapter's.
+Checked at the requester's request before a rerun, which would have failed, and most of
+what this survey records above had been overtaken. **The adapter now reads the 2027 French
+catalogue** and collects the three Minis; the Silver line is read and held back on the two
+questions at the bottom, which are the requester's.
 
 ### The catalogue link is gone from `/en/`, and the 2027 edition is French-only
 
@@ -315,8 +316,9 @@ figures, rather than being retired beside a new row.
    already shown in this survey to be archived 7239 on mass and dimension. Reviving them
    is a cross-manufacturer question, so this adapter cannot propose it.
 
-Until both are answered the adapter is left as it is, failing loudly, which is the right
-failure: reading the unlinked 2026 catalogue would propose a 300 the maker no longer sells.
+Until both are answered the Silver pair is parsed, logged with its figures and its reason,
+and not collected — so the evidence is in every run's narration and one line in
+`SILVER_MODELS` releases it.
 
 ## Maximum nose weight is not published — checked 9 November 2026
 
@@ -334,3 +336,25 @@ and the administrative MTPLM upgrade, and stops.
 There is also **no FMLV column to put one in**: `caravan_schema.COLUMNS` is 62 columns and
 its only masses are `mtplm_kilograms`, `mro_kilograms` and the two payloads.
 
+### What the rebuild changed, 9 November 2026
+
+* **The home page read is `/fr/`.** The English page links no catalogue at all; the French
+  one links the 2027 edition, which the document itself makes authoritative. An English
+  edition appearing later is not a reason to switch back.
+* **Columns are named by their table, not matched on length.** A line of model numbers sits
+  directly above each `NOMBRE DE PLACES`, which retired `MODELS_BY_LENGTH` and
+  `SILVER_PAGE_LENGTHS` and with them the most fragile thing in this adapter. The
+  discriminator is *position*: `380 442` and `270 320290` also appear as artwork captions.
+* **Both tables are on one page.** Tables are split on their own marker, so the 2026 habit
+  of one table per page costs nothing either way.
+* **Two labels are prefixes of longer ones** — `Poids à vide` of `Poids à vide en ordre de
+  marche`, and `PTAC` of `Modification Administrative PTAC`. They stay apart only because a
+  cell must begin with a digit. Both are tested.
+* **The awning row's label contains a digit** (`Développé auvent + -5%`), so it cannot be
+  separated from its cells by "everything up to the first number" — which silently lost the
+  row until it was tested.
+* **Provenance quotes the French row**, untranslated, so a reader can find it.
+
+The live run on 9 November 2026 collected the three Minis with every figure matching the
+printed table, held the Silver pair back with both reasons narrated, and reported that no
+price and no nose weight are published.
