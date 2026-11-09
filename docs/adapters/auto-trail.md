@@ -17,10 +17,26 @@ class of column-misalignment failure that dominates [Morelo](morelo.md),
 | Motorhomes | Expedition Coachbuilt, Excel, F-Line, Imala, Frontier, Grande Frontier | 21 |
 | Campervans | Adventure, Expedition, V-Line SE, V-Line Sport | 16 |
 
-**That was the August 2025 roster. Three of those ten ranges are withdrawn** — Expedition
-Coachbuilt, V-Line SE and the Adventure campervans, confirmed on 27 October 2026 by 404s,
-the sitemaps and the 2027 price list together. Ten products go with them, and the 2027
-Adventure coachbuilts replace them. See the Adventure section below.
+**That was the August 2025 roster. Three of those ten ranges are now withdrawn,** and the
+adapter walks seven. Each left on the same three site signals — the range page 404s, the
+relevant `*-range-sitemap.xml` omits it, and the 2027 price list has no section for it:
+
+| Range | Products | Established | Confirmed by Auto-Trail |
+|---|---|---|---|
+| Adventure (campervans 55, 65) | 2 | 27 Oct 2026 | the 2027 NEC line-up lists "Adventure — All New" among the *motorhomes* |
+| Expedition Coachbuilt (C63, C71, C72, C73) | 4 | 9 Nov 2026 | yes — email, 9 Nov 2026 |
+| V-Line SE (540, 610, 635, 636 SE) | 4 | 9 Nov 2026 | yes — email, 9 Nov 2026 |
+
+Auto-Trail's marketing executive wrote to the NCC on 9 November 2026: *"Yes that's right,
+the Expedition Coachbuilt and V-Line SE ranges have ended for 2027."* The site had already
+said so; the email removes the possibility that three signals were three symptoms of one
+rebuild. Ten live FMLV products go with these ranges, and the 2027 Adventure coachbuilts
+replace the first of them. See the Adventure section below.
+
+The withdrawn paths are not left on the roster to 404 forever — a 404 a reviewer learns
+to expect is a 404 they learn to ignore — but they are not simply deleted either. Each
+sits in `WITHDRAWN_RANGES` with what was established and when, re-checked every run, so a
+range that comes back says so on the run it comes back.
 
 ## What the user brought to the survey
 
@@ -39,6 +55,11 @@ Auto-Trail sells:
   `/motorhomes-range/expedition-coachbuilt/`, spec PDF `...Tech-Spec-Expedition-Coach.pdf`.
 - **Expedition** — 7 campervans, 54/66/67/67 Flex/68/68 XL/68 XL Flex, on
   `/campervans-range/expedition/`, spec PDF `...Tech-Spec-Expedition-Van.pdf`.
+
+**The coachbuilt range ended for 2027** (see the roster above), so from that model year
+`Expedition` means the campervans and nothing else. Everything below is kept because the
+collision is dormant rather than solved: the coachbuilt document still has a fixture and a
+passing test, and if Auto-Trail revive the range it revives into the same name.
 
 These are different vehicles at different weights on different body styles, and nothing
 in a model's own name distinguishes them — `EXPEDITION 68` and

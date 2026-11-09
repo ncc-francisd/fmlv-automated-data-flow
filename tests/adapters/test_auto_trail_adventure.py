@@ -62,7 +62,7 @@ def test_the_label_is_auto_trails_own_name() -> None:
 
 def test_the_withdrawn_campervan_adventure_is_off_the_roster() -> None:
     """It has to be, or two ranges would file under one name — see
-    `_campervan_adventure_returned`, which is what now watches for its return."""
+    `_withdrawn_ranges_returned`, which is what now watches for its return."""
     paths = {path for path, _label in auto_trail.DEFAULT_RANGES}
     assert "campervans-range/adventure" not in paths
     assert ADVENTURE_RANGE_LABEL not in {label for _path, label in auto_trail.DEFAULT_RANGES}

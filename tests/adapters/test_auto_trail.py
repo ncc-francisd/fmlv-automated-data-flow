@@ -351,17 +351,51 @@ def test_the_two_expedition_ranges_are_labelled_separately(
 
     The range comes from which document the model was read out of, and the two must not
     collapse into one `manufacturer_range`.
+
+    The coachbuilts were withdrawn for 2027, so this now runs against the fixture only.
+    It is kept for the day Auto-Trail bring them back: the collision is dormant, not
+    solved, and the parsing that keeps the two apart has to still work when it wakes.
     """
     assert expedition_coachbuilt["C73"].range_label == "Expedition Coachbuilt"
     assert expedition_van["68"].range_label == "Expedition"
     assert not set(expedition_coachbuilt) & set(expedition_van)
 
 
-def test_both_expedition_ranges_are_registered_and_distinct() -> None:
+def test_only_the_campervan_expedition_is_on_the_roster() -> None:
+    """Auto-Trail ended the coachbuilt range for 2027, so "Expedition" is unambiguous.
+
+    Their marketing executive confirmed it to the NCC by email on 9 November 2026, after
+    the range page, the sitemap and the 2027 price list had all said so.
+    """
     labels = [label for _path, label in auto_trail.DEFAULT_RANGES]
     assert len(labels) == len(set(labels))
-    assert "Expedition Coachbuilt" in labels
     assert "Expedition" in labels
+    assert "Expedition Coachbuilt" not in labels
+
+
+def test_the_withdrawn_ranges_are_recorded_rather_than_forgotten() -> None:
+    """Off the roster and in `WITHDRAWN_RANGES` — not merely deleted.
+
+    A path dropped from the roster stops announcing its own 404, which is the point, but
+    it also stops announcing its return. The table is what asks the question the roster
+    no longer asks, and every entry has to carry why it was dropped.
+    """
+    paths = {path for path, _label in auto_trail.DEFAULT_RANGES}
+    for withdrawn in (
+        "motorhomes-range/expedition-coachbuilt",
+        "campervans-range/v-line-se",
+        "campervans-range/adventure",
+    ):
+        assert withdrawn not in paths
+        assert withdrawn in auto_trail.WITHDRAWN_RANGES
+        assert len(auto_trail.WITHDRAWN_RANGES[withdrawn]) > 80
+
+
+def test_v_line_sport_survives_the_v_line_se_withdrawal() -> None:
+    """Two ranges share a name stem and only one of them ended."""
+    labels = [label for _path, label in auto_trail.DEFAULT_RANGES]
+    assert "V-Line Sport" in labels
+    assert "V-Line SE" not in labels
 
 
 # --------------------------------------------------------------------------- #

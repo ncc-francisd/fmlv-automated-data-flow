@@ -22,10 +22,14 @@ dominates `morelo.py`, `swift.py` and `sunlight.py` — and that defeated Rimor'
 catalogue outright — does not arise. Attribution is free: a number is inside exactly one
 model's block or it is nowhere.
 
-Two ranges are both called **Expedition** — a coachbuilt motorhome range and a campervan
-range — and nothing in a model's own name separates `EXPEDITION 68` from
-`EXPEDITION COACHBUILT C73`. The range therefore always comes from *which document the
-model was read out of*, never from the model name. See `DEFAULT_RANGES`.
+Two ranges were both called **Expedition** — a coachbuilt motorhome range and a
+campervan range — and nothing in a model's own name separates `EXPEDITION 68`
+from `EXPEDITION COACHBUILT C73`. The range therefore always comes from *which document
+the model was read out of*, never from the model name. **Auto-Trail ended the coachbuilt
+range for 2027** and confirmed it by email on 9 November 2026, so only the campervans are
+collected now; the rule stands and the parsing is kept, because a withdrawn range can
+return and this one would return into the same name. See `DEFAULT_RANGES` and
+`WITHDRAWN_RANGES`.
 
 Price comes from a second source, and is the one join this adapter makes. Auto-Trail's
 price and options list PDF is a rasterised image — the whole of page 2 extracts to four
@@ -61,26 +65,64 @@ MANUFACTURER = "Auto-Trail"
 MANUFACTURER_DISPLAY_NAME = "Auto-Trail"
 
 #: (range page path, range label). The label is what reviewers see as
-#: `manufacturer_range`, and it is also the `--range` selector, so the two Expeditions
-#: must stay distinguishable here: "Expedition Coachbuilt" (4 coachbuilt motorhomes)
-#: against "Expedition" (7 campervans). Their spec PDFs are
-#: `...Tech-Spec-Expedition-Coach.pdf` and `...Tech-Spec-Expedition-Van.pdf`, but
-#: "Expedition Van" is a document-internal name that appears nowhere on the website, so
-#: it is deliberately not used as the range label.
+#: `manufacturer_range`, and it is also the `--range` selector.
+#:
+#: **From 2027 there is only one Expedition.** The name used to sit on two ranges at
+#: once — four coachbuilt motorhomes and seven campervans — which is why the
+#: coachbuilts carried the suffix "Expedition Coachbuilt" while the campervans went bare.
+#: Auto-Trail have ended the coachbuilt range (see `WITHDRAWN_RANGES`), so "Expedition"
+#: now means the campervans and nothing else. Their spec PDF is
+#: `...Tech-Spec-Expedition-Van.pdf`, but "Expedition Van" is a document-internal name
+#: appearing nowhere on the website, so it is still deliberately not the range label.
+#:
+#: The code that reads the coachbuilt document is kept, and still tested against its
+#: fixture: a range that has ended is a range that can come back, and all that changed is
+#: which documents Auto-Trail publish.
 #:
 #: Campervans are included on the same basis as Swift's and Adria's: FMLV treats them as
 #: motorhomes and the export carries both under one manufacturer.
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
-    ("motorhomes-range/expedition-coachbuilt", "Expedition Coachbuilt"),
     ("motorhomes-range/excel", "Excel"),
     ("motorhomes-range/f-line", "F-Line"),
     ("motorhomes-range/imala", "Imala"),
     ("motorhomes-range/frontier", "Frontier"),
     ("motorhomes-range/grande-frontier", "Grande Frontier"),
     ("campervans-range/expedition", "Expedition"),
-    ("campervans-range/v-line-se", "V-Line SE"),
     ("campervans-range/v-line-sport", "V-Line Sport"),
 )
+
+#: Range pages Auto-Trail have taken down, mapped to what was established about each
+#: withdrawal and when. Every entry is re-checked on every run and narrated if the page
+#: answers again — see `_withdrawn_ranges_returned`.
+#:
+#: **Why a dead path is not simply left on the roster.** One that stays there announces
+#: its own disappearance as `SKIPPED: ... returned 404`, and then says the same thing on
+#: every run forever; a 404 a reviewer learns to expect is a 404 they learn to ignore.
+#: Taking the path off buys that silence and pays for it with silence on the return, which
+#: is the debt this table settles.
+WITHDRAWN_RANGES: dict[str, str] = {
+    "campervans-range/adventure": (
+        "the Adventure campervans (55 and 65), off the roster since 27 October 2026 on "
+        "four independent sources: the range page 404s, campervans-range-sitemap.xml "
+        "omits it, the 2027 price list has no rows for them, and the NEC line-up lists "
+        "'Adventure - All New' among the motorhomes with no campervan Adventure at all. "
+        "IF THIS RETURNS it files under the same name as the new Adventure coachbuilts, "
+        "and the suffix that once kept the two apart has to come back with it"
+    ),
+    "motorhomes-range/expedition-coachbuilt": (
+        "the Expedition coachbuilts C63, C71, C72 and C73. Auto-Trail's marketing "
+        "executive confirmed it to the NCC by email on 9 November 2026: 'Yes that's "
+        "right, the Expedition Coachbuilt and V-Line SE ranges have ended for 2027.' The "
+        "site had already said so on three signals - the range page 404s, "
+        "motorhomes-range-sitemap.xml omits it, and the 2027 price list has no section "
+        "for it. This is what frees the name 'Expedition' for the campervans alone"
+    ),
+    "campervans-range/v-line-se": (
+        "the V-Line SE campervans 540 SE, 610 SE, 635 SE and 636 SE, ended in the same "
+        "email of 9 November 2026 and on the same three site signals. V-Line Sport is a "
+        "different range, is unaffected, and stays on the roster"
+    ),
+}
 
 #: Auto-Trail's new 2027 coachbuilt range, which **has no range page yet**. It is
 #: announced on a news post, specified in a spreadsheet sent to the NCC, and priced in the
@@ -460,6 +502,10 @@ _BODY_STYLES: tuple[tuple[str, BodyType], ...] = (
 #: it holds one entry and not a copy of the price list.
 _PRICE_LIST_SOURCE = "Price and Options List, 1st June 2026 (read from the page image)"
 _PRICE_LIST_READ_ON = "16 August 2026"
+#: **Dormant since 9 November 2026**, when Auto-Trail ended the Expedition coachbuilt
+#: range. The entry is kept rather than deleted because the figure and its provenance are
+#: still correct: deleting it would cost nothing today and everything on the day they
+#: bring the range back.
 _MANUALLY_SOURCED_MTPLM_KG: dict[tuple[str, str], int] = {
     ("Expedition Coachbuilt", "C71"): 3500,
 }
@@ -1360,30 +1406,32 @@ def _adventure_range_is_published(http: Fetcher, on_progress: Callable[[str], No
     return False
 
 
-def _campervan_adventure_returned(http: Fetcher, on_progress: Callable[[str], None]) -> bool:
-    """Have the Adventure *campervans* come back after being withdrawn?
+def _withdrawn_ranges_returned(
+    http: Fetcher, on_progress: Callable[[str], None]
+) -> list[str]:
+    """Narrate any `WITHDRAWN_RANGES` page that answers again, and return their paths.
 
-    They left `DEFAULT_RANGES` on 27 October 2026, once four sources agreed they were
-    gone. Dropping a page from the roster also drops the `SKIPPED` line that would have
-    announced its return, so this asks the question the roster no longer asks — and it
-    matters more than it did, because `ADVENTURE_RANGE_LABEL` is now the bare "Adventure"
-    and a revived campervan range would file under the same name as the coachbuilts.
+    Nothing is collected from a page that comes back. Restoring a range means deciding
+    what its label should be and what it would collide with, which is a person's call and
+    not this function's — so it reports, loudly, and stops there.
     """
-    url = f"{BASE_URL}/campervans-range/adventure/"
-    try:
-        html = http.fetch(url).file_path.read_text(encoding="utf-8", errors="replace")
-    except Exception:  # noqa: BLE001
-        return False
-    if _NOT_FOUND_TITLE.search(html):
-        return False
-    on_progress(
-        f"[{ADVENTURE_RANGE_LABEL}] WARNING: {url} resolves again, so the Adventure "
-        f"campervans withdrawn in October 2026 are back. They are NOT collected — the "
-        f"page left DEFAULT_RANGES — and until it is restored they would also share the "
-        f"range name {ADVENTURE_RANGE_LABEL!r} with the coachbuilts, so the suffix that "
-        f"kept the two apart has to come back with them"
-    )
-    return True
+    returned: list[str] = []
+    for path, established in WITHDRAWN_RANGES.items():
+        url = f"{BASE_URL}/{path}/"
+        try:
+            html = http.fetch(url).file_path.read_text(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            continue
+        if _NOT_FOUND_TITLE.search(html):
+            continue
+        returned.append(path)
+        on_progress(
+            f"WARNING: {url} resolves again, so a range recorded as withdrawn is back. "
+            f"It is NOT collected, because the path is not in DEFAULT_RANGES; add it "
+            f"there to collect it. What was established about the withdrawal: "
+            f"{established}"
+        )
+    return returned
 
 
 def collect(
@@ -1504,7 +1552,7 @@ def collect(
     # The Adventure range has no range page, so the loop above cannot reach it. It is
     # collected from Auto-Trail's own 2027 price list joined to the specification
     # spreadsheet — see `adventure_products` — and retires itself the day they publish it.
-    _campervan_adventure_returned(http, on_progress)
+    _withdrawn_ranges_returned(http, on_progress)
     if not _adventure_range_is_published(http, on_progress):
         price_list_url = _price_list_pdf_url(http, on_progress)
         if price_list_url is not None:
