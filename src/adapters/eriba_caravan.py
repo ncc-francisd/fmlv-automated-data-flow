@@ -207,9 +207,11 @@ def _canonical(label: str) -> str:
 #: list is what makes a label a **boundary**: `parse_spec_page` reads each row's values from
 #: the end of its own label to the start of the next one, so a label omitted here would let
 #: the row before it swallow both the label and its values. Several are here purely as
-#: boundaries and are never emitted — `Tire size`, `Interior width (cm)`,
-#: `Maximum nose weight (kg)`, the four bed dimensions — because FMLV has no column for them
-#: or, for the bed rows, because they may be blank and are then unattributable.
+#: boundaries and are never emitted — `Tire size`, `Interior width (cm)` and the four bed
+#: dimensions — because FMLV has no column for them or, for the bed rows, because they may
+#: be blank and are then unattributable. `Maximum nose weight (kg)` was one of those until
+#: 9 November 2026 and is now read: FMLV still has no column for it, but TowCheck needs it,
+#: so it rides in the readable copy of the upload as a finding.
 SPEC_LABELS: tuple[str, ...] = (
     "Price £",
     "Axle",
@@ -273,6 +275,9 @@ _VALUE_PATTERNS: dict[str, str] = {
     "manufacturer-specified mass for optional equipment": r"(?<![\d,.])(\d{1,4})(?![\d,.])",
     "unladen weight approx kg": _INT,
     "technically permissible maximum laden mass": _INT,
+    # For TowCheck, not for FMLV. A boundary label since the adapter was written; read as
+    # a value from 9 November 2026 — see `product_model.findings.NOSE_WEIGHT_FIELD`.
+    "maximum nose weight": _INT,
     "berths": r"(\d(?: - \d)?)",
     "refrigerator volume incl freezer": r"(\d+ \(\d+\))",
 }
@@ -810,6 +815,8 @@ class EribaCaravan:
     berths_published: str | None = None
     mtplm_kilograms: int | None = None
     mro_kilograms: int | None = None
+    #: For TowCheck, not for FMLV — see `product_model.findings.NOSE_WEIGHT_FIELD`.
+    max_nose_weight_kilograms: int | None = None
     mass_band: tuple[int, int] | None = None
     unladen_kilograms: int | None = None
     optional_equipment_allowance_kg: int | None = None
@@ -926,6 +933,7 @@ class EribaCaravan:
             berths=berths,
             berths_published=berths_published,
             mtplm_kilograms=_int_or_none(rows.get("technically permissible maximum laden mass")),
+            max_nose_weight_kilograms=_int_or_none(rows.get("maximum nose weight")),
             mro_kilograms=mass,
             mass_band=band,
             unladen_kilograms=_int_or_none(rows.get("unladen weight approx kg")),
@@ -1026,6 +1034,7 @@ def build_extracted(
         rrp_pounds=product.rrp_pounds,
         mtplm_kilograms=product.mtplm_kilograms,
         mro_kilograms=product.mro_kilograms,
+        max_nose_weight_kilograms=product.max_nose_weight_kilograms,
         personal_effects_payload_kilograms=product.derived_payload_kilograms,
         shipping_length_mm=product.shipping_length_mm,
         exterior_body_length_mm=product.exterior_body_length_mm,
@@ -1099,6 +1108,14 @@ def build_extracted(
         record(
             "mtplm_kilograms",
             f"Technically permissible maximum laden mass: {product.mtplm_kilograms}kg",
+        )
+    if product.max_nose_weight_kilograms is not None:
+        record(
+            "max_nose_weight_kilograms",
+            f"Maximum nose weight (kg): {product.max_nose_weight_kilograms}kg. Recorded "
+            f"for the TowCheck sister site, which cannot say whether a car may legally tow "
+            f"a caravan without it. FMLV has no column for it, so it is reported as a "
+            f"finding and written only to the readable copy of the upload",
         )
     if product.mro_kilograms is not None:
         low, high = product.mass_band or (0, 0)

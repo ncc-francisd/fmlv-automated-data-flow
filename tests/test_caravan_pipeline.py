@@ -199,7 +199,13 @@ def test_a_caravan_run_produces_a_caravan_upload_csv(tmp_path: Path) -> None:
     lines = result.path.read_text(encoding="utf-8-sig").splitlines()
     assert lines[:2] == ["-", "-"]  # FMLV wants the header on row 3
     header = next(csv.reader([lines[2]]))
-    assert tuple(header) == caravan_schema.COLUMNS
+    # The upload carries FMLV's own columns and nothing else. `max_nose_weight_kilograms`
+    # is in the schema and stripped from here — see `caravan_schema.NEVER_IN_UPLOAD`.
+    assert tuple(header) == caravan_schema.UPLOAD_COLUMNS
+    assert "max_nose_weight_kilograms" not in header
+
+    readable = result.readable_path.read_text(encoding="utf-8-sig").splitlines()
+    assert next(csv.reader([readable[0]]))[-1] == "max_nose_weight_kilograms"
     assert len(header) == 62
 
 

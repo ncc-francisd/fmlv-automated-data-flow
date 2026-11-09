@@ -33,7 +33,7 @@ from ..product_model.enums import (
     LoungeLocation,
     Refrigeration,
 )
-from ..product_model.findings import FINDING_FIELDS
+from ..product_model.findings import FINDING_FIELDS, NOT_PROPOSED
 from ..product_model.model import Motorhome
 from ..product_model.product import Product
 
@@ -251,7 +251,7 @@ def compare_fields(
     profile = profile_for(extracted.product)
 
     for field_path in extracted.provenance:
-        if field_path in FINDING_FIELDS:
+        if field_path in NOT_PROPOSED:
             # Reported, never proposed — `product_model.findings` says why. A matched
             # product keeps whatever FMLV holds for the habitation fields, so there is
             # nothing here to confirm, replace or delete, and the adapter's reading of
@@ -334,7 +334,7 @@ def compare_fields(
         )
 
     for field_path in profile.in_scope:
-        if field_path in extracted.provenance or field_path in FINDING_FIELDS:
+        if field_path in extracted.provenance or field_path in NOT_PROPOSED:
             continue  # already handled above, or reported as a finding
         old_value = field_value(baseline, field_path)
         new_value = field_value(extracted.product, field_path)

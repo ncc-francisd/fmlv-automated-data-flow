@@ -43,12 +43,12 @@ from ..product_model.caravan import Caravan
 from ..product_model.caravan_io import columns_for_field as caravan_columns_for_field
 from ..product_model.caravan_io import write_csv as write_caravan_csv
 from ..product_model.enums import CaravanBodyType, CaravanSleepingArea
-from ..product_model.findings import FINDING_FIELDS
+from ..product_model.findings import FINDING_FIELDS, NOSE_WEIGHT_FIELD
 from ..product_model.io import columns_for_field as motorhome_columns_for_field
 from ..product_model.io import write_csv as write_fmlv_csv
 from ..product_model.model import AutomaticVariant, Motorhome
 from ..product_model.product import Product
-from ..product_model import schema
+from ..product_model import caravan_schema, schema
 from ..product_model.validation import (
     Issue,
     format_issues,
@@ -56,7 +56,12 @@ from ..product_model.validation import (
     validate_all_caravans,
 )
 from ..registry.models import Manufacturer
-from ..store.changes import LIST_SEPARATOR, ChangeQueueEntry, list_change_queue
+from ..store.changes import (
+    LIST_SEPARATOR,
+    ChangeQueueEntry,
+    findings_by_product,
+    list_change_queue,
+)
 from ..vehicle_class import DEFAULT as DEFAULT_VEHICLE_CLASS
 from ..vehicle_class import VehicleClass
 
@@ -381,6 +386,27 @@ def _unanswered_habitation_columns(product: Product) -> list[str]:
     return unanswered
 
 
+def _nose_weights(connection: sqlite3.Connection, run_id: int) -> dict[int, int | None]:
+    """This run's maximum nose weights, by store product id.
+
+    Read from the run's **findings** rather than its decisions, because nothing accepts or
+    rejects a nose weight: an adapter either read one off the manufacturer's site or it did
+    not. `store.changes._record_findings` writes one row per product that has a figure.
+    """
+    found: dict[int, int | None] = {}
+    for product_id, findings in findings_by_product(connection, run_id).items():
+        for finding in findings:
+            if finding.field != NOSE_WEIGHT_FIELD or finding.new_value is None:
+                continue
+            try:
+                found[product_id] = int(finding.new_value)
+            except ValueError:
+                # Stored as TEXT like every other proposal value. A row that will not
+                # parse is left blank rather than guessed at.
+                continue
+    return found
+
+
 def build_upload_products(
     connection: sqlite3.Connection,
     *,
@@ -413,6 +439,8 @@ def build_upload_products(
     for entry in list_change_queue(connection, run_id):
         entries_by_product[entry.product.id].append(entry)
 
+    nose_weights = _nose_weights(connection, run_id)
+
     results: list[Product] = []
     for entries in entries_by_product.values():
         approved = [
@@ -442,6 +470,15 @@ def build_upload_products(
             # habitation column already holds whatever FMLV holds and blanking one would
             # clear a `No` the NCC set deliberately.
             product.unanswered_columns = _unanswered_habitation_columns(product)
+
+        if isinstance(product, Caravan):
+            # **Assigned unconditionally, including to `None`.** This is the one field that
+            # is not carried over: the requester's rule is that it is either what this run
+            # read off the manufacturer's own site or it is blank, because the figure feeds
+            # advice about whether a tow is safe and legal. The baseline cannot supply one
+            # anyway — FMLV has no such column — but saying so here is what keeps it true if
+            # a readable copy is ever read back in as a baseline.
+            product.max_nose_weight_kilograms = nose_weights.get(stored.id)
 
         results.append(_mirror_guide_price(product))
 
@@ -499,8 +536,13 @@ def write_upload_csv(
         caravans = [p for p in products if isinstance(p, Caravan)]
         assert len(caravans) == len(products), "a caravan upload cannot carry motorhome rows"
         issues = validate_all_caravans(caravans)
-        write_caravan_csv(caravans, path, leading_blank_rows=2)
-        write_caravan_csv(caravans, readable_path)
+        # The upload drops `max_nose_weight_kilograms`; the readable copy keeps it. FMLV
+        # has no field for it, so pasting it in would break the template, but it is the
+        # whole reason the column exists — see `caravan_schema.NEVER_IN_UPLOAD`.
+        write_caravan_csv(
+            caravans, path, leading_blank_rows=2, columns=caravan_schema.UPLOAD_COLUMNS
+        )
+        write_caravan_csv(caravans, readable_path, columns=caravan_schema.COLUMNS)
     else:
         motorhomes = [p for p in products if isinstance(p, Motorhome)]
         assert len(motorhomes) == len(products), "a motorhome upload cannot carry caravan rows"

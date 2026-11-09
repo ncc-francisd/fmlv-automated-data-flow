@@ -122,6 +122,22 @@ COLUMNS: tuple[str, ...] = (
     "latest_model_id",
     "images",
     "archived",
+    # Appended past the end of FMLV's own template, deliberately — see NEVER_IN_UPLOAD.
+    "max_nose_weight_kilograms",
+)
+
+#: Columns that exist for us and **never** for FMLV, so they are written to the generated
+#: CSV and stripped from the upload.
+#:
+#: Distinct from the motorhome schema's `NOT_YET_IN_UPLOAD_TEMPLATE`, which holds back a
+#: column Steadfast have built but not released: that one is temporary and is kept out of
+#: *both* files so nobody pastes it in early. This is permanent. FMLV has no maximum nose
+#: weight field and is not getting one — the figure is for the TowCheck sister site — so it
+#: belongs in the file a person reads and never in the file they upload.
+NEVER_IN_UPLOAD: frozenset[str] = frozenset({"max_nose_weight_kilograms"})
+
+UPLOAD_COLUMNS: tuple[str, ...] = tuple(
+    column for column in COLUMNS if column not in NEVER_IN_UPLOAD
 )
 
 #: Written back exactly as read. Guide: "PLEASE Leave as is!"

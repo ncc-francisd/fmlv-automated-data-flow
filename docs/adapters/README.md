@@ -2284,6 +2284,52 @@ Two follow-on questions the later surveys added:
   often exactly the roster or comparison view an adapter wants, and nobody links to them
   because they are not part of the sales funnel.
 
+### The maximum nose weight is collected, and never carried over
+
+**Added 9 November 2026, caravans only.** TowCheck — FMLV's sister site — tells an owner
+whether their car may legally tow a given caravan, and cannot answer without the caravan's
+maximum nose weight. FMLV itself has no column for it and is not getting one.
+
+So it is collected into `Caravan.max_nose_weight_kilograms`, written to the **readable copy**
+of the upload and stripped from the upload proper. `caravan_schema.NEVER_IN_UPLOAD` is that
+strip, and it is not the same thing as the motorhome schema's
+`NOT_YET_IN_UPLOAD_TEMPLATE`: that one holds back a column Steadfast have built but not
+released, is temporary, and is kept out of *both* files so nobody pastes it in early.
+
+Three rules, all the requester's, 9 November 2026:
+
+* **Nothing proposes it and nothing decides it.** *"I don't think it needs to be something
+  that's approved or rejected."* It is a finding, like the habitation fields — but recorded
+  for **every** product rather than new ones only, because the column is meant to carry what
+  this run read.
+* **Found, or blank.** *"If it's not readily accessible, then we don't collect it and we
+  leave it blank."*
+* **Never carried over.** *"We don't carry over any nose weight figures in the same way that
+  we do with other weights. So either it is current and factual, off the website, or we
+  couldn't find it and it's blank."* This is the **one exception** to
+  `missing-data-must-blank-not-inherit`, which everywhere else preserves a figure a run
+  could not re-find. The reason is what the figure is for: a stale nose weight feeds advice
+  about whether a tow is safe and legal, so it is worse than no figure at all.
+  `output.build.build_upload_products` therefore assigns it unconditionally, including to
+  `None`.
+
+**Where it is actually published, which is not many places.** Of the sixteen caravan
+adapters, three sources carry a real figure and are wired:
+
+| | what it says |
+|---|---|
+| **Eriba** | `Maximum nose weight (kg) 100 100 100 100`, per layout, in the price list |
+| **Adria** | `Max nose weight 100`, in the price list |
+| **Freedom** | `Noseweight: 70kg`, on the model page |
+
+Campod prints the label with no value after it. Bailey's pages mention nose weight only as
+marketing copy — *"centrally mounted gas locker for enhanced towing stability and reduced
+nose weight"* — which is the trap worth naming: **grep for the label, then read the hit.** A
+tooltip is not a specification. Swift publishes MTPLM and payload and no nose weight.
+
+Absence of a hit in the snapshots held is not proof a maker publishes nothing — see the
+Elddis orphan-page lesson above.
+
 ### A catalogue link can disappear from one language and survive in another
 
 **Mini Freestyle, 9 November 2026.** A rerun would have failed outright: `catalogue_url`

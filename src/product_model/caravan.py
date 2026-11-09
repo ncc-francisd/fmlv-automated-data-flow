@@ -82,6 +82,22 @@ class Caravan(BaseModel):
     price_min_range_pounds: int | None = None
     price_max_range_pounds: int | None = None
     mtplm_kilograms: int | None = None
+
+    #: **Not an FMLV field.** The maximum nose weight, for the TowCheck sister site, which
+    #: tells an owner whether their car can legally tow a given caravan — and cannot answer
+    #: without this figure. FMLV itself has no column for it, so it rides in the generated
+    #: CSV and is held out of the upload: see `caravan_schema.NEVER_IN_UPLOAD`.
+    #:
+    #: **Never carried over, unlike every other mass here.** The requester's rule, 9
+    #: November 2026: *"either it is current and factual, off the website, or we couldn't
+    #: find it and it's blank"*. So this is the one field on a caravan that is not preserved
+    #: when a run fails to find it — `output.build` writes what this run read and nothing
+    #: else. A stale nose weight is worse than none, because the advice it feeds is about
+    #: whether a tow is safe and legal.
+    #:
+    #: Nothing proposes it and nothing decides it. Adapters set it without provenance, so
+    #: `diff.compare` never visits it, and `store.changes` records it as a finding instead.
+    max_nose_weight_kilograms: int | None = None
     mro_kilograms: int | None = None
 
     #: Payload is split in two here, where a motorhome has one column.

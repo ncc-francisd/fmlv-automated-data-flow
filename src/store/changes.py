@@ -55,6 +55,7 @@ from ..product_model.findings import (
     FINDING_FIELDS,
     FLOORPLAN_FIELD,
     FLOORPLAN_SNIPPET,
+    NOSE_WEIGHT_FIELD,
     SILENCE_MEANS,
 )
 from ..product_model.validation import (
@@ -635,6 +636,26 @@ def _record_findings(
         )
         recorded += 1
 
+    # The nose weight, for **every** product rather than new ones only. FMLV has no column
+    # for it, so there is nothing to carry across and a matched product is precisely where
+    # a figure from an earlier run would otherwise go stale. See `findings.NOSE_WEIGHT_FIELD`.
+    nose = extracted.provenance.get(NOSE_WEIGHT_FIELD)
+    if nose is not None:
+        nose_value = _serialize(field_value(extracted.product, NOSE_WEIGHT_FIELD))
+        if nose_value is not None:
+            record_proposed_change(
+                connection,
+                run_id=run_id,
+                product_id=product_id,
+                field=NOSE_WEIGHT_FIELD,
+                old_value=None,
+                new_value=nose_value,
+                source_url=nose.source_url,
+                source_snippet=nose.snippet,
+                is_finding=True,
+            )
+            recorded += 1
+
     if not is_new:
         return recorded
 
@@ -1020,7 +1041,14 @@ def findings_by_product(
     first, then the beds and washroom, then the equipment — rather than alphabetical,
     because it is a list a person reads down while typing a row into FMLV.
     """
-    order = {field: index for index, field in enumerate((FLOORPLAN_FIELD, *FINDING_FIELDS))}
+    # The nose weight last, deliberately: it is a measurement for TowCheck rather than
+    # one of the habitation answers a person is reading down the list to type in.
+    order = {
+        field: index
+        for index, field in enumerate(
+            (FLOORPLAN_FIELD, *FINDING_FIELDS, NOSE_WEIGHT_FIELD)
+        )
+    }
     rows = connection.execute(
         "SELECT * FROM proposed_change WHERE run_id = ? AND is_finding = 1",
         (run_id,),

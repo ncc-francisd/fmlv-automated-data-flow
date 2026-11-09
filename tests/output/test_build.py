@@ -854,3 +854,153 @@ def test_a_whole_run_carrying_a_gearbox_decision_generates_its_csv(
     # proof it was applied is the readable copy plus the model. See
     # `schema.NOT_YET_IN_UPLOAD_TEMPLATE`.
     assert result.path.exists()
+
+
+# --- The maximum nose weight, for TowCheck ----------------------------------------------
+
+
+def _caravan_run_with_a_nose_weight(
+    connection: sqlite3.Connection, *, nose: int | None, baseline_nose: int | None = None
+):
+    """One caravan run carrying a price change, and optionally a nose weight finding."""
+    from src.adapters.base import ExtractedCaravan
+    from src.product_model.caravan import Caravan
+    from src.vehicle_class import VehicleClass
+
+    run = store.start_run(
+        connection,
+        manufacturer_id=196,
+        fmlv_manufacturer="Eriba",
+        trigger="manual",
+        vehicle_class=VehicleClass.CARAVAN,
+    )
+    baseline = Caravan(
+        product_id=9001,
+        manufacturer="Eriba",
+        manufacturer_display_name="Eriba",
+        manufacturer_range="Touring",
+        model="430",
+        rrp_pounds=25_170,
+        mtplm_kilograms=1100,
+        mro_kilograms=889,
+        max_nose_weight_kilograms=baseline_nose,
+    )
+    caravan = Caravan(
+        manufacturer="Eriba",
+        manufacturer_display_name="Eriba",
+        manufacturer_range="Touring",
+        model="430",
+        rrp_pounds=26_000,
+        mtplm_kilograms=1100,
+        mro_kilograms=889,
+        max_nose_weight_kilograms=nose,
+    )
+    provenance = {
+        "rrp_pounds": Provenance(source_url="https://eriba.com/price", snippet="£26,000")
+    }
+    if nose is not None:
+        provenance["max_nose_weight_kilograms"] = Provenance(
+            source_url="https://eriba.com/price",
+            snippet=f"Maximum nose weight (kg): {nose}kg",
+        )
+    store.persist_diff(
+        connection,
+        run_id=run.id,
+        manufacturer_id=196,
+        diffs=diff_products(
+            [ExtractedCaravan(caravan=caravan, provenance=provenance)],
+            [baseline],
+        ),
+        vehicle_class=VehicleClass.CARAVAN,
+    )
+    for entry in store.list_change_queue(connection, run.id):
+        store.record_decision(
+            connection, proposed_change_id=entry.change.id, action="accept", decided_by="ben"
+        )
+    return run, baseline
+
+
+def test_a_nose_weight_is_never_proposed_only_reported(
+    connection: sqlite3.Connection,
+) -> None:
+    """Nothing accepts or rejects one: the adapter either read it or it did not.
+
+    If it reached `list_change_queue` a reviewer would be asked to arbitrate a figure
+    FMLV has no column for, and `apply_field` would raise on the accepted decision.
+    """
+    run, _baseline = _caravan_run_with_a_nose_weight(connection, nose=100)
+
+    decided = [e.change.field for e in store.list_change_queue(connection, run.id)]
+    findings = [
+        f.field
+        for findings in store.findings_by_product(connection, run.id).values()
+        for f in findings
+    ]
+
+    assert "max_nose_weight_kilograms" not in decided
+    assert "max_nose_weight_kilograms" in findings
+
+
+def test_the_nose_weight_reaches_the_readable_csv_and_not_the_upload(
+    connection: sqlite3.Connection, tmp_path: Path
+) -> None:
+    """The whole point of the column: usable by us, invisible to FMLV's importer."""
+    from src.product_model import caravan_schema
+    from src.vehicle_class import VehicleClass
+
+    run, baseline = _caravan_run_with_a_nose_weight(connection, nose=100)
+
+    result = generate_upload(
+        connection,
+        run_id=run.id,
+        manufacturer=make_manufacturer(manufacturer_id=196, fmlv_manufacturer="Eriba"),
+        baseline=[baseline],
+        path=tmp_path / "upload.csv",
+        vehicle_class=VehicleClass.CARAVAN,
+    )
+
+    [product] = result.motorhomes
+    assert product.max_nose_weight_kilograms == 100
+
+    # Row 3, because the upload carries two leading `-` rows for the FMLV site.
+    upload_lines = result.path.read_text(encoding="utf-8-sig").splitlines()
+    upload_header = next(csv.reader([upload_lines[2]]))
+    with result.readable_path.open(encoding="utf-8-sig", newline="") as handle:
+        [row] = list(csv.DictReader(handle))
+
+    assert "max_nose_weight_kilograms" not in upload_header
+    assert upload_header == list(caravan_schema.UPLOAD_COLUMNS)
+    assert row["max_nose_weight_kilograms"] == "100"
+
+
+def test_a_nose_weight_is_not_carried_over_when_a_run_does_not_find_one(
+    connection: sqlite3.Connection, tmp_path: Path
+) -> None:
+    """The requester's rule, 9 November 2026: *"either it is current and factual, off the
+    website, or we couldn't find it and it's blank"*.
+
+    The one field here that is **not** preserved when a run comes back without it. The
+    figure feeds advice about whether a tow is safe and legal, so a stale one is worse than
+    none — which is the opposite of the rule every other mass follows.
+    """
+    from src.vehicle_class import VehicleClass
+
+    run, baseline = _caravan_run_with_a_nose_weight(
+        connection, nose=None, baseline_nose=100
+    )
+
+    result = generate_upload(
+        connection,
+        run_id=run.id,
+        manufacturer=make_manufacturer(manufacturer_id=196, fmlv_manufacturer="Eriba"),
+        baseline=[baseline],
+        path=tmp_path / "upload.csv",
+        vehicle_class=VehicleClass.CARAVAN,
+    )
+
+    [product] = result.motorhomes
+    assert product.max_nose_weight_kilograms is None
+
+    with result.readable_path.open(encoding="utf-8-sig", newline="") as handle:
+        [row] = list(csv.DictReader(handle))
+    assert row["max_nose_weight_kilograms"] == ""

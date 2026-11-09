@@ -53,8 +53,10 @@ def _row(**overrides: object) -> dict[str, object]:
 
 
 def test_the_caravan_schema_has_the_columns_the_export_has() -> None:
-    assert len(caravan_schema.COLUMNS) == 62
-    assert len(set(caravan_schema.COLUMNS)) == 62
+    """62 of FMLV's, plus one of ours — see `test_the_nose_weight_column_is_ours_alone`."""
+    assert len(caravan_schema.UPLOAD_COLUMNS) == 62
+    assert len(caravan_schema.COLUMNS) == 63
+    assert len(set(caravan_schema.COLUMNS)) == 63
 
 
 def test_the_caravan_schema_drops_every_motorhome_only_column() -> None:
@@ -98,7 +100,18 @@ def test_the_schema_column_order_matches_the_real_export_exactly() -> None:
     finally:
         workbook.close()
 
-    assert caravan_schema.COLUMNS == header
+    # `UPLOAD_COLUMNS`, not `COLUMNS`: `max_nose_weight_kilograms` is appended past the end
+    # of FMLV's template on purpose and is stripped before an upload is written.
+    assert caravan_schema.UPLOAD_COLUMNS == header
+
+
+def test_the_nose_weight_column_is_ours_alone_and_never_uploaded() -> None:
+    """FMLV has no maximum nose weight field and is not getting one — the figure is for the
+    TowCheck sister site. So it rides in the copy a person reads and is stripped from the
+    upload, which must stay byte-compatible with FMLV's own template."""
+    assert caravan_schema.COLUMNS[-1] == "max_nose_weight_kilograms"
+    assert "max_nose_weight_kilograms" not in caravan_schema.UPLOAD_COLUMNS
+    assert caravan_schema.NEVER_IN_UPLOAD == frozenset({"max_nose_weight_kilograms"})
 
 
 # --------------------------------------------------------------------------- #

@@ -225,6 +225,9 @@ def caravan_to_row(caravan: Caravan) -> dict[str, str]:
     set_int("price_max_range_pounds", caravan.price_max_range_pounds)
     set_int("mtplm_kilograms", caravan.mtplm_kilograms)
     set_int("mro_kilograms", caravan.mro_kilograms)
+    # Blank unless this run read one. Never FMLV's own, because FMLV has no such column,
+    # and never the previous run's — see `Caravan.max_nose_weight_kilograms`.
+    set_int("max_nose_weight_kilograms", caravan.max_nose_weight_kilograms)
     set_int(
         "optional_equipment_payload_kilograms", caravan.optional_equipment_payload_kilograms
     )
@@ -299,7 +302,11 @@ def read_export(path: Path | str) -> CaravanReadResult:
 
 
 def write_csv(
-    caravans: Iterable[Caravan], path: Path | str, *, leading_blank_rows: int = 0
+    caravans: Iterable[Caravan],
+    path: Path | str,
+    *,
+    leading_blank_rows: int = 0,
+    columns: tuple[str, ...] = caravan_schema.COLUMNS,
 ) -> None:
     """Write caravans as a CSV in the exact FMLV upload column order.
 
@@ -311,11 +318,18 @@ def write_csv(
     the damage is real, and an upload carrying it creates a *second* base vehicle
     manufacturer in FMLV that no filter will ever join back up. The mark is three bytes
     Excel uses to recognise UTF-8, and `read_csv` below already skips it (`utf-8-sig`).
+
+    `columns` is the column set and order to write, defaulting to the whole schema.
+    `output.write_upload_csv` passes `caravan_schema.UPLOAD_COLUMNS` for the upload proper
+    and the full set for the copy a person reads — the difference between the two being
+    `max_nose_weight_kilograms`, which FMLV has no field for.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8-sig") as handle:
-        writer = csv.DictWriter(handle, fieldnames=caravan_schema.COLUMNS)
+        # `extrasaction="ignore"` so a narrower `columns` simply drops what it leaves out:
+        # the row dict is always built for the full set.
+        writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
         for _ in range(leading_blank_rows):
             # Through the csv writer, so these rows end CRLF like the rest — see
             # `io.write_csv`, which had the same mixed-line-endings bug.

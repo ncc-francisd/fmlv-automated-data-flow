@@ -69,6 +69,28 @@ FINDING_FIELDS: tuple[str, ...] = (
 )
 
 
+#: The maximum nose weight, for the TowCheck sister site. A finding, not a proposal, on
+#: the requester's ruling of 9 November 2026 — *"I don't think it needs to be something
+#: that's approved or rejected… if you find it, you add it, and if you don't find it, you
+#: leave it blank"*.
+#:
+#: **Deliberately not in `FINDING_FIELDS`.** That tuple is the habitation group, and
+#: `output.build._unanswered_habitation_columns` walks it to decide which columns a *new*
+#: product should reach FMLV blank on rather than `No`. A nose weight is a number in a
+#: column of its own, with no group of yes/no alternatives to blank, so it has no business
+#: in that walk. `NOT_PROPOSED` is what the diff reads.
+#:
+#: Unlike the habitation findings it is recorded for **every** product, new or matched:
+#: the column is meant to carry what this run read, and a matched product is exactly the
+#: case where a stale figure would otherwise persist.
+NOSE_WEIGHT_FIELD = "max_nose_weight_kilograms"
+
+
+#: Everything `diff.compare` must not propose. The habitation group plus the nose weight —
+#: the floorplan is not here because it is not a field path at all.
+NOT_PROPOSED: frozenset[str] = frozenset({*FINDING_FIELDS, NOSE_WEIGHT_FIELD})
+
+
 #: The one finding that is a pointer rather than a value: the layout drawing, which
 #: answers every positional field at once. Not a `Motorhome`/`Caravan` field name — it is
 #: about the product, not one column of it — which is why it is spelled unlike the rest
@@ -101,6 +123,7 @@ FINDING_LABELS: dict[str, str] = {
     "sleeping_area": "Sleeping area",
     "kitchen_location": "Kitchen",
     "lounge_location": "Lounge",
+    NOSE_WEIGHT_FIELD: "Maximum nose weight",
 }
 
 
