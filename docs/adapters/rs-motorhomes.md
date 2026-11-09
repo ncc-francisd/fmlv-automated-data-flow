@@ -1,6 +1,6 @@
 # RS Motorhomes — survey
 
-**Surveyed 9 November 2026. No adapter written yet.**
+**Surveyed and built 9 November 2026.** The adapter is `src/adapters/rs_motorhomes.py`.
 
 RS Motorhomes build very large bespoke luxury coachbuilts in Westwoodside, Doncaster —
 £300,000 to £400,000, four models, one product each. They are also a dealership trading as
@@ -172,13 +172,80 @@ Three weaker checks are available and all three should be used:
   Hi-Matic's effect on towing capacity. The Envoy's base transmission is already automatic.
   FMLV already carries an automatic price for the Endeavour and the Elysian.
 - **`/rs-emotion/` is an orphan, not a fifth model.** It resolves, describes an 18-tonne
-  Mercedes-Benz Antos at 12.1 metres with four slide-outs, and is absent from both the nav
-  and the `/luxury-motorhomes/` index. It also throws a visible PHP warning —
-  *"Attempt to read property \"post_title\" on null"* — which is what a page left behind
-  looks like. It is not in the active export either. Watch it rather than collect it.
+  Mercedes-Benz Antos at 12.1 metres with four slide-outs, and throws a visible PHP warning
+  — *"Attempt to read property \"post_title\" on null"* — which is what a page left behind
+  looks like. It is in neither the navigation nor the active export. Watch it rather than
+  collect it.
+
+  **Correction, made while building.** The survey first said it was absent from the models
+  index as well, and that was too strong: `/luxury-motorhomes/` does carry a
+  `DISCOVER THE RS EMOTION` button. It sits on the *Bespoke* block at the foot of the page,
+  which is about custom adaptations and names no vehicle of its own — so the Emotion has a
+  button and no heading, where each of the four real models has both. The distinction is
+  what `parse_roster` turns on, and it is why that function reads headings rather than
+  links: a link-following roster reports five models here.
 - **Never read `/listings/` or `/preowned-motorhomes/`.** They are the dealership's used
   stock and include Bailey, Carado, Dethleffs, Swift and Autocruise vehicles alongside
   used RS ones. A used `rs-endeavour-4` listing is one unit's plate, not the model's spec.
 - **These are bespoke builds.** Every document says *"Bespoke luxury. Built around you"* and
   *"Choice of layout configurations"*. One FMLV row per model is a base specification, not
   a layout, which is how the export already treats them.
+
+## What the adapter does
+
+One fetch of the media listing, three PDFs, one HTML table, one index page — six requests
+for four products, no browser.
+
+| Field | Source | Proposed? |
+|---|---|---|
+| `base_vehicle_manufacturer` | the chassis table's `Base Vehicle`, never the cover | yes |
+| `mh_length_mm` / `mh_width_mm` / `mh_height_mm` | `Overall …` rows | yes |
+| `mtplm_kilograms` | `Gross Vehicle Weight` | yes, unless two rows disagree |
+| `rrp_pounds` | both printings of the price, where they agree | yes |
+| `mh_passenger_seats_inc_driver` | the cab-seat row, optional rear belts excluded | yes |
+| `automatic_available` | the Hi-Matic row or the stated transmission | yes |
+| `manufacturer_range` | always `RS` | yes |
+| `heating`, `refrigeration`, `microwave`, `bed_types` | the standard specification | **finding** |
+| `mro_kilograms`, `mh_payload_kilograms` | nothing published | **no** |
+| `berths` | marketing, and it contradicts itself | **no**, narrated |
+| `body_type` | nothing published settles it | **no** |
+
+Four things it refuses to do, each because of something this site actually did:
+
+1. **Read a value from a label that appears twice with different values.** `_single`
+   returns a value only when every row under that label agrees; an identical repeat is
+   fine, which matters because the Evolution's page prints `Engine Capacity – 4500cc`
+   twice. This is what keeps its gross vehicle weight blank rather than one of 7,200kg and
+   10.5 tonnes chosen at random.
+2. **Believe a cover page.** The Envoy's names an Iveco Daily; its chassis table names a
+   DAF XB. The table is taken and the disagreement is narrated every run.
+3. **Read a row that contradicts its own label.** `Gross Train Weight 12-ton towing
+   capacity` is not a train weight, so it is not read as one.
+4. **Record a price the document states twice and differently.** The two printings are the
+   nearest thing to a self-check here, so disagreement means no price rather than a guess
+   at which printing is right.
+
+The options table is cut off before the habitation read, because these documents put every
+priced extra in a table with no per-line marker — `habitation.usable_lines` cannot tell an
+option from a fitting, so the split has to be structural.
+
+### The first run, 9 November 2026
+
+Run #215: 4 scraped against 4 baseline, 4 matched, none new, none disappeared, 31 proposed
+changes. Hand-checked against the documents, the substantive ones are:
+
+* **Envoy** — `Mercedes` → `DAF`, length 9,448 → **10,005mm**, MTPLM 7,200 → **16,000kg**,
+  price £380,000 → £399,995, travel seats 4 → 2.
+* **Elysian** — height 3,600 → **3,400mm**, price £290,000 → £335,000.
+* **Endeavour** — price £259,000 → £299,995.
+* **Evolution** — travel seats 4 → 2; nothing else, because its page publishes no price and
+  its mass is refused.
+* **All four** — `automatic_available` blank → Yes.
+
+One row needs reading carefully rather than accepting: the Envoy's
+`mh_payload_kilograms 2000 → 10800`. The adapter proposes no payload, and this is the
+pipeline's own arithmetic — the scraped 16,000kg MTPLM less FMLV's **unsourced** 5,200kg
+MRO. Its snippet says so, and the settled rule is that an arithmetic correction is offered
+even where neither mass has a source. But 5,200kg is not a credible mass in running order
+for a 16-tonne DAF, so accepting the derived figure would make three numbers agree without
+making any of them right. The real fix is to get a mass in running order from RS.
