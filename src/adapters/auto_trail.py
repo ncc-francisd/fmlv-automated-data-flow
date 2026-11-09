@@ -137,37 +137,57 @@ class _AdventureSpec:
     mro_kilograms: int
     mh_width_mm: int
     mh_height_mm: int
-    #: The spreadsheet's length, **checked against the price list** and overridden where
-    #: they disagree — see `adventure_products`. The 64's is wrong there: the spreadsheet
-    #: repeats 7288mm down all four rows where the price list gives the 64 as 6.37m, and
-    #: the news post says the range comes "in two lengths".
-    spreadsheet_length_mm: int
+    #: The length in millimetres, **checked against the price list** and overridden where
+    #: the two disagree by more than `_ADVENTURE_LENGTH_TOLERANCE_MM` — see
+    #: `adventure_products`.
+    #:
+    #: **The price list cannot settle this field, only check it.** It prints metres to 2dp,
+    #: so every length in it is a figure rounded to the nearest centimetre: `7.29m` for a
+    #: 7288mm vehicle, `6.37m` for a 6371mm one. The check exists to catch a *gross* error,
+    #: which it did — the spreadsheet repeated 7288mm down all four rows, and the 64 is
+    #: 900mm shorter than that.
+    length_mm: int
 
 
 ADVENTURE_SPECS: tuple[_AdventureSpec, ...] = (
-    _AdventureSpec("64", 4, 4, 2880, 2353, 3041, 7288),
+    # The 64's 6371mm is **Auto-Trail's own correction**, sent to the NCC on 9 November
+    # 2026 when they asked us to check the range. It is not in any document they publish:
+    # the price list and the 2027 fold-out leaflet both print `6.37m`, which rounds to
+    # 6370mm, and that millimetre is the whole of the discrepancy they reported. Their
+    # word about their own vehicle outranks a figure rounded off their own brochure.
+    _AdventureSpec("64", 4, 4, 2880, 2353, 3041, 6371),
     _AdventureSpec("74", 4, 4, 3000, 2353, 3041, 7288),
     _AdventureSpec("76", 4, 4, 3030, 2353, 3041, 7288),
     _AdventureSpec("76G", 4, 4, 3000, 2353, 3041, 7288),
 )
 
-#: **The requester's estimate, not a published figure.** Auto-Trail publish no body type
-#: for the Adventure, no floorplan and not one photograph — there is nothing to derive it
-#: from, which is why the range carried `coach_built_over_cab_bed` unsourced from
-#: 2 October. The requester settled it on 27 October 2026: a fixed over-cab bed is close
-#: to extinct in a new build, and the one piece of published wording that bears on it
-#: reconciles with a low profile rather than against it. The launch post promises "a new
-#: Luton overcab bulkhead design, exclusive to the Adventure range, providing an improved
-#: and convenient bed-making experience", and the Adventure is the only coachbuilt range
-#: whose options list does **not** sell a drop-down bed — F-Line and Imala both charge
-#: GBP1,500 for one — while every Adventure layout still sleeps four. A drop-down bed
-#: fitted as standard explains both at once.
+#: **Auto-Trail's own published wording**, from 9 November 2026. Their 2027 fold-out
+#: leaflet introduces the range as *"four thoughtfully designed **Hi-Line** models, each
+#: featuring a comfortable **overcab bed**, including the Adventure 64, Adventure 74, the
+#: Adventure 76 and Adventure 76G"*.
 #:
-#: **What would overturn it:** a floorplan or an interior photograph showing a fixed bed
-#: in the Luton. Height cannot, and must not be used — FMLV holds Frontier Delaware and
-#: Comanche at 3030mm and Grande Frontier at 3040mm as low profiles, against the
-#: Adventure's 3041mm, so Auto-Trail's own data puts both body types in that band.
-ADVENTURE_BODY_TYPE = BodyType.COACH_BUILT_LOW_PROFILE
+#: That settles a field this adapter carried as an explicit estimate from 2 October and
+#: then as the requester's judgement from 27 October, when nothing Auto-Trail had published
+#: bore on it: no body type, no floorplan, not one photograph. The estimate was
+#: `coach_built_low_profile`, reasoned from the launch post's "Luton overcab bulkhead
+#: design ... bed-making experience" reading as a drop-down bed, and from the Adventure
+#: being the only coachbuilt range that does not sell one as a GBP1,500 option. The
+#: inference was sound and the conclusion was wrong: the Luton holds a fixed bed, and
+#: Auto-Trail call these Hi-Lines.
+#:
+#: The note recorded against the estimate said to overturn it on a floorplan or an interior
+#: photograph and **never on the 3041mm height**. That still holds, and no height was used
+#: here — FMLV has Frontier Delaware and Comanche at 3030mm and Grande Frontier at 3040mm
+#: as low profiles, so Auto-Trail's own data puts both body types in that band. What
+#: overturned it is better than a drawing: the maker naming the body style in print.
+ADVENTURE_BODY_TYPE = BodyType.COACH_BUILT_OVER_CAB_BED
+
+#: The 2027 fold-out leaflet, which settled the body type on 9 November 2026 and
+#: independently confirms four berths and four belts on all four models — the figures the
+#: requester ruled in favour of on 2 October against the spreadsheet's 4/6/6/6. Its
+#: "MEET THE RANGE" block prints each model's length, and prints it in metres to 2dp, so it
+#: is no better than the price list on `length_mm`.
+_ADVENTURE_LEAFLET_URL = f"{BASE_URL}/wp-content/uploads/A4-Fold-Out-Leaflet-2027.pdf"
 
 #: Where the berths, the belted seats, the two lengths and the Luton wording all come
 #: from. It is the only page Auto-Trail have published about the 2027 Adventure at all.
@@ -178,13 +198,13 @@ _ADVENTURE_LAUNCH_POST_URL = (
 #: Said in full on every Adventure's `body_type`, because an estimate that reaches review
 #: looking like a parsed figure is worse than no estimate at all.
 _ADVENTURE_BODY_TYPE_NOTE = (
-    "ESTIMATED by the requester on 27 October 2026, not published. Auto-Trail state no "
-    "body type for the Adventure and publish no floorplan or photograph of it. A fixed "
-    "over-cab bed is near-extinct in a new build, and the launch post's new 'Luton "
-    "overcab bulkhead design ... bed-making experience' reads as a drop-down bed fitted "
-    "as standard — the Adventure is the only coachbuilt range that does not sell one as "
-    "an option. Overturn this on a floorplan or an interior photograph, NOT on the "
-    "3041mm height: Frontier and Grande Frontier are low profiles at 3030 and 3040mm"
+    "PUBLISHED by Auto-Trail in their 2027 fold-out leaflet: 'With four thoughtfully "
+    "designed Hi-Line models, each featuring a comfortable overcab bed, including the "
+    "Adventure 64, Adventure 74, Adventure 76 and Adventure 76G'. This replaces the "
+    "estimate of 27 October 2026, which read the launch post's 'Luton overcab bulkhead "
+    "design' as a drop-down bed and recorded a low profile. The maker's own words settle "
+    "it, and no height was used either way: Frontier and Grande Frontier are low profiles "
+    "at 3030 and 3040mm against the Adventure's 3041mm"
 )
 
 #: The spreadsheet, named in every Adventure provenance so a reviewer can see which
@@ -304,13 +324,13 @@ def adventure_products(
                 f"{_ADVENTURE_SPEC_SOURCE} alone"
             )
 
-        length_mm = spec.spreadsheet_length_mm
+        length_mm = spec.length_mm
         warnings: list[str] = []
         if row is not None:
-            gap = abs(row.length_mm - spec.spreadsheet_length_mm)
+            gap = abs(row.length_mm - spec.length_mm)
             if gap > _ADVENTURE_LENGTH_TOLERANCE_MM:
                 warnings.append(
-                    f"the spreadsheet says {spec.spreadsheet_length_mm}mm but the 2027 "
+                    f"the spreadsheet says {spec.length_mm}mm but the 2027 "
                     f"price list says {row.length_mm}mm, {gap}mm apart. The price list is "
                     f"recorded: it is Auto-Trail's own published document, and their news "
                     f"post says the range comes in two lengths where the spreadsheet "

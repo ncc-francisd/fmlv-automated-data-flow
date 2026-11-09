@@ -586,3 +586,76 @@ document.
 So the Adventures are recorded at GBP69,135 (64) and GBP71,635 (74, 76, 76G). **That is an
 extrapolation**, used only because this range has no card, and the first run after
 Auto-Trail publish the range pages replaces it with the published figure.
+
+## Auto-Trail checked our Adventure data — 9 November 2026
+
+Auto-Trail asked the NCC to check the prices, lengths and specifications on the 2027
+Adventure range, reporting the 64's length as wrong. Two things came out of it, and the
+second matters far more than the first.
+
+### The 64 is 6371mm, and no document they publish says so
+
+They are right and we were 1mm out. The cause is in this adapter's own notes: **the price
+list prints metres to two decimal places**, so `6.37m` converts to 6370mm, and
+`parse_adventure_price_list` rounds it there. Their 2027 fold-out leaflet prints `6.37m`
+too. So 6371 exists in neither document — it is their own correction, and it is recorded
+as that.
+
+The 64 is the only Adventure with this exposure. The other three take 7288mm from the
+specification spreadsheet, which is millimetre-precise; the spreadsheet repeated that same
+7288mm down all four rows, which is why the 64 fell back to the rounded price-list figure
+in the first place. `_AdventureSpec.length_mm` now holds 6371 and the price-list check
+passes silently at 1mm.
+
+**The standing lesson:** a price list that prints metres to 2dp can *check* a length and
+can never *set* one. Where a maker publishes only rounded dimensions, every figure taken
+from them is up to 5mm out, and a maker who audits their own data will notice.
+
+### The body type was wrong, and their leaflet settles it
+
+`ADVENTURE_BODY_TYPE` was `coach_built_low_profile`, recorded as the requester's explicit
+estimate on 27 October 2026 because Auto-Trail had published no body type, no floorplan and
+no photograph. The estimate reasoned from the launch post's *"Luton overcab bulkhead design
+... bed-making experience"* reading as a drop-down bed, plus the Adventure being the only
+coachbuilt range not selling one as a GBP1,500 option.
+
+Their **2027 fold-out leaflet** — `/wp-content/uploads/A4-Fold-Out-Leaflet-2027.pdf`, on
+the downloads page — says plainly:
+
+> With four thoughtfully designed **Hi-Line** models, each featuring a comfortable
+> **overcab bed**, including the Adventure 64, Adventure 74, Adventure 76 and Adventure
+> 76G, every vehicle offers four berths and four travelling seats as standard
+
+So it is `coach_built_over_cab_bed`. The estimate's own overturn condition was "a floorplan
+or an interior photograph, and **never** the 3041mm height" — this is better than either,
+and no height was used.
+
+Two things worth carrying forward:
+
+* **A range with no model pages may still have a leaflet.** `/motorhomes/adventure/` is a
+  404 and the Adventure has no page on the site at all, yet the downloads page carries a
+  2027 leaflet that answers the question five weeks of inference could not. Check the
+  downloads page again whenever a field is being estimated.
+* **The leaflet corroborates four berths and four belts** on all four models, independently
+  of the launch post. That is the second published source for the figures the requester
+  ruled in favour of on 2 October against the spreadsheet's 4/6/6/6.
+
+### Everything else reconciles
+
+Run against the live price list on 9 November 2026, which is the document Auto-Trail sent:
+
+| | 64 | 74 | 76 | 76G |
+|---|---|---|---|---|
+| Length | **6371** | 7288 | 7288 | 7288 |
+| Price | GBP 69,135 | GBP 71,635 | GBP 71,635 | GBP 71,635 |
+| Gross vehicle weight | 3500 | 3500 | 3500 | 3500 |
+| Mass in running order | 2880 | 3000 | 3030 | 3000 |
+| Berths / belts | 4 / 4 | 4 / 4 | 4 / 4 | 4 / 4 |
+
+The prices are the price list's ex-works-including-VAT (GBP 68,500 and GBP 71,000) plus
+`_ON_THE_ROAD_UPLIFT_POUNDS`. **If Auto-Trail query the price, that is the figure to
+discuss**: the Adventure has no "Price from" card on the website, so the uplift is inferred
+from the 25 models that do have one, and GBP 180 of its GBP 635 is unexplained by the price
+list's own stated government charges of GBP 455. Either an Adventure card on their site or
+an on-the-road figure from them would retire the inference.
+

@@ -123,36 +123,72 @@ def test_four_products_are_built() -> None:
 
     assert [p.model for p in products] == ["64", "74", "76", "76G"]
     assert {p.range_label for p in products} == {ADVENTURE_RANGE_LABEL}
-    assert {p.body_type for p in products} == {BodyType.COACH_BUILT_LOW_PROFILE}
+    assert {p.body_type for p in products} == {BodyType.COACH_BUILT_OVER_CAB_BED}
 
 
-def test_the_body_type_is_an_estimate_and_says_so() -> None:
-    """Auto-Trail publish no body type, no floorplan and no photograph of this range, so
-    the value is the requester's judgement of 27 October 2026 and has to reach review
-    labelled as one — it carried `coach_built_over_cab_bed` unsourced before that."""
-    assert auto_trail.ADVENTURE_BODY_TYPE is BodyType.COACH_BUILT_LOW_PROFILE
+def test_the_body_type_is_published_and_says_whose_words_it_is() -> None:
+    """Settled 9 November 2026 by Auto-Trail's own 2027 fold-out leaflet: *"four
+    thoughtfully designed Hi-Line models, each featuring a comfortable overcab bed"*.
+
+    It was the requester's estimate from 2 October, recorded as a low profile on 27
+    October, and reaching review labelled as an estimate throughout — which is the only
+    reason it was safe to be wrong. Now it is the maker's statement and says so.
+    """
+    assert auto_trail.ADVENTURE_BODY_TYPE is BodyType.COACH_BUILT_OVER_CAB_BED
     note = auto_trail._ADVENTURE_BODY_TYPE_NOTE
-    assert "ESTIMATED by the requester" in note
-    assert "floorplan or an interior photograph" in note
+    assert "PUBLISHED by Auto-Trail" in note
+    assert "Hi-Line" in note
+    assert "overcab bed" in note
 
 
-def test_the_estimate_does_not_rest_on_the_height() -> None:
-    """The argument I offered first and had to withdraw: 3041mm proves nothing, because
-    Auto-Trail's own low profiles sit at 3030mm and 3040mm in FMLV."""
-    assert "NOT on the" in auto_trail._ADVENTURE_BODY_TYPE_NOTE
-    assert "3041mm height" in auto_trail._ADVENTURE_BODY_TYPE_NOTE
+def test_the_body_type_still_does_not_rest_on_the_height() -> None:
+    """The argument offered first and withdrawn: 3041mm proves nothing either way, because
+    Auto-Trail's own low profiles sit at 3030mm and 3040mm in FMLV. It did not decide the
+    estimate and it did not decide the correction."""
+    note = auto_trail._ADVENTURE_BODY_TYPE_NOTE
+
+    assert "3030 and 3040mm" in note
+    assert "3041mm" in note
 
 
-def test_the_price_list_overrules_a_spreadsheet_length_that_disagrees() -> None:
-    """**The trap this exists for.** The spreadsheet repeats 7288mm down all four rows,
+def test_the_price_list_overrules_a_length_that_grossly_disagrees() -> None:
+    """**The trap this exists for.** The spreadsheet repeated 7288mm down all four rows,
     but Auto-Trail's price list gives the 64 as 6.37m and their news post says the range
-    comes in two lengths. The spreadsheet is describing one model's length four times."""
-    assert _spec("64").spreadsheet_length_mm == 7288
+    comes in two lengths. The spreadsheet was describing one model's length four times.
 
-    sixty_four = next(p for p in adventure_products(PRICE_LIST) if p.model == "64")
+    The 64 now carries Auto-Trail's own 6371mm, so the gross disagreement is gone and the
+    check passes silently. Proved here against the figure that was actually wrong.
+    """
+    from src.adapters.auto_trail import _AdventureSpec, adventure_products as _build
+
+    assert _spec("64").length_mm == 6371
+
+    wrong = _AdventureSpec("64", 4, 4, 2880, 2353, 3041, 7288)
+    original = auto_trail.ADVENTURE_SPECS
+    auto_trail.ADVENTURE_SPECS = (wrong,)
+    try:
+        [sixty_four] = _build(PRICE_LIST)
+    finally:
+        auto_trail.ADVENTURE_SPECS = original
 
     assert sixty_four.mh_length_mm == 6370
     assert any("918mm apart" in w for w in sixty_four.parse_warnings)
+
+
+def test_the_64_carries_auto_trails_own_millimetre() -> None:
+    """Auto-Trail reported our 6370mm as a fault on 9 November 2026, and it was one.
+
+    **No document they publish states 6371.** Their price list and their 2027 leaflet both
+    print `6.37m`, which converts to 6370mm, so the whole of the millimetre they
+    complained about is the rounding in their own brochures. Their word about their own
+    vehicle outranks a figure rounded off their own paper — and the price list can only
+    ever check this field, never set it.
+    """
+    sixty_four = next(p for p in adventure_products(PRICE_LIST) if p.model == "64")
+
+    assert sixty_four.mh_length_mm == 6371
+    assert sixty_four.parse_warnings == ()
+    assert auto_trail.parse_adventure_price_list(PRICE_LIST)["64"].length_mm == 6370
 
 
 def test_a_length_that_agrees_to_the_rounded_metre_is_kept() -> None:

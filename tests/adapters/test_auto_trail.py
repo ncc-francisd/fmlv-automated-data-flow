@@ -794,3 +794,4 @@ def test_habitation_is_left_alone_when_the_block_was_not_kept(f_line) -> None:
     assert extracted.motorhome.heating is None
     assert extracted.motorhome.microwave is None
     assert "refrigeration" not in extracted.provenance
+
