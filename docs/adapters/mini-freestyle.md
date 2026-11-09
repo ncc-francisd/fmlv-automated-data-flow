@@ -217,3 +217,120 @@ is not collected, and it is **not to be uploaded as a 2027 model**.
 This reverses the plan of 7 October, when the intention was to bring the deactivated 442
 back by reusing product 7239. `EXPECTED_LAYOUTS` is **3**, and `WITHDRAWN` carries the
 reason so a run says out loud why a model in the source is being passed over.
+
+## The 2027 range — checked 9 November 2026, nothing yet changed in code
+
+Checked at the requester's request before a rerun. **A rerun today fails**, and most of
+what this survey records above has been overtaken. Nothing has been changed in the adapter:
+the open questions at the bottom are the requester's, not an adapter's.
+
+### The catalogue link is gone from `/en/`, and the 2027 edition is French-only
+
+`collect` raises `no catalogue PDF linked from .../en/ — the only source is gone`, which is
+accurate about the link and wrong about the document:
+
+* The English 2026 catalogue **still answers 200** at
+  `/files/2026/Minifreestyle_catalogue_2025_EN.pdf`, byte-identical to what runs 146 and
+  165 held (`86a82a06…`). It is merely unlinked.
+* **`/fr/` links `/files/2027/Minifreestyle_catalogue_2027.pdf`** — 13.4 MB, two pages,
+  printed August 2026, carrying both spec tables in extractable text. No English page
+  mentions it.
+* No PDF is linked from any English page at all, the model pages included.
+
+### The roster and the naming have both moved
+
+| nav, 9 Oct 2026 | nav, 9 Nov 2026 |
+|---|---|
+| Minis: 270, 290, **300** | Minis: 270, 290, **320** |
+| Silver: **Mini Freestyle 442** | Silver: **Silver 380**, **Silver 442** |
+
+**`Silver` is now a model-name prefix, not just a nav heading.** The 2027 catalogue heads
+its second table *"Les SILVER…"* and the pages are titled `Silver 380` and `Silver 442`.
+That is the change this survey's "the range names stay as FMLV has them" predates — the
+7 October reasoning was that `Silver` was a marketing grouping, and the maker has since
+made it a name.
+
+**The 290 has moved from the Silver line into the Minis**, keeping its dimensions.
+
+### The 2027 figures
+
+Mini — three models, 2 berths each:
+
+| | 270 | 290 | 320 |
+|---|---|---|---|
+| Overall length with hitch | 3,95 | 4,42 | **4,59** |
+| External body length | 2,99 | 3,47 | **3,64** |
+| Internal length | 2,50 | 2,97 | **3,20** |
+| Overall height | 1,98 | 1,98 | 1,98 |
+| Internal height | 1,87 | 1,87 | 1,87 |
+| Overall width | 2,03 | 2,03 | 2,03 |
+| Empty weight | 590 | 662 | 675 |
+| Mass in running order | 594 | 679 | 692 |
+| MTPLM (PTAC) | 750 | 750 | 750 |
+| Awning | 8,74 | 8,94 | 9,14 |
+
+Silver — two models, 3 berths each:
+
+| | 380 | 442 |
+|---|---|---|
+| Overall length with hitch | 5,31 | 5,91 |
+| External body length | 4,28 | 4,88 |
+| Internal length | 3,80 | 4,40 |
+| Overall height | 2,00 | 2,00 |
+| Internal height | 1,95 | 1,95 |
+| Overall width | 2,03 | 2,03 |
+| Empty weight | 880 | 944 |
+| Mass in running order | 897 | 961 |
+| MTPLM (PTAC) | 1000 | 1050 |
+| Awning | 9,74 | 9,94 |
+
+**Every mass has dropped** against the 2026 edition — 641 → 594 on the 270, 693 → 679 on
+the 290 — so a rerun proposes a mass change on every model that survives.
+
+### The 320 is the 300's successor, not a second model beside it
+
+Three strands of evidence, and they agree:
+
+* Its page is **still `/en/mini-freestyle-300.html`** — the URL was not changed.
+* That page's floorplan is **still captioned `Mini 300`**.
+* The 2027 catalogue has **no 300**, and the 320 sits in its column.
+
+But it is **not a pure rename**: 4,59 m against 4,42 m, 170 mm longer, with the internal
+length up 230 mm. The old 300 and 290 were near-twins on every dimension and differed only
+by 2 kg in running order; in 2027 the 290 keeps those dimensions and the 320 is the longer
+vehicle. So FMLV product **7698 (`Mini / 300`)** most likely becomes the 320 with new
+figures, rather than being retired beside a new row.
+
+### Two questions only the requester can settle
+
+1. **The 442 is back, and the maker said it was gone.** Their email of 9 October 2026 —
+   which `WITHDRAWN` quotes and every run narrates — says the 442 is no longer in the
+   range. It is in the 2027 catalogue, and its English page reads *"Range available while
+   stocks last"*, as does the 380's. Run-out stock and "not in the range" are reconcilable,
+   but only they know which they meant.
+2. **Where the Silver line goes.** `Silver` is **NCC id 187**, a separate display name
+   under the same `Trigano` manufacturer, holding the archived `Trend` 350, 380 and 442.
+   The 2027 `Silver 380` and `Silver 442` may be those rows returning rather than new
+   products — the 380's MTPLM of 1000 matches archived 7238 exactly, and the 442 was
+   already shown in this survey to be archived 7239 on mass and dimension. Reviving them
+   is a cross-manufacturer question, so this adapter cannot propose it.
+
+Until both are answered the adapter is left as it is, failing loudly, which is the right
+failure: reading the unlinked 2026 catalogue would propose a 300 the maker no longer sells.
+
+## Maximum nose weight is not published — checked 9 November 2026
+
+Asked for TowCheck, which needs a maximum nose weight to tell an owner whether their car
+can tow a given caravan. **Mini Freestyle publish none, in either catalogue edition or
+anywhere on the site.**
+
+Searched for `nose weight`, `noseweight`, `vertical coupling load`, `S value`, `hitch` and
+`tongue weight` in English, and `poids/charge sur la flèche`, `timon` and `appui` in
+French. The only hits are equipment copy — *"Galvanized chassis and drawbar"*, *"Drawbar
+cover"* in the Look Pack, *"Châssis et timon galvanisés"* — and a towball in the bike-carrier
+option. The 2027 catalogue's weight block runs empty weight, mass in running order, MTPLM
+and the administrative MTPLM upgrade, and stops.
+
+There is also **no FMLV column to put one in**: `caravan_schema.COLUMNS` is 62 columns and
+its only masses are `mtplm_kilograms`, `mro_kilograms` and the two payloads.
+

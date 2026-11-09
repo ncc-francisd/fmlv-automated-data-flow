@@ -2284,6 +2284,26 @@ Two follow-on questions the later surveys added:
   often exactly the roster or comparison view an adapter wants, and nobody links to them
   because they are not part of the sales funnel.
 
+### A catalogue link can disappear from one language and survive in another
+
+**Mini Freestyle, 9 November 2026.** A rerun would have failed outright: `catalogue_url`
+found no PDF on `/en/`, which the adapter correctly treats as "the only source is gone".
+It had not gone. The English 2026 catalogue was *unlinked* — still answering 200 at its old
+address — because there is no English 2027 edition yet, and **`/fr/` links the 2027
+catalogue**, which the English pages do not mention at all.
+
+So when a document vanishes, check the other language homepages before concluding the
+manufacturer has withdrawn it. The lesson generalises past catalogues: a maker who
+translates their site will update the authoritative language first, and for a French or
+German maker that is not English. Mini Freestyle's own catalogue says so outright — *"en
+cas de version multilingue, c'est la langue française qui fait foi"*.
+
+The trap that follows is worse than the missing link. The **site** had already moved to the
+2027 roster and naming while the **English catalogue** still described 2026, so an adapter
+pinned to the old URL would have gone on proposing a model the maker no longer sells, from
+a document that still parses perfectly. A source that still answers is not the same as a
+source that is still current — check the edition, not the status code.
+
 ### A download card can name the right market and link the wrong one
 
 Weinsberg, 3 September 2026, and it is the nastiest near-miss found so far — because the
