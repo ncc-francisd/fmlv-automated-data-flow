@@ -1,11 +1,28 @@
-# Landseer — survey, 10 November 2026
+# Landseer — survey and adapter
 
-**NCC id 249**, `Landseer`. Campervans only, converted at Brindle Store, Bournes Row,
-Hoghton, Lancashire PR5 0DR — `01772 429763`, `info@landseerleisure.com`. The site carries
-a news page announcing that Landseer have joined the NCC as an approved manufacturer
-member, so this is a new member rather than a long-standing one.
+**Surveyed and built 10 November 2026.** The adapter is `src/adapters/landseer.py`.
 
-**Stage 1 only. No adapter has been written.**
+**NCC id 249.** Campervans only, converted at Brindle Store, Bournes Row, Hoghton,
+Lancashire PR5 0DR — `01772 429763`, `info@landseerleisure.com`. The site carries a news
+page announcing that Landseer have joined the NCC as an approved manufacturer member, so
+this is a new member rather than a long-standing one.
+
+**The two names are different and must not be crossed.** FMLV’s export spells the
+`manufacturer` column **`Landseer`**, one word — confirmed against the export of
+10 November 2026. The NCC supplier dropdown spells it **`Landseer Leisure`**, two words,
+confirmed by the requester the same day. The first is `fmlv_manufacturer` and the
+adapter’s `MANUFACTURER`; the second is `ncc_supplier_name` and nothing else.
+
+| | Landseer |
+|---|---|
+| JavaScript needed | No |
+| Products | **5** — Custom 2.0 SWB/LWB, Custom 2.5 PHEV SWB/LWB, Artemis |
+| Fetches | 1 index + 1 media listing + 2 PDFs |
+| Price | **In both PDFs**, on-the-road including one year’s VED |
+| Berths | **Never published, for anything** |
+| Weights | **GVW only. No mass in running order and no payload, in any of ten editions** |
+| Dimensions | Custom only, and the width is qualified `(mirrors folded)` |
+| Self-check | **The price grid**, not mass arithmetic — plus seats against belts |
 
 ## What was asked
 
@@ -176,15 +193,79 @@ published; its pop-top is a £9,200 *option*, which implies a fixed roof as stan
 that is an inference and the figure is missing, so the Artemis body type cannot be derived
 and must stay blank.
 
-## What is unverified
+## Built, 10 November 2026 — and the first run against the real export
 
-1. **`ncc_supplier_name` and `fmlv_manufacturer`.** Both are `Landseer`, taken from
-   `resources/manufacturers-full-list.csv` id 249. Neither has been checked against the NCC
-   export dropdown or an FMLV export.
-2. **What FMLV's two rows are actually called**, which decides whether an adapter matches
-   them or proposes everything as new.
-3. **The Artemis's dimensions and masses**, which the manufacturer publishes nowhere.
-4. **The body width**, as above.
+The requester supplied the NCC supplier name (`Landseer Leisure`) and both FMLV exports —
+one of current products, one of everything ever loaded. **They are byte-identical**, so
+nothing has ever been deactivated here and the relisting trap does not apply. FMLV holds
+exactly two products, `8421` and `8422`, as range `Custom 2.0` with the wheelbase as the
+model. The adapter matches both.
 
-Items 3 and 4 are a letter to Landseer. They are an NCC member, which usually makes that a
-short conversation.
+Run #218 compared five scraped products against that baseline: **2 changed, 3 new, 0
+disappeared**, which is the shape a correct first run has.
+
+### What the run found on the two products FMLV already holds
+
+| | FMLV held | Landseer publish |
+|---|---|---|
+| Custom 2.0 SWB price | £77,900 | **£76,000** |
+| Custom 2.0 LWB price | £81,400 | **£81,000** |
+| Custom 2.0 LWB automatic price | £85,950 | **£84,950** |
+| Custom 2.0 SWB automatic price | £79,950 | £79,950 — unchanged |
+
+**The two automatic prices FMLV holds are the 2026-season figures, exactly.** The December
+2025 and June 2026 editions both print £79,950 and £85,950, and the LWB's has since moved
+to £84,950. The two *manual* prices FMLV holds match **no edition Landseer have ever
+published**: every edition back to December 2025 prints £76,000 for the short wheelbase,
+and £82,000 then £81,000 for the long one. £77,900 and £81,400 come from somewhere else.
+
+### `automatic.rrp_pounds`, populated for the first time
+
+No adapter before this one has written that column. The field guide reserves it for a
+model offered with an automatic, and until now no surveyed manufacturer published a
+separate price for one — Landseer print it as its own line on every wheelbase. The PHEV is
+a 1-speed automatic with no manual at all, so its automatic price is its only price, and
+it is recorded in both columns so the product reaches FMLV's automatic filter.
+
+The automatic *mass* columns stay blank, because no automatic weight is published either.
+
+### The Custom has no washroom as standard
+
+The rear shower attachment is £240 and the Thetford porta toilet £100, both in the options
+list, and the rear awning "creating privacy/shower/toilet area" is price on application.
+So the vehicle as built has neither — yet **both of FMLV's existing Custom 2.0 rows carry
+`rear_shower_toilet`**. The adapter cannot propose that away, because silence about a
+washroom is not a statement that there is none, so it narrates the three option lines on
+every run instead. The Artemis, by contrast, has a real shower room as standard.
+
+### What the habitation module cannot read here
+
+`habitation.bed_types_from` drops any line containing the word `mattress` — a sound rule
+against "bed linen and mattresses" copy, which here costs the Artemis its shape, because
+its only statement of one is *"Custom Design Premium Memory Foam Mattress – 6' 5"
+Transverse Bed"*. Loosening that filter would reach seventy adapters, so the adapter
+quotes the bed lines into the run narration instead. Bed types are a finding a person
+types in, so the sentence in front of them is what the field actually needs.
+
+## Still open
+
+1. **A mass in running order and a payload, per model.** Landseer have never published
+   either, in any of ten editions, for anything. FMLV's own 2,400kg / 2,450kg and 775kg on
+   the two Custom rows have no Landseer document behind them and no known source; the
+   adapter leaves them alone rather than blanking them.
+2. **The body width excluding mirrors.** `2.15m wide (mirrors folded)` is their only
+   published width, and it is recorded as stated with their wording mirrored — which is
+   also what FMLV already holds. A Transit Custom's body is narrower than 2,150mm.
+3. **The Artemis's height, length, width, GVW and berth count**, none of which exist
+   anywhere. Its height is what blocks a body type.
+4. **Whether the Artemis's standard bench has three-point belts**, and how many travel
+   seats that makes. The brochure says `2 travel positions, see options for 4 positions`
+   and names a belt type only on the £3,500 option.
+5. **Whether the PHEV has its own GVW.** The sheet states one pair for the whole document
+   and a PHEV is the heavier vehicle, so the figure recorded for it is Landseer's own
+   published number rather than one measured for that engine. The provenance says so.
+6. **Berths**, which are published for nothing. FMLV holds 4 on both Customs; the Artemis
+   is a single fixed transverse bed.
+
+All six are a letter to Landseer. They are an NCC member, which usually makes that a short
+conversation.
