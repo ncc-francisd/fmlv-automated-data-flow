@@ -2870,6 +2870,57 @@ specification is full of automatic energy selection, automatic ignition, automat
 changeover and automatic levelling. Every pattern demands a gearbox word beside it or a
 chassis maker's trade name (`Hi-Matic`, `9G-Tronic`, `EAT8`, `PowerShift`, `DSG`).
 
+### The `automatic_*` columns are for a maker who prices the automatic separately
+
+The four columns beside `automatic_available` — `automatic_mro_kilograms`,
+`automatic_mh_payload_kilograms`, `automatic_rrp_pounds` and
+`automatic_price_min_range_pounds` — went unwritten by every adapter until **Landseer, 10
+November 2026**, because no manufacturer surveyed before them published a separate figure
+for the automatic. The guide's instruction is plain enough: *"IF AUTOMATIC OPTION, COMPLETE
+THESE EXTRA COLUMNS TO FEATURE IN AUTOMATIC FILTER RESULTS (otherwise leave blank)"*.
+
+**So fill them where, and only where, the manufacturer publishes a figure for the automatic
+specifically.** Landseer's price list prints
+
+```
+2027 Landseer Custom 2.0 - 150ps 6 Speed Manual (SWB)     £76,000
+2027 Landseer Custom 2.0 - 170ps 8 Speed Automatic (SWB)  £79,950
+```
+
+which is two published prices for one product, not two products: the gearbox is an option,
+not a model. The manual's price is `rrp_pounds` on the base-vehicle rule, and the
+automatic's goes to `automatic.rrp_pounds` — which is the field path `diff.compare` uses,
+since the model holds these under a nested `AutomaticVariant`.
+
+Three things follow:
+
+- **Fill each column independently.** Landseer publish an automatic price and no automatic
+  weight, so the two mass columns stay blank. Deriving a weight because the price was found
+  is the inheritance error under its own name.
+- **An automatic-only model fills them with its own single price.** Landseer's PHEV is a
+  *1 Speed Automatic* with no manual offered, so its one price is both `rrp_pounds` and
+  `automatic.rrp_pounds`. That looks like duplication and is not: `automatic_available` is
+  held back from uploads until Steadfast release column BN, so these columns are what puts
+  an automatic-only product into FMLV's automatic filter today.
+- **This does not weaken the identical-uplift rule above.** A gearbox priced at one uplift
+  across a range is still an option rather than a model — it just happens to be an option
+  FMLV has four columns for.
+
+### Beware the habitation module's `mattress` exclusion when a bed is named once
+
+`habitation.bed_types_from` skips any line containing `mattress`, which is right far more
+often than it is wrong: "bed linen and mattresses" is ordinary equipment copy that read as a
+bed gave products beds nobody published. But it costs a real type where the **only**
+statement of a bed's shape is in a line that also sells the mattress — Landseer's Artemis
+says just *"Custom Design Premium Memory Foam Mattress – 6' 5" Transverse Bed"*, and its
+`transverse_bed` is lost.
+
+**Do not loosen the filter for one brand**; it is shared by every adapter. Bed types are a
+*finding* a person types in by hand, so the fix is to put the manufacturer's own sentence in
+front of them — narrate the bed lines through `on_progress`, as `landseer._narrate_habitation`
+does. The same applies to any habitation field whose evidence the vocabulary cannot reach:
+state it, do not force it.
+
 ### A lifting roof does not change a caravan's body type
 
 **Rule from the NCC side, 7 September 2026: the type is rigid even where the manufacturer's
