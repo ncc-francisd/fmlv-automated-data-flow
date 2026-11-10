@@ -46,16 +46,24 @@ so an adapter *could* fetch them every run. It must not, because that download h
 `"type":"originalFiles"` — the file **first uploaded** — and on the price list it is
 already serving a superseded euro edition while the pages on screen are sterling. A fetch
 that looks live but silently returns last season's document is worse than a constant that
-says what it is. See `UK_PRICES` and `FALCON_MRO_KILOGRAMS`, and the flipbook section of
+says what it is. See `UK_PRICES` and `RANGE_MRO_KILOGRAMS`, and the flipbook section of
 `docs/adapters/README.md`.
 
-**What is missing is missing on purpose.** The nine Fiat models have a price and no mass in
-running order; the three Falcons have a mass and no price. Nothing is invented to fill
-either gap, and in particular the per-series mass printed in both documents is **not**
-spread across the models beside it: it is footnoted *"the heaviest model variant in the
-series"*, which makes it a sibling's figure — the Airstream unit-plate mistake. Those
-fields are simply not recorded, so they reach a reviewer as blanks rather than as plausible
-wrong numbers. See `collect`, which narrates both gaps on every run.
+**The UK range is nine models, not twelve.** Globe-Traveller confirmed on 10 November 2026
+that the Falcon range is not offered here, so `DEFAULT_RANGES` leaves it out and the three
+VW models no longer reach a reviewer without a price. The index still lists all twelve,
+because it is a world roster; `--range falcon-series` still collects them. See
+`NOT_SOLD_IN_UK`.
+
+**The mass in running order is the manufacturer's figure for the range, not for the
+model.** The same email answered a request for a per-model mass by directing us to the
+per-range one: *"These represent the heaviest model within each range and should be applied
+to every model in that range."* The build of 30 October had refused that figure, correctly,
+while it was only a footnote in a document; a written instruction from the factory about
+its own vehicles is a different thing. Every record says whose mass it is, and `collect`
+says so again on every run, because a reviewer who is not told would reasonably read it as
+the model's own. See `RANGE_MRO_KILOGRAMS`, which also explains why the error can only run
+in the safe direction.
 
 **The self-check is structural, because the arithmetic is unavailable.** `payload == MTPLM
 - MRO` needs an MRO that nine of the twelve do not have. What the pages do support is an
@@ -104,14 +112,34 @@ MODELS_URL = f"{BASE_URL}/models/"
 #: "Globe-Traveller Explorer Series Explorer X".
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
     ("explorer-series", "Explorer"),
-    ("falcon-series", "Falcon"),
     ("pathfinder-series", "Pathfinder"),
     ("voyager-series", "Voyager"),
 )
 
+#: **The Falcon range is not sold here**, which is why it is missing from `DEFAULT_RANGES`
+#: above. Globe-Traveller's head of marketing wrote to the NCC on 10 November 2026: *"We do
+#: not currently offer the Falcon range on the UK market."* That is the manufacturer
+#: speaking about their own market, and it settles what the documents could only hint at —
+#: the hint being the UK price list's title, "Voyager | Pathfinder | Explorer".
+#:
+#: This is **not** a withdrawal to watch for a return. The three pages stay up and the
+#: index still carries their cards, so `EXPECTED_PRODUCTS` still counts twelve; what would
+#: change is a Falcon line appearing in the UK price list, which is a constant here and so
+#: a person will see it before this code could. `--range falcon-series` still collects
+#: them, and they still come out priceless.
+NOT_SOLD_IN_UK: dict[str, str] = {
+    "falcon-series": (
+        "Globe-Traveller, 10 November 2026: 'We do not currently offer the Falcon range "
+        "on the UK market.'"
+    )
+}
+
 #: What the brand's own index claims and what a run must match. Twelve, not the fourteen
-#: lines in the price list — see the module docstring on the two Bike Versions.
+#: lines in the price list — see the module docstring on the two Bike Versions. The index
+#: is a world roster and counts the Falcons, so `EXPECTED_UK_PRODUCTS` is the number a
+#: default run should actually return.
 EXPECTED_PRODUCTS = 12
+EXPECTED_UK_PRODUCTS = 9
 
 #: **Manually sourced.** The website publishes no price anywhere: its footer's
 #: "Catalogues and prices" link has no `href` at all. These are the GBP figures on page 3
@@ -144,18 +172,42 @@ PRICE_SOURCE = (
     "(public.globe-traveller.eu/books/pyci/, 2026/2027 edition)"
 )
 
-#: **Also manually sourced, and only the Falcons have one.** The catalogue states
-#: `Weight in running order ±5%` for the three VW models and for nothing else; the
-#: Explorer, Pathfinder and Voyager spec blocks carry no mass at all.
+#: **Manually sourced, and per range rather than per model — on the manufacturer's own
+#: written instruction.** Asked on 9 November 2026 for a mass in running order per model,
+#: and asked in those words precisely because the published figure is per series,
+#: Globe-Traveller's head of marketing replied the next morning: *"For the mass in running
+#: order (MRO), please use the figures listed in our UK price list. These represent the
+#: heaviest model within each range and should be applied to every model in that range."*
 #:
-#: The per-series figures printed in both documents — Explorer 3 060, Pathfinder 3 160,
-#: Voyager 3 170 — are **deliberately not here**. They are footnoted *"the heaviest model
-#: variant in the series"*, which makes each one a statement about one sibling rather than
-#: about the models beside it. Recording it on all four Explorers would put a heavier
-#: vehicle's mass on three lighter ones, which is the Airstream unit-plate mistake with a
-#: different cover on it.
-FALCON_MRO_KILOGRAMS: dict[str, int] = {"XS": 2_980, "YS": 3_000, "Z": 3_300}
+#: These are the same three figures the build of 30 October **refused to use**, on the
+#: ground that a mass footnoted *"the heaviest model variant in the series"* describes one
+#: sibling rather than the models beside it. That reasoning was right about the document
+#: and is now beside the point: the factory decides the numbers for its own vehicles, and
+#: the factory has said which number to record. It is the same shape as a mass published
+#: only as a band, where the rule is likewise to record the figure given and say so.
+#:
+#: **The error it can introduce runs in the safe direction.** A range's heaviest MRO is at
+#: worst too high, so the payload derived beneath it is at worst too low, and no buyer is
+#: ever told they can carry more than they can. Every record says in its provenance that
+#: the figure is the range's and not the model's. Replace a range's figure the moment a
+#: per-model one is published.
+RANGE_MRO_KILOGRAMS: dict[str, int] = {
+    "Explorer": 3_060,
+    "Pathfinder": 3_160,
+    "Voyager": 3_170,
+}
 MRO_SOURCE = (
+    "Globe-Traveller's head of marketing, by email to the NCC on 10 November 2026: "
+    "'These represent the heaviest model within each range and should be applied to "
+    "every model in that range'"
+)
+
+#: The Falcons' own per-model masses, from the catalogue's `Weight in running order ±5%`,
+#: which is published for the three VW models and for nothing else. Kept even though the
+#: range is not sold here: they are genuine per-model figures, and `--range falcon-series`
+#: still collects the range. See `NOT_SOLD_IN_UK`.
+FALCON_MRO_KILOGRAMS: dict[str, int] = {"XS": 2_980, "YS": 3_000, "Z": 3_300}
+FALCON_MRO_SOURCE = (
     "the Globe-Traveller 2026/2027 catalogue, 'Weight in running order ±5%' "
     "(public.globe-traveller.eu/books/cect/)"
 )
@@ -396,18 +448,32 @@ class GlobeTravellerProduct:
 
     @property
     def mro_kilograms(self) -> int | None:
-        """Published for the three Falcons and for nothing else. See `FALCON_MRO_KILOGRAMS`."""
-        if self.manufacturer_range != "Falcon":
-            return None
-        return FALCON_MRO_KILOGRAMS.get(self.model)
+        """Per model for the Falcons, per range for the three the UK takes.
+
+        See `RANGE_MRO_KILOGRAMS` for why a range-level figure is recorded on each of its
+        models rather than left blank: the manufacturer instructed it in writing.
+        """
+        if self.manufacturer_range == "Falcon":
+            return FALCON_MRO_KILOGRAMS.get(self.model)
+        return RANGE_MRO_KILOGRAMS.get(self.manufacturer_range)
+
+    @property
+    def mro_is_range_level(self) -> bool:
+        """Whether this model's mass is its range's heaviest rather than its own.
+
+        Drives both the provenance and the run narration, so a reviewer is never shown a
+        range-level figure without being told that is what it is.
+        """
+        return self.manufacturer_range in RANGE_MRO_KILOGRAMS
 
     @property
     def mh_payload_kilograms(self) -> int | None:
-        """Derived, and only where both masses exist — so only on the three Falcons.
+        """Derived, and only where both masses exist.
 
         Globe-Traveller publish no payload for anything. This is `MTPLM - MRO` and is
-        recorded with provenance saying so, including the catalogue's own ±5% tolerance
-        on the mass it rests on.
+        recorded with provenance saying so. Where the mass beneath it is the range's
+        heaviest rather than the model's own, the result is a floor rather than a figure,
+        and the provenance says that too.
         """
         if self.mtplm_kilograms is None or self.mro_kilograms is None:
             return None
@@ -721,11 +787,21 @@ def _build_extracted_motorhome(
     if product.mro_kilograms is not None:
         record(
             "mro_kilograms",
-            f"{product.mro_kilograms}kg, MANUALLY SOURCED from {MRO_SOURCE}, stated there "
-            f"with the brand's own ±5% tolerance. The website publishes no mass in running "
-            f"order for anything, and the catalogue publishes one only for the three "
-            f"Falcons. Not machine-readable and not refreshed by later runs — re-verify at "
-            f"the model-year changeover",
+            (
+                f"{product.mro_kilograms}kg — THE {product.manufacturer_range.upper()} "
+                f"RANGE'S FIGURE, NOT THIS MODEL'S OWN. MANUALLY SOURCED from "
+                f"{MRO_SOURCE}. Neither the website nor the catalogue publishes a mass in "
+                f"running order for this model; asked for a per-model figure, the "
+                f"manufacturer directed us to this one. Being the heaviest model in the "
+                f"range it is at worst too high, so the payload beneath it is at worst "
+                f"too low. Replace it when a per-model mass is published"
+                if product.mro_is_range_level
+                else f"{product.mro_kilograms}kg, MANUALLY SOURCED from "
+                f"{FALCON_MRO_SOURCE}, stated there with the brand's own ±5% tolerance. "
+                f"A genuine per-model figure, published for the Falcons and for nothing "
+                f"else. Not machine-readable and not refreshed by later runs — re-verify "
+                f"at the model-year changeover"
+            ),
         )
     if product.mh_payload_kilograms is not None:
         record(
@@ -733,7 +809,13 @@ def _build_extracted_motorhome(
             f"derived: {product.mtplm_kilograms}kg permissible maximum mass - "
             f"{product.mro_kilograms}kg mass in running order = "
             f"{product.mh_payload_kilograms}kg. Globe-Traveller publish no payload "
-            f"anywhere, and the mass it rests on carries their ±5% tolerance",
+            + (
+                f"anywhere, and the mass beneath this one is the {product.manufacturer_range} "
+                f"range's heaviest rather than this model's, so the real payload is this "
+                f"figure or better"
+                if product.mro_is_range_level
+                else "anywhere, and the mass it rests on carries their ±5% tolerance"
+            ),
         )
     if product.rrp_pounds is not None:
         record(
@@ -819,6 +901,11 @@ def collect(
         )
     targets = [entry for entry in found if entry[1] in wanted]
     on_progress(f"{len(targets)} model page(s) for {sorted(wanted.values())}")
+    if ranges == DEFAULT_RANGES and len(targets) != EXPECTED_UK_PRODUCTS:
+        on_progress(
+            f"WARNING: {len(targets)} UK model page(s) where {EXPECTED_UK_PRODUCTS} are "
+            f"expected — a range has gained or lost a model"
+        )
 
     results: list[ExtractedMotorhome] = []
     for url, series_segment, slug in targets:
@@ -849,16 +936,21 @@ def collect(
 
         if product.rrp_pounds is None:
             on_progress(
-                f"[{product.label}] NO PRICE: the UK price list is titled 'Voyager | "
-                f"Pathfinder | Explorer' and omits the Falcon range, and the website "
-                f"publishes none. Left blank rather than guessed"
+                f"[{product.label}] NO PRICE: the UK price list omits the Falcon range, "
+                f"which Globe-Traveller confirm they do not sell here, and the website "
+                f"publishes no price at all. Left blank rather than guessed"
             )
         if product.mro_kilograms is None:
             on_progress(
-                f"[{product.label}] NO MASS IN RUNNING ORDER: neither document publishes "
-                f"one for this model. The per-series figure printed beside it is "
-                f"footnoted 'the heaviest model variant in the series', which is a "
-                f"sibling's mass — left blank rather than spread across the range"
+                f"[{product.label}] NO MASS IN RUNNING ORDER: none published for this "
+                f"model and none supplied for its range. Left blank"
+            )
+        elif product.mro_is_range_level:
+            on_progress(
+                f"[{product.label}] RANGE-LEVEL MASS: {product.mro_kilograms}kg is the "
+                f"heaviest {product.manufacturer_range}, recorded on every model in the "
+                f"range on Globe-Traveller's written instruction of 10 November 2026. The "
+                f"payload derived beneath it is a floor, not a figure"
             )
 
         results.append(
@@ -867,12 +959,17 @@ def collect(
 
     priced = sum(1 for item in results if item.motorhome.rrp_pounds is not None)
     weighed = sum(1 for item in results if item.motorhome.mro_kilograms is not None)
+    complete = sum(
+        1
+        for item in results
+        if item.motorhome.rrp_pounds is not None and item.motorhome.mro_kilograms is not None
+    )
     on_progress(
-        f"{len(results)} product(s) collected: {priced} with a price and {weighed} with a "
-        f"mass in running order. The two documents cover opposite halves of the range, so "
-        f"NO PRODUCT YET HAS BOTH — the nine Fiat models need a per-model mass and the "
-        f"three Falcons need a UK price before any of this is uploadable. Both figures are "
-        f"constants here, not fetched: the flipbook download serves whichever edition was "
-        f"uploaded first. Re-verify at the model-year changeover"
+        f"{len(results)} product(s) collected: {priced} with a price, {weighed} with a "
+        f"mass in running order, {complete} with both. The Falcon range is left out by "
+        f"default because Globe-Traveller do not sell it here. Price and mass are both "
+        f"constants rather than fetched — the flipbook download serves whichever edition "
+        f"was uploaded first, and the mass came by email. Re-verify both at the model-year "
+        f"changeover, and replace the range-level masses as soon as per-model ones exist"
     )
     return results

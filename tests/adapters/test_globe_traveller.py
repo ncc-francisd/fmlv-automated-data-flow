@@ -26,9 +26,13 @@ import pytest
 
 from src.adapters import adapter_for, globe_traveller
 from src.adapters.globe_traveller import (
+    DEFAULT_RANGES,
     EXPECTED_PRODUCTS,
+    EXPECTED_UK_PRODUCTS,
     FALCON_MRO_KILOGRAMS,
     HIGH_TOP_ABOVE_MM,
+    NOT_SOLD_IN_UK,
+    RANGE_MRO_KILOGRAMS,
     SPEC_LABELS,
     UK_PRICES,
     GlobeTravellerProduct,
@@ -324,49 +328,84 @@ def test_every_model_is_a_high_top() -> None:
         assert parsed.body_type is BodyType.CAMPERVAN_HIGH_TOP
 
 
-# --- The two gaps, which are the point -----------------------------------------------
+# --- The gaps, and how the manufacturer closed them ----------------------------------
 
 
-def test_a_fiat_model_has_a_price_and_no_mass_in_running_order() -> None:
-    """The UK price list covers it; neither document publishes its mass.
+def test_a_uk_model_takes_its_range_mass_on_the_makers_written_instruction() -> None:
+    """3 060 is the heaviest Explorer, recorded on all four of them.
 
-    The per-series figure printed beside it is footnoted "the heaviest model variant in
-    the series", which is a sibling's mass — so nothing is recorded rather than that.
+    Refused on 30 October while it was only a footnote reading "the heaviest model
+    variant in the series". Globe-Traveller then instructed it in writing on 10 November:
+    "These represent the heaviest model within each range and should be applied to every
+    model in that range." The factory decides the numbers for its own vehicles.
     """
     explorer = product("globe_traveller_explorer_x.html")
     assert explorer.rrp_pounds == 95_671
-    assert explorer.mro_kilograms is None
-    assert explorer.mh_payload_kilograms is None
+    assert explorer.mro_kilograms == 3060
+    assert explorer.mh_payload_kilograms == 440
+    assert explorer.mro_is_range_level is True
 
 
-def test_a_falcon_has_a_mass_in_running_order_and_no_price() -> None:
-    """The mirror image. The price list is titled "Voyager | Pathfinder | Explorer"."""
+def test_a_falcon_keeps_its_own_per_model_mass() -> None:
+    """The catalogue publishes one for each Falcon, so no range figure is substituted."""
     falcon = product("globe_traveller_falcon_z.html")
-    assert falcon.rrp_pounds is None
     assert falcon.mro_kilograms == 3300
     assert falcon.mh_payload_kilograms == 520
+    assert falcon.mro_is_range_level is False
+    assert "Falcon" not in RANGE_MRO_KILOGRAMS
 
 
-def test_no_model_has_both_a_price_and_a_mass() -> None:
-    """Which is why none of the twelve is uploadable until the brand answers.
+def test_a_falcon_still_has_no_price_but_is_no_longer_collected() -> None:
+    """Not sold here, so the gap stopped mattering rather than being filled."""
+    falcon = product("globe_traveller_falcon_z.html")
+    assert falcon.rrp_pounds is None
+    assert "falcon-series" not in dict(DEFAULT_RANGES)
+    assert "UK market" in NOT_SOLD_IN_UK["falcon-series"]
 
-    The two documents cover opposite halves of the range. When this test starts failing,
-    something has been supplied and the gap has closed.
+
+def test_every_model_the_uk_takes_now_has_both_a_price_and_a_mass() -> None:
+    """The inverse of the test this replaces, which asserted no model had both.
+
+    Nine priced models, each of whose ranges has a mass — so nothing the UK sells is
+    short of a required figure, and a reviewer sees no blank mass.
     """
-    for key in UK_PRICES:
-        assert key[0] != "Falcon"
-    assert set(FALCON_MRO_KILOGRAMS) == {"XS", "YS", "Z"}
+    assert len(UK_PRICES) == EXPECTED_UK_PRODUCTS
+    assert {key[0] for key in UK_PRICES} == set(RANGE_MRO_KILOGRAMS)
+    for manufacturer_range, _model in UK_PRICES:
+        assert RANGE_MRO_KILOGRAMS[manufacturer_range] > 0
 
 
-def test_the_per_series_mass_is_nowhere_in_the_constants() -> None:
-    """3 060, 3 160 and 3 170 are a sibling's figure and must not be spread.
+def test_the_per_series_mass_is_never_put_on_a_falcon() -> None:
+    """The three figures are a range's heaviest, which is only acceptable where said.
 
-    This is the Airstream unit-plate mistake in a different costume, and the only defence
-    against it is that the numbers never enter the code.
+    The Falcons publish their own, so substituting a range figure there would throw a
+    real per-model number away — the half of the original rule that still stands.
     """
     assert 3060 not in FALCON_MRO_KILOGRAMS.values()
     assert 3160 not in FALCON_MRO_KILOGRAMS.values()
     assert 3170 not in FALCON_MRO_KILOGRAMS.values()
+
+
+def test_a_range_level_mass_says_so_in_its_own_provenance() -> None:
+    """A reviewer who is not told would read it as the model's own weight."""
+    extracted = _build_extracted_motorhome(
+        product("globe_traveller_explorer_x.html"), "https://example.invalid/x", None
+    )
+    mass = extracted.provenance["mro_kilograms"].snippet
+    assert "NOT THIS MODEL'S OWN" in mass
+    assert "10 November 2026" in mass
+    payload = extracted.provenance["mh_payload_kilograms"].snippet
+    assert "this figure or better" in payload
+
+
+def test_a_falcons_provenance_claims_no_such_caveat() -> None:
+    """Its mass is genuinely its own, so the warning would be false."""
+    extracted = _build_extracted_motorhome(
+        product("globe_traveller_falcon_z.html"), "https://example.invalid/z", None
+    )
+    mass = extracted.provenance["mro_kilograms"].snippet
+    assert "NOT THIS MODEL'S OWN" not in mass
+    assert "±5%" in mass
 
 
 # --- The self-check ------------------------------------------------------------------

@@ -670,3 +670,79 @@ against holding one on a row that already exists. One upload answers it.
 compute it — they publish it per model for the Falcons and per series for everything else —
 so the request is reasonable and the per-series answer is the one to pre-empt. Ask for the
 three Falcons' sterling prices in the same breath, since a GB price list would carry both.
+
+
+# Answered, 10 November 2026 — and the range is nine, not twelve
+
+Globe-Traveller replied the morning after the letter went. Two sentences in it closed both
+of the gaps recorded above, one by supplying a figure and one by removing the question.
+
+## "We do not currently offer the Falcon range on the UK market"
+
+The three VW Falcons are out. `DEFAULT_RANGES` no longer lists `falcon-series`, so a
+default run collects nine, and the UK price list's omission of the range — which had
+looked like a gap in the document — turns out to have been the document being right.
+
+The pages stay up and `/models/` still shows twelve cards, because that index is a world
+roster, so `EXPECTED_PRODUCTS` is still 12 and a new `EXPECTED_UK_PRODUCTS` of 9 is what a
+default run is checked against. `--range falcon-series` still collects them, still
+priceless, and `FALCON_MRO_KILOGRAMS` is kept because those are real per-model masses.
+This is deliberately **not** modelled as a withdrawal to watch for a return: nothing on
+the site would change if the range came here, so the signal is a Falcon line appearing in
+the UK price list, and a person will see that before any code could.
+
+## "These represent the heaviest model within each range and should be applied to every model in that range"
+
+The full passage, from Globe-Traveller's head of marketing:
+
+> For the mass in running order (MRO), please use the figures listed in our UK price list.
+> These represent the heaviest model within each range and should be applied to every
+> model in that range:
+> - Explorer: 3,060 kg
+> - Pathfinder: 3,160 kg
+> - Voyager: 3,170 kg
+
+These are **the same three figures this adapter was built to refuse**, and the reversal is
+worth being explicit about rather than quietly shipping.
+
+The refusal was right at the time. A number footnoted *"the heaviest model variant in the
+series"*, found in a document, is a statement about one sibling; spreading it across the
+models beside it is the Airstream unit-plate mistake, and the code carried a test asserting
+the figures appeared nowhere in it. What changed is not the document but the authority: the
+manufacturer has now instructed, in writing and in answer to a request that asked for
+per-model figures in those words, that this is the number to record for each model. The
+factory decides the numbers for its own vehicles. It is the same shape as a mass published
+only as a band, where the rule is to record what is given and say what it is.
+
+**The error can only run in the safe direction.** A range's heaviest MRO is at worst too
+high for a given model, so the payload derived under it is at worst too low, and no buyer
+is told they can carry more than they can:
+
+| range | MTPLM | MRO (range) | payload (floor) |
+|---|---|---|---|
+| Explorer | 3500 | 3060 | 440 |
+| Pathfinder | 3500 | 3160 | 340 |
+| Voyager | 3500 | 3170 | 330 |
+
+Three things keep that visible rather than buried. Each record's `mro_kilograms`
+provenance opens **"THE <RANGE>'S FIGURE, NOT THIS MODEL'S OWN"**; the payload provenance
+says the real figure is *"this figure or better"*; and `collect` narrates a RANGE-LEVEL
+MASS line per product on every run. A reviewer who was not told would reasonably read
+3,060 kg as the Explorer X's own weight. The Falcons keep their per-model masses and get
+none of this wording, because for them it would be false.
+
+Replace a range's figure the moment a per-model one is published.
+
+## Where that leaves it
+
+Run #217, against the live site: **nine products, nine with a price, nine with a mass in
+running order, nine with both.** Nothing dropped. The registry row moves from `paused` to
+`active`, which it had never been.
+
+Still worth having, neither blocking: a per-model mass, and confirmation that the
+travel-seat belts are three-point. The Falcon prices are no longer wanted.
+
+The layout drawings arrived with the same email, as three archives covering all nine UK
+models day and night. Among them is a genuine `Explorer_EVO_layout` — so the Z EVO page's
+`voyager_z_layout-3.png`, which `layout_filename_warning` has flagged since the build, is
+confirmed as a website error rather than a shared drawing.
