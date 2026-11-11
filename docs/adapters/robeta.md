@@ -110,54 +110,58 @@ price and it is already correct in FMLV.
 FMLV either: the February 2026 and November 2026 exports hold the same six products, the
 same prices, and the same gap at product id 8731.
 
-## The open question: berths, and whether the pop-up roof is standard
+## Berths, and the roof: settled 11 November 2026
 
-**Robeta publish capacities as ranges**, and FMLV holds the top of every sleeping one:
+**Robeta publish capacities as spans**, and FMLV held the top of every sleeping one:
 
-| model | factory sleeping | factory seating | FMLV berths | FMLV seats |
-|---|---|---|---|---|
-| Ares | 2 – 6 | 4 – 5 | 6 | 5 |
-| Helios | 2 – 6 | 2 – 5 | 6 | 5 |
-| Kronos | 2 – 4 *(lineup)* / 2 – 6 *(model page)* | 2 – 4 | 4 | 4 |
-| Apollo | 2 – 6 | 2 – 5 | 6 | 5 |
-| Adonis | 2 – 4 | 2 – 4 | 4 | 4 |
-| Schumacher Edition | 2 adults | load capacity 5 | 2 | 2 |
+| model | published sleeping | FMLV held | recorded |
+|---|---|---|---|
+| Adonis | 2 – 4 | 4 | **2** |
+| Apollo | 2 – 6 | 6 | **2** |
+| Ares | 2 – 6 | 6 | **2** |
+| Helios | 2 – 6 | 6 | **2** |
+| Kronos | 2 – 4 *(lineup)* / 2 – 6 *(model page)* | 4 | **2** |
+| Schumacher Edition | 2 adults | 2 | 2 — unchanged |
 
-**The factory says the pop-up roof is an upgrade**, in the same words on every model page:
+The requester settled it in two steps, from his own research.
 
-> Pop-up Roof — Add versatile living space with our pop-up roof solution. **This upgrade**
-> provides an additional sleeping area with a comfortable mattress.
+**First, the roof.** It is an option on five models and standard on none, and the
+Schumacher Edition is not offered with one at all — *"All of them have the option, none of
+them are standard, but the Schumacher edition does not have the option. That's the only
+one."* Every published source already said it was an option; what he settled is that it is
+**never** fitted as standard, and which single model cannot have it.
 
-Its FAQ is blunter: the Helios has an *"optional pop-up roof"*, and *"The Ares can be
-upgraded to seat up to 5 people … and with a pop-up roof, it can sleep up to 6 people."*
-**Cara agree**, on the Adonis page: *"Or looking to travel with 4 passengers, why not add a
-pop top?"*
+**Then the second bed.** Taking two off the published maximum would have left the Apollo,
+Ares and Helios at four — but their six needs **two** options, not one. Robeta say so on
+the Apollo: *"sleeping space for six featuring an electrical lifting bed in the Family
+Edition and a 1.45m x 2.2m pop-up roof bed"*, and the Family Edition is listed as available
+on exactly those three. His conclusion: *"the birth number on each model is going to
+be 2."*
 
-On the settled lower-figure rule that makes the berths **2** on five of the six, and makes
-**no model an elevating-roof campervan** — against FMLV, which marks the Helios and Kronos
-`type_campervan_high_top_elevating_roof`.
+So **two across the range**, which is also the lower end of every published span — the
+settled berth-range rule landing in the same place by a different route. See
+`STANDARD_BERTHS`, which is the one place to change if a model ever ships with a roof or a
+lifting bed as standard.
 
-**The requester said on 11 November 2026 that the elevating roofs are standard.** Every
-published source read here says the opposite. He may be right about what Cara actually
-supply in the UK — the importer defines the UK range, and a UK vehicle built with the roof
-fitted as standard would be an elevating-roof campervan whatever the factory's generic page
-says. **This must be settled with him and with Cara before any adapter is written**,
-because it decides `berths` and `body_type` on five of six products.
+### Seats are still open, and run the other way
 
-### Seats run the other way, so do not apply one rule to both ends
-
-The Adonis's **"for Two" package *removes* travelling seats** — *"Just the two of you
-travelling? The Adonis for Two package replaces the travelling seats with more storage"*.
-So for seating the **upper** figure is the standard one, and FMLV's seat counts already
-look right. Reading both ends of both ranges as "take the lower" would be wrong.
+`mh_passenger_seats_inc_driver` is **not** emitted. It has the same span problem without a
+single answer, because **the two ends swap round between models**: the Adonis's *"for Two"
+package replaces the travelling seats*, so its standard is the **upper** figure of `2 - 4`,
+while the Ares *"can be upgraded to seat up to 5"*, so its standard is the **lower** figure
+of `4 - 5`. No page states a standard count outright. FMLV's own counts stand and the run
+narrates the span.
 
 ## Body type
 
-**All six are high tops on height alone** — 2654 mm on the four Fiats, 2690 mm on the
-Adonis, 2825 mm on the Schumacher Edition, every one above the settled 2300 mm threshold.
-So `type_campervan_high_top` for all six, and
-`type_campervan_high_top_elevating_roof` only for whichever models turn out to have the
-pop-up roof as standard — which on the published evidence is none.
+**Every Robeta is a plain high top.** All six clear the 2,300 mm threshold on height alone
+— 2,654 mm on the four Fiats, 2,690 mm on the Adonis, 2,825 mm on the Schumacher Edition —
+and none has an elevating roof as standard, so none is
+`type_campervan_high_top_elevating_roof`.
+
+That corrects **two FMLV rows**: the Helios (8729) and the Kronos (8730), both of which
+were held as high tops *with* an elevating roof. The height never settled this on its own;
+the roof did.
 
 ## Cara are not the exclusive importer, but they are the only usable UK source
 
@@ -179,16 +183,25 @@ It is worth knowing for two reasons. If SC Sporthomes ever publish prices they m
 and the two dealers could in principle stock different models — so the roster is "what Cara
 list", which happens to match FMLV, rather than "what the UK gets" in any stronger sense.
 
-## What is unverified
+## What is still open
 
-1. **`ncc_supplier_name`**, which has not been read off the NCC export dropdown. The NCC
-   manufacturer list says `Robeta`; the requester said "Robetta".
-2. **Whether the pop-up roof is standard on UK vehicles**, which decides `berths` and
-   `body_type` on five of six products. Every published source says it is an upgrade.
-3. **The Kronos's sleeping capacity**, which the factory states two different ways —
-   `2 - 4` on the lineup card, `2 - 6` in the model page's JSON-LD.
-4. **Whether FMLV should carry Hercules**, which the factory sells and neither UK dealer
+1. **The standard travel-seat count**, which no page states and which the published span
+   cannot settle, because its two ends swap round between models. Not emitted.
+2. **Whether FMLV should carry Hercules**, which the factory sells and neither UK dealer
    lists.
+
+Settled since the survey, and left here so the record shows what moved:
+
+* **`ncc_supplier_name`** — `Robeta`, one `t`, confirmed 11 November 2026 against the NCC
+  supplier export dropdown.
+* **Whether the pop-up roof is standard** — it is not, on any model, and the Schumacher
+  Edition is not offered one. That settled `berths` at two throughout and made every model
+  a plain high top.
+* **The Kronos's sleeping capacity**, which the factory states as `2 - 4` on the lineup
+  card and `2 - 6` on the model page. The conflict is now moot: both ends above two are
+  optional, so the figure recorded is two either way. Worth remembering if Robeta ever
+  publish a standard count, because one of those two pages is wrong.
+* **The fridge** — `fridge_freezer` on all six.
 
 ## Built, 11 November 2026 — and the first run confirmed rather than proposed
 

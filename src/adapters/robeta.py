@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..fetch.http import Fetcher
+from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
 from . import gearbox, habitation
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
@@ -86,6 +87,54 @@ ROBETA_SECTION_URL = f"{CARA_BASE_URL}/robeta-motorhomes/"
 FACTORY_LINEUP_URL = f"{FACTORY_BASE_URL}/model-lineup"
 
 EXPECTED_PRODUCTS = 6
+
+#: Models offered with a pop-up roof, which is **an option on every one of them and
+#: standard on none**. Settled by the requester on 11 November 2026 from his own research,
+#: after he checked the Kronos image and corrected himself: *"All of them have the option,
+#: none of them are standard, but the Schumacher edition does not have the option. That's
+#: the only one."*
+#:
+#: Every published source agrees it is an option — the factory calls it an upgrade in
+#: identical words on all five model pages, its FAQ says the Helios has an *"optional
+#: pop-up roof"*, and Cara invite you to *"add a pop top"*. What the requester settled is
+#: the part no page states plainly: that it is **never** fitted as standard here, and that
+#: the Schumacher Edition cannot have one at all.
+#:
+#: This is what makes every Robeta a plain high top rather than a high top with an
+#: elevating roof — see `_body_type`.
+POP_TOP_OPTION: frozenset[str] = frozenset(
+    {"Adonis", "Apollo", "Ares", "Helios", "Kronos"}
+)
+
+#: Berths **as built**, with no option fitted: **two on every model**.
+#:
+#: Settled by the requester across 11 November 2026 in two steps. First, that the pop-up
+#: roof is an option on five models and standard on none — *"that means that the standard
+#: berths will be 2 less on those models"*. Then, once it emerged that the published
+#: maximum of six needs **two** options rather than one, that the answer is two throughout:
+#: *"I assume that means that the birth number on each model is going to be 2."*
+#:
+#: The second step is what makes this uniform. On the Apollo, Ares and Helios the span runs
+#: `2 - 6`, and six needs the pop-up roof **and** the Family Edition's electric lifting bed
+#: — Robeta say so on the Apollo, *"sleeping space for six featuring an electrical lifting
+#: bed in the Family Edition and a 1.45m x 2.2m pop-up roof bed"*, and the Family Edition
+#: is listed as available on those same three. Take both away and two is left.
+#:
+#: Two is also **the lower end of every published span**, so this lands exactly where the
+#: settled berth-range rule puts it: the figure recorded is the one the vehicle has before
+#: anybody pays for anything. The Schumacher Edition is published as `2 adults` outright
+#: and has no roof option, so it was never in question.
+#:
+#: A dict rather than a constant because it is per-model data, and because the moment one
+#: model ships with a roof or a lifting bed as standard this is the one place to say so.
+STANDARD_BERTHS: dict[str, int] = {
+    "Adonis": 2,
+    "Apollo": 2,
+    "Ares": 2,
+    "Helios": 2,
+    "Kronos": 2,
+    "Schumacher Edition": 2,
+}
 
 
 @dataclass(frozen=True)
@@ -318,6 +367,41 @@ _FACTORY_CHASSIS = re.compile(
     r"\b(Mercedes(?:-Benz)?|Fiat|Peugeot|Citro[eë]n|Ford|Renault|MAN|VW)\b", re.I
 )
 
+#: The settled campervan threshold, shared with `aura`, `auto_sleepers` and `auto_trail`.
+HIGH_TOP_ABOVE_MM = 2300
+
+
+def _body_type(product: RobetaProduct) -> tuple[BodyType | None, str | None]:
+    """The body type, now that the roof question is settled.
+
+    **Every Robeta is a plain high top.** Two things decide it and both are now firm:
+
+    * the published height clears the threshold on all six — 2,654 mm on the four Fiats,
+      2,690 mm on the Adonis, 2,825 mm on the Schumacher Edition; and
+    * **no model has an elevating roof as standard.** The pop-up roof is an option on five
+      and is not offered at all on the Schumacher Edition, settled by the requester on
+      11 November 2026 and agreed by every published source.
+
+    So none of them is `campervan_high_top_elevating_roof`, which is what FMLV held on the
+    Helios and the Kronos. A dimension never decides a body type on its own — the roof
+    does, and the height only says which kind of high top it is.
+    """
+    height = product.mh_height_mm
+    if height is None:
+        return None, None
+    if height <= HIGH_TOP_ABOVE_MM:
+        return None, None
+    roof = (
+        "its pop-up roof is an option, never standard"
+        if product.name in POP_TOP_OPTION
+        else "it is offered with no elevating roof at all"
+    )
+    return (
+        BodyType.CAMPERVAN_HIGH_TOP,
+        f"{height:,}mm, above the {HIGH_TOP_ABOVE_MM}mm high-top threshold, and {roof}, "
+        f"so a plain high top rather than a high top with an elevating roof",
+    )
+
 
 # --------------------------------------------------------------------------- #
 # The self-check
@@ -379,29 +463,23 @@ _FINDING_PROPERTIES = (
 def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
     """One model as a `Motorhome`, with the provenance a reviewer reads beside each field.
 
-    **Three fields are deliberately not emitted**, and this is the adapter's one open
-    question rather than a gap in the sources:
+    **`berths` and `body_type` are now settled and proposed**, since the requester
+    established on 11 November 2026 that the pop-up roof is an option on five models,
+    standard on none, and not offered at all on the Schumacher Edition. See
+    `STANDARD_BERTHS` and `_body_type`.
 
-    * `berths` — Robeta publish a *configuration span* (`Sleeping Capacity 2 - 6`), not a
-      berth count for the vehicle as built, and the pop-up roof that supplies the upper end
-      is called an **upgrade** in identical words on every factory model page. Cara say the
-      same on the Adonis: *"looking to travel with 4 passengers, why not add a pop top?"*
-    * `mh_passenger_seats_inc_driver` — the same span problem, and the two ends swap round
-      between models. The Adonis's *"for Two" package replaces the travelling seats*, so
-      its standard is the **upper** figure; the Ares *"can be upgraded to seat up to 5"*,
-      so its standard is the **lower**. One rule cannot serve both.
-    * `body_type` — all six clear the 2,300mm high-top threshold on height alone, so the
-      only live question is whether the pop-up roof is standard, which is the same
-      unresolved question.
-
-    Emitting nothing leaves FMLV's own figures untouched, which is the right failure here:
-    the requester believes the roofs are standard and the published sources say they are an
-    option, and until that is settled a proposal either way would be a guess shipped to a
-    live site. `_narrate_open_questions` puts the evidence in front of the reviewer every
-    run instead.
+    **`mh_passenger_seats_inc_driver` is still not emitted**, and that is deliberate. It
+    has the same configuration-span problem the berths had, but without a single answer:
+    **the two ends swap round between models.** The Adonis's *"for Two" package replaces
+    the travelling seats*, so its standard is the **upper** figure of `2 - 4`; the Ares
+    *"can be upgraded to seat up to 5"*, so its standard is the **lower** figure of
+    `4 - 5`. One rule cannot serve both, and no page states the standard count outright.
+    A field with no provenance is never proposed, so FMLV's own seat counts stand while
+    `_narrate_open_questions` keeps the published span in front of the reviewer.
     """
     features = habitation.features_from(product.standard_lines)
     automatic = gearbox.automatic_available_from(product.all_lines)
+    body_type, body_type_note = _body_type(product)
 
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -409,6 +487,8 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
         manufacturer_range=product.name,
         model=product.name,
         base_vehicle_manufacturer=fmlv_base_vehicle(product.base_vehicle),
+        berths=STANDARD_BERTHS.get(product.name),
+        body_type=body_type,
         rrp_pounds=product.rrp_pounds,
         mro_kilograms=product.mro_kilograms,
         mtplm_kilograms=product.mtplm_kilograms,
@@ -478,6 +558,30 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
             "base_vehicle_manufacturer",
             f"the chassis is named as {product.base_vehicle}",
         )
+    berths = STANDARD_BERTHS.get(product.name)
+    if berths is not None:
+        span = (
+            f"Robeta publish 'Sleeping Capacity {product.sleeping_capacity}', which is a "
+            f"span of configurations rather than the vehicle as built. "
+            if product.sleeping_capacity
+            else ""
+        )
+        if product.name in POP_TOP_OPTION:
+            why = (
+                f"Everything above {berths} is a paid extra: the pop-up roof bed is an "
+                f"OPTION and never standard, and on the models published as '2 - 6' the "
+                f"Family Edition's electric lifting bed is a second one. Settled by the "
+                f"requester on 11 November 2026. {berths} berths as built, which is also "
+                f"the lower end of the published span."
+            )
+        else:
+            why = (
+                f"This model is offered with no pop-up roof at all and Robeta publish it "
+                f"as '2 adults' outright, so {berths} is the vehicle as built."
+            )
+        record("berths", f"{span}{why}")
+    if body_type is not None and body_type_note is not None:
+        record("body_type", f"a campervan at {body_type_note}")
     if automatic is not None:
         record("automatic_available", gearbox.provenance_note(automatic))
 
@@ -518,17 +622,11 @@ def _narrate_open_questions(
     if product.seating_capacity:
         spans.append(f"Seating Capacity '{product.seating_capacity}'")
     if spans:
-        # Only say it where there is a pop-up roof to say it about: the Schumacher Edition
-        # has none, and claiming otherwise would invent a reason for its figures.
-        roof = (
-            ". The factory calls the pop-up roof that supplies the upper figure an upgrade"
-            if "Pop-up Roof Bed Dimensions" in product.factory
-            else ""
-        )
         on_progress(
-            f"{product.label} — OPEN: Robeta publish {' and '.join(spans)}, a span of "
-            f"configurations rather than the vehicle as built. berths, travel seats and "
-            f"body_type are therefore NOT proposed and FMLV's own figures stand{roof}"
+            f"{product.label} — Robeta publish {' and '.join(spans)}, a span of "
+            f"configurations rather than the vehicle as built. OPEN: travel seats are "
+            f"therefore NOT proposed and FMLV's own count stands — the two ends of the "
+            f"seating span swap round between models, so no single rule picks one"
         )
 
     quoted = [

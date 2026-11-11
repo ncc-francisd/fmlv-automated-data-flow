@@ -198,14 +198,15 @@ def test_a_page_with_no_json_ld_yields_nothing() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_berths_seats_and_body_type_are_never_proposed(
+def test_the_travel_seat_count_is_never_proposed(
     cara_adonis: str, factory_lineup: str
 ) -> None:
-    """The adapter's one deliberate gap — see `_build_extracted_motorhome`.
+    """The adapter's one remaining gap — see `_build_extracted_motorhome`.
 
-    Robeta publish a span of configurations, not the vehicle as built, and the pop-up roof
-    that supplies the upper end is an upgrade. A field with no provenance is not proposed,
-    so FMLV's own figures stand until the requester settles it with Cara.
+    The seating span's two ends swap round between models: the Adonis's "for Two" package
+    *removes* seats, so its standard is the upper figure, while the Ares *"can be upgraded
+    to seat up to 5"*, so its standard is the lower. A field with no provenance is not
+    proposed, so FMLV's own counts stand.
     """
     product = _adonis(cara_adonis)
     product.factory = robeta.factory_properties(factory_lineup)["ROBETA ADONIS"]
@@ -213,11 +214,54 @@ def test_berths_seats_and_body_type_are_never_proposed(
 
     extracted = robeta._build_extracted_motorhome(product)
 
-    assert extracted.motorhome.berths is None
     assert extracted.motorhome.mh_passenger_seats_inc_driver is None
-    assert extracted.motorhome.body_type is None
-    for name in ("berths", "mh_passenger_seats_inc_driver", "body_type"):
-        assert name not in extracted.provenance
+    assert "mh_passenger_seats_inc_driver" not in extracted.provenance
+
+
+def test_every_model_has_two_berths_as_built(cara_adonis: str) -> None:
+    """Settled by the requester, 11 November 2026, in two steps.
+
+    The pop-up roof is an option on five models and standard on none; and on the three
+    published as `2 - 6` the Family Edition's lifting bed is a *second* option. Strip both
+    and two is left — which is also the lower end of every published span.
+    """
+    assert set(robeta.STANDARD_BERTHS) == {model.name for model in robeta.MODELS}
+    assert set(robeta.STANDARD_BERTHS.values()) == {2}
+
+    motorhome = robeta._build_extracted_motorhome(_adonis(cara_adonis)).motorhome
+    assert motorhome.berths == 2
+
+
+def test_the_schumacher_edition_is_the_one_with_no_roof_option() -> None:
+    """*"the Schumacher edition does not have the option. That's the only one."*"""
+    assert "Schumacher Edition" not in robeta.POP_TOP_OPTION
+    assert robeta.POP_TOP_OPTION == {"Adonis", "Apollo", "Ares", "Helios", "Kronos"}
+
+
+def test_every_robeta_is_a_plain_high_top(cara_adonis: str, cara_schumacher: str) -> None:
+    """No model has an elevating roof as standard, so none is the elevating-roof type.
+
+    FMLV held `campervan_high_top_elevating_roof` on the Helios and the Kronos, which this
+    corrects. The height alone would not have settled it — the roof does.
+    """
+    from src.product_model.enums import BodyType
+
+    for page, name, slug in (
+        (cara_adonis, "Adonis", "adonis"),
+        (cara_schumacher, "Schumacher Edition", "schumacher-edition"),
+    ):
+        product = robeta.parse_range_page(page, name, slug, "https://example.invalid")
+        body_type, note = robeta._body_type(product)
+        assert body_type is BodyType.CAMPERVAN_HIGH_TOP, name
+        assert note is not None and "plain high top" in note
+
+
+def test_a_campervan_under_the_threshold_gets_no_body_type(cara_adonis: str) -> None:
+    """The threshold still has to be cleared — a height alone never decides the type."""
+    product = _adonis(cara_adonis)
+    product.mh_height_mm = 2_100
+
+    assert robeta._body_type(product) == (None, None)
 
 
 def test_every_uk_models_published_capacity_is_a_span_and_not_a_number(
