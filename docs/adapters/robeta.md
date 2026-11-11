@@ -143,14 +143,35 @@ settled berth-range rule landing in the same place by a different route. See
 `STANDARD_BERTHS`, which is the one place to change if a model ever ships with a roof or a
 lifting bed as standard.
 
-### Seats are still open, and run the other way
+### Seats: four belts, settled 11 November 2026
 
-`mh_passenger_seats_inc_driver` is **not** emitted. It has the same span problem without a
-single answer, because **the two ends swap round between models**: the Adonis's *"for Two"
-package replaces the travelling seats*, so its standard is the **upper** figure of `2 - 4`,
-while the Ares *"can be upgraded to seat up to 5"*, so its standard is the **lower** figure
-of `4 - 5`. No page states a standard count outright. FMLV's own counts stand and the run
-narrates the span.
+The requester, from his own research: *"the standard number of three-point seatbelts is 4,
+when you haven't got the upgraded configuration. So that's the driver plus passenger, and
+then a bench seat behind of 2 more."* Only three-point belts count, which is the settled
+rule and the terms the figure is already in.
+
+**This is the number the published spans could never give, and why is worth keeping.** The
+standard sits at a *different place in each span*:
+
+| model | published `Seating Capacity` | where four sits | FMLV held |
+|---|---|---|---|
+| Ares | `4 - 5` | the **lower** end — *"can be upgraded to seat up to 5"* | 5 |
+| Adonis | `2 - 4` | the **upper** end — the *"for Two"* package removes seats | 4 ✓ |
+| Kronos | `2 - 4` | the **upper** end | 4 ✓ |
+| Apollo | `2 - 5` | the **middle**, reachable from neither end | 5 |
+| Helios | `2 - 5` | the **middle** | 5 |
+
+Four is consistent with every one of them, and two of them agree with it independently —
+the Ares's span *starts* at four and the Adonis's *ends* at four. That is a real check
+rather than a restatement: a span that merely contained four would prove nothing.
+
+So three rows change — Apollo, Ares and Helios from five to four — and the Adonis and
+Kronos verify unchanged.
+
+**The Schumacher Edition is two, not four.** Robeta publish its `Seating Capacity` as `2`
+outright, and it is a two-berth grand tourer with a floating bed and **no rear bench** —
+which is the thing the requester's figure counts. Recording four would contradict the
+maker's own explicit number.
 
 ## Body type
 
@@ -185,10 +206,10 @@ list", which happens to match FMLV, rather than "what the UK gets" in any strong
 
 ## What is still open
 
-1. **The standard travel-seat count**, which no page states and which the published span
-   cannot settle, because its two ends swap round between models. Not emitted.
-2. **Whether FMLV should carry Hercules**, which the factory sells and neither UK dealer
+1. **Whether FMLV should carry Hercules**, which the factory sells and neither UK dealer
    lists.
+
+Nothing else. Every field this adapter can reach is now emitted.
 
 Settled since the survey, and left here so the record shows what moved:
 
@@ -197,6 +218,8 @@ Settled since the survey, and left here so the record shows what moved:
 * **Whether the pop-up roof is standard** — it is not, on any model, and the Schumacher
   Edition is not offered one. That settled `berths` at two throughout and made every model
   a plain high top.
+* **The standard travel-seat count** — four three-point belts on the five with a rear
+  bench, two on the Schumacher Edition.
 * **The Kronos's sleeping capacity**, which the factory states as `2 - 4` on the lineup
   card and `2 - 6` on the model page. The conflict is now moot: both ends above two are
   optional, so the figure recorded is two either way. Worth remembering if Robeta ever

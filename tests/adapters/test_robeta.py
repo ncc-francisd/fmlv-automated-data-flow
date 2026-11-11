@@ -198,24 +198,59 @@ def test_a_page_with_no_json_ld_yields_nothing() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_the_travel_seat_count_is_never_proposed(
-    cara_adonis: str, factory_lineup: str
+def test_four_three_point_belts_as_built_on_every_model_with_a_bench(
+    cara_adonis: str,
 ) -> None:
-    """The adapter's one remaining gap — see `_build_extracted_motorhome`.
+    """The driver, the passenger and two on the bench behind.
 
-    The seating span's two ends swap round between models: the Adonis's "for Two" package
-    *removes* seats, so its standard is the upper figure, while the Ares *"can be upgraded
-    to seat up to 5"*, so its standard is the lower. A field with no provenance is not
-    proposed, so FMLV's own counts stand.
+    Settled by the requester on 11 November 2026. Only three-point belts count, which is
+    the settled rule and the terms his figure is already stated in.
     """
-    product = _adonis(cara_adonis)
-    product.factory = robeta.factory_properties(factory_lineup)["ROBETA ADONIS"]
-    product.sleeping_capacity = product.factory.get("Sleeping Capacity")
+    bench_models = {model.name for model in robeta.MODELS} - {"Schumacher Edition"}
+    assert {robeta.STANDARD_TRAVEL_SEATS[name] for name in bench_models} == {4}
 
+    motorhome = robeta._build_extracted_motorhome(_adonis(cara_adonis)).motorhome
+    assert motorhome.mh_passenger_seats_inc_driver == 4
+
+
+def test_the_schumacher_edition_has_two_seats_and_no_bench(cara_schumacher: str) -> None:
+    """Robeta publish its `Seating Capacity` as `2` outright.
+
+    It is a two-berth grand tourer with a floating bed and no rear bench, so the
+    four-belt figure does not apply and recording it would contradict the maker.
+    """
+    assert robeta.STANDARD_TRAVEL_SEATS["Schumacher Edition"] == 2
+
+    product = robeta.parse_range_page(
+        cara_schumacher, "Schumacher Edition", "schumacher-edition", "https://example.invalid"
+    )
     extracted = robeta._build_extracted_motorhome(product)
 
-    assert extracted.motorhome.mh_passenger_seats_inc_driver is None
-    assert "mh_passenger_seats_inc_driver" not in extracted.provenance
+    assert extracted.motorhome.mh_passenger_seats_inc_driver == 2
+    assert "no rear bench" in extracted.provenance["mh_passenger_seats_inc_driver"].snippet
+
+
+def test_four_belts_agrees_with_every_published_seating_span(factory_lineup: str) -> None:
+    """The check that makes the figure more than one person's word.
+
+    The standard sits at a **different place in each span** — the lower end of the Ares's
+    `4 - 5`, the upper end of the Adonis's `2 - 4`, the middle of the Apollo's `2 - 5` —
+    and four is consistent with all of them. A span that merely contained four would prove
+    nothing; two spans that *start* and *end* at four agree with it independently.
+    """
+    spans = {
+        "ROBETA ARES": (4, 5),
+        "ROBETA ADONIS": (2, 4),
+        "ROBETA KRONOS": (2, 4),
+        "ROBETA APOLLO": (2, 5),
+        "ROBETA HELIOS": (2, 5),
+    }
+    for factory_name, (low, high) in spans.items():
+        model = next(m for m in robeta.MODELS if m.factory_name == factory_name)
+        assert low <= robeta.STANDARD_TRAVEL_SEATS[model.name] <= high, factory_name
+
+    assert spans["ROBETA ARES"][0] == 4, "the Ares span starts at the standard"
+    assert spans["ROBETA ADONIS"][1] == 4, "the Adonis span ends at the standard"
 
 
 def test_every_model_has_two_berths_as_built(cara_adonis: str) -> None:

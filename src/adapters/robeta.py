@@ -136,6 +136,42 @@ STANDARD_BERTHS: dict[str, int] = {
     "Schumacher Edition": 2,
 }
 
+#: Belted travel seats **as built**, with no option fitted.
+#:
+#: The requester, 11 November 2026, from his own research: *"the standard number of
+#: three-point seatbelts is 4, when you haven't got the upgraded configuration. So that's
+#: the driver plus passenger, and then a bench seat behind of 2 more."*
+#:
+#: **Only three-point belts are counted**, which is the settled rule, and his figure is
+#: already stated in those terms.
+#:
+#: This is the number Robeta's own spans could never give, and the reason is worth keeping:
+#: **the standard sits at a different place in each span.**
+#:
+#: | model | published `Seating Capacity` | where 4 sits |
+#: |---|---|---|
+#: | Ares | `4 - 5` | the **lower** end — *"can be upgraded to seat up to 5"* |
+#: | Adonis, Kronos | `2 - 4` | the **upper** end — the *"for Two"* package removes seats |
+#: | Apollo, Helios | `2 - 5` | the **middle**, reachable from neither end |
+#:
+#: Every one of those is consistent with four as built, which is the strongest check
+#: available: a span that merely *contained* four would prove nothing, but the Ares's span
+#: starting at four and the Adonis's ending at four both agree with it independently.
+#:
+#: **The Schumacher Edition is two, not four**, and deliberately so. Robeta publish its
+#: `Seating Capacity` as `2` outright, it is a two-berth grand tourer with a floating bed
+#: and no rear bench, and the requester's wording is about *"a bench seat behind"* — which
+#: this model does not have. Recording four here would contradict the maker's own explicit
+#: figure.
+STANDARD_TRAVEL_SEATS: dict[str, int] = {
+    "Adonis": 4,
+    "Apollo": 4,
+    "Ares": 4,
+    "Helios": 4,
+    "Kronos": 4,
+    "Schumacher Edition": 2,
+}
+
 
 @dataclass(frozen=True)
 class _Model:
@@ -463,19 +499,15 @@ _FINDING_PROPERTIES = (
 def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
     """One model as a `Motorhome`, with the provenance a reviewer reads beside each field.
 
-    **`berths` and `body_type` are now settled and proposed**, since the requester
-    established on 11 November 2026 that the pop-up roof is an option on five models,
-    standard on none, and not offered at all on the Schumacher Edition. See
-    `STANDARD_BERTHS` and `_body_type`.
+    **Every field is now settled and proposed.** The three that Robeta's published spans
+    could not give — `berths`, `mh_passenger_seats_inc_driver` and `body_type` — were
+    settled by the requester on 11 November 2026, and all three come down to the same
+    thing: **a published span is a range of configurations, not the vehicle as built**, so
+    the question is always how much of it a buyer gets without paying. See
+    `STANDARD_BERTHS`, `STANDARD_TRAVEL_SEATS` and `_body_type` for each.
 
-    **`mh_passenger_seats_inc_driver` is still not emitted**, and that is deliberate. It
-    has the same configuration-span problem the berths had, but without a single answer:
-    **the two ends swap round between models.** The Adonis's *"for Two" package replaces
-    the travelling seats*, so its standard is the **upper** figure of `2 - 4`; the Ares
-    *"can be upgraded to seat up to 5"*, so its standard is the **lower** figure of
-    `4 - 5`. One rule cannot serve both, and no page states the standard count outright.
-    A field with no provenance is never proposed, so FMLV's own seat counts stand while
-    `_narrate_open_questions` keeps the published span in front of the reviewer.
+    The spans are still narrated beside the figures, because they are the thing a reviewer
+    would otherwise check the numbers against and find them apparently too low.
     """
     features = habitation.features_from(product.standard_lines)
     automatic = gearbox.automatic_available_from(product.all_lines)
@@ -488,6 +520,7 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
         model=product.name,
         base_vehicle_manufacturer=fmlv_base_vehicle(product.base_vehicle),
         berths=STANDARD_BERTHS.get(product.name),
+        mh_passenger_seats_inc_driver=STANDARD_TRAVEL_SEATS.get(product.name),
         body_type=body_type,
         rrp_pounds=product.rrp_pounds,
         mro_kilograms=product.mro_kilograms,
@@ -580,6 +613,26 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
                 f"as '2 adults' outright, so {berths} is the vehicle as built."
             )
         record("berths", f"{span}{why}")
+    seats = STANDARD_TRAVEL_SEATS.get(product.name)
+    if seats is not None:
+        span = (
+            f"Robeta publish 'Seating Capacity {product.seating_capacity}'. "
+            if product.seating_capacity
+            else ""
+        )
+        if seats == 2:
+            why = (
+                "Robeta state it outright and this model has no rear bench — a two-berth "
+                "grand tourer with a floating bed — so two belted seats as built."
+            )
+        else:
+            why = (
+                f"{seats} THREE-POINT belts as built: the driver, the passenger and two "
+                f"on the bench behind. Settled by the requester on 11 November 2026; the "
+                f"span above it is the upgraded configuration and the span below it is "
+                f"the package that takes seats out. Only three-point belts are counted."
+            )
+        record("mh_passenger_seats_inc_driver", f"{span}{why}")
     if body_type is not None and body_type_note is not None:
         record("body_type", f"a campervan at {body_type_note}")
     if automatic is not None:
@@ -622,12 +675,23 @@ def _narrate_open_questions(
     if product.seating_capacity:
         spans.append(f"Seating Capacity '{product.seating_capacity}'")
     if spans:
-        on_progress(
-            f"{product.label} — Robeta publish {' and '.join(spans)}, a span of "
-            f"configurations rather than the vehicle as built. OPEN: travel seats are "
-            f"therefore NOT proposed and FMLV's own count stands — the two ends of the "
-            f"seating span swap round between models, so no single rule picks one"
-        )
+        berths = STANDARD_BERTHS.get(product.name)
+        seats = STANDARD_TRAVEL_SEATS.get(product.name)
+        as_built = f"Recorded as built: {berths} berths, {seats} three-point belted seats"
+        # Only the five with options have a span to explain. The Schumacher Edition
+        # publishes `2 adults` and `2` outright, and saying "everything above those is a
+        # paid option" of a model with no options would be nonsense.
+        if product.name in POP_TOP_OPTION:
+            on_progress(
+                f"{product.label} — Robeta publish {' and '.join(spans)}, which is a range "
+                f"of CONFIGURATIONS and not the vehicle as built. {as_built}. Everything "
+                f"above those is a paid option"
+            )
+        else:
+            on_progress(
+                f"{product.label} — Robeta publish {' and '.join(spans)} outright, with no "
+                f"pop-up roof offered and no seating upgrade. {as_built}"
+            )
 
     quoted = [
         f"{name} '{product.factory[name]}'"
