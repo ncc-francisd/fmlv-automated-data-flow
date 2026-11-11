@@ -1,6 +1,8 @@
-# ITINEO — survey, 11 November 2026
+# ITINEO — survey and adapter
 
-**NCC id 128.** **Stage 1 only. No adapter has been written.**
+**Surveyed and built 11 November 2026.** The adapter is `src/adapters/itineo.py`.
+
+**NCC id 128.**
 
 Part of **Groupe Rapido** (Mayenne, France), alongside Rapido (id 129, adapter built),
 Dreamer (id 127, to survey next), Campéréve and Fleurette. Ten coachbuilt motorhomes on
@@ -116,3 +118,69 @@ Ten, matching the ten `motorhome_<code>.php` pages one for one:
    neither checked against an export or the supplier dropdown. This blocks a build.
 2. **What FMLV currently holds** — no export has been downloaded, so the product count, the
    naming of range versus model, and which rows carry a dealer price are all unknown.
+
+## Built, 11 November 2026
+
+Run #229, against the live site and the live guide: **ten products collected, every one
+reconciling to exactly 3,500 kg**, against a baseline of nine.
+
+```
+classified  8 changed, 0 unchanged, 2 new, 1 disappeared
+verified    48 fields checked and unchanged
+findings     5 habitation readings
+```
+
+### Three things the first run turned up
+
+**`PC640` has gone from the site.** It is live in FMLV (7088, COZI, £58,800) and has no
+model page any more, so it comes through as the run's one disappearance. Nothing is
+proposed for it — deactivating is a decision for a person.
+
+**`JC740` is a relisting, not a new model.** FMLV holds it at **7085**, archived and
+inactive, and the baseline drops archived rows — so the adapter proposes it as new. It is
+not: Itineo have put it back. The row to reactivate is 7085, matched on the mass (FMLV
+3,065 kg against the guide's 3,070 kg for the 2027 collection). Creating a second JC740
+would leave two rows for one vehicle.
+
+**`PS740` is genuinely new**, and is not a renamed `PS700`. FMLV's PS700 (8252) is archived
+at 2,935 kg; the guide gives PS740 3,070 kg, and the two are a different length.
+
+### The column order, and the guard that makes it safe
+
+The guide's ten model codes are staggered across two lines and some share one `<text>`
+element, so the page's own `(y, x)` reading order interleaves them. Sorting the
+**elements** by x and flattening each one's cells gives the true order:
+
+```
+CM660, CJ660, SBD700, JC740, MC740, SB740, PF600, PJ700, PS740, PM740
+```
+
+**Nothing about that is self-evident, and a wrong order would not look wrong** — every
+figure would still be plausible for an Itineo. So `_check_alignment` compares the guide's
+height column against **each model page's own published height**, and refuses the product
+if they disagree. All ten agree.
+
+### Where Rapido's code was reused, and where it was not
+
+| | |
+|---|---|
+| `rapido.page_cells`, `_split_element`, `_svg_of` | reused unchanged |
+| `rapido._capture_pages` | reused unchanged |
+| `rapido.reconciles` | reused unchanged |
+| `rapido.technical_guide_url` | **does not match** — keys on a `TECHNICAL GUIDE` heading |
+| `rapido.heading_key` | **does not transfer** — anchors on `VEHICLE DIMENSIONS`, and this guide says `VEHICULE DIMENSIONS` |
+
+### One length cannot be read at all
+
+Column nine's overall length extracts as `.` — private-use glyphs, the
+font-substitution problem the Rapido survey found in prose, here landing in a number. It
+converts to `None` rather than to a plausible figure, so **PS740 is recorded with no
+length**. Every other value on that row reads cleanly.
+
+### What is not emitted, and why
+
+* **No price.** Itineo publish none anywhere. FMLV's nine live rows carry dealer-sourced
+  figures, and a blank would propose deleting them.
+* **No MTPLM.** The guide gives the gross weight as a *choice* — `LIGHT: 3.5 T` and
+  `HEAVY: 4.4 T` — not as this model's own figure. It is used for the arithmetic and
+  narrated, never proposed.
