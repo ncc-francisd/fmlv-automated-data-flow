@@ -1,6 +1,8 @@
-# Robeta — survey, 11 November 2026
+# Robeta — survey and adapter
 
-**NCC id 255**, `Robeta`. **Stage 1 only. No adapter has been written.**
+**Surveyed and built 11 November 2026.** The adapter is `src/adapters/robeta.py`.
+
+**NCC id 255**, `Robeta`.
 
 Robeta d.o.o., Pohorska cesta 6b, 2380 Slovenj Gradec, **Slovenia** — `info@robeta.si`.
 Premium panel-van conversions on Fiat and Mercedes, sold in the UK through **Cara
@@ -186,3 +188,67 @@ list", which happens to match FMLV, rather than "what the UK gets" in any strong
    `2 - 4` on the lineup card, `2 - 6` in the model page's JSON-LD.
 4. **Whether FMLV should carry Hercules**, which the factory sells and neither UK dealer
    lists.
+
+## Built, 11 November 2026 — and the first run confirmed rather than proposed
+
+Run #221, against both live sites: **six products, 1 changed, 5 unchanged, 0 new, 0
+disappeared, and 50 fields checked and unchanged.** That is what it looks like when the
+adapter has been pointed at the same source a person used by hand.
+
+The **one real change** is `automatic_available` → `Yes` on the Schumacher Edition, off
+Cara's own prose — *"a 2.0, four cylinder engine with automatic gearbox"*. The other five
+stay blank, correctly: neither site mentions a gearbox for them, and
+`/standard-equipment-stelantis` does not either. The vocabulary did its job there — the
+only thing on that page matching `automatic` is *"Electric valve for grey water (automatic
+emptying)"*, which it rightly ignored.
+
+Everything else proposed is a year bump or one of the twelve deliberate blanks below.
+
+### What the adapter does not emit, and why
+
+`berths`, `mh_passenger_seats_inc_driver` and `body_type` carry **no provenance**, so they
+are never proposed and FMLV's own figures stand untouched. That is the open question of
+this adapter rather than a gap in the sources:
+
+* **The capacities are spans of configurations, not the vehicle as built** — `Sleeping
+  Capacity 2 - 6`, `Seating Capacity 4 - 5`.
+* **The upper sleeping figure comes from the pop-up roof, which is an upgrade** on every
+  factory model page, and which Cara invite you to add.
+* **The two ends swap round between models**, so one rule cannot serve both. The Adonis's
+  *"for Two" package replaces the travelling seats*, so its standard seating is the
+  **upper** figure; the Ares *"can be upgraded to seat up to 5"*, so its standard is the
+  **lower**.
+* **Body type turns on the same roof question.** All six clear the 2,300mm threshold on
+  height alone, so high-top is certain and elevating-or-not is not.
+
+`_narrate_open_questions` prints the published span and the roof caveat for each product on
+every run, so the question stays visible. When Cara answer, it is one place to change.
+
+### How it is put together
+
+| | |
+|---|---|
+| Roster | Cara's Robeta section — the model pages are in **no sitemap** |
+| Price, MIRO, MTPLM, payload, L/W/H | Cara's `<table>` on each range page |
+| Habitation, capacities, chassis | the factory's schema.org JSON-LD |
+| Self-check | `payload == MTPLM − MIRO`, a hard drop on failure |
+
+Two details that would be easy to undo by accident. **`RANGE_LINK` only ever matches
+`/robeta-motorhomes/the-range/`** — widening it would pull in `/vehicle-details/`, which is
+individual stock and carries five other manufacturers' vehicles. And **the Adonis's own
+factory page has no `Product` block**; it embeds the whole lineup array instead, which is
+why `factory_properties` returns a map keyed by product name rather than a single block,
+and why `collect` reads the lineup page before the model pages.
+
+### A fridge disagreement that the pipeline will not show you
+
+`store.changes` records habitation findings **only for a new product**, and all six Robeta
+products are matched, so none appears in the review. The adapter still reads them, and one
+is worth knowing about: **FMLV holds `fridge` on five of the six and `fridge_freezer` on
+one**, while Robeta's own wording — *"65L pull-out drawer compressor fridge"*, *"85L
+compressor refrigerator"* — gives `fridge_freezer` under the house default for a fridge
+whose freezer is neither stated nor ruled out.
+
+Robeta say nothing either way about a freezer on any model. The run narrates the
+`Refrigerator` string verbatim for each product so the call can be made from their words
+rather than from the default.
