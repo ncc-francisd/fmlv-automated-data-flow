@@ -170,12 +170,33 @@ if they disagree. All ten agree.
 | `rapido.technical_guide_url` | **does not match** — keys on a `TECHNICAL GUIDE` heading |
 | `rapido.heading_key` | **does not transfer** — anchors on `VEHICLE DIMENSIONS`, and this guide says `VEHICULE DIMENSIONS` |
 
-### One length cannot be read at all
+### One length cannot be read, and the model page supplies it
 
 Column nine's overall length extracts as `.` — private-use glyphs, the
 font-substitution problem the Rapido survey found in prose, here landing in a number. It
-converts to `None` rather than to a plausible figure, so **PS740 is recorded with no
-length**. Every other value on that row reads cleanly.
+converts to `None` rather than to a plausible figure.
+
+**The model page states it plainly**, which the requester spotted from the guide itself on
+11 November 2026. Every model page carries a hero block:
+
+```html
+<h1 class=fb__nom>PS740</h1>
+<span class=fb__cartouche>7,40 m</span>
+<span class=fb__cartouche>PEUGEOT / FIAT</span>
+```
+
+So PS740 is recorded at **7,400mm** from its own page, and the provenance says which
+document it is quoting. That block earns its place three times over:
+
+* **the length** fills the unreadable cell, and elsewhere agrees with the guide;
+* **the name** checks that the URL this adapter built leads to the model it expected; and
+* **the chassis** is more reliable than the guide's multi-line chassis cell, which left
+  PS740 with no base vehicle at all. **The first make named is the one FMLV holds** —
+  `PEUGEOT / FIAT` becomes `Peugeot`, `FIAT` becomes `Fiat`, true across all thirteen
+  current rows.
+
+The alignment check now compares **both** height and length, which matters because ten
+models share only three heights between them.
 
 ### What is not emitted, and why
 

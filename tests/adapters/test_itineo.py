@@ -57,6 +57,11 @@ def sbd700() -> str:
     return _text("itineo-model-sbd700.html")
 
 
+@pytest.fixture
+def ps740() -> str:
+    return _text("itineo-model-ps740.html")
+
+
 # --------------------------------------------------------------------------- #
 # The site
 # --------------------------------------------------------------------------- #
@@ -252,6 +257,55 @@ def test_the_model_page_height_is_kept_for_the_alignment_check(pf600: str) -> No
     product = itineo.parse_model_page(pf600, "PF600", "https://example.invalid")
 
     assert product.page_height_mm == 2880
+
+
+def test_the_hero_block_gives_the_page_its_own_length_name_and_chassis(
+    pf600: str, ps740: str
+) -> None:
+    """Three independent readings of the same vehicle, on its own page.
+
+    The length is what rescues the one guide cell that cannot be read; the name is an
+    identity check on the URL; and the chassis is more reliable than the guide's
+    multi-line chassis cell.
+    """
+    pf = itineo.parse_model_page(pf600, "PF600", "https://example.invalid")
+    assert (pf.page_name, pf.page_length_mm, pf.base_vehicle) == ("PF600", 5990, "Peugeot")
+
+    ps = itineo.parse_model_page(ps740, "PS740", "https://example.invalid")
+    assert (ps.page_name, ps.page_length_mm, ps.base_vehicle) == ("PS740", 7400, "Peugeot")
+
+
+def test_the_first_chassis_named_is_the_one_fmlv_holds(ps740: str) -> None:
+    """The hero block says `PEUGEOT / FIAT`; FMLV records `Peugeot`.
+
+    Itineo offer the 660s and the P models on either chassis depending on market. FMLV
+    holds the first-named for every one of them, and `Fiat` for the models headed `FIAT`
+    alone — true across all thirteen current rows.
+    """
+    assert "PEUGEOT / FIAT" in " ".join(ps740.split()).upper()
+
+    product = itineo.parse_model_page(ps740, "PS740", "https://example.invalid")
+    assert product.base_vehicle == "Peugeot"
+
+
+def test_a_page_that_names_a_different_model_is_dropped(ps740: str) -> None:
+    """The URL is built from a slug map, so a page that disagrees means the map is wrong."""
+    product = itineo.parse_model_page(ps740, "PM740", "https://example.invalid")
+
+    messages: list[str] = []
+    assert not itineo._check_alignment(product, messages.append)
+    assert messages and "calls itself 'PS740'" in messages[0]
+
+
+def test_a_misaligned_length_column_is_caught_too(pf600: str) -> None:
+    """Two dimensions check the columns, not one — ten models share only three heights."""
+    product = itineo.parse_model_page(pf600, "PF600", "https://example.invalid")
+    product.mh_height_mm = 2880
+    product.mh_length_mm = 7420  # as if the column order had slipped
+
+    messages: list[str] = []
+    assert not itineo._check_alignment(product, messages.append)
+    assert messages and "overall length" in messages[0]
 
 
 def test_a_misaligned_column_is_caught_by_the_model_pages_own_height(pf600: str) -> None:

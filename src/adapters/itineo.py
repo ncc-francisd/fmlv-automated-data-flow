@@ -337,6 +337,29 @@ _BERTH_PROSE = re.compile(
 #: options are already split out of the headline figure.
 _STANDARD = re.compile(r"^\s*(?P<standard>\d+)")
 
+#: The model page's hero block: `<h1 class="fb__nom">PS740</h1>` followed by
+#: `<span class="fb__cartouche">7,40 m</span>` and another naming the chassis.
+#:
+#: **This is where a model states its own length**, which the guide's table does not always
+#: survive — see `_METRES_ROWS` and the private-use glyphs in `column_order`'s docstring.
+#: It also names the chassis, and it repeats the model code, which is three independent
+#: readings of the same vehicle on one page.
+_HERO_NAME = re.compile(r'class="fb__nom"[^>]*>(?P<name>.*?)</h1>', re.I | re.S)
+_HERO_CARTOUCHE = re.compile(r'class="fb__cartouche"[^>]*>(?P<value>.*?)</span>', re.I | re.S)
+
+#: A length as the hero block writes it — `7,40 m`.
+_HERO_METRES = re.compile(r"^(?P<metres>\d+[,.]\d+)\s*m\b", re.I)
+
+#: The chassis as the hero block writes it: `PEUGEOT / FIAT (a)` or `FIAT`.
+#:
+#: **The first make named is the one FMLV holds.** Itineo offer the 660s and the P models
+#: on either a Peugeot Boxer or a Fiat Ducato depending on market, and write it
+#: `PEUGEOT / FIAT`; FMLV records `Peugeot` for every one of those and `Fiat` for the
+#: models the site heads `FIAT` alone. That holds across all thirteen current rows.
+_HERO_CHASSIS = re.compile(
+    r"\b(PEUGEOT|FIAT|CITRO[EË]N|FORD|MERCEDES|MAN|RENAULT)\b", re.I
+)
+
 
 @dataclass
 class ItineoProduct:
@@ -357,9 +380,17 @@ class ItineoProduct:
     berths_note: str | None = None
     mh_passenger_seats_inc_driver: int | None = None
     seats_note: str | None = None
-    #: The model page's own `Overall height`, in millimetres — the independent reading the
-    #: column alignment is checked against.
+    #: The model page's own `Overall height`, in millimetres — one of the two independent
+    #: readings the column alignment is checked against.
     page_height_mm: int | None = None
+    #: The model page's own length, from its hero block. Both a second alignment check and
+    #: the fallback for the one guide cell that cannot be read at all.
+    page_length_mm: int | None = None
+    #: The model code the page gives itself, checked against the one we asked for.
+    page_name: str | None = None
+    #: True where the length came from the model page because the guide's cell was
+    #: unreadable, so the provenance can say which document it is quoting.
+    length_from_page: bool = False
 
     standard_lines: list[str] = field(default_factory=list)
     all_lines: list[str] = field(default_factory=list)
@@ -414,6 +445,19 @@ def parse_model_page(page: str, model: str, source_url: str) -> ItineoProduct:
     if height:
         product.page_height_mm = _metres_to_mm(height.replace("M", "").replace("m", ""))
 
+    name = _HERO_NAME.search(page)
+    if name:
+        product.page_name = _text(name.group("name")).upper().replace(" ", "")
+    for cartouche in _HERO_CARTOUCHE.findall(page):
+        value = _text(cartouche)
+        metres = _HERO_METRES.match(value)
+        if metres and product.page_length_mm is None:
+            product.page_length_mm = _metres_to_mm(metres.group("metres"))
+            continue
+        chassis = _HERO_CHASSIS.search(value)
+        if chassis and product.base_vehicle is None and not metres:
+            product.base_vehicle = chassis.group(1).title()
+
     lines = [" ".join(line.split()) for line in gearbox.lines_from_page(page)]
     product.all_lines = [line for line in lines if line]
     product.standard_lines = product.all_lines
@@ -439,17 +483,26 @@ def _check_alignment(
     Ten models share only three heights, so a single agreement proves little; what the
     check is worth comes from applying it to every product.
     """
-    guide, page = product.mh_height_mm, product.page_height_mm
-    if guide is None or page is None:
-        return True
-    if abs(guide - page) <= 10:
-        return True
-    on_progress(
-        f"DROPPED {product.label}: the guide's column gives an overall height of "
-        f"{guide}mm but its own model page says {page}mm, so the table's columns are not "
-        f"where this adapter thinks they are"
-    )
-    return False
+    if product.page_name is not None and product.page_name != product.model:
+        on_progress(
+            f"DROPPED {product.label}: its page calls itself {product.page_name!r}, so the "
+            f"URL this adapter built does not lead to the model it expected"
+        )
+        return False
+
+    for what, guide, page in (
+        ("overall height", product.mh_height_mm, product.page_height_mm),
+        ("overall length", product.mh_length_mm, product.page_length_mm),
+    ):
+        if guide is None or page is None or abs(guide - page) <= 10:
+            continue
+        on_progress(
+            f"DROPPED {product.label}: the guide's column gives an {what} of {guide}mm "
+            f"but its own model page says {page}mm, so the table's columns are not where "
+            f"this adapter thinks they are"
+        )
+        return False
+    return True
 
 
 def _reconciles(product: ItineoProduct) -> tuple[bool, str]:
@@ -558,7 +611,21 @@ def _build_extracted_motorhome(product: ItineoProduct) -> ExtractedMotorhome:
             f"the technical guide's 'Payload (kg)' row, {product.mh_payload_kilograms:,}kg",
         )
     if product.mh_length_mm is not None:
-        record("mh_length_mm", f"the guide's 'Overall length' row, {product.mh_length_mm / 1000:.2f}m")
+        if product.length_from_page:
+            record(
+                "mh_length_mm",
+                f"{product.mh_length_mm / 1000:.2f}m, from the model page's own hero block. "
+                f"The technical guide gives this model's length in PRIVATE-USE GLYPHS "
+                f"rather than digits - a font substitution no parser can read - so the "
+                f"page is quoted instead. Every other model's length comes from the guide "
+                f"and the two agree",
+            )
+        else:
+            record(
+                "mh_length_mm",
+                f"the guide's 'Overall length' row, {product.mh_length_mm / 1000:.2f}m, "
+                f"which agrees with the model page's own hero block",
+            )
     if product.mh_width_mm is not None:
         record(
             "mh_width_mm",
@@ -747,6 +814,12 @@ def collect(
         product = products.get(code)
         if product is None:
             continue
+        # The one cell of the guide that no parser can read - column nine's length is
+        # set in private-use glyphs - is filled from the model page's own hero block,
+        # which states it plainly. Everywhere else the two agree and the guide wins.
+        if product.mh_length_mm is None and product.page_length_mm is not None:
+            product.mh_length_mm = product.page_length_mm
+            product.length_from_page = True
         if not _check_alignment(product, on_progress):
             continue
         reconciles, note = _reconciles(product)
