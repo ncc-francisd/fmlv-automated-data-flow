@@ -746,3 +746,67 @@ The layout drawings arrived with the same email, as three archives covering all 
 models day and night. Among them is a genuine `Explorer_EVO_layout` — so the Z EVO page's
 `voyager_z_layout-3.png`, which `layout_filename_warning` has flagged since the build, is
 confirmed as a website error rather than a shared drawing.
+
+## The habitation pack, 11 November 2026
+
+`data/uploads/floorplans and hab excels/globe-traveller-2027-habitation-layouts.xlsx`,
+nine rows, in the same twenty-one columns as the Weinsberg pack. These are **findings**:
+nothing here is proposed, and a person types them into FMLV by hand.
+
+**Globe-Traveller publish more of this than any manufacturer surveyed so far.** Their
+model pages carry a specification block that states, per model, `Bed type`, `Main bed
+size`, `Additional bed`, `Bathroom`, `Shower tray` and `Toilet`. That settles the washroom
+and the beds outright, and the only two fields left for the drawings are the kitchen and
+the lounge.
+
+**The drawings and the specification rows agree on all nine**, which is the cross-check
+this pack rests on rather than arithmetic:
+
+| | spec row | drawing |
+|---|---|---|
+| `Bed type: French`, `200 x 123 cm` | one bed | one bed fore and aft at the rear, foot corner cut |
+| `Bed type: Double`, `196 x 192 cm` | one bed | **two** singles with a wardrobe between |
+| `Bathroom: Integrated with toilet` | one room | shower and toilet in one compartment |
+| `Bathroom: Seperate shower` | two rooms | shower cubicle, toilet and basin separately |
+
+**`Bed type: Double` is twin singles plus an infill, not a double.** 192 cm across a 206 cm
+body is the full interior width, and the drawing shows two separate beds. Globe-Traveller's
+own prose on the Pathfinder Z settles it — *"The rear sleeping area features two single
+beds that can be converted into one large double."* So those four take
+`fixed_separate_beds` with `make_up_beds` for the infill, which is how Weinsberg's
+CaraCore 650 MEG was recorded.
+
+**The `+2` sleeps at the front.** `Additional bed` reads `187 x 134 cm` on the five 2+2
+models and `N/A` on the four 2-berth ones, and the night drawings show the front made up
+while the rear bed stays. So 2+2 is `sleeping_area_both` and 2 is `sleeping_area_rear`.
+
+**Every one of the nine is the same at the front and amidships:** kitchen along one side
+amidships, lounge at the front on the two swivelled cab seats — with a single side bench on
+the 2-seat models and a two-seat travel bench with a table on the 4-seat ones. Neither is
+in any specification row.
+
+### Heating is not published, and an earlier note claiming otherwise was wrong
+
+**Globe-Traveller state no heater anywhere.** Not on a model page, not on a series page,
+not on the home or about pages — a search of all of them for `heat`, `warm air`, `Truma`,
+`Webasto`, `Alde`, `year-round` and `all-season` returns nothing. Both flipbooks (the
+2026/2027 catalogue at `books/cect/` and the UK price list at `books/pyci/`) are image-only
+with an obfuscated `config.js`, so no text in them is machine-readable, and
+`files/search/*` and `files/download/` are 404.
+
+An earlier working note recorded a catalogue quote — *"warm air distributed through this
+space supports year round use"* — as evidence of blown air **on every model**. It could not
+be re-sourced, and the wording reads like copy about the Z EVO's double floor rather than a
+statement about the range. **The pack leaves all three heating columns blank** and the
+question goes to Globe-Traveller. Blank is right here: silence is not a statement that
+there is no heating.
+
+### Two more for the same letter
+
+* **The fridge.** They publish a litre figure (`90 l` or `115 l`) and nothing about a
+  freezer either way. `fridge_freezer` in the pack is the house default for exactly that
+  case, not something Globe-Traveller said.
+* **The rear garage.** Named only on the Explorer Z and Pathfinder Z pages, and only in
+  passing — *"the rear garage is adapted to carry two bicycles"*. The Voyager Z and
+  Explorer Z EVO are the same shape and say nothing, so the pack leaves them unstated
+  rather than inferring from the drawing.
