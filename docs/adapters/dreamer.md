@@ -1,7 +1,8 @@
-# Dreamer — survey, 11 November 2026
+# Dreamer — survey and adapter, 11 November 2026
 
-**NCC id 127**, `Dreamer`. **Stage 1 only — no adapter yet.** The first pass of this survey
-stopped for the wrong reason; see "What the second pass changed".
+**NCC id 127**, `Dreamer`. **Adapter shipped**, `src/adapters/dreamer.py`, 19 products.
+The first pass of this survey stopped for the wrong reason; see "What the second pass
+changed".
 
 Part of **Groupe Rapido** (Mayenne, France), alongside Rapido, ITINEO, Campéréve and
 Fleurette. Panel-van conversions on Fiat, Peugeot and Ford. No caravans.
@@ -112,7 +113,7 @@ Site, with the lengths off the range tiles:
 | FUN | D43 *(new)* 5.41 · D43 UP 5.41 · D55 5.99 · D55 UP 5.99 · D68 6.36 · D68 UP *(new)* 6.36 · CAMPER SPORT 5.98 · CAMPER FIVE 6.36 |
 | Select | Cap Easy *(new)* 5.48 · D43 5.41 · D55 5.99 · City Camp 5.05 · D64 *(new)* 6.36 · D68 6.36 · Cap Land 5.45 · LIFT VAN *(new)* 6.36 · LIFT VAN UP *(new)* 6.36 · Camper Van XL 6.36 · Family Van 5.99 |
 
-FMLV (export of **5 August 2026** — get a fresh one before any run):
+FMLV, from the export downloaded 11 November 2026 (16 live products, all year 2027):
 
 | range | models |
 |---|---|
@@ -124,7 +125,7 @@ anyone believes otherwise:
 
 * FMLV `LIVING VAN` against the site's `LIFT VAN` — one letter apart, same range.
 * FMLV `D62` against the site's `D64 Select`.
-* FMLV `FAMILY` against the site's `FAMILY VAN Select`.
+* FMLV `FAMILY` against the site's `FAMILY VAN Select` — resolved: the matcher paired them on run #232.
 * FMLV lists `D68 UP` under `Select`; the site shows it under FUN.
 
 `CITY CAMP HYBRIDE` is in FMLV and not on the site at all.
@@ -135,11 +136,78 @@ cannot be derived from the model code.
 Base vehicles in FMLV: Fiat, except CAP LAND, CITY CAMP and CITY CAMP HYBRIDE, which are
 Ford. **The site publishes no chassis per model**, so this cannot currently be refreshed.
 
-## What has to be settled before building
+## What the adapter emits, and what it refuses to
+
+| emitted | not emitted |
+|---|---|
+| `manufacturer_range` (`Fun` / `Select`), `model` | `mro_kilograms`, `mtplm_kilograms`, `mh_payload_kilograms` |
+| `mh_length_mm`, `mh_height_mm`, `mh_width_mm` | `rrp_pounds` |
+| `berths`, `mh_passenger_seats_inc_driver` | `base_vehicle_manufacturer` |
+| `body_type`, `automatic_available` | |
+| habitation findings (`heating`, `refrigeration`, `bed_types`, `shower_toilet_separated`) | |
+
+The three absences are **left unset rather than emitted empty**, so FMLV's existing values
+survive a run untouched. The pipeline flags each as a no-op change for a person to confirm
+— the "not found this run" rows in the review.
+
+## What the first run found (#232, 11 November 2026)
+
+19 scraped against 16 baseline: **5 new, 2 disappeared, 12 changed**.
+
+The single most useful result is a **systematic +40 mm correction to every height**:
+
+```
+Fun    D55            2590 -> 2630      Select D43            2590 -> 2630
+Fun    D43 UP         2720 -> 2760      Select D68            2590 -> 2630
+Fun    CAMPER SPORT   2880 -> 2920      Select CAMPER VAN XL  2880 -> 2920
+```
+
+That is the superseded table's own figures sitting in FMLV, corrected to what Dreamer now
+publish — and it is independent confirmation that **FMLV's Dreamer data was taken from
+that table**. The same shift explains the berth corrections (`3 -> 2` on the Select D55 and
+D68, `5 -> 4` on Cap Land and Camper Van XL): the old figures counted the optional dinette
+bed, and the model pages now split the options out as `2 (O : 2 + 1)`.
+
+## Two things the adapter deliberately will not decide
+
+**City Camp Select's roof.** The settled rule is that silence means the elevating roof is
+an option, and the first run duly proposed downgrading it from
+`campervan_elevating_roof` to a plain `campervan`. That proposal was wrong and has been
+suppressed: City Camp publishes **four berths in a van 2,040 mm tall**, and its twin the
+Cap Land Select — same height, same chassis, same four berths — says *"4 adult berths with
+pop-up roof"* in so many words. `ROOF_UNSTATED` names it, no `body_type` is emitted, and
+FMLV's own value stands.
+
+**Which product is which, in the Select 6,360 mm group.** FMLV holds `D68 UP` (4 berths,
+2,720 mm, 3,165 kg) and `LIVING VAN` (4 berths, 2,880 mm, 3,105 kg). The site now holds
+`LIFT VAN` (2 berths, 2,630 mm) and `LIFT VAN UP` (4 berths, 2,760 mm), and has moved a
+`D68 UP` into **FUN**, badged new. The automatic matcher reads the FUN `D68 UP` as FMLV's
+Select one moved between ranges, which makes `LIFT VAN UP` new. **The heights suggest
+otherwise** — 2,720 → 2,760 is the same +40 mm every other model shifts by. It cannot be
+settled without a mass, so `AMBIGUOUS_IDENTITY` states it every run instead.
+
+## Three traps, each of which cost a run or a test
+
+1. **A `New` badge hides the length.** The tile is the only place Dreamer publish an
+   overall length, and a model badged `New` carries an extra span *inside* `class="dim"`
+   and before the figure. Stopping at the first `</span>` lost the length on six of the
+   nineteen — silently, because the other thirteen still worked.
+2. **The site is `iso-8859-1` and means it.** Cap Easy Select's heater is
+   `WEBASTO 2500\xa0W FUEL HEATING` with a real non-breaking space: one byte, not valid
+   UTF-8. Read with `errors="replace"` it becomes U+FFFD, which then cannot be written to
+   a Windows console, and the run dies on one page's typography. `dreamer._read` tries
+   strict UTF-8 and falls back to cp1252.
+3. **A cruise-control caveat reads as an automatic being ruled out.** The Select equipment
+   list contains `Adaptive cruise control - manual transmission only`, which
+   `gearbox.automatic_available_from` correctly reads as an explicit *No* — and it is
+   nothing of the kind, because the line directly below offers lane-keeping *"automatic
+   transmission only"*. `_transmission_lines` keeps only lines that name a make.
+
+## What is still open
 
 1. **A current weights table** — MIRO, MTPLM/GVW and payload for the 19 models now sold.
-   This is a question for Dreamer, who are in the same group as two manufacturers already
-   answering us. Until it arrives, an adapter can emit no mass at all, exactly as the
-   Rapido adapter emits no price.
-2. **A fresh FMLV export**, to settle the rename candidates above.
-3. **Chassis per model**, which the site no longer states.
+   A question for Dreamer, who are in the same group as two manufacturers already
+   answering us. It would also settle the identity question above.
+2. **Chassis per model**, which the site no longer states.
+3. **Whether City Camp Select has a pop-up roof**, and whether `CITY CAMP HYBRIDE` has
+   been withdrawn.

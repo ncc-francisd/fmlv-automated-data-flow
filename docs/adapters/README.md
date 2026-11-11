@@ -1594,6 +1594,37 @@ Two practical consequences, from the NCC side on 19 August 2026:
   the site, record the model year, and re-run when the site changes — rather than to write to
   the contact, which is the right move for Coachman and Chausson but not here.
 
+### A specification table can be a previous season's, and nothing on it says so
+
+Dreamer's `fourgon-caracteristiques-techniques_dreamer.php` is the cleanest source this
+project has met: a plain HTML `<table>` of masses, dimensions, berths and bed sizes, with
+`MIRO + payload == GVW` holding on eight of its nine columns. It sits on a site headed
+`Vans DREAMER 2027`, beside model pages for the current range, and it describes **vehicles
+Dreamer stopped selling a year ago**.
+
+Nothing on the page admits it. The giveaway was a **dimension held in common with a second
+source**: every height in the table is 40 mm short of what the model pages publish — fixed
+roof `2,59` against `2.63`, pop-top `2,72` against `2.76`, Camper Five `2,88` against
+`2.92`. Once that was visible the rest followed: trims no longer sold (`ADDICT`,
+`EXCLUSIVE`), a replaced model numbering (`D42`/`D53`/`D60` where the site says
+`D43`/`D55`/`D68`), and a current model missing from it altogether.
+
+**So before trusting a table that is not reachable from the model pages, check one figure
+it shares with them.** A height or a width will do; it need not be a figure you intend to
+collect. This is cheap, and it is the only check that works, because:
+
+- **the arithmetic cannot catch it.** A superseded table reconciles perfectly — it was
+  correct when it was published;
+- **the model count cannot catch it.** Dreamer's nine columns against sixteen live FMLV
+  products looked like an incomplete table, which is what it was mistaken for first; and
+- **nothing downstream can catch it.** Last year's masses are entirely plausible masses
+  for this year's vans, and a reviewer has no reason to doubt them.
+
+Note the inversion of the usual advice. Elsewhere in this file a glossy summary is the
+thing to distrust and the technical table is the data. That still holds *within* one
+document set — but a technical table is also the page a manufacturer forgets to replace,
+precisely because nobody browsing the site ever opens it.
+
 ### The website overrules the PDF, and a document's year is what the page says
 
 > **One documented exception, Elddis, 25 August 2026.** The rule below rests on a reason —
@@ -2869,6 +2900,39 @@ vocabulary is narrow — the word `automatic` on its own is never matched, since
 specification is full of automatic energy selection, automatic ignition, automatic gas
 changeover and automatic levelling. Every pattern demands a gearbox word beside it or a
 chassis maker's trade name (`Hi-Matic`, `9G-Tronic`, `EAT8`, `PowerShift`, `DSG`).
+
+### A gearbox named as another feature's condition says nothing about the gearbox
+
+`gearbox.automatic_available_from` reads a page's lines and returns `True`, `False` or
+nothing. Give it a whole equipment list and it can return a confident, wrong `False`.
+
+Dreamer's Select list, in order:
+
+```
+Adaptive cruise control - manual transmission only
+Lane-keeping assist and warning - manual transmission only
+Lane-keeping assist, warning and centring - automatic transmission only
+```
+
+The first line reads as an automatic being ruled out. It is nothing of the kind — it is a
+caveat on a *driver-assistance feature*, and the third line proves an automatic exists.
+Accepting the first writes an explicit `No` into FMLV where the correct answer is `Yes`,
+and an explicit `No` is worse than a blank: a blank asks a question, a `No` answers it.
+
+**So filter to the lines that state an offering before calling it.** The reliable test is
+that an offering names the base-vehicle make, because a manufacturer listing a gearbox
+lists the engine with it:
+
+```
+FIAT 140 hp automatic transmission, 3.5T - LIGHT DUTY     <- an offering
+FORD EcoBlue 2.0-litre 136 hp engine with manual transmission   <- an offering
+Adaptive cruise control - manual transmission only        <- a caveat, discard
+```
+
+`dreamer._transmission_lines` is the implementation. The same shape will appear on any
+manufacturer whose equipment list qualifies ADAS features by gearbox, which is most of
+them now — the feature genuinely differs between the two transmissions, so the caveat is
+honest and common and will keep turning up.
 
 ### The `automatic_*` columns are for a maker who prices the automatic separately
 
