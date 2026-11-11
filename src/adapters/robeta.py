@@ -496,6 +496,13 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
 # --------------------------------------------------------------------------- #
 
 
+def _feature_value(value: object) -> str:
+    """One habitation value as a reviewer would type it into FMLV."""
+    if isinstance(value, list):
+        return ";".join(_feature_value(item) for item in value) or "none"
+    return getattr(value, "value", str(value))
+
+
 def _narrate_open_questions(
     product: RobetaProduct, on_progress: Callable[[str], None]
 ) -> None:
@@ -531,6 +538,22 @@ def _narrate_open_questions(
     ]
     if quoted:
         on_progress(f"{product.label} — habitation, as Robeta state it: " + " | ".join(quoted))
+
+    # What those words were *read as*. Said out loud because `store.changes` records
+    # habitation findings for a **new** product only, and all six Robeta products are
+    # matched — so without this the reading never reaches a reviewer at all. The
+    # refrigeration one matters: FMLV held `fridge` on five of the six, and the requester
+    # confirmed on 11 November 2026 that these refrigerators do have a freezer section.
+    features = habitation.features_from(product.standard_lines)
+    if features:
+        on_progress(
+            f"{product.label} — read as: "
+            + " | ".join(
+                f"{name} = {_feature_value(feature.value)}"
+                for name, feature in sorted(features.items())
+            )
+            + ". These are findings on a matched product, so the review will NOT show them"
+        )
 
 
 def _check_factory_roster(

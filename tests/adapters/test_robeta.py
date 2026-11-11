@@ -272,9 +272,44 @@ def test_the_payload_provenance_states_the_arithmetic(cara_adonis: str) -> None:
 
 
 def test_the_manufacturer_is_spelled_with_one_t() -> None:
-    """The NCC list reads `Robeta` at id 255 and so does FMLV's export."""
+    """`Robeta` everywhere, confirmed by the requester on 11 November 2026.
+
+    The NCC manufacturer list at id 255, the NCC supplier export dropdown, FMLV's export,
+    Cara's URL and the factory's domain all agree. He says "Robetta" out loud.
+    """
     assert robeta.MANUFACTURER == "Robeta"
     assert robeta.MANUFACTURER_DISPLAY_NAME == "Robeta"
+    assert "robeta-motorhomes" in robeta.RANGE_INDEX_URL
+    assert "robeta-campervans" in robeta.FACTORY_BASE_URL
+
+
+def test_the_habitation_reading_is_rendered_as_a_reviewer_would_type_it(
+    factory_ares: str,
+) -> None:
+    """`store.changes` shows habitation findings for NEW products only, and all six Robeta
+    products are matched — so the run narration is the only place this reading appears.
+    """
+    from src.product_model.enums import BedType, Refrigeration
+
+    assert robeta._feature_value(Refrigeration.FRIDGE_FREEZER) == "fridge_freezer"
+    assert robeta._feature_value([BedType.MAKE_UP, BedType.FIXED]) == "make_up_beds;fixed_bed"
+    assert robeta._feature_value([]) == "none"
+
+
+def test_robetas_refrigerator_reads_as_a_fridge_freezer(factory_ares: str) -> None:
+    """*"65L pull-out drawer compressor fridge"* — a litre figure and no word on a freezer.
+
+    The house default for that case is `fridge_freezer`, and the requester confirmed on
+    11 November 2026 that these do have a freezer section. FMLV holds plain `fridge` on
+    five of the six and needs flipping by hand.
+    """
+    from src.adapters import gearbox, habitation
+
+    lines = [" ".join(line.split()) for line in gearbox.lines_from_page(factory_ares)]
+    features = habitation.features_from([line for line in lines if line])
+
+    assert "refrigeration" in features
+    assert robeta._feature_value(features["refrigeration"].value) == "fridge_freezer"
 
 
 def test_every_model_is_offered_to_the_range_flag() -> None:

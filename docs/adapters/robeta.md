@@ -8,10 +8,11 @@ Robeta d.o.o., Pohorska cesta 6b, 2380 Slovenj Gradec, **Slovenia** — `info@ro
 Premium panel-van conversions on Fiat and Mercedes, sold in the UK through **Cara
 Motorhomes & Caravans**.
 
-**The spelling is `Robeta`, one `t`.** The NCC manufacturer list reads `Robeta` at id 255
-and the FMLV export's `manufacturer` column reads `Robeta`. The requester referred to it as
-"Robetta"; `ncc_supplier_name` has not been read off the NCC export dropdown and is the one
-identity field still unverified.
+**The spelling is `Robeta`, one `t`, everywhere** — confirmed by the requester on
+11 November 2026. The NCC manufacturer list at id 255, **the NCC supplier export
+dropdown**, the FMLV export's `manufacturer` column, `caramotorhomes.co.uk/robeta-motorhomes/`
+and `robeta-campervans.com` all agree. He says "Robetta" in conversation; none of the
+systems does.
 
 | | Robeta |
 |---|---|
@@ -249,6 +250,12 @@ one**, while Robeta's own wording — *"65L pull-out drawer compressor fridge"*,
 compressor refrigerator"* — gives `fridge_freezer` under the house default for a fridge
 whose freezer is neither stated nor ruled out.
 
-Robeta say nothing either way about a freezer on any model. The run narrates the
-`Refrigerator` string verbatim for each product so the call can be made from their words
-rather than from the default.
+**Settled on 11 November 2026**: the requester is confident these refrigerators include a
+freezer section, so `fridge_freezer` is right on all six and **five FMLV rows need flipping
+by hand at the next upload** — 8726 Adonis, 8727 Apollo, 8728 Ares, 8729 Helios and
+8730 Kronos. 8732 Schumacher Edition already holds it, which is what suggests the other
+five were an oversight rather than a decision.
+
+Because the review will never show this, the run now narrates **both** the manufacturer's
+words and what they were read as — `read as: refrigeration = fridge_freezer` — on every
+product, every run.
