@@ -168,10 +168,10 @@ rather than a restatement: a span that merely contained four would prove nothing
 So three rows change — Apollo, Ares and Helios from five to four — and the Adonis and
 Kronos verify unchanged.
 
-**The Schumacher Edition is two, not four.** Robeta publish its `Seating Capacity` as `2`
-outright, and it is a two-berth grand tourer with a floating bed and **no rear bench** —
-which is the thing the requester's figure counts. Recording four would contradict the
-maker's own explicit number.
+**The Schumacher Edition is two, not four** — confirmed by the requester the same day:
+*"The Schumacher edition is strictly two seats for seatbelts as well as two berths."*
+Robeta publish its `Seating Capacity` as `2` outright, and it is a two-berth grand tourer
+with a floating bed and **no rear bench**, which is the thing the four-belt figure counts.
 
 ## Body type
 
@@ -287,10 +287,10 @@ compressor refrigerator"* — gives `fridge_freezer` under the house default for
 whose freezer is neither stated nor ruled out.
 
 **Settled on 11 November 2026**: the requester is confident these refrigerators include a
-freezer section, so `fridge_freezer` is right on all six and **five FMLV rows need flipping
-by hand at the next upload** — 8726 Adonis, 8727 Apollo, 8728 Ares, 8729 Helios and
-8730 Kronos. 8732 Schumacher Edition already holds it, which is what suggests the other
-five were an oversight rather than a decision.
+freezer section, so `fridge_freezer` is right on all six. **Five FMLV rows hold plain
+`fridge`** — 8726 Adonis, 8727 Apollo, 8728 Ares, 8729 Helios and 8730 Kronos — and he is
+changing them by hand; 8732 Schumacher Edition already holds it, which is what suggests
+the other five were an oversight rather than a decision.
 
 Because the review will never show this, the run now narrates **both** the manufacturer's
 words and what they were read as — `read as: refrigeration = fridge_freezer` — on every

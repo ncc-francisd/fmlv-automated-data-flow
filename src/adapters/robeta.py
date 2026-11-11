@@ -158,11 +158,11 @@ STANDARD_BERTHS: dict[str, int] = {
 #: available: a span that merely *contained* four would prove nothing, but the Ares's span
 #: starting at four and the Adonis's ending at four both agree with it independently.
 #:
-#: **The Schumacher Edition is two, not four**, and deliberately so. Robeta publish its
-#: `Seating Capacity` as `2` outright, it is a two-berth grand tourer with a floating bed
-#: and no rear bench, and the requester's wording is about *"a bench seat behind"* — which
-#: this model does not have. Recording four here would contradict the maker's own explicit
-#: figure.
+#: **The Schumacher Edition is two, not four** — put to the requester and confirmed by him
+#: the same day: *"The Schumacher edition is strictly two seats for seatbelts as well as
+#: two berths."* Robeta publish its `Seating Capacity` as `2` outright, and it is a
+#: two-berth grand tourer with a floating bed and **no rear bench** — which is the thing
+#: the four-belt figure counts.
 STANDARD_TRAVEL_SEATS: dict[str, int] = {
     "Adonis": 4,
     "Apollo": 4,
