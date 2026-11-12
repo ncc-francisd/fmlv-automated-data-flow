@@ -251,6 +251,18 @@ MODELS: tuple[_Model, ...] = (
 #: and seats is worth more to FMLV than no product at all, and a blank required column
 #: does not block an upload. Everything missing shows in the review as a field needing a
 #: person.
+#:
+#: **Cara were asked, and have answered: they do not have the figures either.** John
+#: Burton, 12 November 2026, replying to a request for a UK price, the masses, the belt
+#: count and the missing dimensions: *"We don't have all that info for Hercules or Ananya
+#: as yet, so they can be left out for now or put as TBA."*
+#:
+#: The requester's decision the same day was to carry them regardless — *"we will decide
+#: whether or not we can include it but without some data for the time being. We might
+#: activate it just so that it's there and remind ourselves that we need to add the
+#: data."* So these two are **TBA rows by agreement with the importer**, not an adapter
+#: falling short, and the run's narration is the reminder: it states every time which
+#: columns are empty and why.
 FACTORY_ONLY: frozenset[str] = frozenset({"Hercules", "Ananya"})
 
 #: `(slug, label)` for `--range`. Every model is its own range here.
@@ -1045,10 +1057,15 @@ def collect(
             on_progress(
                 f"{model.name} is collected from the FACTORY page, because Cara have no "
                 f"range page for it. Cara confirmed it as UK range for 2027 by email on "
-                f"12 November 2026, and the importer defines the range — but no price "
-                f"and no mass can be had until they publish one. WATCH FOR a Cara range "
-                f"page appearing at {RANGE_INDEX_URL}{model.slug}/, which would supply "
-                f"both"
+                f"12 November 2026, and the importer defines the range. ASKED AND "
+                f"ANSWERED: Cara were asked the same day for a UK price, the masses, the "
+                f"belt count and the missing dimensions, and replied that they do not "
+                f"have them yet — *\"We don't have all that info for Hercules or Ananya "
+                f"as yet, so they can be left out for now or put as TBA.\"* So there is "
+                f"nothing further to chase; this is a WATCH, not a question. The figures "
+                f"will appear either in a Cara range page at "
+                f"{RANGE_INDEX_URL}{model.slug}/, which this run checks for every time, "
+                f"or in a further email"
             )
 
     _check_factory_roster(http, on_progress)

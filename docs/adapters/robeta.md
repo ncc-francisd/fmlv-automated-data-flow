@@ -279,19 +279,29 @@ list", which happens to match FMLV, rather than "what the UK gets" in any strong
 
 ## What is still open
 
-All five are questions for Cara, who answer, and all five concern the two models they
-named as new for 2027:
+**Asked on 12 November 2026, and answered the same day: Cara do not have the figures
+either.** John Burton, replying to a request for a UK price, the masses, the belt count
+and the Hercules's missing dimensions:
 
-1. **A UK price for the Hercules and the Ananya.** Neither published figure is a UK one —
-   a German RRP and a net price.
-2. **MIRO, MTPLM and payload for both.** Nothing is published for the Hercules at all,
-   and the Ananya gives a payload against two candidate plated weights.
-3. **The Hercules's height and width**, which would also give it a body type — it is
-   plainly a high top in the photographs, but a dimension is what decides that and there
-   is none.
-4. **The Ananya's berth count.** The factory publishes no sleeping capacity for it.
-5. **How many of the stated seats are three-point belts** — four on the Hercules, three
-   on the Ananya, with no belt type given, and only three-point belts are counted.
+> *"We don't have all that info for Hercules or Ananya as yet, so they can be left out for
+> now or put as TBA."*
+
+**The requester's decision, the same day: carry them anyway.** *"We will decide whether or
+not we can include it but without some data for the time being. We might activate it just
+so that it's there and remind ourselves that we need to add the data."*
+
+So the Hercules and the Ananya are **TBA rows by agreement with the importer**, and the
+list below is now a watch rather than a question — there is nobody left to chase:
+
+1. **A UK price** for both.
+2. **MIRO, MTPLM and payload** for both.
+3. **The Hercules's height and width**, without which it gets no body type.
+4. **The Ananya's berth count.**
+5. **How many of the stated seats are three-point belts** — four on the Hercules, three on
+   the Ananya, with no belt type given.
+
+The run states every one of these each time it collects the two models, which is the
+reminder the requester asked for.
 
 Two further things worth watching rather than asking:
 
