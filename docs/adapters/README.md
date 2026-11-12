@@ -689,6 +689,35 @@ three.
 The general rule, and it applies to every field the pipeline can derive: **emitting
 nothing means holding no value, not hiding one.**
 
+### The importer's word beats the importer's website
+
+The rule above gives the UK importer authority over what the range is. That authority is
+**the importer**, not the importer's website, and the two can disagree — the website
+being the slower of the two, because somebody has to update it.
+
+Cara Motorhomes, 12 November 2026, their General Manager to the NCC directory:
+
+> *"There are 2 new models within the Robeta range for 2027, Hercules and Ananya."*
+
+Their website listed six that day, and listed six the day after. The adapter had been
+right to leave both out until then, on exactly the right grounds — no UK seller listed
+them — and was wrong to go on doing so the moment the seller said otherwise.
+
+**So an email, a price list or a phone call from the importer settles the range, and a
+website that has not caught up is not evidence against it.** The corollary matters as
+much: it settles the *range*, not the *numbers*. The models are in scope; their masses and
+their UK prices are still unpublished, and inventing them from a foreign-market figure
+would be the usual error wearing a new hat.
+
+**Record the claim and its date where the adapter can be read**, because a roster entry
+with no provenance is indistinguishable from a guess six months later. `robeta._Model`'s
+`on_cara` field carries the email and the date in its own docstring.
+
+One practical consequence: **do not build the roster check so that it silently passes.**
+Robeta's run narrates, every time, that Cara have no range page for these two and names
+the URL to watch — so the day a page appears, with a price and three masses on it, the
+run says so rather than quietly improving.
+
 ### A filtered roster needs a check on what the filter threw away
 
 Where the roster comes from a source you **narrow** — a sitemap filtered to known URL
@@ -1128,6 +1157,42 @@ fridge-freezer proposal under a line that says "fridge" and reading it as a bug.
 Positive evidence is still required to propose anything at all. A page that never mentions
 refrigeration still proposes nothing: the assumption is about what a stated fridge
 includes, not about what every vehicle has.
+
+### Marketing prose is not a specification, even when the habitation module reads it
+
+`habitation.features_from` is built for a manufacturer's own specification list —
+`Refrigerator '85L compressor refrigerator'`, `Fresh Water Tank '107L'` — where every
+line is a statement about the vehicle. Point it at a launch page or a brochure essay and
+it keeps working, confidently, on sentences that are not about this vehicle at all.
+
+Robeta's two 2027 additions produced both failure modes in one run:
+
+> *"a tiny counter, a camping stove, maybe a mini-fridge if you're lucky"*
+
+read as the **Ananya's** refrigeration. The sentence is about how *other* manufacturers
+build vans, and it is there to disparage them.
+
+> *"…with an optional 140-litre refrigerator"*
+
+read as the **Hercules's** refrigeration, where its own specification list gives 90 l as
+standard and names the 140 l as the option. The value happened to be right and the
+citation was wrong, which is worse than being plainly wrong: a reviewer checking the
+quotation finds a real sentence about a real fridge.
+
+Both would have reached a reviewer as a finding with a plausible-looking quotation
+attached, and a finding is typed in by hand — there is no second check behind it.
+
+**So decide what a page *is* before reading habitation off it, and prefer a structured
+block over prose every time.** Where a manufacturer publishes both — Robeta's five
+original models carry an `additionalProperty` JSON-LD block and the prose besides — read
+the block and ignore the prose. Where a model has only prose, emit nothing and quote the
+manufacturer's own labels into the run instead, so a person reads the words and decides.
+`robeta._habitation_of` is the implementation: one guard, returning `{}` for the models
+that have no structured block.
+
+The general shape: **a parser that cannot fail is not the same as a parser that is
+right.** The habitation module has no way to know whether a sentence is about the vehicle
+in front of it, so that judgement belongs in the adapter, which does.
 
 ### Habitation features split into the factual and the subjective
 

@@ -1,5 +1,8 @@
 # Robeta — survey and adapter
 
+**Updated 12 November 2026: the UK range is eight, not six.** See "The roster was six".
+
+
 **Surveyed and built 11 November 2026.** The adapter is `src/adapters/robeta.py`.
 
 **NCC id 255**, `Robeta`.
@@ -97,18 +100,88 @@ That is a better parse target than the rendered page and it carries most of the 
 findings for free. The euro price is **not** wanted — Cara's sterling figure is the UK
 price and it is already correct in FMLV.
 
-## The roster is six, and the factory's is bigger
+## The roster was six; from 12 November 2026 it is eight
 
-**Cara list exactly six**, matching FMLV. The factory lists more:
+**Cara's website lists exactly six**, matching FMLV, and still did on 12 November 2026.
+The factory lists more:
 
-* **Hercules** — a new Mercedes model with its own `/models/hercules` page and a launch
-  blog post, *"Private Mercedes-Benz grand tourer for two"*.
+* **Hercules** — a Mercedes grand tourer with its own `/models/hercules` page.
+* **Ananya** — a "glampervan" with its own section of the site and its own brand.
 * **Dionysus** — appears only in the contact form's model dropdown.
-* **Ananya** — a "glampervan" with its own section of the site.
 
-**None of the three is on Cara**, so none is in the UK range. Hercules has never been in
-FMLV either: the February 2026 and November 2026 exports hold the same six products, the
-same prices, and the same gap at product id 8731.
+Until 12 November 2026 the adapter collected none of the three, on the grounds that the
+importer defines the range and no UK seller listed them. **Then the importer said
+otherwise.** John Burton, General Manager of Cara Motorhomes, to the NCC directory:
+
+> *"There are 2 new models within the Robeta range for 2027, Hercules and Ananya, you can
+> view them all at www.robetauk.co.uk"*
+
+That settles the range, because the importer's word is what defines it — **their website
+lagging behind their own email is not evidence against them.** Both are now collected.
+The Dionysus was not named and is still left out.
+
+### The link in that email is not a new source
+
+`www.robetauk.co.uk` looks like a UK importer site and is not one. It serves the factory
+homepage, its `<link rel="canonical">` points at `https://www.robeta-campervans.com/`,
+and every sub-path 404s. It is a domain alias, so there is nothing on it to read that
+`robeta-campervans.com` does not already have.
+
+### What collecting them costs
+
+Everything numeric in this adapter comes from Cara, because Cara are the ones who publish
+numbers. These two have no Cara page, so they come with **no price, no mass, no
+self-check and no habitation reading** — see `robeta.FACTORY_ONLY`. In particular:
+
+| | Hercules | Ananya |
+|---|---|---|
+| length | 6.97 m | 6.97 m |
+| height | *not published* | 2.66 m |
+| berths | 2 | *not published* |
+| travel seats | 4 | 3 |
+| MIRO / MTPLM / payload | *none* | payload 1,362 kg only |
+| price | €130,990.44, tagged `eligibleRegion: DE` | €198,000 **net** |
+| base vehicle | Mercedes | Mercedes (Sprinter 419 CDI long 4x4) |
+
+**Neither price is usable.** The Hercules's is a German RRP at a German VAT rate; the
+Ananya's is explicitly *net*, which is to say excluding VAT. This project's euro
+conversion assumes a domestic VAT-inclusive price, so converting either would invent a UK
+figure rather than convert one.
+
+**Neither mass is usable either.** The Hercules publishes none. The Ananya publishes
+*"Base chassis rating (Sprinter 419): 4,100 kg. Category B registration is possible only
+if the completed vehicle is homologated at 3,500 kg"* — two candidate plated weights with
+no way to tell which a UK buyer gets — and a payload with no MIRO or MTPLM to sit against.
+
+**And their habitation is not read.** The other five are read from the factory's
+structured `additionalProperty` block; these two have only marketing prose, and running
+that through `habitation.features_from` produced two wrong findings on the first run: the
+Ananya's `refrigeration` out of *"maybe a mini-fridge if you're lucky"* — a sentence about
+how **other** manufacturers build vans — and the Hercules's out of its *optional*
+140-litre refrigerator rather than the 90-litre one its own specification list gives as
+standard. Both would have reached a reviewer with a plausible quotation attached.
+
+They are collected anyway, because a product with a name, dimensions, berths and seats is
+worth more than no product, and a blank required column does not block an upload.
+
+### Two page layouts, because Robeta built them on different stacks
+
+* the **Hercules** has a Next.js `The essentials` definition list — `<dl>` of
+  `<dt>Length</dt><dd>6.97 m</dd>` pairs — read by `parse_launch_specs`;
+* the **Ananya** sits on a Webflow sub-site with a `Key facts` bullet list —
+  `<li><strong>Vehicle Length: </strong>6.97 meters</li>` — read by `parse_key_facts`.
+
+Neither carries the `additionalProperty` JSON-LD the other five use. The Hercules's only
+JSON-LD is an `offers` block holding the German price; the Ananya's is an `Organization`.
+
+### The Hercules's berth count may be read straight; the others' may not
+
+The factory lineup block gives the Hercules `Sleeping Capacity 2` — a plain number — where
+the other five get spans like `2 - 6`. That difference is the whole point:
+a span is a set of configurations needing a judgement about which options are standard,
+and a plain number is the vehicle as built. `_standard_berths_from` refuses a span, so if
+Robeta ever start offering options on the Hercules its berth count stops being proposed
+rather than silently becoming wrong.
 
 ## Berths, and the roof: settled 11 November 2026
 
@@ -206,10 +279,31 @@ list", which happens to match FMLV, rather than "what the UK gets" in any strong
 
 ## What is still open
 
-1. **Whether FMLV should carry Hercules**, which the factory sells and neither UK dealer
-   lists.
+All five are questions for Cara, who answer, and all five concern the two models they
+named as new for 2027:
 
-Nothing else. Every field this adapter can reach is now emitted.
+1. **A UK price for the Hercules and the Ananya.** Neither published figure is a UK one —
+   a German RRP and a net price.
+2. **MIRO, MTPLM and payload for both.** Nothing is published for the Hercules at all,
+   and the Ananya gives a payload against two candidate plated weights.
+3. **The Hercules's height and width**, which would also give it a body type — it is
+   plainly a high top in the photographs, but a dimension is what decides that and there
+   is none.
+4. **The Ananya's berth count.** The factory publishes no sleeping capacity for it.
+5. **How many of the stated seats are three-point belts** — four on the Hercules, three
+   on the Ananya, with no belt type given, and only three-point belts are counted.
+
+Two further things worth watching rather than asking:
+
+* **A Cara range page appearing for either model** at
+  `/robeta-motorhomes/the-range/hercules/` or `.../ananya/`. That would supply the price,
+  the masses and the arithmetic self-check in one go, and the run narrates the absence
+  every time so it cannot be missed.
+* **Whether the Ananya belongs in FMLV at all.** It has its own brand site
+  (`glam-van.com`), its own logo, three seats, a 4,100 kg Sprinter 4x4 base and a
+  €198,000 net price — which is not obviously a catalogue campervan. Cara named it as
+  range, and the importer defines the range, so it is collected; but it is the one entry
+  here that a person might reasonably decide against.
 
 Settled since the survey, and left here so the record shows what moved:
 

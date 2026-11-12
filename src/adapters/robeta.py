@@ -52,12 +52,16 @@ __all__ = [
     "DEFAULT_RANGES",
     "EXPECTED_PRODUCTS",
     "FACTORY_BASE_URL",
+    "FACTORY_ONLY",
     "MANUFACTURER",
     "MANUFACTURER_DISPLAY_NAME",
     "MODELS",
     "RobetaProduct",
     "collect",
     "factory_properties",
+    "parse_factory_model_page",
+    "parse_key_facts",
+    "parse_launch_specs",
     "parse_range_page",
     "parse_roster",
 ]
@@ -86,7 +90,7 @@ ROBETA_SECTION_URL = f"{CARA_BASE_URL}/robeta-motorhomes/"
 #: The factory's roster page, watched for a model the UK does not get.
 FACTORY_LINEUP_URL = f"{FACTORY_BASE_URL}/model-lineup"
 
-EXPECTED_PRODUCTS = 6
+EXPECTED_PRODUCTS = 8
 
 #: Models offered with a pop-up roof, which is **an option on every one of them and
 #: standard on none**. Settled by the requester on 11 November 2026 from his own research,
@@ -186,6 +190,15 @@ class _Model:
     factory_path: str
     #: The name the factory's JSON-LD uses, which is not the FMLV name.
     factory_name: str
+    #: Whether Cara publish a range page for this model, and therefore whether there is a
+    #: price, a set of masses and an arithmetic self-check to be had.
+    #:
+    #: **False for the two 2027 additions.** Cara confirmed the Hercules and the Ananya as
+    #: UK range for 2027 by email on 12 November 2026 — John Burton, their General
+    #: Manager, to the NCC directory — while their website still lists only the original
+    #: six. The importer defines the range, so the email settles that these are in scope;
+    #: it does not conjure the numbers. See `FACTORY_ONLY` for what that costs.
+    on_cara: bool = True
 
 
 MODELS: tuple[_Model, ...] = (
@@ -200,7 +213,45 @@ MODELS: tuple[_Model, ...] = (
         "/schumacher",
         "Robeta Schumacher Edition",
     ),
+    # --- added for 2027, on the importer's word, with no Cara page behind them ------
+    _Model("hercules", "Hercules", "/models/hercules", "ROBETA HERCULES", on_cara=False),
+    _Model("ananya", "Ananya", "/ananya", "ROBETA ANANYA", on_cara=False),
 )
+
+#: What a model with no Cara range page loses, and why it is collected anyway.
+#:
+#: Everything numeric in this adapter comes from Cara, because Cara are the ones who
+#: publish numbers: MIRO, MTPLM, payload, three dimensions and a sterling price, in a
+#: plain table, with `payload == MTPLM - MIRO` to check the parse. **The Hercules and the
+#: Ananya have no such page**, so for those two there is:
+#:
+#: * **no price.** The factory quotes the Hercules at EUR 130,990.44 and tags it
+#:   `eligibleRegion: DE` — a German price at a German VAT rate — and the Ananya at
+#:   EUR 198,000 **net**, which is to say excluding VAT altogether. Neither is a UK
+#:   figure, and the euro conversion this project uses assumes a domestic VAT-INCLUSIVE
+#:   price, so converting either would invent one. Nothing is emitted.
+#: * **no mass.** The Hercules publishes none at all. The Ananya publishes a payload of
+#:   1,362 kg and a *"Base chassis rating (Sprinter 419): 4,100 kg"* qualified by
+#:   *"Category B registration is possible only if the completed vehicle is homologated at
+#:   3,500 kg"* — which is two candidate plated weights and no way to tell which a UK
+#:   buyer gets. Nothing is emitted; both figures are narrated.
+#: * **no self-check.** `_reconciles` needs all three masses and there are none, so these
+#:   two bypass it rather than being dropped by it.
+#:
+#: * **no habitation reading.** The other five are read from the factory's structured
+#:   `additionalProperty` block — `Refrigerator '85L compressor refrigerator'` and the
+#:   like — and these two have no such block, only marketing prose. Run through
+#:   `habitation.features_from` that prose produces confident nonsense: the Ananya's
+#:   `refrigeration` came out of *"maybe a mini-fridge if you're lucky"*, a sentence
+#:   disparaging **other** manufacturers' vans, and the Hercules's out of its *optional*
+#:   140-litre unit rather than the 90-litre one it is built with. So nothing is emitted
+#:   and the factory's own labels are quoted into the run instead.
+#:
+#: They are still collected, because a product with a name, a range, dimensions, berths
+#: and seats is worth more to FMLV than no product at all, and a blank required column
+#: does not block an upload. Everything missing shows in the review as a field needing a
+#: person.
+FACTORY_ONLY: frozenset[str] = frozenset({"Hercules", "Ananya"})
 
 #: `(slug, label)` for `--range`. Every model is its own range here.
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = tuple(
@@ -212,19 +263,10 @@ _BY_SLUG = {model.slug: model for model in MODELS}
 #: Models the factory sells that no UK dealer lists, with what each one is. Watched every
 #: run by `_check_factory_roster`, never collected: the importer defines the range.
 NOT_SOLD_IN_THE_UK: dict[str, str] = {
-    "hercules": (
-        "a new Mercedes-Benz model — the factory calls it a 'Private Mercedes-Benz grand "
-        "tourer for two' and gave it a launch blog post. Neither Cara nor SC Sporthomes "
-        "list it, and it has never been in FMLV: the February and November 2026 exports "
-        "hold the same six products"
-    ),
     "dionysus": (
         "named only in the factory contact form's model dropdown — no model page, no "
-        "specification, and not on either UK dealer's site"
-    ),
-    "ananya": (
-        "the 'glampervan', which has its own section of the factory site and a press page "
-        "but is not sold through a UK dealer"
+        "specification, not on either UK dealer's site, and not among the two models Cara "
+        "named as new for 2027"
     ),
 }
 
@@ -313,9 +355,68 @@ class RobetaProduct:
     standard_lines: list[str] = field(default_factory=list)
     all_lines: list[str] = field(default_factory=list)
 
+    #: True for a model with no Cara range page — see `FACTORY_ONLY`. Such a product
+    #: carries no price and no mass, bypasses `_reconciles`, and reads its berths and
+    #: seats off the factory page instead of from `STANDARD_BERTHS`.
+    factory_only: bool = False
+    #: Berths and belted seats as the factory page itself states them, used only by a
+    #: `factory_only` product. `None` elsewhere, where the two settled dicts decide.
+    berths: int | None = None
+    travel_seats: int | None = None
+    #: The factory's own spec labels and values, quoted into the run for a reviewer.
+    stated: dict[str, str] = field(default_factory=dict)
+
     @property
     def label(self) -> str:
         return f"{MANUFACTURER_DISPLAY_NAME} {self.name}"
+
+
+#: Labels on a factory page that give a figure FMLV holds, and the field each one fills.
+#: Both layouts are covered in one map because the two never collide.
+_FACTORY_FIELDS: dict[str, str] = {
+    "length": "mh_length_mm",
+    "vehicle length": "mh_length_mm",
+    "vehicle height": "mh_height_mm",
+    "vehicle width": "mh_width_mm",
+}
+
+#: Labels giving a count rather than a measurement.
+_FACTORY_SEATS = ("travelling seats", "number of seats")
+
+
+def parse_factory_model_page(
+    page: str, model_name: str, slug: str, source_url: str
+) -> RobetaProduct:
+    """One model that Cara do not list, from the factory's own page.
+
+    Two layouts, because Robeta built the two 2027 additions on different stacks: the
+    Hercules has a Next.js `The essentials` definition list, the Ananya a Webflow
+    `Key facts` bullet list. `parse_launch_specs` and `parse_key_facts` read one each and
+    the results are merged, since a page only ever has one of them.
+
+    **No price and no mass is taken from here, ever** — see `FACTORY_ONLY`. The figures
+    are on the page in both cases and not one of them is a UK figure.
+    """
+    product = RobetaProduct(
+        name=model_name, slug=slug, source_url=source_url, factory_only=True
+    )
+    stated = {**parse_launch_specs(page), **parse_key_facts(page)}
+    product.stated = stated
+
+    for label, value in stated.items():
+        field_name = _FACTORY_FIELDS.get(label.lower())
+        if field_name is not None and getattr(product, field_name) is None:
+            millimetres = _metres_to_mm(value)
+            if millimetres is not None:
+                setattr(product, field_name, millimetres)
+        if label.lower() in _FACTORY_SEATS and product.travel_seats is None:
+            product.travel_seats = _integer(value)
+
+    chassis = _FACTORY_CHASSIS.search(_text(page))
+    if chassis is not None:
+        product.base_vehicle = chassis.group(1)
+
+    return product
 
 
 def parse_range_page(page: str, model_name: str, slug: str, source_url: str) -> RobetaProduct:
@@ -396,6 +497,70 @@ def factory_properties(page: str) -> dict[str, dict[str, str]]:
             if properties:
                 found.setdefault(name.strip(), {}).update(properties)
     return found
+
+
+#: The Hercules's specification strip: a plain `<dl>` of `<dt>`/`<dd>` pairs under
+#: `The essentials`. The five original models carry JSON-LD instead, and the Hercules
+#: carries none — its only JSON-LD is an `offers` block holding the German price.
+_SPEC_LIST = re.compile(r'(?is)<dl[^>]*class="[^"]*specList[^"]*"[^>]*>(?P<body>.*?)</dl>')
+_SPEC_PAIR = re.compile(r"(?is)<dt[^>]*>(?P<label>.*?)</dt>\s*<dd[^>]*>(?P<value>.*?)</dd>")
+
+#: The Ananya's `Key facts` list: `<li><strong>Label:</strong> value</li>`. It sits on a
+#: Webflow sub-site rather than the Next.js one the other models use, which is why it
+#: needs its own reader.
+_KEY_FACTS = re.compile(r'(?is)id="KEY-FACTS".*?<ul[^>]*>(?P<body>.*?)</ul>')
+_KEY_FACT = re.compile(r"(?is)<li[^>]*>(?P<body>.*?)</li>")
+
+
+def parse_launch_specs(page: str) -> dict[str, str]:
+    """`{label: value}` from a launch model's `The essentials` definition list.
+
+    The Hercules is Robeta's first model published this way, and it publishes **no mass
+    and no price a UK buyer could use** — see `FACTORY_ONLY`. What it does give is a
+    length, a travelling-seat count and the habitation detail.
+    """
+    block = _SPEC_LIST.search(page)
+    if block is None:
+        return {}
+    found: dict[str, str] = {}
+    for pair in _SPEC_PAIR.finditer(block.group("body")):
+        label, value = _text(pair.group("label")), _text(pair.group("value"))
+        if label and value:
+            found.setdefault(label, value)
+    return found
+
+
+def parse_key_facts(page: str) -> dict[str, str]:
+    """`{label: value}` from the Ananya's `Key facts` list.
+
+    Each entry is `<li><strong>Label:</strong> value</li>`, with the colon sometimes
+    inside the `<strong>` and sometimes after it, so the split is done on the text rather
+    than on the markup.
+    """
+    block = _KEY_FACTS.search(page)
+    if block is None:
+        return {}
+    found: dict[str, str] = {}
+    for item in _KEY_FACT.finditer(block.group("body")):
+        line = _text(item.group("body"))
+        if ":" not in line:
+            continue
+        label, _, value = line.partition(":")
+        label, value = label.strip(), value.strip()
+        if label and value:
+            found.setdefault(label, value)
+    return found
+
+
+#: `6.97 m`, `2.66 meters` — the factory writes its dimensions in metres on both pages.
+_METRES = re.compile(r"(?P<metres>\d+[.,]\d+)\s*(?:m\b|meters?\b)", re.I)
+
+
+def _metres_to_mm(value: str) -> int | None:
+    match = _METRES.search(value)
+    if match is None:
+        return None
+    return round(float(match.group("metres").replace(",", ".")) * 1000)
 
 
 #: The factory's own words for a chassis, in its `Base Vehicle` property.
@@ -509,7 +674,7 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
     The spans are still narrated beside the figures, because they are the thing a reviewer
     would otherwise check the numbers against and find them apparently too low.
     """
-    features = habitation.features_from(product.standard_lines)
+    features = _habitation_of(product)
     automatic = gearbox.automatic_available_from(product.all_lines)
     body_type, body_type_note = _body_type(product)
 
@@ -519,8 +684,8 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
         manufacturer_range=product.name,
         model=product.name,
         base_vehicle_manufacturer=fmlv_base_vehicle(product.base_vehicle),
-        berths=STANDARD_BERTHS.get(product.name),
-        mh_passenger_seats_inc_driver=STANDARD_TRAVEL_SEATS.get(product.name),
+        berths=_berths_of(product),
+        mh_passenger_seats_inc_driver=_travel_seats_of(product),
         body_type=body_type,
         rrp_pounds=product.rrp_pounds,
         mro_kilograms=product.mro_kilograms,
@@ -591,8 +756,16 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
             "base_vehicle_manufacturer",
             f"the chassis is named as {product.base_vehicle}",
         )
-    berths = STANDARD_BERTHS.get(product.name)
-    if berths is not None:
+    berths = _berths_of(product)
+    if berths is not None and product.factory_only:
+        record(
+            "berths",
+            f"the factory's own figure for this model, 'Sleeping Capacity "
+            f"{product.sleeping_capacity or berths}' — a plain number, not one of the "
+            f"spans the other models publish, so there is no option to strip out. Cara "
+            f"have no range page for this model",
+        )
+    elif berths is not None:
         span = (
             f"Robeta publish 'Sleeping Capacity {product.sleeping_capacity}', which is a "
             f"span of configurations rather than the vehicle as built. "
@@ -613,8 +786,23 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
                 f"as '2 adults' outright, so {berths} is the vehicle as built."
             )
         record("berths", f"{span}{why}")
-    seats = STANDARD_TRAVEL_SEATS.get(product.name)
-    if seats is not None:
+    seats = _travel_seats_of(product)
+    if seats is not None and product.factory_only:
+        label = next(
+            (
+                f"{name} '{value}'"
+                for name, value in product.stated.items()
+                if name.lower() in _FACTORY_SEATS
+            ),
+            f"{seats}",
+        )
+        record(
+            "mh_passenger_seats_inc_driver",
+            f"the factory page states {label}. Robeta do not say how many are "
+            f"three-point belts, and only three-point belts are counted — worth "
+            f"confirming with Cara before this is relied on",
+        )
+    elif seats is not None:
         span = (
             f"Robeta publish 'Seating Capacity {product.seating_capacity}'. "
             if product.seating_capacity
@@ -653,6 +841,63 @@ def _build_extracted_motorhome(product: RobetaProduct) -> ExtractedMotorhome:
 # --------------------------------------------------------------------------- #
 
 
+def _habitation_of(product: RobetaProduct) -> dict[str, habitation.Feature]:
+    """Habitation features, but **only** from the factory's structured specification.
+
+    The five models with a Cara page carry an `additionalProperty` block on the factory
+    site — `Refrigerator '85L compressor refrigerator'`, `Fresh Water Tank '107L'` — and
+    that is what gets read. The two 2027 additions have no such block, only a launch
+    page of marketing copy, and reading that produces confident nonsense:
+
+    * the Ananya's `refrigeration` came out of *"maybe a mini-fridge if you're lucky"*,
+      a sentence about how **other** manufacturers build vans; and
+    * the Hercules's came out of its *optional* 140-litre refrigerator rather than the
+      90-litre one its own specification list gives as standard.
+
+    Both would have reached a reviewer as a finding with a plausible-looking quotation
+    attached. So a `factory_only` product reports no habitation at all, and
+    `_narrate_open_questions` quotes the factory's own labels instead.
+    """
+    if product.factory_only:
+        return {}
+    return habitation.features_from(product.standard_lines)
+
+
+def _standard_berths_from(capacity: str | None) -> int | None:
+    """Berths from a factory `Sleeping Capacity`, but **only** where it is a plain number.
+
+    A span — `2 - 6` — means the figure depends on options, and which options are standard
+    is the judgement `STANDARD_BERTHS` records for the six models it covers. Reaching a
+    number out of a span here would be making that judgement silently, so a span yields
+    nothing and `_narrate_open_questions` says why.
+    """
+    if not capacity:
+        return None
+    if re.search(r"[-–—]|\bto\b|\+", capacity):
+        return None
+    return _integer(capacity)
+
+
+def _berths_of(product: RobetaProduct) -> int | None:
+    """Berths as built: the factory page's own figure, or the settled per-model constant.
+
+    A `factory_only` product is not covered by `STANDARD_BERTHS`, because that dict
+    records a judgement made about Robeta's published *spans* and these two publish a
+    plain number instead — `Sleeping Capacity 2` on the Hercules, nothing at all on the
+    Ananya.
+    """
+    if product.factory_only:
+        return product.berths
+    return STANDARD_BERTHS.get(product.name)
+
+
+def _travel_seats_of(product: RobetaProduct) -> int | None:
+    """Belted seats as built, by the same division as `_berths_of`."""
+    if product.factory_only:
+        return product.travel_seats
+    return STANDARD_TRAVEL_SEATS.get(product.name)
+
+
 def _feature_value(value: object) -> str:
     """One habitation value as a reviewer would type it into FMLV."""
     if isinstance(value, list):
@@ -669,14 +914,20 @@ def _narrate_open_questions(
     the only place the question is visible. Saying it once per product per run is
     deliberate: it is the thing standing between this adapter and a complete one.
     """
-    spans = []
-    if product.sleeping_capacity:
-        spans.append(f"Sleeping Capacity '{product.sleeping_capacity}'")
-    if product.seating_capacity:
-        spans.append(f"Seating Capacity '{product.seating_capacity}'")
+    # The span narration below is about the judgement `STANDARD_BERTHS` and
+    # `STANDARD_TRAVEL_SEATS` record, which covers only the models with a Cara page. Run
+    # it over a `factory_only` product and it asserts two things nobody has established:
+    # that the model is offered with no pop-up roof, and that its seats are three-point
+    # belts. The factory-only block further down says what is actually known.
+    spans: list[str] = []
+    if not product.factory_only:
+        if product.sleeping_capacity:
+            spans.append(f"Sleeping Capacity '{product.sleeping_capacity}'")
+        if product.seating_capacity:
+            spans.append(f"Seating Capacity '{product.seating_capacity}'")
     if spans:
-        berths = STANDARD_BERTHS.get(product.name)
-        seats = STANDARD_TRAVEL_SEATS.get(product.name)
+        berths = _berths_of(product)
+        seats = _travel_seats_of(product)
         as_built = f"Recorded as built: {berths} berths, {seats} three-point belted seats"
         # Only the five with options have a span to explain. The Schumacher Edition
         # publishes `2 adults` and `2` outright, and saying "everything above those is a
@@ -693,6 +944,23 @@ def _narrate_open_questions(
                 f"pop-up roof offered and no seating upgrade. {as_built}"
             )
 
+    if product.factory_only:
+        stated = " | ".join(f"{name} '{value}'" for name, value in product.stated.items())
+        on_progress(
+            f"{product.label} — the factory page states: {stated}. NO price and NO mass "
+            f"is proposed from any of it"
+        )
+        if product.berths is None:
+            on_progress(
+                f"{product.label} — BERTHS NOT PROPOSED: the factory publishes "
+                f"{product.sleeping_capacity!r} for this model, which is a span rather "
+                f"than a figure, and which options are standard is not stated. A person "
+                f"has to settle it, the way the other models' berths were settled"
+                if product.sleeping_capacity
+                else f"{product.label} — BERTHS NOT PROPOSED: the factory publishes no "
+                f"sleeping capacity for this model at all. Ask Cara"
+            )
+
     quoted = [
         f"{name} '{product.factory[name]}'"
         for name in _FINDING_PROPERTIES
@@ -706,7 +974,7 @@ def _narrate_open_questions(
     # matched — so without this the reading never reaches a reviewer at all. The
     # refrigeration one matters: FMLV held `fridge` on five of the six, and the requester
     # confirmed on 11 November 2026 that these refrigerators do have a freezer section.
-    features = habitation.features_from(product.standard_lines)
+    features = _habitation_of(product)
     if features:
         on_progress(
             f"{product.label} — read as: "
@@ -769,8 +1037,19 @@ def collect(
                 f"/robeta-motorhomes/the-range/{slug}/"
             )
     for model in MODELS:
-        if model.slug not in slugs:
+        if model.slug in slugs:
+            continue
+        if model.on_cara:
             on_progress(f"Cara no longer list {model.name} ({model.slug})")
+        else:
+            on_progress(
+                f"{model.name} is collected from the FACTORY page, because Cara have no "
+                f"range page for it. Cara confirmed it as UK range for 2027 by email on "
+                f"12 November 2026, and the importer defines the range — but no price "
+                f"and no mass can be had until they publish one. WATCH FOR a Cara range "
+                f"page appearing at {RANGE_INDEX_URL}{model.slug}/, which would supply "
+                f"both"
+            )
 
     _check_factory_roster(http, on_progress)
 
@@ -787,16 +1066,43 @@ def collect(
     for model in MODELS:
         if model.name not in wanted:
             continue
-        url = f"{RANGE_INDEX_URL}{model.slug}/"
-        result = http.fetch(url)
-        if result.status_code != 200:
-            on_progress(f"DROPPED {model.name}: Cara returned HTTP {result.status_code} for {url}")
-            continue
-        page = result.file_path.read_text(encoding="utf-8", errors="replace")
-        product = parse_range_page(page, model.name, model.slug, url)
-        product.all_lines = [
-            " ".join(line.split()) for line in gearbox.lines_from_page(page)
-        ]
+        if model.on_cara:
+            url = f"{RANGE_INDEX_URL}{model.slug}/"
+            result = http.fetch(url)
+            if result.status_code != 200:
+                on_progress(
+                    f"DROPPED {model.name}: Cara returned HTTP {result.status_code} for {url}"
+                )
+                continue
+            page = result.file_path.read_text(encoding="utf-8", errors="replace")
+            product = parse_range_page(page, model.name, model.slug, url)
+            product.all_lines = [
+                " ".join(line.split()) for line in gearbox.lines_from_page(page)
+            ]
+        else:
+            # No Cara page to read, so the factory page is both the figures and the
+            # source URL. See `FACTORY_ONLY`.
+            url = f"{FACTORY_BASE_URL}{model.factory_path}"
+            result = http.fetch(url)
+            if result.status_code != 200:
+                on_progress(
+                    f"DROPPED {model.name}: the factory returned HTTP "
+                    f"{result.status_code} for {url}, and Cara have no page for this "
+                    f"model to fall back on"
+                )
+                continue
+            page = result.file_path.read_text(encoding="utf-8", errors="replace")
+            product = parse_factory_model_page(page, model.name, model.slug, url)
+            product.all_lines = [
+                " ".join(line.split()) for line in gearbox.lines_from_page(page)
+            ]
+            if not product.stated:
+                on_progress(
+                    f"DROPPED {model.name}: {url} carries neither a 'The essentials' "
+                    f"specification list nor a 'Key facts' list, so the page has changed "
+                    f"shape and nothing read off it is trustworthy"
+                )
+                continue
 
         # The factory, for what Cara do not publish.
         factory_url = f"{FACTORY_BASE_URL}{model.factory_path}"
@@ -822,23 +1128,41 @@ def collect(
             match = _FACTORY_CHASSIS.search(stated)
             if match is not None:
                 product.base_vehicle = match.group(1)
+        if product.factory_only and product.berths is None:
+            # The lineup block gives the Hercules a plain `2`, where the other models get
+            # a span like `2 - 6`. A span here would mean Robeta have started offering
+            # options on this model and the figure needs the same judgement the settled
+            # `STANDARD_BERTHS` records, so it is narrated rather than guessed at.
+            product.berths = _standard_berths_from(product.sleeping_capacity)
 
-        reconciles, note = _reconciles(product)
-        if not reconciles:
-            on_progress(f"DROPPED {product.label}: {note}")
-            continue
+        if model.on_cara:
+            reconciles, note = _reconciles(product)
+            if not reconciles:
+                on_progress(f"DROPPED {product.label}: {note}")
+                continue
+            price = f"£{product.rrp_pounds:,}" if product.rrp_pounds else "NO PRICE"
+            summary = (
+                f"{product.label}: {price}, MIRO {product.mro_kilograms:,}kg, MTPLM "
+                f"{product.mtplm_kilograms:,}kg, payload "
+                f"{product.mh_payload_kilograms:,}kg — {note}"
+            )
+        else:
+            summary = (
+                f"{product.label}: {product.mh_length_mm or '?'}mm long, "
+                f"{product.berths if product.berths is not None else '?'} berths, "
+                f"{product.travel_seats if product.travel_seats is not None else '?'} "
+                f"seats — NO PRICE and NO MASS, by design: Cara have no range page for "
+                f"this model, and the factory's figures are a German price, a net price "
+                f"and a chassis rating. Nothing checks the parse either, because "
+                f"`payload == MTPLM - MIRO` needs three masses and there are none"
+            )
 
         extracted.append(_build_extracted_motorhome(product))
-        price = f"£{product.rrp_pounds:,}" if product.rrp_pounds else "NO PRICE"
-        on_progress(
-            f"{product.label}: {price}, MIRO {product.mro_kilograms:,}kg, MTPLM "
-            f"{product.mtplm_kilograms:,}kg, payload {product.mh_payload_kilograms:,}kg — "
-            f"{note}"
-        )
+        on_progress(summary)
         _narrate_open_questions(product, on_progress)
 
     if wanted == {model.name for model in MODELS} and len(extracted) != EXPECTED_PRODUCTS:
         on_progress(
-            f"collected {len(extracted)} products where Cara list {EXPECTED_PRODUCTS}"
+            f"collected {len(extracted)} products where the UK range is {EXPECTED_PRODUCTS}"
         )
     return extracted
