@@ -68,6 +68,7 @@ from .base import ExtractedMotorhome, Provenance
 
 __all__ = [
     "AMBIGUOUS_IDENTITY",
+    "CATALOGUE_AUTOMATIC",
     "BASE_URL",
     "DEFAULT_RANGES",
     "EXPECTED_PRODUCTS",
@@ -79,6 +80,7 @@ __all__ = [
     "RENAME_CANDIDATES",
     "ROOF_UNSTATED",
     "SELECT",
+    "SELECT_WITHOUT_AUTOMATIC",
     "DreamerProduct",
     "collect",
     "parse_model_page",
@@ -248,6 +250,50 @@ ROOF_UNSTATED: dict[str, str] = {
         "campervan_elevating_roof. Too strong a case to overturn on silence, so NO body "
         "type is proposed and FMLV's own value stands"
     ),
+}
+
+#: `automatic_available` evidence that exists **only in the 2027 catalogue**, which sits
+#: behind a name-and-email form and so cannot be fetched by a run.
+#:
+#: The website's own equipment list settles the FUN range — `FIAT 140 hp automatic
+#: transmission, 3.5T - LIGHT DUTY` — and settles nothing for Select, where the only
+#: engine lines name a Ford and a Renault, both manual. Select therefore came through
+#: blank, which is the correct reading of silence but is not the whole story.
+#:
+#: The catalogue says it twice. In the Select section, the **SAPHIR finish** is listed as
+#: including *"140 hp engine with automatic transmission"* (p.33), and in the FUN section
+#: *"The automatic gearbox is available across the entire range"* (p.13). An automatic
+#: cited as part of a finish is cited, and the settled rule counts a cited option as a
+#: `Yes`.
+#:
+#: Recorded as a constant rather than parsed, because the document cannot be re-fetched.
+#: A run that could read it would not need this.
+CATALOGUE_AUTOMATIC: dict[str, tuple[bool, str]] = {
+    SELECT: (
+        True,
+        "the 2027 catalogue's SAPHIR finish for the Select range includes '140 hp engine "
+        "with automatic transmission' (p.33), and the catalogue states 'The automatic "
+        "gearbox is available across the entire range' (p.13)",
+    ),
+}
+
+#: Select models the SAPHIR finish does not cover, and which therefore get **no** automatic
+#: from `CATALOGUE_AUTOMATIC`.
+#:
+#: This is not a guess from their size. `dreamer-select-equipements.php` lays its table out
+#: in **four** columns — `SELECT RANGE STANDARD`, `SELECT RANGE FINISH SAPHIR`,
+#: `CAP LAND SELECT / CITY CAMP SELECT`, and `CAP EASY SELECT` — so Dreamer themselves
+#: hold these three apart from the finish that carries the automatic. Their base-vehicle
+#: entries name the only engines they are offered with, and both are manual:
+#: `FORD EcoBlue 2.0-litre 136 hp engine with manual transmission` and `RENAULT Trafic
+#: Blue 130 hp engine with manual transmission`.
+#:
+#: So for these three the answer is **silence, not denial** — nothing states an automatic
+#: is unavailable — and silence is a blank. See `docs/adapters/README.md`.
+SELECT_WITHOUT_AUTOMATIC: dict[str, str] = {
+    "CAP EASY": "on the Renault Trafic, offered only with a manual transmission",
+    "CAP LAND": "on the Ford, offered only with a manual transmission",
+    "CITY CAMP": "on the Ford, offered only with a manual transmission",
 }
 
 #: Products FMLV holds that have no counterpart on the site at all.
@@ -873,11 +919,29 @@ def _collect_transmission(
     offers = _transmission_lines(lines)
     if not offers:
         on_progress(
-            f"{url} states no engine-and-gearbox offering, so automatic_available stays "
-            f"BLANK for that range. Silence is blank, never 'no'"
+            f"{url} states no engine-and-gearbox offering, so the website settles nothing "
+            f"for that range. Silence is blank, never 'no'"
         )
         return None
     return gearbox.automatic_available_from(offers)
+
+
+def _automatic_for(
+    model: _Model, from_the_site: dict[str, tuple[bool, str] | None]
+) -> tuple[bool, str] | None:
+    """Whether this model is offered with an automatic, the site first.
+
+    The live equipment list wins wherever it says anything, because it is re-read every
+    run and the catalogue is not. It settles the FUN range and says nothing about Select,
+    and that is where `CATALOGUE_AUTOMATIC` comes in — for the Select models the SAPHIR
+    finish covers, which is all of them bar the three in `SELECT_WITHOUT_AUTOMATIC`.
+    """
+    live = from_the_site.get(model.manufacturer_range)
+    if live is not None:
+        return live
+    if model.model in SELECT_WITHOUT_AUTOMATIC:
+        return None
+    return CATALOGUE_AUTOMATIC.get(model.manufacturer_range)
 
 
 def collect(
@@ -905,8 +969,20 @@ def collect(
 
     transmission: dict[str, tuple[bool, str] | None] = {}
     for range_name, url in ((FUN, FUN_EQUIPMENT_URL), (SELECT, SELECT_EQUIPMENT_URL)):
-        if range_name in wanted:
-            transmission[range_name] = _collect_transmission(http, url, on_progress)
+        if range_name not in wanted:
+            continue
+        transmission[range_name] = _collect_transmission(http, url, on_progress)
+        if transmission[range_name] is None and range_name in CATALOGUE_AUTOMATIC:
+            _, why = CATALOGUE_AUTOMATIC[range_name]
+            on_progress(
+                f"automatic_available for the {range_name} range comes from the 2027 "
+                f"CATALOGUE, not the website: {why}. The catalogue sits behind a "
+                f"name-and-email form so a run cannot re-read it — if Dreamer change "
+                f"this, nothing here will notice. NOT applied to "
+                f"{', '.join(sorted(SELECT_WITHOUT_AUTOMATIC))}, which Dreamer's own "
+                f"equipment table holds in separate columns from the SAPHIR finish and "
+                f"which are offered only with a manual"
+            )
 
     extracted: list[ExtractedMotorhome] = []
     for model in MODELS:
@@ -937,7 +1013,7 @@ def collect(
         if roof_warning is not None:
             on_progress(roof_warning)
 
-        product.automatic = transmission.get(model.manufacturer_range)
+        product.automatic = _automatic_for(model, transmission)
 
         extracted.append(_build_extracted_motorhome(product))
         length = f"{product.mh_length_mm:,}mm" if product.mh_length_mm else "NO LENGTH"

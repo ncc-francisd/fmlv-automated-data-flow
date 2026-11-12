@@ -493,3 +493,68 @@ def test_the_unsettled_identities_are_stated_rather_than_applied() -> None:
     names = {model.model for model in dreamer.MODELS}
     for held in (*dreamer.RENAME_CANDIDATES, *dreamer.NOT_ON_THE_SITE):
         assert held not in names, held
+
+
+# --------------------------------------------------------------------------- #
+# The automatic, where the website says nothing and the catalogue does
+# --------------------------------------------------------------------------- #
+
+
+def test_the_website_settles_the_fun_range_by_itself() -> None:
+    """`FIAT 140 hp automatic transmission, 3.5T - LIGHT DUTY`, read every run."""
+    from src.adapters import gearbox
+
+    lines = [
+        " ".join(line.split())
+        for line in gearbox.lines_from_page(_page("dreamer-equipment-fun.html"))
+    ]
+    found = gearbox.automatic_available_from(dreamer._transmission_lines(lines))
+    assert found is not None and found[0] is True
+
+
+def test_the_website_settles_nothing_for_select() -> None:
+    """Its only engine-and-gearbox lines name a Ford and a Renault, both manual.
+
+    Crucially this must come back as *nothing*, not as a `False`. Silence is a blank;
+    writing an explicit "no automatic" into FMLV off these two lines would be wrong.
+    """
+    from src.adapters import gearbox
+
+    lines = [
+        " ".join(line.split())
+        for line in gearbox.lines_from_page(_page("dreamer-equipment-select.html"))
+    ]
+    kept = dreamer._transmission_lines(lines)
+    assert kept and all("manual" in line.lower() for line in kept)
+    assert gearbox.automatic_available_from(kept) is None
+
+
+def test_the_catalogue_fills_select_where_the_website_is_silent() -> None:
+    """The SAPHIR finish includes `140 hp engine with automatic transmission` (p.33)."""
+    found = dreamer._automatic_for(_model("D68", dreamer.SELECT), {dreamer.SELECT: None})
+    assert found is not None and found[0] is True
+    assert "SAPHIR" in found[1]
+
+
+def test_the_three_vans_saphir_does_not_cover_stay_blank() -> None:
+    """Not a guess from their size — Dreamer's own equipment table holds them apart.
+
+    `dreamer-select-equipements.php` lays out four columns: `SELECT RANGE STANDARD`,
+    `SELECT RANGE FINISH SAPHIR`, `CAP LAND SELECT / CITY CAMP SELECT` and `CAP EASY
+    SELECT`. The finish that carries the automatic is not one of the last two, and both
+    of those bases are stated as manual. Nothing denies an automatic, so: blank.
+    """
+    assert set(dreamer.SELECT_WITHOUT_AUTOMATIC) == {"CAP EASY", "CAP LAND", "CITY CAMP"}
+    for name in dreamer.SELECT_WITHOUT_AUTOMATIC:
+        assert dreamer._automatic_for(_model(name, dreamer.SELECT), {dreamer.SELECT: None}) is None
+
+
+def test_the_website_always_beats_the_catalogue() -> None:
+    """The catalogue cannot be re-fetched; the equipment page is read every run."""
+    live = (False, "RENAULT Trafic Blue 130 hp engine with manual transmission only")
+    assert dreamer._automatic_for(_model("D68", dreamer.SELECT), {dreamer.SELECT: live}) == live
+
+
+def test_the_catalogue_says_nothing_about_the_fun_range() -> None:
+    """It does not need to — the website settles FUN, so nothing is hardcoded for it."""
+    assert dreamer.FUN not in dreamer.CATALOGUE_AUTOMATIC
