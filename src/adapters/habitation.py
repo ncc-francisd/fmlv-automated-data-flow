@@ -218,6 +218,16 @@ def refrigeration_from(lines: Iterable[str]) -> Feature | None:
 _WARM_AIR = re.compile(
     r"\bblown[- ]air\b|\bwarm[- ]air\b|\bhot[- ]air\b|\bforced[- ]air\b"
     r"|\bcombi\b(?!\s*(?:oven|microwave|grill|hob|cooker))"
+    # **A Truma model number can name the Combi without the word.** Project Yonder write
+    # "the extremely capable Truma D6 E makes light work of your heating & hot water",
+    # which is Truma's Combi D 6 E — a warm-air heater with a 10-litre water boiler built
+    # into it, per Truma's own operating manual. `combi` above could never catch it, and
+    # the line would otherwise fall through to "heating mentioned, kind unclear" on a
+    # manufacturer whose entire selling point is that the heater is diesel rather than gas.
+    # Matched on the make plus a D-number because that designation exists only in Truma's
+    # warm-air lines; a bare `truma` would also claim their fridges, fans and movers.
+    r"|\btruma\b[\s-]*(?:combi[\s-]*)?d[\s-]*\d"
+    r"|\bvarioheat\b"
     r"|\bairtop\b|\bair top\b|\bnight heater\b",
     re.I,
 )

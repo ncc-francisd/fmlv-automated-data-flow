@@ -575,6 +575,37 @@ So before recording a field as unobtainable, or a pointer as the best available 
 check whether the interactive part of the site is fed by an API. And when a reviewer says a
 page does something your notes say it cannot, believe the reviewer: they are looking at it.
 
+### A site that publishes nothing may be publishing everything, inside its own payload
+
+A modern CMS-driven site ships its whole content tree to the browser as JSON and renders
+it client- or server-side from there. Project Yonder's is Remix over Storyblok, and every
+page carries the lot in `window.__remixContext`. What looks on screen like a styled
+graphic with no markup worth parsing arrives as a typed record:
+
+```json
+{"big_text": "4.1T", "small_text": "GVW", "component": "callout_spec"}
+```
+
+Two consequences, both of which change what a survey concludes.
+
+**A page can publish text that never renders.** Project Yonder's FAQ answers sit in
+collapsed accordions written into the DOM only on a click, so anything reading the
+rendered page finds fifteen questions and no answers — and that page is the only place on
+their whole site where a width or a height appears. The survey very nearly recorded "no
+dimensions published" on the strength of a rendered read.
+
+**And the payload is a better source than the markup even where both work**, because a
+label survives a redesign and a CSS class does not. Read the tile by its `small_text`,
+never by its position: Project Yonder's Freedom 4X carries eight tiles in two groups and
+its Nomad carries four, so the fourth tile is the gross weight on one page and something
+else on another.
+
+**So before concluding a site has no specifications, look for the payload.** `grep` the
+served HTML for `__remixContext`, `__NEXT_DATA__`, `__NUXT__`, `__sveltekit`, or a
+`<script type="application/json">` block. `json.JSONDecoder().raw_decode` reads the object
+out from the assignment onwards without needing to find its end. None of this needs a
+browser, and reaching for `BrowserFetcher` first would have hidden it.
+
 ### A one-layout range's leaflet is a spec sheet, not marketing
 
 The reason brochure tables are hard is that they put layouts side by side. A range with
@@ -1222,6 +1253,36 @@ that have no structured block.
 The general shape: **a parser that cannot fail is not the same as a parser that is
 right.** The habitation module has no way to know whether a sentence is about the vehicle
 in front of it, so that judgement belongs in the adapter, which does.
+
+### An option written in a sentence needs a different filter from one written in a list
+
+`habitation._OPTION` catches an extra the way a **specification document** writes one: a
+price on the line (`Rear Adjustable Bed Option: £1,500`), or the word `option` followed by
+a colon. That is the right test for every manufacturer who publishes a spec sheet.
+
+Project Yonder publish no spec sheet at all. They publish paragraphs, and they put the
+standard fitting and the paid upgrade in the same sentence:
+
+> *"…a two ring induction hob plus a 90L fridge freezer & a variety of additional cooking
+> options such as air fryer, microwave & coffee machine…"*
+
+> *"Optional belted passenger seats, cosy kids bunk beds or even an elevating pop-top roof
+> will make your little ones dreams a reality."*
+
+No price, no colon, so the shared filter passes both through whole. Read whole, the first
+asserts a microwave in every van they build and the second asserts fixed bunks in a van
+that has none.
+
+**Where prose is the only source, cut the sentence rather than keeping or dropping it.**
+Everything before the word that turns a sentence into an offer — `optional`, `options such
+as`, `upgrade`, `or even`, `add-ons` — describes the vehicle as built; everything after is
+a catalogue. `project_yonder._standard_prose` truncates at the first such marker, so the
+fridge survives and the microwave does not, and a sentence whose marker is its first word
+disappears entirely, which is correct.
+
+This is the narrower companion to the rule above. There, the adapter decides a whole page
+is unreadable and emits nothing. Here the page is the only source there is, so the cut has
+to happen inside the sentence.
 
 ### Habitation features split into the factual and the subjective
 
