@@ -647,6 +647,35 @@ and says which in the snippet. It stands down in three cases:
 * **caravans** — `personal_effects_payload_kilograms` is *not* MTPLM minus MRO but the
   personal-effects half of a split, and one published figure may be the total. Deriving it would be wrong.
 
+### A gross weight offered as a choice still yields an MTPLM, through the payload
+
+A manufacturer who sells one shell on two chassis often prints the gross weight as a
+choice rather than a figure — Itineo's technical guide gives `LIGHT: 3.5 T / 3.65 T` and
+`HEAVY: 4.4 T` on one row spanning all ten models. There is no column to read a per-model
+MTPLM from, and the first instinct is to record nothing.
+
+**Record the arithmetic instead.** `MIRO + payload` *is* the MTPLM — that is what a
+payload means — and a manufacturer who prints both rows has published it without saying
+so. The derivation is safe when two conditions hold:
+
+1. **The sum lands on one of the published gross weights.** If it lands nowhere, a row was
+   misread, and a misread MTPLM is exactly the plausible wrong number nothing downstream
+   catches. Emit nothing.
+2. **The tonnage it lands on is the base one.** It almost always is, because a payload is
+   quoted against the chassis the price is quoted against. Itineo's ten all sum to exactly
+   3,500 kg — the light figure — which is both the check and the proof that the light
+   chassis is what the rest of the row describes. The heavy chassis is an upgrade, and the
+   base-vehicle rule above sends us to the base one anyway.
+
+Ten independent subtractions agreeing to the kilogram is as good as published arithmetic
+gets, and far better evidence than a single stated figure would be. `itineo._derived_mtplm`
+is the implementation; the provenance it writes names both source rows and says the figure
+was derived, so a reviewer is never shown a number dressed up as something it was not.
+
+**Say "derived" in the provenance, always.** The difference between a figure a
+manufacturer printed and a figure we computed from two they printed matters to whoever has
+to defend it later, and it costs one word.
+
 ### One published mass, qualified, is still the mass to record
 
 Settled by the requester on 15 October 2026, when Beauer forced the question.

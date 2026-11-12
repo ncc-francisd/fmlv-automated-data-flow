@@ -205,3 +205,62 @@ models share only three heights between them.
 * **No MTPLM.** The guide gives the gross weight as a *choice* — `LIGHT: 3.5 T` and
   `HEAVY: 4.4 T` — not as this model's own figure. It is used for the arithmetic and
   narrated, never proposed.
+
+## MTPLM and heating, added 12 November 2026
+
+Both were raised by the requester after a run, and both were things the adapter had
+decided not to say when it could have.
+
+### The MTPLM is derived, not read
+
+Itineo publish no MTPLM per model. Their gross-weight row is a **choice of chassis offered
+to the whole range** — `LIGHT: 3.5 T / 3.65 T`, `HEAVY: 4.4 T` — spread across a dozen
+fragments rather than ten cells, so there is no column to read a per-model figure from.
+The adapter therefore shipped emitting nothing, on the grounds that recording the light
+figure would assert something Itineo had not said.
+
+**That was too cautious.** `MIRO + payload` *is* the MTPLM, by definition, and Itineo
+publish both rows. Better still, the sum lands on **exactly 3,500 kg for all ten**:
+
+```
+CM660  2900+600   CJ660  2935+565   SBD700 2995+505   JC740 3070+430   MC740 3085+415
+SB740  3075+425   PF600  2780+720   PJ700  2975+525   PS740 3070+430   PM740 3125+375
+```
+
+Ten independent subtractions agreeing to the kilogram settles that the published payloads
+are quoted against the **light** chassis — which is the base vehicle, and so the figure the
+settled cross-manufacturer rule wants. `_derived_mtplm` returns nothing where the sum
+misses a published gross weight, because a sum that lands nowhere means a row was misread.
+
+**The first run after the change confirmed it independently:** eight of the ten already
+held 3,500 kg in FMLV and were verified rather than changed; only `JC740` and `PS740`,
+both new, had the field filled.
+
+### Heating is read as a type, not as an appliance
+
+The guide lists the heating appliances on an **equipment page**, not the specification
+table, and those rows cannot be read per model: the labels split across lines — `(P RHD /`,
+`(DIESEL)` — and the bullet rows come back with six, eight or twelve values where there
+should be ten. Attributing a particular heater to a particular van would be the alignment
+error `_check_alignment` exists to prevent, in a different column.
+
+**But the type does not need the alignment.** Every appliance the guide names is a Truma
+Combi:
+
+```
+TRUMA Combi 4 (Gas) · TRUMA Combi 4 DIESEL · TRUMA Combi 4 hot water/heating
+TRUMA Combi 6 EH DIESEL (diesel + electric) · TRUMA with heating control CP PLUS
+```
+
+A Truma Combi is a blown-air heater with integrated water heating, so whichever variant a
+model carries the FMLV value is the same. `heating_type_from_guide` records the type and
+never the appliance, and **returns nothing if the appliances ever disagree** — an Alde wet
+system appearing alongside would mean the type genuinely varies by model.
+
+`Floor heating in living area (230 V)` is deliberately excluded: it is a mains-electric
+extra sold on top of the heater and only works on hook-up.
+
+**All nine live FMLV rows already held `blown_air_heating = Yes`** before this was read,
+which is the check this reading would otherwise lack — there being no per-model column to
+verify against.
+

@@ -41,6 +41,7 @@ from pathlib import Path
 
 from ..fetch.browser import BrowserFetcher
 from ..fetch.http import Fetcher
+from ..product_model.enums import Heating
 from ..product_model.model import Motorhome
 from . import gearbox, habitation, rapido
 from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
@@ -55,6 +56,7 @@ __all__ = [
     "collect",
     "column_order",
     "guide_rows",
+    "heating_type_from_guide",
     "parse_model_page",
     "parse_roster",
     "range_of",
@@ -374,6 +376,9 @@ class ItineoProduct:
     mro_kilograms: int | None = None
     mh_payload_kilograms: int | None = None
     gross_weights: set[int] = field(default_factory=set)
+    #: The heating TYPE, read once off the guide and shared by every model — see
+    #: `heating_type_from_guide`. The appliance itself is not attributable.
+    heating: Heating | None = None
     base_vehicle: str | None = None
 
     berths: int | None = None
@@ -505,6 +510,95 @@ def _check_alignment(
     return True
 
 
+#: A guide row naming a heating appliance rather than describing one of its effects.
+#: `Floor heating in living area (230 V)` is deliberately excluded: it is a mains-electric
+#: extra sold on top of the heater, not the system that heats the vehicle.
+_HEATER_ROW = re.compile(
+    r"\b(truma|alde|webasto|eberspa|combi|boiler)\b(?!.*\bfloor heating\b)", re.I
+)
+
+
+def heating_type_from_guide(
+    rows: Sequence[GuideRow], on_progress: Callable[[str], None] = lambda message: None
+) -> Heating | None:
+    """The heating **type** every model has, where the guide's appliances all agree on one.
+
+    The heating rows cannot be read per model. They sit on an equipment page whose labels
+    split across lines — `(P RHD /`, `(DIESEL)` — and whose bullet rows come back with
+    six, eight or twelve values where there should be ten, so there is no column to
+    attribute a particular heater to a particular van. Guessing would be the alignment
+    error this adapter has `_check_alignment` to prevent, in a different column.
+
+    **But the type does not need the alignment.** On the 2027 collection every appliance
+    the guide names is a Truma Combi:
+
+        TRUMA Combi 4 (Gas) · TRUMA Combi 4 DIESEL · TRUMA Combi 4 hot water/heating
+        TRUMA Combi 6 EH DIESEL (diesel + electric) · TRUMA with heating control CP PLUS
+
+    A Truma Combi is a blown-air heater with integrated water heating, so whichever
+    variant a given model carries, the FMLV value is the same. That is what is recorded —
+    the type, not the appliance.
+
+    **If the appliances ever disagree**, this returns nothing rather than picking one.
+    An Alde wet system appearing alongside the Trumas would mean the type genuinely varies
+    by model, and at that point the per-model alignment this cannot do becomes necessary.
+    """
+    found: dict[Heating, list[str]] = {}
+    for row in rows:
+        label = row.label.strip()
+        if not _HEATER_ROW.search(label):
+            continue
+        reading = habitation.heating_from([label])
+        if reading is None:
+            continue
+        found.setdefault(reading[0], []).append(label)
+    if not found:
+        return None
+    if len(found) > 1:
+        disagreement = "; ".join(
+            f"{value.value} from {', '.join(sorted(set(labels)))}"
+            for value, labels in found.items()
+        )
+        on_progress(
+            f"HEATING NOT PROPOSED: the guide's appliances do not agree on one type "
+            f"({disagreement}), and they cannot be read per model — the heating rows are "
+            f"on an equipment page whose cells do not align to the ten columns. A person "
+            f"has to settle which model gets which"
+        )
+        return None
+    value, labels = next(iter(found.items()))
+    on_progress(
+        f"heating is {value.value} on every model: every appliance the guide names is a "
+        f"blown-air unit ({', '.join(sorted(set(labels)))}), so the TYPE holds whichever "
+        f"variant a model carries. The variant itself is NOT read — those rows do not "
+        f"align to the ten columns"
+    )
+    return value
+
+
+def _derived_mtplm(product: ItineoProduct) -> int | None:
+    """The MTPLM, as `MIRO + payload`, where that sum is one of the published gross weights.
+
+    Itineo never print a per-model MTPLM — the gross-weight row is a choice of chassis
+    offered to the whole range — but they print the two figures it is made of, and the sum
+    has to be checked rather than trusted. The condition is the same one `_reconciles`
+    applies: the sum must land on a tonnage the guide actually publishes. On the 2027
+    collection it lands on 3,500 kg for every one of the ten.
+
+    Returning `None` rather than a guess when the arithmetic misses is the point. A sum
+    that does not match a published gross weight means one of the two rows was misread,
+    and a misread MTPLM is exactly the kind of plausible wrong number nothing downstream
+    would catch.
+    """
+    miro, payload = product.mro_kilograms, product.mh_payload_kilograms
+    if miro is None or payload is None:
+        return None
+    total = miro + payload
+    if not rapido.reconciles(miro, payload, product.gross_weights):
+        return None
+    return total
+
+
 def _reconciles(product: ItineoProduct) -> tuple[bool, str]:
     """Whether MIRO plus payload lands on a published gross weight.
 
@@ -546,10 +640,25 @@ def _build_extracted_motorhome(product: ItineoProduct) -> ExtractedMotorhome:
     field with no provenance is not proposed, which is what keeps those alive; emitting an
     empty one would propose deleting them.
 
-    **No `mtplm_kilograms` either.** The guide gives the gross weight as a *choice* of
-    chassis rather than a figure for the vehicle, and recording the light one as though it
-    were the model's own would be asserting something Itineo did not say. It is used for
-    the arithmetic check and narrated, not proposed.
+    **`mtplm_kilograms` IS proposed, and it is derived rather than read.** This adapter
+    shipped without it, on the grounds that the guide gives the gross weight as a *choice*
+    of chassis — `LIGHT: 3.5 T` and `HEAVY: 4.4 T` — rather than a figure for the vehicle,
+    so recording the light one would assert something Itineo had not said. That was too
+    cautious, and the requester said so on 12 November 2026. Three things settle it:
+
+    * **`MIRO + payload` is the MTPLM, by definition.** That is what a payload is.
+    * **The sum lands on exactly 3,500 kg for all ten models**, which is the LIGHT figure.
+      Itineo's published payloads are therefore computed against the light chassis, so the
+      light chassis is the one the rest of the row describes. That is not an assumption:
+      ten independent subtractions agreeing to the kilogram is about as good as published
+      arithmetic gets.
+    * **The light chassis is the base vehicle**, and the settled cross-manufacturer rule
+      takes the base vehicle's figure where two are published. The heavy chassis is an
+      upgrade, exactly like an optioned variant.
+
+    So the figure is emitted with provenance naming both rows it comes from, and
+    `_reconciles` still has to pass first — a model whose arithmetic does not land on a
+    published gross weight is dropped before it can propose anything.
     """
     features = habitation.features_from(product.standard_lines)
     automatic = gearbox.automatic_available_from(product.all_lines)
@@ -563,13 +672,15 @@ def _build_extracted_motorhome(product: ItineoProduct) -> ExtractedMotorhome:
         berths=product.berths,
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         mro_kilograms=product.mro_kilograms,
+        mtplm_kilograms=_derived_mtplm(product),
         mh_payload_kilograms=product.mh_payload_kilograms,
         mh_length_mm=product.mh_length_mm,
         mh_width_mm=product.mh_width_mm,
         mh_height_mm=product.mh_height_mm,
         automatic_available=automatic[0] if automatic else None,
         # Habitation: findings, never proposals — see `docs/adapters/README.md`.
-        heating=features["heating"].value if "heating" in features else None,
+        heating=product.heating
+        or (features["heating"].value if "heating" in features else None),
         refrigeration=(
             features["refrigeration"].value if "refrigeration" in features else None
         ),
@@ -604,6 +715,19 @@ def _build_extracted_motorhome(product: ItineoProduct) -> ExtractedMotorhome:
             "mro_kilograms",
             f"the technical guide's 'Mass in Running Order (MIRO) (kg)' row, "
             f"{product.mro_kilograms:,}kg" + (f" — and it reconciles: {note}" if reconciles else ""),
+        )
+    mtplm = _derived_mtplm(product)
+    if mtplm is not None:
+        published = ", ".join(f"{w:,}kg" for w in sorted(product.gross_weights))
+        record(
+            "mtplm_kilograms",
+            f"{mtplm:,}kg, DERIVED rather than read: the guide's MIRO "
+            f"{product.mro_kilograms:,}kg plus its payload "
+            f"{product.mh_payload_kilograms:,}kg. Itineo publish no MTPLM per model — "
+            f"their gross-weight row is a choice of chassis offered to the whole range "
+            f"({published}) — but MIRO plus payload IS the MTPLM, and this sum lands "
+            f"exactly on the LIGHT figure, which is the base vehicle. The payloads are "
+            f"therefore quoted against the light chassis",
         )
     if product.mh_payload_kilograms is not None:
         record(
@@ -655,6 +779,16 @@ def _build_extracted_motorhome(product: ItineoProduct) -> ExtractedMotorhome:
         )
     if automatic is not None:
         record("automatic_available", gearbox.provenance_note(automatic))
+
+    if product.heating is not None and "heating" not in features:
+        record(
+            "heating",
+            f"{product.heating.value}. The technical guide lists the heating appliances "
+            f"on an equipment page, and every one of them is a Truma Combi — a blown-air "
+            f"heater with integrated water heating — so the TYPE is the same whichever "
+            f"variant this model carries. The variant is NOT claimed: those rows do not "
+            f"align to the ten model columns",
+        )
 
     for field_name, feature in features.items():
         detail = f" — {feature.note}" if feature.note else ""
@@ -787,12 +921,24 @@ def collect(
     if not pages:
         raise RuntimeError(f"no page of the technical guide could be captured from {guide}")
 
+    # Every page is parsed, not just the one the masses are on: the heating appliances
+    # are listed on an equipment page further in. See `heating_type_from_guide`.
+    parsed: list[tuple[int, tuple[str, ...], tuple[GuideRow, ...]]] = []
     for number in sorted(pages):
         rows = rapido.page_cells(rapido._svg_of(pages[number]))
         order = column_order(rows)
         if len(order) < 2:
             continue
-        table = guide_rows(rows, len(order))
+        parsed.append((number, order, guide_rows(rows, len(order))))
+
+    heating = heating_type_from_guide(
+        [row for _, _, table in parsed for row in table], on_progress
+    )
+    if heating is not None:
+        for product in products.values():
+            product.heating = heating
+
+    for number, order, table in parsed:
         # Pages 2 to 6 are equipment checklists laid out in the same ten columns, and
         # their bullet rows look like data to anything counting cells. The specification
         # table is the one that names the dimensions and the mass, so say so rather than
@@ -833,8 +979,9 @@ def collect(
             f"{product.mh_payload_kilograms:,}kg, {product.berths} berths, "
             f"{product.mh_passenger_seats_inc_driver} seats — {note}. NO PRICE is "
             f"published by Itineo anywhere, so none is proposed and FMLV's own stands. "
-            f"Gross weight is a choice of chassis ({gross}) rather than this model's own "
-            f"figure, so no MTPLM is proposed either"
+            f"MTPLM {_derived_mtplm(product):,}kg is DERIVED as MIRO plus payload: Itineo "
+            f"publish gross weight only as a choice of chassis ({gross}) offered to the "
+            f"whole range, and the sum lands on the LIGHT figure, which is the base vehicle"
         )
 
     if wanted == known and len(extracted) != EXPECTED_PRODUCTS:

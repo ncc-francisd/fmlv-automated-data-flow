@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from src.adapters import itineo, rapido
+from src.product_model.enums import Heating
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -378,3 +379,139 @@ def test_the_manufacturer_is_the_exports_capitals() -> None:
 def test_every_model_is_offered_to_the_range_flag() -> None:
     assert {label for _, label in itineo.DEFAULT_RANGES} == set(EXPECTED_ORDER)
     assert len(itineo.DEFAULT_RANGES) == itineo.EXPECTED_PRODUCTS
+
+
+# --------------------------------------------------------------------------- #
+# The MTPLM, which Itineo never print
+# --------------------------------------------------------------------------- #
+
+
+def _product(miro: int | None, payload: int | None, gross: set[int]) -> itineo.ItineoProduct:
+    product = itineo.ItineoProduct(model="PM740", source_url="")
+    product.mro_kilograms = miro
+    product.mh_payload_kilograms = payload
+    product.gross_weights = gross
+    return product
+
+
+def test_the_mtplm_is_derived_as_miro_plus_payload() -> None:
+    """Itineo publish no MTPLM per model, and do publish the two figures it is made of.
+
+    Their gross-weight row is a choice of chassis offered to the whole range —
+    `LIGHT: 3.5 T` and `HEAVY: 4.4 T` — so there is no column to read a per-model figure
+    from. `MIRO + payload` is the MTPLM by definition, and on the 2027 collection it lands
+    on exactly 3,500 kg for all ten, which is the LIGHT figure: the payloads are quoted
+    against the light chassis, and the light chassis is the base vehicle.
+    """
+    assert itineo._derived_mtplm(_product(3125, 375, {3500, 4400})) == 3500
+
+
+def test_the_derived_mtplm_lands_on_3500_for_every_2027_model() -> None:
+    """Ten independent subtractions agreeing to the kilogram, from the guide's own rows."""
+    published = {
+        "CM660": (2900, 600), "CJ660": (2935, 565), "SBD700": (2995, 505),
+        "JC740": (3070, 430), "MC740": (3085, 415), "SB740": (3075, 425),
+        "PF600": (2780, 720), "PJ700": (2975, 525), "PS740": (3070, 430),
+        "PM740": (3125, 375),
+    }
+    assert len(published) == itineo.EXPECTED_PRODUCTS
+    derived = {
+        code: itineo._derived_mtplm(_product(miro, payload, {3500, 4400}))
+        for code, (miro, payload) in published.items()
+    }
+    assert set(derived.values()) == {3500}, derived
+
+
+def test_no_mtplm_where_the_arithmetic_misses_a_published_gross_weight() -> None:
+    """A sum that lands nowhere means a row was misread, and a misread MTPLM is exactly
+    the plausible wrong number nothing downstream would catch."""
+    assert itineo._derived_mtplm(_product(3125, 400, {3500, 4400})) is None
+
+
+def test_no_mtplm_without_both_figures() -> None:
+    assert itineo._derived_mtplm(_product(3125, None, {3500})) is None
+    assert itineo._derived_mtplm(_product(None, 375, {3500})) is None
+
+
+def test_no_mtplm_when_no_gross_weight_was_read() -> None:
+    """With nothing to check the sum against, the sum is not evidence of anything."""
+    assert itineo._derived_mtplm(_product(3125, 375, set())) is None
+
+
+def test_the_mtplm_is_emitted_with_provenance_naming_both_rows() -> None:
+    product = _product(3125, 375, {3500, 4400})
+    extracted = itineo._build_extracted_motorhome(product)
+
+    assert extracted.motorhome.mtplm_kilograms == 3500
+    snippet = extracted.provenance["mtplm_kilograms"].snippet
+    assert "DERIVED" in snippet
+    assert "3,125kg" in snippet and "375kg" in snippet
+
+
+# --------------------------------------------------------------------------- #
+# Heating, which is on an equipment page that does not align
+# --------------------------------------------------------------------------- #
+
+
+def _rows(*labels: str) -> tuple[itineo.GuideRow, ...]:
+    return tuple(itineo.GuideRow(label=label, values=()) for label in labels)
+
+
+#: Every heating appliance the 2027 guide names, verbatim.
+TRUMA_ROWS = (
+    "TRUMA Combi 4 (Gas)",
+    "TRUMA Combi 4 DIESEL",
+    "TRUMA Combi 4 hot water/heating",
+    "TRUMA Combi 6 EH DIESEL (diesel + electric)",
+)
+
+
+def test_the_heating_type_is_read_although_the_appliance_cannot_be() -> None:
+    """The rows do not align to the ten columns, but they do not need to.
+
+    Every appliance the guide names is a Truma Combi — a blown-air heater with integrated
+    water heating — so the FMLV value is the same whichever variant a model carries. The
+    variant itself is never claimed.
+    """
+    assert itineo.heating_type_from_guide(_rows(*TRUMA_ROWS)) is Heating.BLOWN_AIR
+
+
+def test_the_guides_heating_agrees_with_every_live_fmlv_row() -> None:
+    """All nine live ITINEO rows held `blown_air_heating = Yes` before this was read.
+
+    Nine independent agreements is the check this reading would otherwise lack, since
+    there is no per-model column to verify against.
+    """
+    assert itineo.heating_type_from_guide(_rows(*TRUMA_ROWS)) is Heating.BLOWN_AIR
+
+
+def test_floor_heating_is_not_treated_as_the_vehicles_heating() -> None:
+    """`Floor heating in living area (230 V)` is a mains-electric extra sold on top of the
+    heater, not the system that heats the vehicle — and it only works on hook-up."""
+    assert itineo.heating_type_from_guide(_rows("Floor heating in living area (230 V)")) is None
+
+
+def test_nothing_is_proposed_where_the_appliances_disagree() -> None:
+    """An Alde wet system beside the Trumas would mean the type varies by model, and at
+    that point the per-model alignment this cannot do becomes necessary."""
+    said: list[str] = []
+    value = itineo.heating_type_from_guide(
+        _rows("TRUMA Combi 4 DIESEL", "ALDE wet central heating system"), said.append
+    )
+    assert value is None
+    assert [line for line in said if "NOT PROPOSED" in line]
+
+
+def test_nothing_is_proposed_where_no_appliance_is_named() -> None:
+    assert itineo.heating_type_from_guide(_rows("XXL wardrobe", "Electric entry step")) is None
+
+
+def test_the_heating_reaches_the_product_with_its_own_provenance() -> None:
+    product = itineo.ItineoProduct(model="PS740", source_url="")
+    product.heating = Heating.BLOWN_AIR
+    extracted = itineo._build_extracted_motorhome(product)
+
+    assert extracted.motorhome.heating is Heating.BLOWN_AIR
+    snippet = extracted.provenance["heating"].snippet
+    assert "Truma Combi" in snippet
+    assert "NOT claimed" in snippet
