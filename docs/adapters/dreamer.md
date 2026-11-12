@@ -140,15 +140,74 @@ Ford. **The site publishes no chassis per model**, so this cannot currently be r
 
 | emitted | not emitted |
 |---|---|
-| `manufacturer_range` (`Fun` / `Select`), `model` | `mro_kilograms`, `mtplm_kilograms`, `mh_payload_kilograms` |
-| `mh_length_mm`, `mh_height_mm`, `mh_width_mm` | `rrp_pounds` |
-| `berths`, `mh_passenger_seats_inc_driver` | `base_vehicle_manufacturer` |
-| `body_type`, `automatic_available` | |
+| `manufacturer_range` (`Fun` / `Select`), `model` | `rrp_pounds` |
+| `mh_length_mm`, `mh_height_mm`, `mh_width_mm` | |
+| `berths`, `mh_passenger_seats_inc_driver` | |
+| `mro_kilograms`, `mtplm_kilograms`, `mh_payload_kilograms` | |
+| `base_vehicle_manufacturer`, `body_type`, `automatic_available` | |
 | habitation findings (`heating`, `refrigeration`, `bed_types`, `shower_toilet_separated`) | |
 
-The three absences are **left unset rather than emitted empty**, so FMLV's existing values
-survive a run untouched. The pipeline flags each as a no-op change for a person to confirm
-— the "not found this run" rows in the review.
+**The masses, the chassis and the heater were added on 12 November 2026**, from the
+specification document described below. Only the price is still withheld: Dreamer publish
+none anywhere and FMLV holds one on all sixteen live rows, so emitting an empty one would
+propose deleting every one of them. It is left unset rather than emitted empty, and the
+pipeline flags it as a no-op change for a person to confirm.
+
+## The 2027 specification document
+
+`COM_DRE_CT_Dreamer_EXPORT_2027_220x285_BD_EN.pdf`, reached from the foot of any model
+page. It carries, for all nineteen models, everything the website does not: **MIRO,
+payload, gross vehicle weight, the chassis and the heater**, plus bed sizes, tank
+capacities and a three-point belt count.
+
+**It is stored in the adapter rather than fetched**, in `SPECIFICATION_2027`. The form in
+front of it posts to itself, so the PDF's URL only exists after a human submits the form,
+and the file is not publicly indexed — the two routes `docs/adapters/README.md` recommends
+for a gated document both fail here. A run cannot reach it.
+
+### What makes a stored table acceptable here
+
+**It checks against itself.** `MIRO + payload == GVW` on all nineteen, and not trivially:
+thirteen land on 3,500 kg, and the other six on their own figures —
+
+```
+CITY CAMP 2715 + 585 = 3300      CAP LAND 2730 + 445 = 3175
+CAP EASY  2589 + 481 = 3070      D68 UP   3135 + 365 = 3500
+```
+
+Three distinct gross weights hit exactly is evidence rather than coincidence.
+`_check_specification` re-runs the arithmetic every run instead of trusting it.
+
+**The live site audits it.** Every model page publishes its own height and every range
+tile its own length, so the document's two dimensions are compared against figures read
+fresh each run. A stored table that cannot notice it has rotted is a liability; one the
+live site audits is not.
+
+**Only the base finish is recorded.** The document lists each model twice — `D43 FUN` and
+`D43 FUN +`, `D43 SELECT` and `D43 SELECT SAPHIR` — and the second is a trim carrying extra
+equipment and usually five more kilos. The settled rule takes the base vehicle.
+
+### Where the document and the website disagree, the website wins
+
+Requester's instruction, 12 November 2026: *"on Dreamer let the length stated on the
+website take precedent if there's a conflict like that."* The website is re-read every run
+and the document cannot be, so the website is the fresher of the two by construction.
+
+One live case: **Camper Sport** is **5.98 m** on the range tile and **6.36 m** in the
+document. 5,980 mm is recorded, and the divergence is narrated.
+
+### Two traps it laid
+
+1. **`FIAT DUCATO` is not `Fiat`.** Dreamer name the model as well as the maker, and
+   `fmlv_base_vehicle` returns an unrecognised make *unchanged* rather than blanking it —
+   so the first run proposed `FIAT DUCATO` against FMLV's `Fiat` on all nineteen products.
+   `_base_vehicle_of` reduces it to the make. Caught only by reading the diff.
+2. **The belt row and the seat row disagree on two models.** `3-point retractable safety
+   belts (cab and living space)` reads `2+2` — four — for every Fiat model, including the
+   **Camper Five** and the **Family Van**, whose `Registered (driving) seats` row reads
+   **5**. FMLV holds 5 for both. Nothing is changed: `BELT_ROW_DISAGREES` narrates it, on
+   the grounds that reducing a live product's seat count is a person's decision and `2+2`
+   may describe the two rows of belts rather than every belt aboard.
 
 ## What the first run found (#232, 11 November 2026)
 
@@ -205,9 +264,21 @@ settled without a mass, so `AMBIGUOUS_IDENTITY` states it every run instead.
 
 ## What is still open
 
-1. **A current weights table** — MIRO, MTPLM/GVW and payload for the 19 models now sold.
-   A question for Dreamer, who are in the same group as two manufacturers already
-   answering us. It would also settle the identity question above.
-2. **Chassis per model**, which the site no longer states.
+The masses and the chassis are **no longer open** — the specification document supplied
+both on 12 November 2026. What remains:
+
+1. **Which model FMLV's Select `D68 UP` became.** The masses now allow the settled rename
+   test, and it does not settle this one: both readings agree `LIVING VAN` is the site's
+   `LIFT VAN` (3,105 → 3,025 kg), but FMLV's Select `D68 UP` (3,165 kg) is 30 kg from the
+   new FUN `D68 UP` and 20 kg from `LIFT VAN UP`. Ten kilograms is not a margin to decide
+   an identity on. Ask Dreamer.
+2. **A price**, which Dreamer publish nowhere.
 3. **Whether City Camp Select has a pop-up roof**, and whether `CITY CAMP HYBRIDE` has
    been withdrawn.
+4. **Camper Sport's length** — 5.98 m on the site, 6.36 m in the document.
+5. **Whether the Camper Five and Family Van have four three-point belts or five**, per the
+   belt-row trap above.
+
+And one standing risk: **the specification document is a stored copy.** It needs
+re-requesting whenever Dreamer publish a new collection, and the live-site audit is what
+will say when that moment has come.

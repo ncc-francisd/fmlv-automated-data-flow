@@ -558,3 +558,153 @@ def test_the_website_always_beats_the_catalogue() -> None:
 def test_the_catalogue_says_nothing_about_the_fun_range() -> None:
     """It does not need to — the website settles FUN, so nothing is hardcoded for it."""
     assert dreamer.FUN not in dreamer.CATALOGUE_AUTOMATIC
+
+
+# --------------------------------------------------------------------------- #
+# The 2027 specification document
+# --------------------------------------------------------------------------- #
+
+
+def test_every_model_has_a_specification_row() -> None:
+    assert len(dreamer.SPECIFICATION_2027) == dreamer.EXPECTED_PRODUCTS
+    for model in dreamer.MODELS:
+        assert (model.manufacturer_range, model.model) in dreamer.SPECIFICATION_2027
+
+
+def test_the_stored_specification_adds_up_on_every_model() -> None:
+    """`MIRO + payload == GVW`, and not trivially.
+
+    Thirteen of the nineteen land on 3,500 kg, which on its own would prove little. The
+    other six do not: the Ford and Renault vans carry their own gross weights and land on
+    those exactly, which is what makes the agreement evidence rather than coincidence.
+    """
+    for (manufacturer_range, model), spec in dreamer.SPECIFICATION_2027.items():
+        total = spec.mro_kilograms + spec.payload_kilograms
+        assert total == spec.mtplm_kilograms, f"{manufacturer_range} {model}"
+
+    distinct = {spec.mtplm_kilograms for spec in dreamer.SPECIFICATION_2027.values()}
+    assert distinct == {3500, 3300, 3175, 3070}
+
+
+def test_the_three_non_fiat_vans_have_their_own_gross_weights() -> None:
+    weights = {
+        model: dreamer.SPECIFICATION_2027[(dreamer.SELECT, model)].mtplm_kilograms
+        for model in ("CITY CAMP", "CAP LAND", "CAP EASY")
+    }
+    assert weights == {"CITY CAMP": 3300, "CAP LAND": 3175, "CAP EASY": 3070}
+
+
+def test_the_chassis_make_is_reduced_to_fmlvs_spelling() -> None:
+    """Dreamer name the model as well as the maker, and FMLV's column holds the maker.
+
+    `fmlv_base_vehicle` returns an unrecognised make unchanged rather than blanking it,
+    so passing `FIAT DUCATO` straight through proposed exactly that against FMLV's `Fiat`
+    on all nineteen products. The first run after wiring the document in caught it.
+    """
+    makes = {
+        dreamer._base_vehicle_of(spec) for spec in dreamer.SPECIFICATION_2027.values()
+    }
+    assert makes == {"Fiat", "Ford", "Renault"}
+    assert dreamer._base_vehicle_of(None) is None
+
+
+def test_the_specification_is_audited_against_its_own_arithmetic() -> None:
+    product = dreamer.DreamerProduct(
+        model="D43", manufacturer_range=dreamer.FUN, source_url="", elevating_roof=False
+    )
+    product.specification = dreamer._Specification(
+        2835, 665, 3600, "FIAT DUCATO", "WEBASTO 4 kW DIESEL", 2630, 5410
+    )
+    complaints = dreamer._check_specification(product)
+    assert [c for c in complaints if "does not add up" in c]
+
+
+def test_the_specification_is_audited_against_the_live_height() -> None:
+    """A stored table cannot notice it has been superseded; the live site can."""
+    product = dreamer.DreamerProduct(
+        model="D43", manufacturer_range=dreamer.FUN, source_url="", elevating_roof=False
+    )
+    product.specification = dreamer.SPECIFICATION_2027[(dreamer.FUN, "D43")]
+    product.mh_height_mm = 2700
+    complaints = dreamer._check_specification(product)
+    assert [c for c in complaints if "may have been superseded" in c]
+
+
+def test_the_website_length_wins_over_the_document() -> None:
+    """Requester's instruction, 12 November 2026. The website is re-read every run and the
+    document cannot be, so the website is the fresher of the two by construction.
+
+    Camper Sport is the live case: the tile says 5,980mm, the document 6,360mm.
+    """
+    model = _model("CAMPER SPORT", dreamer.FUN)
+    product = dreamer.parse_model_page(
+        _page("dreamer-model-d43.html"), model, length_mm=5980
+    )
+    product.specification = dreamer.SPECIFICATION_2027[(dreamer.FUN, "CAMPER SPORT")]
+    assert product.specification.length_mm == 6360
+
+    extracted = dreamer._build_extracted_motorhome(product)
+    assert extracted.motorhome.mh_length_mm == 5980
+
+    complaints = dreamer._check_specification(product)
+    assert [c for c in complaints if "THE WEBSITE'S FIGURE IS THE ONE RECORDED" in c]
+
+
+def test_the_masses_and_chassis_reach_the_product_with_provenance() -> None:
+    product = dreamer.parse_model_page(
+        _page("dreamer-model-d43.html"), _model("D43", dreamer.FUN), length_mm=5410
+    )
+    product.specification = dreamer.SPECIFICATION_2027[(dreamer.FUN, "D43")]
+    extracted = dreamer._build_extracted_motorhome(product)
+
+    assert extracted.motorhome.mro_kilograms == 2835
+    assert extracted.motorhome.mh_payload_kilograms == 665
+    assert extracted.motorhome.mtplm_kilograms == 3500
+    assert extracted.motorhome.base_vehicle_manufacturer == "Fiat"
+    for field_name in (
+        "mro_kilograms",
+        "mh_payload_kilograms",
+        "mtplm_kilograms",
+        "base_vehicle_manufacturer",
+    ):
+        assert "specification document" in extracted.provenance[field_name].snippet
+
+
+def test_no_price_is_ever_emitted() -> None:
+    """The one thing still deliberately absent: FMLV holds a price on all sixteen rows."""
+    product = dreamer.parse_model_page(
+        _page("dreamer-model-d43.html"), _model("D43", dreamer.FUN), length_mm=5410
+    )
+    product.specification = dreamer.SPECIFICATION_2027[(dreamer.FUN, "D43")]
+    extracted = dreamer._build_extracted_motorhome(product)
+    assert extracted.motorhome.rrp_pounds is None
+    assert "rrp_pounds" not in extracted.provenance
+
+
+def test_the_belt_disagreement_is_stated_and_never_applied() -> None:
+    """The document gives 5 registered seats and '2+2' three-point belts on two models.
+
+    Reducing a live product's seat count is a decision for a person, so it is narrated.
+    """
+    assert set(dreamer.BELT_ROW_DISAGREES) == {
+        (dreamer.FUN, "CAMPER FIVE"),
+        (dreamer.SELECT, "FAMILY VAN"),
+    }
+    product = dreamer.parse_model_page(
+        _page("dreamer-model-d43.html"), _model("CAMPER FIVE", dreamer.FUN)
+    )
+    product.specification = dreamer.SPECIFICATION_2027[(dreamer.FUN, "CAMPER FIVE")]
+    said: list[str] = []
+    dreamer._narrate_findings(product, said.append)
+    assert [line for line in said if "SEATS WORTH A SECOND LOOK" in line]
+
+
+def test_the_heater_comes_from_the_document_where_the_page_is_vague() -> None:
+    """The D64 is the one Select model on a Webasto rather than a Truma, and only the
+    specification document says so — its model page's picto just reads `WEBASTO 4 kW
+    DIESEL`, which the habitation module cannot turn into a heating type on its own."""
+    assert (
+        dreamer.SPECIFICATION_2027[(dreamer.SELECT, "D64")].heating
+        == "WEBASTO 4 KW DIESEL"
+    )
+    assert "Truma" in dreamer.SPECIFICATION_2027[(dreamer.SELECT, "D68")].heating

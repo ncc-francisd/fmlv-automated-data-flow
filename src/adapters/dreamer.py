@@ -64,10 +64,11 @@ from ..fetch.http import Fetcher
 from ..product_model.enums import BodyType
 from ..product_model.model import Motorhome
 from . import gearbox, habitation
-from .base import ExtractedMotorhome, Provenance
+from .base import ExtractedMotorhome, Provenance, fmlv_base_vehicle
 
 __all__ = [
     "AMBIGUOUS_IDENTITY",
+    "BELT_ROW_DISAGREES",
     "CATALOGUE_AUTOMATIC",
     "BASE_URL",
     "DEFAULT_RANGES",
@@ -80,6 +81,7 @@ __all__ = [
     "RENAME_CANDIDATES",
     "ROOF_UNSTATED",
     "SELECT",
+    "SPECIFICATION_2027",
     "SELECT_WITHOUT_AUTOMATIC",
     "DreamerProduct",
     "collect",
@@ -212,17 +214,15 @@ RENAME_CANDIDATES: dict[str, str] = {
 #: way to evidence a rename is to match the mass in running order and this adapter collects
 #: no mass. So it is said rather than applied.
 AMBIGUOUS_IDENTITY: tuple[str, ...] = (
-    "FMLV Select 'D68 UP' (4 berths, 2,720mm, 3,165kg) and Select 'LIVING VAN' (4 berths, "
-    "2,880mm, 3,105kg) against the site's Select 'LIFT VAN' (2 berths, 2,630mm) and "
-    "'LIFT VAN UP' (4 berths, 2,760mm), with a D68 UP now in FUN badged new. The automatic "
-    "match reads the FUN D68 UP as FMLV's Select D68 UP moved ranges, which makes LIFT VAN "
-    "UP a new product. THE HEIGHTS SUGGEST OTHERWISE: 2,720 -> 2,760 is the same +40mm "
-    "every other model shifts by, so FMLV's Select D68 UP is more likely to BE the LIFT "
-    "VAN UP, and the FUN D68 UP the genuinely new one. Settle it on the mass in running "
-    "order, which Dreamer no longer publish",
-    "FMLV Select 'LIVING VAN' is 2,880mm with 4 berths; the site's Select 'LIFT VAN' is "
-    "2,630mm with 2. One letter apart in the name, but 250mm apart in height, where every "
-    "other model moved by 40mm. Treat the name resemblance as a lead, not as proof",
+    "FMLV Select 'D68 UP' (3,165kg) and Select 'LIVING VAN' (3,105kg) against the site's "
+    "Select 'LIFT VAN' (3,025kg) and 'LIFT VAN UP' (3,145kg), with a D68 UP now in FUN "
+    "(3,135kg) badged new. NOW THAT THE SPECIFICATION DOCUMENT GIVES MASSES, the settled "
+    "rename test can finally be applied — and it does not settle this one. Both readings "
+    "agree that FMLV's LIVING VAN is the site's LIFT VAN (3,105 -> 3,025kg). They differ "
+    "on FMLV's Select D68 UP: the automatic matcher reads it as the FUN D68 UP "
+    "(3,165 -> 3,135kg, 30kg apart), and the LIFT VAN UP is the closer fit "
+    "(3,165 -> 3,145kg, 20kg apart). TEN kilograms is not a margin to decide a product's "
+    "identity on. Ask Dreamer which of the two the old D68 UP became",
 )
 
 #: Models whose roof this adapter refuses to decide, and why. A model named here emits
@@ -294,6 +294,101 @@ SELECT_WITHOUT_AUTOMATIC: dict[str, str] = {
     "CAP EASY": "on the Renault Trafic, offered only with a manual transmission",
     "CAP LAND": "on the Ford, offered only with a manual transmission",
     "CITY CAMP": "on the Ford, offered only with a manual transmission",
+}
+
+@dataclass(frozen=True)
+class _Specification:
+    """One model's row from Dreamer's 2027 specification document."""
+
+    mro_kilograms: int
+    payload_kilograms: int
+    #: The **base** gross vehicle weight. Where Dreamer offer a choice — `3.5 T / 4.25 T`
+    #: on most of the range — this is the lower, which is the base vehicle.
+    mtplm_kilograms: int
+    #: Dreamer's own chassis wording, normalised at output by `fmlv_base_vehicle`.
+    base_vehicle: str
+    #: Dreamer's own words for the heater, read by `habitation.heating_from`.
+    heating: str
+    #: The document's own height and length, held **only** to check it against the live
+    #: site — see `_check_specification`. Neither is emitted from here.
+    height_mm: int
+    length_mm: int
+
+
+#: Dreamer's **2027 specification document**, base finish only, for all nineteen models.
+#:
+#: `COM_DRE_CT_Dreamer_EXPORT_2027_220x285_BD_EN.pdf`, obtained 12 November 2026. This is
+#: the source that was missing when the adapter was written: it carries the masses, the
+#: chassis and the heater for every model, none of which appears anywhere on the website.
+#:
+#: **It is stored rather than fetched, because a run cannot reach it.** It sits behind a
+#: name-and-email form that posts to itself, so the PDF's URL only exists after a human
+#: submits the form, and it is not publicly indexed. That is the whole reason this is a
+#: constant and not a parser.
+#:
+#: **Two things make a stored table safer here than it sounds.**
+#:
+#: * **It checks against itself.** `MIRO + payload == GVW` on all nineteen, and not
+#:   trivially: the three non-Fiat vans have their own gross weights and land on them
+#:   exactly — City Camp on 3,300 kg, Cap Land on 3,175 kg, Cap Easy on 3,070 kg.
+#:   `_check_specification` re-runs that arithmetic every time rather than trusting it.
+#: * **The live site can tell when it has gone stale.** Every model page publishes its own
+#:   height and the range tile its own length, so the document's figures are compared
+#:   against the site each run and a divergence is narrated. A stored table that cannot
+#:   notice it has rotted is a liability; one the live site audits is not.
+#:
+#: **Only the base finish is recorded.** The document gives each model twice — `D43 FUN`
+#: and `D43 FUN +`, `D43 SELECT` and `D43 SELECT SAPHIR` — and the second is a trim level
+#: carrying extra equipment and, usually, five more kilos. FMLV holds one row per model,
+#: and the settled rule takes the base vehicle rather than the optioned variant.
+SPECIFICATION_2027: dict[tuple[str, str], _Specification] = {
+    # --- DREAMER FUN, all Fiat Ducato, all Webasto ------------------------------
+    (FUN, "D43"): _Specification(2835, 665, 3500, "FIAT DUCATO", "WEBASTO 4 kW DIESEL", 2630, 5410),
+    (FUN, "D43 UP"): _Specification(2925, 575, 3500, "FIAT DUCATO", "WEBASTO 4 kW DIESEL", 2760, 5410),
+    (FUN, "D55"): _Specification(2960, 540, 3500, "FIAT DUCATO", "WEBASTO 4 kW DIESEL", 2630, 5990),
+    (FUN, "D55 UP"): _Specification(3050, 450, 3500, "FIAT DUCATO", "WEBASTO 4 kW DIESEL", 2760, 5990),
+    (FUN, "D68"): _Specification(3025, 475, 3500, "FIAT DUCATO", "WEBASTO 4 kW DIESEL", 2630, 6360),
+    (FUN, "D68 UP"): _Specification(3135, 365, 3500, "FIAT DUCATO", "WEBASTO 4 kW DIESEL", 2760, 6360),
+    (FUN, "CAMPER FIVE"): _Specification(3055, 445, 3500, "FIAT DUCATO", "WEBASTO 4 kW DIESEL", 2920, 6360),
+    # The one place the document and the website disagree — see `_check_specification`.
+    (FUN, "CAMPER SPORT"): _Specification(3020, 480, 3500, "FIAT DUCATO", "WEBASTO 4 kW DIESEL", 2920, 6360),
+    # --- DREAMER SELECT, Fiat Ducato on Truma ----------------------------------
+    (SELECT, "D43"): _Specification(2850, 650, 3500, "FIAT DUCATO", "Truma Combi 4 DIESEL CP PLUS", 2630, 5410),
+    (SELECT, "D55"): _Specification(3025, 475, 3500, "FIAT DUCATO", "Truma Combi 4 DIESEL CP PLUS", 2630, 5990),
+    (SELECT, "D68"): _Specification(3025, 475, 3500, "FIAT DUCATO", "Truma Combi 4 DIESEL CP PLUS", 2630, 6360),
+    # The D64 is the one Fiat Select model on a Webasto rather than a Truma.
+    (SELECT, "D64"): _Specification(3025, 475, 3500, "FIAT DUCATO", "WEBASTO 4 KW DIESEL", 2630, 6360),
+    (SELECT, "LIFT VAN"): _Specification(3025, 475, 3500, "FIAT DUCATO", "Truma Combi 4 DIESEL CP PLUS", 2630, 6360),
+    (SELECT, "LIFT VAN UP"): _Specification(3145, 355, 3500, "FIAT DUCATO", "Truma Combi 4 DIESEL CP PLUS", 2760, 6360),
+    (SELECT, "FAMILY VAN"): _Specification(3055, 445, 3500, "FIAT DUCATO", "Truma Combi 4 DIESEL CP PLUS", 2880, 5990),
+    (SELECT, "CAMPER VAN XL"): _Specification(3125, 375, 3500, "FIAT DUCATO", "Truma Combi 4 DIESEL CP PLUS", 2920, 6360),
+    # --- DREAMER SELECT, the three that are neither Fiat nor 3.5 tonnes ---------
+    (SELECT, "CITY CAMP"): _Specification(2715, 585, 3300, "FORD TRANSIT CUSTOM", "EBERSPAECHER 2200 W", 2040, 5050),
+    (SELECT, "CAP LAND"): _Specification(2730, 445, 3175, "FORD TRANSIT CUSTOM", "EBERSPAECHER 2200 W", 2040, 5450),
+    (SELECT, "CAP EASY"): _Specification(2589, 481, 3070, "RENAULT TRAFIC", "WEBASTO 2500 W", 1990, 5480),
+}
+
+#: What the specification document says about three-point belts, which is **not** the same
+#: as its registered-seat count on two models.
+#:
+#: Its `3-point retractable safety belts (cab and living space)` row reads `2+2` — four —
+#: for every Fiat model, including the **Camper Five** and the **Family Van**, whose
+#: `Registered (driving) seats` row reads **5**. FMLV holds 5 for both, and the settled
+#: rule counts three-point belts only.
+#:
+#: **Nothing is changed on the strength of this.** Reducing two live products' seat counts
+#: is a decision for a person, and `2+2` may describe the two rows of belts rather than
+#: every belt in the vehicle — the Camper Five's fifth seat is a fold-down the document
+#: lists separately. `_narrate_findings` puts it in front of the reviewer each run instead.
+BELT_ROW_DISAGREES: dict[tuple[str, str], str] = {
+    (FUN, "CAMPER FIVE"): (
+        "the specification lists 5 registered (driving) seats but gives its 3-point "
+        "retractable safety belts as '2+2', which is four"
+    ),
+    (SELECT, "FAMILY VAN"): (
+        "the specification lists 5 registered (driving) seats but gives its 3-point "
+        "retractable safety belts as '2+2', which is four"
+    ),
 }
 
 #: Products FMLV holds that have no counterpart on the site at all.
@@ -433,6 +528,10 @@ class DreamerProduct:
     prose: list[str] = field(default_factory=list)
 
     automatic: tuple[bool, str] | None = None
+
+    #: This model's row from `SPECIFICATION_2027`, where there is one. The masses, the
+    #: chassis and the heater come from here and from nowhere else.
+    specification: _Specification | None = None
 
     @property
     def label(self) -> str:
@@ -604,6 +703,76 @@ def _check_roof(product: DreamerProduct) -> str | None:
     return None
 
 
+#: The make inside a chassis name. Dreamer write the model as well as the maker —
+#: `FIAT DUCATO`, `FORD TRANSIT CUSTOM`, `RENAULT TRAFIC` — and FMLV's base-vehicle
+#: column holds the make alone. Passing the whole string to `fmlv_base_vehicle` gets it
+#: back unchanged, because that function returns an unrecognised make rather than
+#: blanking it, so `FIAT DUCATO` would have been proposed against FMLV's `Fiat` on all
+#: nineteen products.
+_CHASSIS_MAKE = re.compile(
+    "(FIAT|FORD|PEUGEOT|CITRO[EË]N|RENAULT|MERCEDES(?:-BENZ)?|MAN|VW|IVECO)", re.I
+)
+
+
+def _base_vehicle_of(specification: _Specification | None) -> str | None:
+    """The chassis make as FMLV spells it, from Dreamer's fuller chassis name."""
+    if specification is None:
+        return None
+    match = _CHASSIS_MAKE.search(specification.base_vehicle)
+    if match is None:
+        return None
+    return fmlv_base_vehicle(match.group(1))
+
+
+def _check_specification(product: DreamerProduct) -> list[str]:
+    """Audit the stored specification row against its own arithmetic and the live site.
+
+    A table of figures typed out of a PDF cannot notice that the PDF has been superseded.
+    This is what stops that being true here, and it has two independent halves:
+
+    * **The arithmetic.** `MIRO + payload` must equal the gross weight Dreamer publish for
+      the model. On the 2027 document it does for all nineteen, and the three non-Fiat
+      vans land on their own distinct weights — 3,300, 3,175 and 3,070 kg — which is what
+      makes the agreement meaningful rather than a coincidence of everything being 3.5 T.
+    * **The live site.** Every model page publishes its own height and every range tile
+      its own length, so the document's two dimensions are checked against figures read
+      fresh this run. A model that has changed shape will diverge here first.
+
+    Returns a list of complaints, empty when all is well. Nothing is dropped on a
+    complaint: a disagreement about a height does not make a mass wrong, and silently
+    withholding the only masses Dreamer publish would be the worse failure. It is said
+    out loud instead.
+    """
+    specification = product.specification
+    if specification is None:
+        return []
+
+    complaints: list[str] = []
+    total = specification.mro_kilograms + specification.payload_kilograms
+    if total != specification.mtplm_kilograms:
+        complaints.append(
+            f"the stored specification does not add up: MIRO "
+            f"{specification.mro_kilograms:,}kg plus payload "
+            f"{specification.payload_kilograms:,}kg is {total:,}kg, not the "
+            f"{specification.mtplm_kilograms:,}kg gross weight recorded beside them"
+        )
+
+    if product.mh_height_mm is not None and product.mh_height_mm != specification.height_mm:
+        complaints.append(
+            f"the model page now publishes a height of {product.mh_height_mm:,}mm where "
+            f"the 2027 specification says {specification.height_mm:,}mm — the stored "
+            f"document may have been superseded, and with it this model's masses"
+        )
+    if product.mh_length_mm is not None and product.mh_length_mm != specification.length_mm:
+        complaints.append(
+            f"the range tile publishes a length of {product.mh_length_mm:,}mm where the "
+            f"2027 specification says {specification.length_mm:,}mm. THE WEBSITE'S FIGURE "
+            f"IS THE ONE RECORDED, on the requester's instruction of 12 November 2026 — "
+            f"but the two disagreeing is worth knowing about"
+        )
+    return complaints
+
+
 def _body_type(product: DreamerProduct) -> tuple[BodyType | None, str | None]:
     """Which of the four campervan body types this van is.
 
@@ -688,26 +857,38 @@ def _habitation_lines(product: DreamerProduct) -> list[str]:
     heater = product.pictos.get("svg__chauffage")
     if heater:
         lines.append(heater)
+    # The specification document names the heater too, and more precisely than the model
+    # page does: it is `WEBASTO 4 kW DIESEL` on the page and the same there, but the D64
+    # is the one Select model on a Webasto rather than a Truma and only the document says
+    # so. Both are offered to the habitation module; it reads whichever it understands.
+    if product.specification is not None:
+        lines.append(product.specification.heating)
     return lines
 
 
 def _build_extracted_motorhome(product: DreamerProduct) -> ExtractedMotorhome:
     """One model as a `Motorhome`, with the provenance a reviewer reads beside each field.
 
-    **Three columns are deliberately absent**, and each for a reason that is not an
-    oversight:
+    **The masses, the chassis and the heater come from `SPECIFICATION_2027`**, Dreamer's
+    own 2027 specification document, and not from the website — which publishes none of
+    them. Everything else is read live: the dimensions, the berths, the seats and the
+    body type.
 
-    * `mro_kilograms`, `mtplm_kilograms`, `mh_payload_kilograms` — Dreamer publish no mass
-      for the current range anywhere. See the module docstring.
-    * `rrp_pounds` — no price is published either, and FMLV holds one on all sixteen rows.
-    * `base_vehicle_manufacturer` — the site names three engines on a range-wide list with
-      no model attribution.
+    **`rrp_pounds` is still deliberately absent.** Dreamer publish no price anywhere and
+    FMLV holds one on all sixteen live rows, so emitting an empty one would propose
+    deleting every one of them. It is left unset rather than emitted empty.
 
-    All three are left unset rather than emitted empty, so the existing FMLV values survive
-    the run untouched.
+    **Where the document and the website disagree on a dimension, the website wins.**
+    Requester's instruction, 12 November 2026: *"on Dreamer let the length stated on the
+    website take precedent if there's a conflict like that."* The website is re-read every
+    run and the document cannot be, so the website is the fresher of the two by
+    construction. `_check_specification` still says when they diverge.
     """
     features = habitation.features_from(_habitation_lines(product))
     body_type, body_type_note = _body_type(product)
+    specification = product.specification
+    # Only used where the website gave no length at all; it never overrides one.
+    specification_length = specification.length_mm if specification else None
 
     motorhome = Motorhome(
         manufacturer=MANUFACTURER,
@@ -717,9 +898,15 @@ def _build_extracted_motorhome(product: DreamerProduct) -> ExtractedMotorhome:
         berths=product.berths,
         mh_passenger_seats_inc_driver=product.mh_passenger_seats_inc_driver,
         body_type=body_type,
-        mh_length_mm=product.mh_length_mm,
+        # The website's dimensions, always — see the docstring. A length the document
+        # disagrees with is narrated, not substituted.
+        mh_length_mm=product.mh_length_mm or specification_length,
         mh_width_mm=product.mh_width_mm,
         mh_height_mm=product.mh_height_mm,
+        mro_kilograms=specification.mro_kilograms if specification else None,
+        mtplm_kilograms=specification.mtplm_kilograms if specification else None,
+        mh_payload_kilograms=specification.payload_kilograms if specification else None,
+        base_vehicle_manufacturer=_base_vehicle_of(specification),
         automatic_available=product.automatic[0] if product.automatic else None,
         # Habitation: findings, never proposals — see `docs/adapters/README.md`.
         heating=features["heating"].value if "heating" in features else None,
@@ -781,6 +968,41 @@ def _build_extracted_motorhome(product: DreamerProduct) -> ExtractedMotorhome:
             f"the specification block's registered (driving) seats, "
             f"{product.seats_note!r}",
         )
+    if specification is not None:
+        source = (
+            "Dreamer's 2027 specification document "
+            "(COM_DRE_CT_Dreamer_EXPORT_2027_220x285_BD_EN.pdf), base finish. It is not "
+            "on the website: it sits behind a name-and-email form, so this adapter holds "
+            "a stored copy and audits it against the live site every run"
+        )
+        reconciles = (
+            f"MIRO {specification.mro_kilograms:,}kg plus payload "
+            f"{specification.payload_kilograms:,}kg is exactly the "
+            f"{specification.mtplm_kilograms:,}kg gross weight published beside them"
+        )
+        record(
+            "mro_kilograms",
+            f"{specification.mro_kilograms:,}kg, from {source} — and it reconciles: "
+            f"{reconciles}",
+        )
+        record(
+            "mh_payload_kilograms",
+            f"{specification.payload_kilograms:,}kg, from {source} — and it reconciles: "
+            f"{reconciles}",
+        )
+        record(
+            "mtplm_kilograms",
+            f"{specification.mtplm_kilograms:,}kg, from {source}. Where Dreamer offer a "
+            f"CHOICE of gross weight — most of the range is published as '3.5 T / 4.25 T' "
+            f"— this is the lower, which is the base vehicle",
+        )
+        record(
+            "base_vehicle_manufacturer",
+            f"the specification's chassis row names {specification.base_vehicle!r}. From "
+            f"{source}; the website names its three bases on a range-wide list with no "
+            f"attribution to a model, which is why this could not be collected before",
+        )
+
     if body_type is not None and body_type_note is not None:
         record("body_type", f"a converted van at {body_type_note}")
     if product.automatic is not None:
@@ -835,6 +1057,16 @@ def _narrate_findings(product: DreamerProduct, on_progress: Callable[[str], None
             f"{ROOF_UNSTATED.get(product.model, 'the roof could not be established')}"
         )
 
+    belts = BELT_ROW_DISAGREES.get((product.manufacturer_range, product.model))
+    if belts is not None:
+        on_progress(
+            f"{product.label} — SEATS WORTH A SECOND LOOK: {belts}. FMLV holds "
+            f"{product.mh_passenger_seats_inc_driver}, which is what is proposed, and the "
+            f"settled rule counts THREE-POINT belts only. Nothing is changed here because "
+            f"reducing a live product's seat count is a decision for a person, and '2+2' "
+            f"may describe the two rows of belts rather than every belt in the vehicle"
+        )
+
     if product.seats_ceiling_note is not None:
         on_progress(
             f"{product.label} — travel seats NOT proposed: Dreamer publish "
@@ -848,18 +1080,26 @@ def _narrate_findings(product: DreamerProduct, on_progress: Callable[[str], None
 def _narrate_absences(on_progress: Callable[[str], None]) -> None:
     """Say, once a run, which columns Dreamer no longer publish and why none is emitted."""
     on_progress(
-        "NO MASS is collected for any Dreamer. The only weights table on the site, "
-        f"{SUPERSEDED_SPECIFICATION_TABLE}, is LAST SEASON'S and covers the FUN range "
-        "alone — every height in it is 40mm short of what the model pages state now, it "
-        "lists ADDICT and EXCLUSIVE trims no longer sold, it numbers the vans D42/D53/D60 "
-        "where the site now says D43/D55/D68, and it has no Camper Sport column at all. "
-        "Nothing is emitted rather than an empty value, so FMLV's existing MRO figures "
-        "survive this run untouched. A current weights table is a question for Dreamer"
+        "The masses, the chassis and the heater come from Dreamer's 2027 SPECIFICATION "
+        "DOCUMENT, a stored copy, because they appear nowhere on the website. It sits "
+        "behind a name-and-email form that posts to itself, so a run cannot fetch it. "
+        "Every row is audited each run: MIRO plus payload must equal the published gross "
+        "weight, and the document's height and length must still match what the live site "
+        "publishes. Divergences are narrated per model"
     )
     on_progress(
-        "NO PRICE and NO BASE VEHICLE are collected either. Dreamer publish no price "
-        "anywhere, and the site names its three engines on a range-wide equipment list "
-        "with no attribution to a model, so which van takes the Ford cannot be read off it"
+        f"The weights table that IS on the site, {SUPERSEDED_SPECIFICATION_TABLE}, is "
+        "still ignored and still should be. It is LAST SEASON'S and covers the FUN range "
+        "alone: every height in it is 40mm short of what the model pages state now, it "
+        "lists ADDICT and EXCLUSIVE trims no longer sold, it numbers the vans D42/D53/D60 "
+        "where the site now says D43/D55/D68, and it has no Camper Sport column at all"
+    )
+    on_progress(
+        "NO PRICE is collected. Dreamer publish none anywhere, and FMLV holds one on all "
+        "sixteen live rows, so emitting an empty one would propose deleting every one of "
+        "them. The base vehicle DOES come through now, from the specification document — "
+        "the website names its three bases on a range-wide list with no attribution to a "
+        "model, which is why it could not be collected before"
     )
 
 
@@ -1014,6 +1254,18 @@ def collect(
             on_progress(roof_warning)
 
         product.automatic = _automatic_for(model, transmission)
+        product.specification = SPECIFICATION_2027.get(
+            (model.manufacturer_range, model.model)
+        )
+        if product.specification is None:
+            on_progress(
+                f"{product.label} — NO MASS, NO CHASSIS and NO HEATER: this model has no "
+                f"row in the stored 2027 specification document, so there is nothing to "
+                f"take them from. A model Dreamer have added since 12 November 2026 will "
+                f"land here, and the document needs re-requesting"
+            )
+        for complaint in _check_specification(product):
+            on_progress(f"{product.label} — {complaint}")
 
         extracted.append(_build_extracted_motorhome(product))
         length = f"{product.mh_length_mm:,}mm" if product.mh_length_mm else "NO LENGTH"
@@ -1022,10 +1274,18 @@ def collect(
             if product.mh_passenger_seats_inc_driver is not None
             else "seats not recorded"
         )
+        masses = (
+            f"MIRO {product.specification.mro_kilograms:,}kg, MTPLM "
+            f"{product.specification.mtplm_kilograms:,}kg, payload "
+            f"{product.specification.payload_kilograms:,}kg, "
+            f"{product.specification.base_vehicle}"
+            if product.specification is not None
+            else "NO MASS and NO CHASSIS"
+        )
         on_progress(
             f"{product.label}: {length} x {product.mh_width_mm or '?'}mm x "
-            f"{product.mh_height_mm or '?'}mm, {product.berths} berths, {seats} — "
-            f"{identity_note}, {shape_note}. NO mass and NO price, by design"
+            f"{product.mh_height_mm or '?'}mm, {product.berths} berths, {seats}, {masses}"
+            f" — {identity_note}, {shape_note}. NO price, by design"
         )
         _narrate_findings(product, on_progress)
 

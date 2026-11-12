@@ -2617,6 +2617,45 @@ Two rules when doing so:
 Say in the survey document which route was used, and if a form was submitted, say so
 explicitly at the checkpoint.
 
+### A document a run cannot fetch can still be stored, if the live site audits it
+
+Sometimes the only source for a manufacturer's masses is a document behind a form that
+posts to itself, so the PDF's URL exists only after a human submits it, and the file is
+not publicly indexed. Both routes above fail, and the choice is between recording nothing
+and recording figures the adapter cannot re-read.
+
+**Record them — but only alongside something that can tell when they have gone stale.**
+A stored table that cannot notice it has rotted is a liability. One the live site audits
+is not, and the audit is usually free, because the website almost always publishes
+*something* that overlaps with the document. Dreamer's model pages give a height and the
+range tiles a length; the document gives those too, so each run compares them.
+
+Build two checks, and run them every time rather than trusting the transcription:
+
+1. **The document against itself.** `MIRO + payload == GVW` is the usual one. Make sure it
+   is not trivially true — if every model is 3,500 kg, agreement proves nothing. Dreamer's
+   nineteen include three vans at 3,300, 3,175 and 3,070 kg, and all three land exactly,
+   which is what makes the other sixteen believable.
+2. **The document against the live site**, on whatever they share. A divergence does not
+   mean the masses are wrong, so do not drop the product — say it out loud. The height
+   is usually the first thing to move when a model is revised.
+
+Two further rules:
+
+- **Record the base finish only.** These documents list each model two or three times —
+  `D43 FUN`, `D43 FUN +`, `D43 SELECT SAPHIR` — because they are configurators on paper.
+  The trimmed version carries extra equipment and a few more kilos, and the settled rule
+  takes the base vehicle.
+- **Where the stored document and the live site disagree, the live site wins.** Requester's
+  ruling on Dreamer, 12 November 2026: *"let the length stated on the website take
+  precedent if there's a conflict like that."* The site is re-read every run and the
+  document is not, so the site is the fresher of the two by construction. Say which was
+  taken in the provenance.
+
+Name the file and the date obtained in the constant's docstring. The next person needs to
+know what to re-request and how old what they have is. `dreamer.SPECIFICATION_2027` is the
+worked example.
+
 ## Then: parsing a spec table is where the real risk is
 
 For a PDF-sourced manufacturer, finding the numbers is easy and *attaching them to the
