@@ -299,11 +299,14 @@ Two further things worth watching rather than asking:
   `/robeta-motorhomes/the-range/hercules/` or `.../ananya/`. That would supply the price,
   the masses and the arithmetic self-check in one go, and the run narrates the absence
   every time so it cannot be missed.
-* **Whether the Ananya belongs in FMLV at all.** It has its own brand site
-  (`glam-van.com`), its own logo, three seats, a 4,100 kg Sprinter 4x4 base and a
-  €198,000 net price — which is not obviously a catalogue campervan. Cara named it as
-  range, and the importer defines the range, so it is collected; but it is the one entry
-  here that a person might reasonably decide against.
+**Settled 12 November 2026: the Ananya is listed.** It was raised as the one entry a
+person might reasonably decide against — own brand site (`glam-van.com`), own logo, three
+seats, a 4,100 kg Sprinter 4x4 base and a €198,000 net price. The requester settled it the
+same day: *"I can't see any reason why the Ananya wouldn't be listed in FMLV at the
+moment. If he's saying that that's available in the UK, so yeah, it looks like a range
+name, or a company even, but there's only one model so I can't think of a reason why
+not."* Availability in the UK is the test, and a name that reads like a brand is not a
+reason to withhold a vehicle that is on sale here.
 
 Settled since the survey, and left here so the record shows what moved:
 
