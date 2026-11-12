@@ -273,7 +273,110 @@ def _mass_basis(mtplm_scraped: bool, mro_scraped: bool, label: str) -> str:
     )
 
 
-def _missing_field_snippet(missing: MissingField) -> str:
+#: The two masses each of the other two can be derived from, as
+#: `{the missing field: (operand, operand, how to combine, wording)}`.
+#:
+#: `mh_payload_kilograms` is **not** here. It has its own mechanism in
+#: `_derived_payload_proposals`, which proposes the derived figure as a real change rather
+#: than describing it, and duplicating it here would say the same thing twice.
+_MASS_ARITHMETIC: dict[str, tuple[str, str, str]] = {
+    "mtplm_kilograms": ("mro_kilograms", "mh_payload_kilograms", "MRO {a:,}kg plus payload {b:,}kg"),
+    "mro_kilograms": ("mtplm_kilograms", "mh_payload_kilograms", "MTPLM {a:,}kg less payload {b:,}kg"),
+}
+
+
+def _mass_arithmetic_note(
+    missing: MissingField, baseline: Product | None, extracted: Product | None
+) -> str | None:
+    """What the other two masses say about a mass the adapter could not find.
+
+    **Why this exists.** A mass that was not published this run reaches the reviewer as
+    "confirm the existing figure is still correct, or enter a replacement" — which is an
+    honest offer and a weak one, because it hands back the question without any evidence
+    to answer it with. The requester, 12 November 2026: *"Instead of saying do you want to
+    accept this previous MTPLM figure, it could say this is the MTPLM calculated from the
+    payload and MIRO found. Which is obviously going to be a lot more certain and easy to
+    accept."*
+
+    The three masses are one equation, so **two of them always testify about the third**,
+    whether or not anybody published it. Where the arithmetic agrees with the figure FMLV
+    holds, that is a confirmation from an independent direction and the row can be
+    accepted on sight. Where it disagrees, the reviewer is told so before accepting rather
+    than finding out from the issues file afterwards.
+
+    **This describes, it does not propose.** The value offered stays FMLV's own. Deriving
+    an MTPLM outright would be wrong in the case `docs/adapters/README.md` records under
+    the Le Voyageur ruling — a printed payload can be one half of an unlabelled split, and
+    `MRO + payload` would then understate the real MTPLM. Saying what the arithmetic comes
+    to is safe in a way that silently adopting it is not, and it is what was asked for.
+
+    Caravans are excluded, for the same reason they are excluded from the payload
+    derivation: `personal_effects_payload_kilograms` is not MTPLM minus MRO.
+    """
+    if isinstance(baseline, Caravan) or isinstance(extracted, Caravan):
+        return None
+    arithmetic = _MASS_ARITHMETIC.get(missing.field)
+    if arithmetic is None or missing.old_value is None:
+        return None
+    first_path, second_path, phrasing = arithmetic
+
+    def effective(field_path: str) -> tuple[int | None, bool]:
+        """The figure the upload row will hold, and whether the site supplied it."""
+        found = field_value(extracted, field_path) if extracted is not None else None
+        if found is not None:
+            return found, True
+        return (field_value(baseline, field_path) if baseline is not None else None), False
+
+    first, first_from_site = effective(first_path)
+    second, second_from_site = effective(second_path)
+    if first is None or second is None:
+        return None
+    if not isinstance(first, int) or not isinstance(second, int):
+        return None
+
+    derived = first + second if missing.field == "mtplm_kilograms" else first - second
+    if derived <= 0:
+        return None
+
+    # How much the agreement is worth depends entirely on where the two operands came
+    # from. Two figures read off the manufacturer's site this run confirm FMLV's held
+    # value from outside it. Two figures carried over from FMLV show only that FMLV is
+    # self-consistent — worth saying, because an inconsistency would matter, but it is
+    # not independent evidence and must not be described as if it were.
+    sources, weight = {
+        (True, True): (
+            "Both of those come from the manufacturer's site this run",
+            "so the figure held is confirmed from outside FMLV and can be accepted",
+        ),
+        (True, False): (
+            "The first comes from the site this run; the second is FMLV's own",
+            "so the figure held is partly confirmed from the site",
+        ),
+        (False, True): (
+            "The second comes from the site this run; the first is FMLV's own",
+            "so the figure held is partly confirmed from the site",
+        ),
+        (False, False): (
+            "Neither was published this run, so both are FMLV's own figures",
+            "which shows FMLV is self-consistent here rather than confirming it from "
+            "outside",
+        ),
+    }[(first_from_site, second_from_site)]
+    sum_of = phrasing.format(a=first, b=second)
+
+    if derived == missing.old_value:
+        return (
+            f"THE ARITHMETIC AGREES: {sum_of} is {derived:,}kg, which is exactly the "
+            f"figure held. {sources} — {weight}."
+        )
+    return (
+        f"THE ARITHMETIC DISAGREES: {sum_of} is {derived:,}kg, but the figure held is "
+        f"{missing.old_value:,}kg — a difference of {abs(derived - missing.old_value):,}kg. "
+        f"{sources}. One of the three masses is wrong; check before accepting."
+    )
+
+
+def _missing_field_snippet(missing: MissingField, arithmetic: str | None = None) -> str:
     """The confirm-or-replace offer, plus whatever evidence the adapter recorded.
 
     Both constants stay **prefixes** of what is stored, because `webapp.app`'s
@@ -297,9 +400,12 @@ def _missing_field_snippet(missing: MissingField) -> str:
             if missing.in_scope
             else UNDETERMINED_FIELD_SNIPPET
         )
+    parts = [base]
     if missing.provenance and missing.provenance.snippet:
-        return f"{base} {missing.provenance.snippet}"
-    return base
+        parts.append(missing.provenance.snippet)
+    if arithmetic:
+        parts.append(arithmetic)
+    return " ".join(parts)
 
 
 @dataclass(frozen=True)
@@ -943,7 +1049,14 @@ def persist_diff(
                 reviewer_reference=(
                     missing.provenance.reviewer_reference if missing.provenance else False
                 ),
-                source_snippet=_missing_field_snippet(missing),
+                source_snippet=_missing_field_snippet(
+                    missing,
+                    _mass_arithmetic_note(
+                        missing,
+                        diff.baseline,
+                        diff.extracted.product if diff.extracted else None,
+                    ),
+                ),
             )
             proposed += 1
             missing_field_proposed += 1

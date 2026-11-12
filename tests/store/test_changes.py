@@ -858,3 +858,171 @@ def test_an_automatic_payload_that_already_agrees_is_left_alone(
     ]
     assert "automatic.payload_kilograms" not in corrected
     assert "mh_payload_kilograms" not in corrected
+
+
+# --------------------------------------------------------------------------- #
+# What the other two masses say about a mass that was not published
+# --------------------------------------------------------------------------- #
+
+
+def _missing(field: str, old_value: int | None):
+    from src.diff.compare import MissingField
+
+    return MissingField(field=field, old_value=old_value, in_scope=True)
+
+
+def test_an_unpublished_mtplm_is_confirmed_by_the_other_two() -> None:
+    """The requester, 12 November 2026, on the bare confirm-or-replace offer.
+
+    *"Instead of saying do you want to accept this previous MTPLM figure, it could say
+    this is the MTPLM calculated from the payload and MIRO found. Which is obviously
+    going to be a lot more certain and easy to accept."*
+
+    The three masses are one equation, so two of them testify about the third whether or
+    not anybody published it.
+    """
+    note = store.changes._mass_arithmetic_note(
+        _missing("mtplm_kilograms", 3500),
+        baseline=Motorhome(mro_kilograms=3070, mh_payload_kilograms=430),
+        extracted=Motorhome(mro_kilograms=3070, mh_payload_kilograms=430),
+    )
+    assert note is not None
+    assert "THE ARITHMETIC AGREES" in note
+    assert "3,500kg" in note
+    assert "can be accepted" in note
+
+
+def test_an_unpublished_mtplm_that_the_other_two_contradict_says_so() -> None:
+    note = store.changes._mass_arithmetic_note(
+        _missing("mtplm_kilograms", 3500),
+        baseline=Motorhome(mro_kilograms=3070, mh_payload_kilograms=500),
+        extracted=Motorhome(mro_kilograms=3070, mh_payload_kilograms=500),
+    )
+    assert note is not None
+    assert "THE ARITHMETIC DISAGREES" in note
+    assert "3,570kg" in note
+    assert "70kg" in note
+    assert "check before accepting" in note
+
+
+def test_the_note_says_where_each_mass_came_from() -> None:
+    """Whether a figure was read this run or carried over changes how much it is worth."""
+    both_from_site = store.changes._mass_arithmetic_note(
+        _missing("mtplm_kilograms", 3500),
+        baseline=Motorhome(),
+        extracted=Motorhome(mro_kilograms=3070, mh_payload_kilograms=430),
+    )
+    assert both_from_site is not None and "Both of those come from" in both_from_site
+
+    neither = store.changes._mass_arithmetic_note(
+        _missing("mtplm_kilograms", 3500),
+        baseline=Motorhome(mro_kilograms=3070, mh_payload_kilograms=430),
+        extracted=Motorhome(),
+    )
+    assert neither is not None and "Neither was published this run" in neither
+
+
+def test_an_unpublished_mro_is_derived_from_the_other_two() -> None:
+    note = store.changes._mass_arithmetic_note(
+        _missing("mro_kilograms", 3070),
+        baseline=Motorhome(mtplm_kilograms=3500, mh_payload_kilograms=430),
+        extracted=Motorhome(mtplm_kilograms=3500, mh_payload_kilograms=430),
+    )
+    assert note is not None
+    assert "THE ARITHMETIC AGREES" in note
+    assert "3,070kg" in note
+
+
+def test_nothing_is_said_where_a_second_mass_is_missing_too() -> None:
+    assert (
+        store.changes._mass_arithmetic_note(
+            _missing("mtplm_kilograms", 3500),
+            baseline=Motorhome(mro_kilograms=3070),
+            extracted=Motorhome(),
+        )
+        is None
+    )
+
+
+def test_nothing_is_said_about_the_payload() -> None:
+    """It has its own mechanism, which proposes the derived figure rather than describing
+    it — saying both would tell the reviewer the same thing twice."""
+    assert (
+        store.changes._mass_arithmetic_note(
+            _missing("mh_payload_kilograms", 430),
+            baseline=Motorhome(mtplm_kilograms=3500, mro_kilograms=3070),
+            extracted=Motorhome(mtplm_kilograms=3500, mro_kilograms=3070),
+        )
+        is None
+    )
+
+
+def test_nothing_is_said_for_a_caravan() -> None:
+    """`personal_effects_payload_kilograms` is not MTPLM minus MRO but the personal-effects
+    half of a split, so the equation does not hold."""
+    from src.product_model.caravan import Caravan
+
+    assert (
+        store.changes._mass_arithmetic_note(
+            _missing("mtplm_kilograms", 1500),
+            baseline=Caravan(mro_kilograms=1200),
+            extracted=Caravan(mro_kilograms=1200),
+        )
+        is None
+    )
+
+
+def test_the_note_is_appended_rather_than_replacing_the_offer() -> None:
+    """`webapp.app`'s `is_missing_field` identifies these rows by their opening text, so
+    the constant has to stay a prefix of whatever is stored."""
+    snippet = store.changes._missing_field_snippet(
+        _missing("mtplm_kilograms", 3500), "THE ARITHMETIC AGREES: ..."
+    )
+    assert snippet.startswith(store.MISSING_FIELD_SNIPPET)
+    assert "THE ARITHMETIC AGREES" in snippet
+
+
+def test_the_bare_offer_is_unchanged_where_there_is_no_arithmetic() -> None:
+    assert (
+        store.changes._missing_field_snippet(_missing("mh_height_mm", 2590))
+        == store.MISSING_FIELD_SNIPPET
+    )
+
+
+def test_two_carried_over_masses_are_not_described_as_independent_confirmation() -> None:
+    """They show FMLV is self-consistent, which is not the same thing.
+
+    Worth saying either way — an inconsistency between three figures FMLV holds would
+    matter — but describing it as confirmation would overstate what it is.
+    """
+    carried = store.changes._mass_arithmetic_note(
+        _missing("mtplm_kilograms", 3500),
+        baseline=Motorhome(mro_kilograms=3070, mh_payload_kilograms=430),
+        extracted=Motorhome(),
+    )
+    assert carried is not None
+    assert "self-consistent" in carried
+    assert "confirmed from outside" not in carried
+
+    from_site = store.changes._mass_arithmetic_note(
+        _missing("mtplm_kilograms", 3500),
+        baseline=Motorhome(),
+        extracted=Motorhome(mro_kilograms=3070, mh_payload_kilograms=430),
+    )
+    assert from_site is not None
+    assert "confirmed from outside FMLV" in from_site
+
+
+def test_the_note_never_runs_the_word_so_twice_together() -> None:
+    for extracted in (
+        Motorhome(mro_kilograms=3070, mh_payload_kilograms=430),
+        Motorhome(mro_kilograms=3070),
+        Motorhome(),
+    ):
+        note = store.changes._mass_arithmetic_note(
+            _missing("mtplm_kilograms", 3500),
+            baseline=Motorhome(mro_kilograms=3070, mh_payload_kilograms=430),
+            extracted=extracted,
+        )
+        assert note is not None
+        assert "so, so" not in note and "figures, so the" not in note
