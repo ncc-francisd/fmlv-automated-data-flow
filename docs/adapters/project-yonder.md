@@ -104,16 +104,21 @@ Since nothing of theirs is in FMLV, the rename costs nothing this time. It is re
 because it is the clearest evidence available about how this company maintains its site,
 and because the FAQ's stale naming is what makes its *other* stale figures legible.
 
-## Two contradictions, neither resolvable from the site
+## Two contradictions, both settled by one rule
 
-Narrated on every run and never resolved in code. These are the questions to put to
-Project Yonder.
+**The model page beats the standing page**, because only the model page is maintained —
+Francis, 13 November 2026, now a cross-manufacturer rule in `docs/adapters/README.md`.
+Both conflicts below fall to it, and both are still narrated on every run as *applied*
+rather than as questions, so that a new disagreement would surface the same way.
 
 **The gross weight.** Every model page tile says `4.1T`. The FAQ says *"Our vans have a
 Gross Vehicle Weight of 4.4T which means you require a C1 licence to drive them."* The tile
-is recorded, because it is published per model inside a specification block where the FAQ
-answer is one sentence about the whole range on a page that is demonstrably out of date.
-With no MIRO and no payload there is no arithmetic that could settle it.
+is recorded.
+
+This one had to be settled rather than left open, because it is what turns a mass in
+running order into a payload. Asking Project Yonder for the payload as well as the MIRO
+would have been asking for a figure we can calculate — and the whole point of the request
+made to them on 13 November 2026 is that it is small enough to answer quickly.
 
 **The price.** The model pages say £192,625 (Nomad) and £194,775 (both LWB vans). The FAQ
 still says:
@@ -124,8 +129,13 @@ still says:
 
 £25,000–£28,000 lower, labelled `OTR` where the model pages are not, and pricing **RWD
 variants that have no model page at all**. The model-page figure is recorded, as the
-manufacturer's own headline price. Whether the range is three vehicles or six is an open
-question.
+manufacturer's own headline price and under the same rule. Whether the range is three
+vehicles or six was not asked, deliberately — see below.
+
+**The rename is what proves the rule's direction** rather than merely asserting it.
+Project Yonder renamed the 140" van in September and the FAQ still used the old name in
+November, so the FAQ's staleness is demonstrated rather than assumed. Once one figure on a
+page is known stale, the rest are suspect by the same mechanism.
 
 ## The prose trap
 
@@ -191,21 +201,30 @@ Added to the shared pattern as the make plus a D-number, because that designatio
 only in Truma's warm-air lines; a bare `truma` would also claim their fridges, fans and
 movers. `varioheat` went in beside it for the same reason.
 
-## What to ask Project Yonder
+## What was asked of Project Yonder, and what was not
 
-In priority order. February's show is the natural occasion.
+**Asked, 13 November 2026 — two things only:**
 
-1. **MIRO and payload per model.** The single biggest gap, and the only one no page on the
+1. **Mass in running order, for each of the three models.** The one figure no page on the
    site could ever supply.
-2. **Which gross weight is right, 4.1T or 4.4T?** Their own two pages disagree.
-3. **Is the RWD Freedom 4X still sold, and what are the current OTR prices for every
-   variant?** The FAQ and the model pages are £25,000–£28,000 apart.
-4. **Confirm the Nomad is the renamed MWB Freedom 4X**, and give the true overall length,
-   width and height in millimetres — everything published is rounded to 0.1m.
-5. **How many three-point belts** the optional belted passenger seats add, and whether they
-   are three-point.
-6. A **floorplan** for each model, which would settle the sleeping, kitchen, lounge and
+2. A **floorplan** for each model, which would settle the sleeping, kitchen, lounge and
    washroom positions in one go.
+
+**Deliberately not asked**, on Francis's instruction: *"the less that it looks like we need,
+the more likely they're going to respond quickly."*
+
+| Not asked | Why |
+|---|---|
+| Payload | It is the published gross weight less the MIRO. Asking for a figure we can calculate makes the request look twice as big as it is. |
+| Which gross weight is right | Settled by the model-page rule. |
+| The current price list, and whether the RWD models are still sold | Settled by the same rule. |
+| Dimensions in millimetres | Everything published is rounded to 0.1m. Worth having, not worth the ask. |
+| Whether the optional belted seats are three-point | Only two are recorded as standard either way. |
+| Whether the Nomad is the renamed MWB Freedom 4X | Their own FAQ already answers it. |
+
+Everything in the right-hand column is still narrated on every run, so none of it is lost —
+it is deprioritised, not forgotten. If Project Yonder answer quickly and are willing, that
+list is the second conversation.
 
 ## Before the first upload
 

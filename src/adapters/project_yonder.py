@@ -24,8 +24,11 @@ Four things make this adapter unlike the others.
   never mentions either.
 
 * **Project Yonder's own two pages disagree about the gross weight and about the price**,
-  and both disagreements are narrated on every run rather than resolved. See
-  `_narrate_conflicts`.
+  and the model page wins both — a model page sells a vehicle so somebody maintains it,
+  where an FAQ is written once and left. Settled by Francis on 13 November 2026 and now a
+  cross-manufacturer rule; see `docs/adapters/README.md`. Both are still narrated on every
+  run, as applied rather than as questions, so that a *new* disagreement surfaces the same
+  way. See `_narrate_conflicts`.
 
 * **The prose is marketing and has to be cut before it is read.** Project Yonder write
   their options in running sentences — "Optional belted passenger seats, cosy kids bunk
@@ -775,10 +778,10 @@ def _build_extracted_motorhome(product: YonderProduct, faq: Faq) -> ExtractedMot
             f"{product.price_text!r}. Project Yonder sell direct with no importer and no "
             f"dealer network, so their headline figure is the guide price. "
             f"THE FAQ DISAGREES — it still prices this van as "
-            f"{'; '.join(faq.prices_for(product.model)) or 'no figure'} — and that page "
-            f"was last "
+            f"{'; '.join(faq.prices_for(product.model)) or 'no figure'} — on a page last "
             f"published {faq.published[:10] or 'unknown'} against this one's "
-            f"{product.published[:10] or 'unknown'}",
+            f"{product.published[:10] or 'unknown'}. SETTLED: the model page beats the "
+            f"standing page (Francis, 13 November 2026)",
         )
 
     if product.berths is not None:
@@ -826,10 +829,10 @@ def _build_extracted_motorhome(product: YonderProduct, faq: Faq) -> ExtractedMot
             f"the GVW tile reads {product.gross_weight_text!r}. Gross vehicle weight is the "
             f"MTPLM. THE FAQ SAYS SOMETHING ELSE — \"Our vans have a Gross Vehicle Weight "
             f"of {(faq.gross_weight_kilograms or 0) / 1000:g}T\" — and the two have never "
-            f"agreed. The tile is recorded because it is published per model in a "
-            f"specification block, where the FAQ answer is one sentence about the whole "
-            f"range on a page that is demonstrably out of date. NO MASS IN RUNNING ORDER "
-            f"AND NO PAYLOAD IS PUBLISHED ANYWHERE, so there is no arithmetic to settle it",
+            f"agreed. SETTLED: a model page beats a standing page like an FAQ, because only "
+            f"the model page is maintained (Francis, 13 November 2026). This figure is also "
+            f"what will turn a mass in running order into a payload once Project Yonder "
+            f"supply one, which is why it had to be settled rather than left open",
         )
 
     if product.body_type is not None and product.mh_height_mm is not None:
@@ -864,42 +867,49 @@ def _build_extracted_motorhome(product: YonderProduct, faq: Faq) -> ExtractedMot
 
 
 def _narrate_conflicts(faq: Faq, products: Iterable[YonderProduct], on_progress) -> None:
-    """The things Project Yonder contradict themselves about, said out loud every run.
+    """Where the two pages disagree, which rule settled it, and what is still missing.
 
-    None of these is resolvable from the site. They are the questions to put to Project
-    Yonder, and they are repeated on every run so that they do not quietly become
-    accepted once the first review has passed.
+    **The conflicts are settled, not open.** Francis ruled on 13 November 2026 that a model
+    page beats a standing page like an FAQ, because only the model page is maintained — see
+    `docs/adapters/README.md`. They are still said out loud every run, because a rule that
+    is applied silently cannot be seen to be wrong, and because a *new* disagreement needs
+    to surface the same way. But they are stated as applied, not asked.
+
+    Only the masses remain a question, and only one of the two: a mass in running order
+    yields the payload through the gross weight the model pages publish.
     """
     gross_tiles = {product.gross_weight_text for product in products if product.gross_weight_text}
     if faq.gross_weight_kilograms is not None and gross_tiles:
         tile = ", ".join(sorted(gross_tiles))
         if {f"{faq.gross_weight_kilograms / 1000:g}T"} != gross_tiles:
             on_progress(
-                f"ASK PROJECT YONDER — THE GROSS WEIGHT: every model page tile says {tile}, "
+                f"SETTLED BY RULE — THE GROSS WEIGHT: every model page tile says {tile}, "
                 f"while the FAQ says \"a Gross Vehicle Weight of "
-                f"{faq.gross_weight_kilograms / 1000:g}T\". The tiles are recorded. There is "
-                f"no mass in running order and no payload published anywhere on the site, "
-                f"so nothing can settle this but Project Yonder"
+                f"{faq.gross_weight_kilograms / 1000:g}T\". The model page wins, so the "
+                f"tile is recorded. Nothing to decide"
             )
 
     if faq.price_lines:
         on_progress(
-            "ASK PROJECT YONDER — THE PRICE: the FAQ's cost answer still lists "
+            "SETTLED BY RULE — THE PRICE: the FAQ's cost answer still lists "
             + "; ".join(faq.price_lines)
             + ". Those are £25,000-£28,000 below the model pages' own figures, they are "
-            "labelled OTR where the model pages are not, and they price RWD variants that "
-            "have no model page at all. The model-page figure is what is recorded"
+            "labelled OTR where the model pages are not, and they price RWD variants with "
+            "no model page at all. The model page wins, so its figure is recorded. "
+            "Nothing to decide"
         )
 
     on_progress(
-        "ASK PROJECT YONDER — THE MASSES: no mass in running order and no payload is "
-        "published for any model, so none is proposed and none can be derived. This is the "
-        "biggest single gap in the record and the one thing no page on the site supplies"
+        "ASK PROJECT YONDER — THE MASS IN RUNNING ORDER: this is the ONE outstanding "
+        "request, made 13 November 2026 along with a floorplan per model. It is not "
+        "published for anything, so none is proposed. THE PAYLOAD DOES NOT NEED ASKING "
+        "FOR: once a MIRO arrives it is the published gross weight less that figure, which "
+        "is why the gross-weight rule above had to be settled first"
     )
     on_progress(
-        "ASK PROJECT YONDER — THE DIMENSIONS: every length, width and height is rounded to "
-        "0.1m, and the width and height come from one FAQ answer covering the whole range "
-        "rather than from any model page"
+        "NOT ASKED FOR, DELIBERATELY: every length, width and height is rounded to 0.1m, "
+        "and the width and height come from one FAQ answer covering the whole range. The "
+        "FAQ is the only source for either, so the rule above does not displace it"
     )
 
 

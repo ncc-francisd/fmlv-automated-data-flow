@@ -455,6 +455,57 @@ def test_the_product_is_not_filed_under_its_own_name_twice(
     assert motorhome.manufacturer == project_yonder.MANUFACTURER == "Project Yonder"
 
 
+# --------------------------------------------------------------------------- #
+# What the run says, now that the conflicts are settled
+# --------------------------------------------------------------------------- #
+
+
+def _narration(
+    faq: project_yonder.Faq, products: list[project_yonder.YonderProduct]
+) -> list[str]:
+    said: list[str] = []
+    project_yonder._narrate_conflicts(faq, products, said.append)
+    return said
+
+
+def test_the_two_page_conflicts_are_reported_as_settled_not_as_questions(
+    faq: project_yonder.Faq,
+    nomad: project_yonder.YonderProduct,
+    freedom: project_yonder.YonderProduct,
+) -> None:
+    """A rule decided once must not be put to a reviewer again on every run."""
+    said = _narration(faq, [nomad, freedom])
+    settled = [line for line in said if line.startswith("SETTLED BY RULE")]
+    assert len(settled) == 2
+    assert any("GROSS WEIGHT" in line and "4.1T" in line and "4.4T" in line for line in settled)
+    assert any("THE PRICE" in line for line in settled)
+    assert all("ASK" not in line for line in settled)
+
+
+def test_the_conflicts_are_still_said_out_loud_so_a_new_one_would_surface(
+    faq: project_yonder.Faq, nomad: project_yonder.YonderProduct
+) -> None:
+    """Applied silently, the rule could never be seen to be wrong."""
+    assert any("4.4T" in line for line in _narration(faq, [nomad]))
+
+
+def test_a_gross_weight_the_two_pages_agree_on_is_not_narrated_at_all(
+    faq: project_yonder.Faq, nomad: project_yonder.YonderProduct
+) -> None:
+    nomad.gross_weight_text = "4.4T"
+    assert not any("GROSS WEIGHT" in line for line in _narration(faq, [nomad]))
+
+
+def test_the_mass_in_running_order_is_the_one_remaining_question(
+    faq: project_yonder.Faq, nomad: project_yonder.YonderProduct
+) -> None:
+    """Payload needs no asking: it is the published gross weight less the MIRO."""
+    asks = [line for line in _narration(faq, [nomad]) if line.startswith("ASK PROJECT YONDER")]
+    assert len(asks) == 1
+    assert "MASS IN RUNNING ORDER" in asks[0]
+    assert "PAYLOAD DOES NOT NEED ASKING FOR" in asks[0]
+
+
 def test_every_default_range_has_a_model_entry() -> None:
     assert len(project_yonder.DEFAULT_RANGES) == project_yonder.EXPECTED_PRODUCTS
     assert {slug for slug, _label in project_yonder.DEFAULT_RANGES} == set(

@@ -136,6 +136,36 @@ table splits a quantity across several rows, **the split is the answer**: Pilote
 coachbuilts give `Permanent sleeping space` and `Extra sleeping spaces` against three rows
 beginning `Optional`, and summing the first two is the whole rule.
 
+### The model page beats the standing page, because only one of them is maintained
+
+**Rule from the NCC side, 13 November 2026, on Project Yonder.** Where a manufacturer's
+own site states the same figure in two places and they disagree, **take the model page**.
+The requester: *"the precedent is the model pages over FAQs, which often get left and go
+out of date and stale."*
+
+A model page sells a vehicle, so somebody revises it when the vehicle changes. An FAQ, an
+"about us" page or a general terms page is written once and left, and nothing about it
+announces its age. Project Yonder's three disagreements all run the same way:
+
+| | model pages | FAQ |
+|---|---|---|
+| gross weight | 4.1T | 4.4T |
+| price, LWB AWD | £194,775 | £169,725 OTR |
+| the 140" van's name | `NOMAD` | `Freedom 4X 140" (MWB)` |
+
+The name is what proves the direction rather than merely asserting it: Project Yonder
+renamed that model in September and the FAQ still used the old name in November. Once one
+figure on a page is known stale, the others on it are suspect by the same mechanism.
+
+**This does not make a standing page worthless — it ranks it.** Where the model pages say
+nothing at all, the FAQ is still the source: Project Yonder's width and height are
+published only there, and are recorded from there. The rule applies where both speak.
+
+Two consequences for an adapter. Record the conflict in the provenance so a reviewer can
+see the rule being applied rather than a figure appearing from nowhere; and narrate it as
+**settled by the rule**, not as an open question, or every run asks a reviewer to decide
+something that was decided once.
+
 ### "Mirrors folded" is recorded; "including mirrors" never is
 
 A common label, and it does not mean the same thing on the two body shapes:
