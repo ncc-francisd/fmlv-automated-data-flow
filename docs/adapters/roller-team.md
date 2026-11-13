@@ -1,7 +1,7 @@
-# Roller Team — survey
+# Roller Team — survey and adapter
 
-Surveyed 13 November 2026. **No adapter yet** — this document is the stage 1 survey, and
-stops at the checkpoint.
+Surveyed and built 13 November 2026. `src/adapters/roller_team.py`, 20 products, first
+run below.
 
 `manufacturer_id` **229**, from `resources/manufacturers-full-list.csv`. Two names, and
 they differ:
@@ -190,34 +190,42 @@ it derives as 3,500 − MRO and the provenance says derived.
 The masses are real and complete: MRO runs from 2,695 kg (Kronos Compact 590) to 3,060 kg
 (Pegaso 750), all twenty present.
 
-## What is unresolved, and needs a decision before stage 2
-
-### Berths on the Kronos Compact 665
-
-The one place where the sources genuinely disagree about a number we would record:
+## Settled: the Kronos Compact 665 tile is a website typo
 
 | source | says |
 |---|---|
 | page tile | `2` |
 | brochure technical table | `4 (+1 optional)` |
 
-The tile says `2` for all three Kronos; the table distinguishes them, and the table is
-coherent with its own facing page: the 665 is the one of the three with no rear bed and a
-standard elevating bed, and the two whose elevating bed is optional are the two the table
-calls `2 (+2 optional)`.
+**Settled by the requester, 13 November 2026, from the floorplan:** *"I've just looked at
+the floor plan and I can see that there's a fixed bed and there's also a drop-down bed at
+the front, both of them are doubles, so that's four berth… I think it's just a typo on the
+website."*
 
-The summary-tile-versus-technical-table rule points at the table, though its stated
-reasoning — tiles oversell — runs the other way here, the tile being the *lower* figure.
-The corroboration is the price list: a `5th homologated seat + 5th sleeping berth` option
-at £290 is offered on exactly four models, and the brochure marks exactly four with
-`(+1 optional)` or `(5 optional)` — Kronos 665, Zefiro 685, Zefiro Sport, T-Line 700.
+So **4**, and the reason matters as much as the figure. This is not the
+summary-tile-versus-technical-table rule arbitrating between two honest sources — it is
+one wrong number on one page. The distinction decides what the adapter does with it: a
+rule would be applied silently to every tile, whereas **a typo is named once and not
+re-raised**, the way Bailey's Endeavour B65 length is. The tile is still worth reading as
+a cross-check, but a disagreement on the 665 specifically is a known fault, not a question
+for a reviewer.
 
-**Recommendation: take the brochure table, 4.** The length check proves the column is the
-665's, and a tile that gives the same number for three different floorplans is a range
-graphic, not a specification.
+The price list corroborates the brochure independently: a `5th homologated seat + 5th
+sleeping berth` option at £290 is offered on exactly four models, and the brochure marks
+exactly four with `(+1 optional)` or `(5 optional)` — Kronos 665, Zefiro 685, Zefiro
+Sport, T-Line 700.
+
+**A caution about how this was nearly argued instead.** The first draft of this survey
+reasoned that the 665 "has no rear bed and a standard elevating bed" from the brochure's
+`Rear bed (cm)` row. That row carries **one value for three models**, so it says nothing
+about which model it belongs to — and the floorplan shows the 665 does have a fixed bed.
+The conclusion was right and the evidence was not. The bed-dimension rows are ragged in a
+way the weights block is not; do not read them positionally.
 
 Livingstone DUO disagrees the same way (`2+1` on the tile, `2` in the table) but resolves
 to **2** under either source once the berth-range rule is applied, so nothing turns on it.
+
+## What is unresolved, and needs a decision before stage 2
 
 ### The automatic gearbox
 
@@ -249,3 +257,80 @@ vehicle at a higher price.
   marketing sentences of the kind that need the prose-option filter.
 - **The optional-extras grid** on price list page 2 is a model-by-model matrix of £ marks.
   Its columns were *not* parsed and should not be trusted positionally from flattened text.
+
+## Built, 13 November 2026
+
+Run #252 against the live site and the real FMLV baseline: **20 collected, none dropped,
+every length checked out across all three sources.** 17 changed, 3 new, 2 disappeared, 78
+changes proposed, 6 habitation findings.
+
+FMLV already held 20 Roller Team rows, and they did not line up with the site.
+
+### The baseline turned out to be the best check of all
+
+The one weakness of the length self-check is that it cannot separate two models in the
+same range that share a chassis length — T-Line 740 and 750 are both 7.43m, Pegaso 740 and
+745 both 7.41m, Zefiro 746 and 747 both 7.24m, Zefiro 685 and 696 both 7.45m. For those
+eight the column assignment rests on the header's own left-to-right order.
+
+**FMLV's own figures settle every one of them.** Each ambiguous model's held mass in
+running order matches the column this adapter assigned it, exactly:
+
+| | FMLV holds | brochure column |
+|---|---|---|
+| Zefiro 685 / 696 | 2,895 / 2,875 | 2,895 / 2,875 |
+| Zefiro 746 / 747 | 2,935 / 2,925 | 2,935 / 2,925 |
+| Pegaso 740 / 745 | 3,040 / 3,010 | 3,040 / 3,010 |
+
+The T-Line is the one range whose masses moved this season, so it has no such
+confirmation — but its prices supply one instead. The price list gives the 700 and the 750
+**the same** on-the-road figure of £76,900 and the 740 a different £79,155; FMLV likewise
+holds the 700 and the 750 at an identical £75,455 and the 740 apart at £77,655. Two
+documents a season apart agreeing on *which two of the three are priced alike* is the same
+kind of evidence as a matching mass.
+
+### `Auto-Roller` is a range rename, and was nearly three new products
+
+The first run reported **6 new and 5 disappeared**, which is the shape the README warns is
+*"almost always"* a rename. Three of them were: FMLV files the Zefiro 707, 746 and 747
+under `Auto-Roller`, Roller Team's older UK brand name, as a *range*. The masses are
+identical to the kilogram and so are the lengths, so `RENAMED_MODELS` declares the three
+and the run now reports **3 new and 2 disappeared**, proposing the range correction on the
+existing products instead of orphaning them.
+
+It is keyed per model rather than range-wide on purpose: the other four Zefiros are already
+filed as `Zefiro`, and a range-wide entry would have orphaned every one of them.
+
+### The three genuinely new, and the two genuinely gone
+
+New, with no FMLV row and no disappearance that matches on mass: **Kronos Compact 670**,
+**Livingstone DUO** and **Pegaso 750**.
+
+Gone, and worth a different action each:
+
+* **`Livingstone 6 Sport` (7699's sibling, 7700)** is discontinued. It is *not* the DUO —
+  2,904kg against 2,994kg, and 5,995mm against 6,360mm, which is a different chassis
+  length rather than a spec change.
+* **`Zefiro 665` (4190) is a duplicate, not a discontinuation.** FMLV holds it at 2,775kg
+  and 6,410mm, which are the **Kronos Compact 665**'s figures exactly — and FMLV holds
+  that model too, at 8403. 4190 is the same vehicle under the old range name.
+
+One more that never reached the run: **`Kronos Compact 590` is in FMLV twice**, 7883
+(year 2025, 2,865kg, £70,890) and 8402 (year 2027, 2,695kg, £58,545). The baseline reader
+deduplicated them and kept 8402, so 7883 is invisible to the diff and will stay in FMLV
+until someone deactivates it.
+
+### What the adapter does not propose
+
+* **No bed type.** The brochure's bed-dimension rows are ragged — `Rear bed (cm)` gives one
+  value for the Kronos's three columns — so nothing can be assigned from them. They are
+  narrated with the floorplan link instead. This is the trap that produced a wrong
+  inference during the survey, and `_cells` now refuses any row whose cell count does not
+  match the column count.
+* **No `automatic_*` figures.** `automatic_available` is a plain Yes on all twenty, cited
+  from the price list. The four figure columns stay blank because Roller Team price the
+  automatic as an **uplift** (£1,860 Ford, £3,840 Fiat), not as a price of its own.
+* **No model-page prose is read for habitation.** It would have put a make-up bed on every
+  model from one sentence about a dinette, on models where the price list prices
+  "Dinette-into-bed transformation" at £320 as an option. Heating and the fridge come from
+  the brochure's equipment tables, where they are per-column and checkable.
