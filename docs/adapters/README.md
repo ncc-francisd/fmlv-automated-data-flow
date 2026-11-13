@@ -444,6 +444,31 @@ Worth checking a neighbouring row when you suspect it: Eriba's `Warm water tank`
 15/3 exactly as the heating row does, which confirmed the split before any of it was
 trusted.
 
+### Where a self-check cannot separate two columns, FMLV's own figures can
+
+A cross-document self-check only distinguishes two columns when the value it checks
+*differs* between them. Roller Team's check is the external length, published by the
+roster, the price list and the brochure and agreeing on all twenty — but four pairs share
+a chassis length within their range (T-Line 740 and 750 both 7.43m, Pegaso 740 and 745
+both 7.41m, Zefiro 746 and 747 both 7.24m, Zefiro 685 and 696 both 7.45m). For those the
+check passes whichever way round the two columns are read, so it proves nothing about
+them.
+
+**The baseline is the tie-breaker, and it is a good one.** FMLV's held mass in running
+order matched the assigned column exactly on every ambiguous pair — 2,895/2,875,
+2,935/2,925, 3,040/3,010 — which is a figure recorded from a different document in a
+different season agreeing to the kilogram.
+
+Where the masses moved this season and that confirmation is not available, look for a
+**pattern** rather than a value. Roller Team's price list gives the T-Line 700 and 750 the
+same on-the-road figure and the 740 a different one; FMLV independently holds the 700 and
+750 at an identical price and the 740 apart. Two documents a season apart agreeing on
+*which* members of a range are priced alike is the same class of evidence as a matching
+mass, and it survives a price rise that would defeat a straight comparison.
+
+This is the same instinct as the rename rule below — the baseline is evidence, not just
+the thing being corrected — applied to the column assignment rather than the identity.
+
 ### The Erwin Hymer Group brands share one configurator API
 
 Eriba, Dethleffs, Bürstner and Carado are all EHG, and all run the same configurator —
