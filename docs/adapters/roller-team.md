@@ -306,19 +306,31 @@ filed as `Zefiro`, and a range-wide entry would have orphaned every one of them.
 New, with no FMLV row and no disappearance that matches on mass: **Kronos Compact 670**,
 **Livingstone DUO** and **Pegaso 750**.
 
-Gone, and worth a different action each:
+**Both disappearances are products to deactivate, for different reasons:**
 
-* **`Livingstone 6 Sport` (7699's sibling, 7700)** is discontinued. It is *not* the DUO —
-  2,904kg against 2,994kg, and 5,995mm against 6,360mm, which is a different chassis
-  length rather than a spec change.
+* **`Livingstone 6 Sport` (7700)** is discontinued. It is *not* the DUO — 2,904kg against
+  2,994kg, and 5,995mm against 6,360mm, which is a different chassis length rather than a
+  spec change.
 * **`Zefiro 665` (4190) is a duplicate, not a discontinuation.** FMLV holds it at 2,775kg
   and 6,410mm, which are the **Kronos Compact 665**'s figures exactly — and FMLV holds
-  that model too, at 8403. 4190 is the same vehicle under the old range name.
+  that model too, at 8403, both active. 4190 is the 2026 row for the same vehicle under
+  the old range name, left live when the 2027 row was created.
 
-One more that never reached the run: **`Kronos Compact 590` is in FMLV twice**, 7883
-(year 2025, 2,865kg, £70,890) and 8402 (year 2027, 2,695kg, £58,545). The baseline reader
-deduplicated them and kept 8402, so 7883 is invisible to the diff and will stay in FMLV
-until someone deactivates it.
+### Check `active` before calling a row a leftover
+
+`Kronos Compact 590` appears twice in the export — 7883 (year 2025, 2,865kg, £70,890) and
+8402 (year 2027, 2,695kg, £58,545) — and the baseline reader deduplicates them and keeps
+8402, so 7883 never reaches the diff.
+
+**It needs no action: 7883 is already `active = No`.** It was deactivated when the 2027 row
+replaced it, which is exactly the treatment 4190 still needs, and it stays in the export on
+purpose so it remains findable.
+
+This was first written up as a second row to deactivate, on the reasoning that a row
+invisible to the diff is a row nobody is looking after. That does not follow, and the
+export answers it directly — the `active` column is right there. **A row being absent from
+the baseline says nothing about whether it is live**; deduplication and deactivation both
+remove it, and only one of them is a problem.
 
 ### What the adapter does not propose
 
