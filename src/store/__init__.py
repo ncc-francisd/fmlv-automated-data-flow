@@ -34,12 +34,14 @@ from .products import (
 from .runs import (
     Run,
     RunTotals,
+    SilentProduct,
     fail_run,
     finish_run,
     get_run,
     list_run_manufacturers,
     list_runs,
     run_totals,
+    silent_products,
     start_run,
 )
 
@@ -76,6 +78,8 @@ __all__ = [
     "record_disappearance_notice",
     "record_proposed_change",
     "record_verification",
+    "SilentProduct",
+    "silent_products",
     "verified_fields_by_product",
     "run_review_summary",
     "start_run",

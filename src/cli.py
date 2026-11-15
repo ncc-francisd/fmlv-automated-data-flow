@@ -558,6 +558,9 @@ class RunSummary:
     kinds: Counter[str]
     persisted: store.PersistResult
     snapshot_dir: Path
+    #: Products the run read and matched that raised no row at all. Reported rather than
+    #: left to be inferred — see `store.SilentProduct`.
+    silent: tuple[store.SilentProduct, ...] = ()
 
 
 def execute_run(
@@ -708,6 +711,7 @@ def execute_run(
             kinds=Counter(diff.kind.value for diff in diffs),
             persisted=persisted,
             snapshot_dir=snapshot_dir,
+            silent=tuple(store.silent_products(connection, run.id)),
         )
     finally:
         connection.close()
@@ -716,6 +720,41 @@ def execute_run(
 # --------------------------------------------------------------------------- #
 # Reporting
 # --------------------------------------------------------------------------- #
+
+
+#: How many silent products to name before summarising the rest. A quiet sweep of a large
+#: manufacturer can leave forty untouched, and forty names is a wall rather than a report;
+#: a handful is what a reviewer actually scans against the site.
+_SILENT_NAMES_SHOWN = 12
+
+
+def _silent_lines(silent: tuple[store.SilentProduct, ...]) -> list[str]:
+    """The "read, nothing to report" section, or nothing at all when every product spoke.
+
+    A run writes a row only where it has something to say, so a product that agrees with
+    FMLV on every field disappears from the review entirely — and from the site's roster
+    it looks skipped. Naming them is what tells "checked and identical" apart from "the
+    adapter never saw it", which is the same distinction `verified_fields_by_product`
+    draws one level down, at the field.
+    """
+    if not silent:
+        return []
+    lines = [
+        f"  silent      {len(silent)} product(s) read and matched with nothing to "
+        f"report — not skipped:"
+    ]
+    for product in silent[:_SILENT_NAMES_SHOWN]:
+        checked = (
+            f"{product.verified_fields} field(s) checked and identical"
+            if product.verified_fields
+            else "no field checked — the adapter found nothing to compare"
+        )
+        lines.append(f"                {product.key} ({checked})")
+    if len(silent) > _SILENT_NAMES_SHOWN:
+        lines.append(
+            f"                ...and {len(silent) - _SILENT_NAMES_SHOWN} more, on the run page"
+        )
+    return lines
 
 
 def format_summary(summary: RunSummary) -> str:
@@ -756,6 +795,7 @@ def format_summary(summary: RunSummary) -> str:
         lines.append(
             f"  suppressed  {persisted.suppressed_rejections} previously-rejected changes"
         )
+    lines.extend(_silent_lines(summary.silent))
     lines.append(f"  snapshots   {summary.snapshot_dir}")
     lines.append(f"  review at   /runs/{summary.run.id}")
     return "\n".join(lines)

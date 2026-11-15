@@ -2450,3 +2450,55 @@ def test_a_product_with_nothing_verified_says_nothing(
     run_id = run_ready_for_upload
 
     assert "checked and already correct" not in client.get(f"/runs/{run_id}").text
+
+
+# --------------------------------------------------------------------------- #
+# "Read, nothing to report" — see `store.SilentProduct`.
+# --------------------------------------------------------------------------- #
+
+
+def _run_with_a_silent_product(db_path: Path) -> int:
+    """One product that changed and one that agreed with FMLV on everything."""
+    connection = store.connect(db_path)
+    try:
+        run = store.start_run(
+            connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+        )
+        changed_baseline = make_baseline()
+        quiet_baseline = make_baseline(product_id=4148, model="Supreme 600 SL")
+        diffs = diff_products(
+            [
+                make_extracted(rrp_pounds=93920),
+                make_extracted(rrp_pounds=93950, model="Supreme 600 SL"),
+            ],
+            [changed_baseline, quiet_baseline],
+        )
+        store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
+        store.finish_run(connection, run.id)
+        return run.id
+    finally:
+        connection.close()
+
+
+def test_the_run_page_names_a_product_that_raised_no_row(
+    client: TestClient, db_path: Path
+) -> None:
+    """Without this the page is shorter than the manufacturer's roster and the difference
+    reads as an adapter that missed a model. Requested 15 November 2026."""
+    run_id = _run_with_a_silent_product(db_path)
+
+    body = client.get(f"/runs/{run_id}").text
+
+    assert "Read, nothing to report (1)" in body
+    assert "Matrix Supreme 600 SL" in body
+    assert "checked and identical" in body
+
+
+def test_the_run_page_says_nothing_when_every_product_raised_a_row(
+    client: TestClient, run_with_one_change: tuple[int, int]
+) -> None:
+    run_id, _change_id = run_with_one_change
+
+    body = client.get(f"/runs/{run_id}").text
+
+    assert "Read, nothing to report" not in body

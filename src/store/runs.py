@@ -174,6 +174,79 @@ def list_run_manufacturers(connection: sqlite3.Connection) -> list[tuple[int, st
 
 
 @dataclass(frozen=True)
+class SilentProduct:
+    """A product this run read and matched that produced no review row of any kind.
+
+    **The gap this closes.** A reviewer counts the products on a manufacturer's site,
+    counts the ones on the run page, and finds fewer — which looks exactly like the
+    adapter having missed some. It is usually the opposite: the product was read, every
+    field agreed with FMLV, and a run only writes a row where it has something to say.
+
+    The requester, 15 November 2026, on Coachman's VIP range: *"the site has 5 VIPs […]
+    and the review run only had 3 […] I'm just going to check if the adapter was also
+    picking up the other 2"*. It was. Both publish `TBC` for every mass including the
+    nose weight, so there was nothing to propose and nothing to find, and they vanished
+    from the page. Naming them is the whole fix.
+
+    `verified_fields` is how many fields were checked and matched — the evidence that
+    silence here means agreement rather than an adapter that never looked.
+    """
+
+    product_id: int
+    fmlv_product_id: int | None
+    key: str
+    verified_fields: int
+
+
+def silent_products(connection: sqlite3.Connection, run_id: int) -> list[SilentProduct]:
+    """Every product this run read that raised no row — ordered as a reviewer reads them.
+
+    **Not the same as "unchanged".** A product whose fields all matched can still raise a
+    finding (a nose weight, a habitation reading on a new product), and then it does appear
+    on the page. What matters to a reviewer scanning for a missing model is whether the
+    product produced *anything*, so the test is on the rows themselves rather than on the
+    diff's classification.
+
+    Disappearances are excluded: they were not read, they were looked for and not found,
+    and they have their own notices.
+
+    Like `run_totals`, this reads `last_seen_run_id`, which only ever holds the newest
+    run that touched a product. So a **superseded** run reports nothing silent, the same
+    way its page already reports nothing collected. That is the existing meaning of the
+    column rather than a limitation introduced here, and the two stay consistent.
+    """
+    rows = connection.execute(
+        """
+        SELECT p.id,
+               p.fmlv_product_id,
+               p.manufacturer_range,
+               p.model,
+               (SELECT COUNT(*) FROM verification v
+                 WHERE v.run_id = ? AND v.product_id = p.id) AS verified
+          FROM product p
+         WHERE p.last_seen_run_id = ?
+           AND NOT EXISTS (SELECT 1 FROM proposed_change c
+                            WHERE c.run_id = ? AND c.product_id = p.id)
+           AND NOT EXISTS (SELECT 1 FROM disappearance_notice d
+                            WHERE d.run_id = ? AND d.product_id = p.id)
+         ORDER BY p.manufacturer_range, p.model
+        """,
+        (run_id, run_id, run_id, run_id),
+    ).fetchall()
+    return [
+        SilentProduct(
+            product_id=row["id"],
+            fmlv_product_id=row["fmlv_product_id"],
+            key=" ".join(
+                part for part in (row["manufacturer_range"], row["model"]) if part
+            ),
+            verified_fields=row["verified"],
+        )
+        for row in rows
+    ]
+
+
+@dataclass(frozen=True)
 class RunTotals:
     """What a run found, as counts — the numbers a reviewer sanity-checks before accepting.
 

@@ -78,6 +78,40 @@
     {% endfor %}
   {% endif %}
 
+  {% if silent %}
+    {# A product whose every field agreed with FMLV raises no row at all, so it vanishes
+       from this page and the page comes up short against the manufacturer's roster.
+       Naming them is what tells "read and identical" apart from "never collected" —
+       the same distinction the per-field "checked and unchanged" note draws one level
+       down. Requested 15 November 2026, after two Coachman VIPs went missing here and
+       turned out to have been read all along. #}
+    <h2>Read, nothing to report ({{ silent|length }})</h2>
+    <p class="muted">
+      These were collected and matched to their FMLV rows, and every field the adapter
+      read already agreed — so there is nothing to decide. They are listed so a short
+      page can be told apart from a missed model.
+    </p>
+    <ul class="silent-products">
+      {% for product in silent %}
+        <li>
+          <strong>{{ product.key }}</strong>
+          {% if product.fmlv_product_id %}
+            <span class="muted">#{{ product.fmlv_product_id }}</span>
+          {% endif %}
+          <span class="muted">
+            —
+            {% if product.verified_fields %}
+              {{ product.verified_fields }} field{{ "" if product.verified_fields == 1 else "s" }}
+              checked and identical
+            {% else %}
+              no field checked &mdash; the adapter found nothing to compare
+            {% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
   {% if decided %}
     <h2>Decided ({{ decided|length }})</h2>
     {% for product_id, group in decided|groupby('product.id') %}

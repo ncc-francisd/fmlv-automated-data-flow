@@ -56,3 +56,15 @@
   border-top: 1px solid #eee;
   color: #555;
 }
+
+/* Products read and matched that raised no row. Deliberately plain and quiet — this is
+   a reassurance that the roster was covered, not a queue of work. */
+.silent-products {
+  margin: 0.5rem 0 1.5rem;
+  padding-left: 1.2rem;
+  line-height: 1.7;
+}
+
+.silent-products li {
+  font-size: 0.9rem;
+}

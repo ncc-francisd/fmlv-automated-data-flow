@@ -789,6 +789,11 @@ def create_app(
                 # rather than proposed, for a person to type into FMLV by hand. See
                 # `product_model.findings`.
                 "findings": store.findings_by_product(connection, run_id),
+                # Products the run read and matched that raised no row at all. Without
+                # them the page is shorter than the manufacturer's roster, and the
+                # difference reads as an adapter that missed some — see
+                # `store.SilentProduct`.
+                "silent": store.silent_products(connection, run_id),
                 "reviewers": app.state.reviewers,
             },
         )

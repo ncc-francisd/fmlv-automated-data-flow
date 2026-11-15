@@ -9,7 +9,7 @@ describes doing by hand.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -691,6 +691,95 @@ def test_summary_reports_the_run(data_root: Path, export_path: Path) -> None:
     assert "Adria Mobil" in text
     assert "succeeded" in text
     assert f"/runs/{summary.run.id}" in text
+
+
+# --------------------------------------------------------------------------- #
+# "Read, nothing to report" — products the run matched that raised no row.
+#
+# A reviewer counting a manufacturer's roster against the run page finds it short and
+# reasonably suspects the adapter. Naming the quiet ones is what tells "checked and
+# identical" apart from "never collected".
+# --------------------------------------------------------------------------- #
+
+
+def _silent(key: str, verified: int = 11, product_id: int = 1) -> store.SilentProduct:
+    return store.SilentProduct(
+        product_id=product_id,
+        fmlv_product_id=6680 + product_id,
+        key=key,
+        verified_fields=verified,
+    )
+
+
+def test_a_run_where_every_product_spoke_says_nothing_about_silence(
+    data_root: Path, export_path: Path
+) -> None:
+    summary = run_once(
+        data_root=data_root,
+        export_path=export_path,
+        adapter=FakeAdapter(products=[make_extracted(rrp_pounds=94950)]),
+    )
+
+    text = format_summary(replace(summary, silent=()))
+
+    assert "silent" not in text
+    assert "nothing to report" not in text
+
+
+def test_silent_products_are_named_so_a_short_page_is_not_a_missing_model(
+    data_root: Path, export_path: Path
+) -> None:
+    summary = run_once(
+        data_root=data_root,
+        export_path=export_path,
+        adapter=FakeAdapter(products=[make_extracted(rrp_pounds=94950)]),
+    )
+
+    text = format_summary(
+        replace(summary, silent=(_silent("VIP 520"), _silent("VIP 565", product_id=3)))
+    )
+
+    assert "2 product(s) read and matched with nothing to report" in text
+    assert "not skipped" in text
+    assert "VIP 520 (11 field(s) checked and identical)" in text
+    assert "VIP 565 (11 field(s) checked and identical)" in text
+
+
+def test_a_silent_product_with_nothing_checked_does_not_claim_a_match(
+    data_root: Path, export_path: Path
+) -> None:
+    """Zero fields checked is a different situation from zero fields differing, and only
+    one of the two is reassuring."""
+    summary = run_once(
+        data_root=data_root,
+        export_path=export_path,
+        adapter=FakeAdapter(products=[make_extracted(rrp_pounds=94950)]),
+    )
+
+    text = format_summary(replace(summary, silent=(_silent("VIP 520", verified=0),)))
+
+    assert "no field checked" in text
+    assert "checked and identical" not in text
+
+
+def test_a_long_list_of_silent_products_is_summarised_rather_than_dumped(
+    data_root: Path, export_path: Path
+) -> None:
+    """A quiet sweep of a large manufacturer can leave forty untouched, and forty names
+    is a wall rather than a report."""
+    summary = run_once(
+        data_root=data_root,
+        export_path=export_path,
+        adapter=FakeAdapter(products=[make_extracted(rrp_pounds=94950)]),
+    )
+    many = tuple(_silent(f"Model {n}", product_id=n) for n in range(1, 21))
+
+    text = format_summary(replace(summary, silent=many))
+
+    assert "20 product(s) read and matched" in text
+    assert "Model 12" in text
+    assert "Model 13" not in text
+    assert "...and 8 more, on the run page" in text
 
 
 # --------------------------------------------------------------------------- #
