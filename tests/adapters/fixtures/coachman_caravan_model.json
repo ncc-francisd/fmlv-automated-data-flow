@@ -1,0 +1,26 @@
+[
+  {
+    "id": 7,
+    "count": 4,
+    "name": "Acadia",
+    "slug": "acadia"
+  },
+  {
+    "id": 5,
+    "count": 6,
+    "name": "Laser",
+    "slug": "laser"
+  },
+  {
+    "id": 4,
+    "count": 4,
+    "name": "Lusso",
+    "slug": "lusso"
+  },
+  {
+    "id": 6,
+    "count": 5,
+    "name": "VIP",
+    "slug": "vip"
+  }
+]

@@ -1,0 +1,192 @@
+[
+  {
+    "id": 672,
+    "slug": "lusso-i",
+    "title": {
+      "rendered": "Lusso I"
+    },
+    "caravan_model": [
+      4
+    ]
+  },
+  {
+    "id": 668,
+    "slug": "lusso-ii",
+    "title": {
+      "rendered": "Lusso II"
+    },
+    "caravan_model": [
+      4
+    ]
+  },
+  {
+    "id": 665,
+    "slug": "lusso-iii",
+    "title": {
+      "rendered": "Lusso III"
+    },
+    "caravan_model": [
+      4
+    ]
+  },
+  {
+    "id": 29018,
+    "slug": "lusso-iv",
+    "title": {
+      "rendered": "Lusso IV"
+    },
+    "caravan_model": [
+      4
+    ]
+  },
+  {
+    "id": 637,
+    "slug": "laser-545-xtra",
+    "title": {
+      "rendered": "Laser 545 Xtra"
+    },
+    "caravan_model": [
+      5
+    ]
+  },
+  {
+    "id": 634,
+    "slug": "laser-575-xtra",
+    "title": {
+      "rendered": "Laser 575 Xtra"
+    },
+    "caravan_model": [
+      5
+    ]
+  },
+  {
+    "id": 631,
+    "slug": "laser-845-xtra",
+    "title": {
+      "rendered": "Laser 845 Xtra"
+    },
+    "caravan_model": [
+      5
+    ]
+  },
+  {
+    "id": 628,
+    "slug": "laser-855-xtra",
+    "title": {
+      "rendered": "Laser 855 Xtra"
+    },
+    "caravan_model": [
+      5
+    ]
+  },
+  {
+    "id": 625,
+    "slug": "laser-865-xtra",
+    "title": {
+      "rendered": "Laser 865 Xtra"
+    },
+    "caravan_model": [
+      5
+    ]
+  },
+  {
+    "id": 621,
+    "slug": "laser-875-xtra",
+    "title": {
+      "rendered": "Laser 875 Xtra"
+    },
+    "caravan_model": [
+      5
+    ]
+  },
+  {
+    "id": 591,
+    "slug": "acadia-545",
+    "title": {
+      "rendered": "Acadia 545 Xtra"
+    },
+    "caravan_model": [
+      7
+    ]
+  },
+  {
+    "id": 588,
+    "slug": "acadia-575",
+    "title": {
+      "rendered": "Acadia 575 Xtra"
+    },
+    "caravan_model": [
+      7
+    ]
+  },
+  {
+    "id": 29622,
+    "slug": "acadia-655-xtra",
+    "title": {
+      "rendered": "Acadia 655 Xtra"
+    },
+    "caravan_model": [
+      7
+    ]
+  },
+  {
+    "id": 585,
+    "slug": "acadia-660-xtra",
+    "title": {
+      "rendered": "Acadia 660 Xtra"
+    },
+    "caravan_model": [
+      7
+    ]
+  },
+  {
+    "id": 208,
+    "slug": "vip-460",
+    "title": {
+      "rendered": "VIP 460"
+    },
+    "caravan_model": [
+      6
+    ]
+  },
+  {
+    "id": 206,
+    "slug": "vip-520",
+    "title": {
+      "rendered": "VIP 520"
+    },
+    "caravan_model": [
+      6
+    ]
+  },
+  {
+    "id": 26694,
+    "slug": "vip-545",
+    "title": {
+      "rendered": "VIP 545"
+    },
+    "caravan_model": [
+      6
+    ]
+  },
+  {
+    "id": 204,
+    "slug": "vip-565",
+    "title": {
+      "rendered": "VIP 565"
+    },
+    "caravan_model": [
+      6
+    ]
+  },
+  {
+    "id": 202,
+    "slug": "vip-575",
+    "title": {
+      "rendered": "VIP 575"
+    },
+    "caravan_model": [
+      6
+    ]
+  }
+]

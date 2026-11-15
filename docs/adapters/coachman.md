@@ -660,3 +660,94 @@ The caravan technical panel is a richer source than the motorhome one:
   washroom — where `docs/adapters/README.md` records Coachman as publishing *"none at
   all"* for motorhomes. Whether it is per-model or range-wide needs checking before it is
   trusted; range-wide prose is what put a make-up bed on every Roller Team model.
+
+### Built, 15 November 2026 — `coachman_caravan.py`
+
+First run (#257): **19 collected, 19 matched, 0 new, 0 disappeared, 51 proposed, 17
+findings, nothing dropped.** The 51 proposals are exactly the 17 weighed models' MTPLM,
+mass in running order and personal-effects payload — every other field already agreed with
+FMLV, which is the 209 "checked and unchanged". The two unchanged products are VIP 520 and
+VIP 565, whose masses are `TBC` on both sides.
+
+**The panel is the primary source here, which inverts the motorhome arrangement.** A
+caravan panel publishes price, berths, axles, all four dimensions, both masses, both
+payloads and the hitch weight — 22 labelled rows, identical on all 19 models. The homepage
+card is read anyway and compared against it on MTPLM, mass in running order and berths: two
+different joins over Coachman's own data, so agreement is evidence the panel belongs to
+this caravan and disagreement means one join has slipped. A product that fails it is
+dropped; none do.
+
+**`Maximum Hitch Weight` is the nose weight TowCheck needs**, published on every weighed
+model (100kg single axle, 120kg twin) and recorded as a finding for every product, new or
+matched.
+
+**The payload question the Bailey pilot raised is settled for Coachman.** They publish
+`Personal Payload` and `Total / Maximum User Payload` side by side, and the two are equal
+on all 17 — and equal to MTPLM minus mass in running order. So the optional-equipment half
+is nil and belongs blank, and the self-check has four sides rather than three.
+
+### The equipment lines are qualified, so a range-wide blanket is wrong here
+
+`coachman.py` reads the range's standard-equipment list onto every model in it. On the
+caravan side that would be a mistake, and FMLV's own rows prove it: the Acadia list carries
+
+> Thetford N4090 91 litre electronic fridge freezer **(545 Xtra and 575 Xtra)**
+> Thetford N4142 137 litre electronic fridge freezer **(665 Xtra and 660 Xtra)**
+
+Writing either onto all four Acadias asserts a refrigerator the model has not got. So
+`applies_to` narrows a line by its trailing parenthetical — by axle count, by the models
+named, by the models excluded — and `(model specific)` reaches nobody, because Coachman are
+saying outright that the line does not hold for all of them and not saying which.
+
+**A line is only ever narrowed on a qualifier that names a model this range actually has.**
+Most trailing parentheses are not about models at all — `(25m)`, `(Thatcham Approved)`,
+`(5 year Glycol)` — and a rule that guessed at them would run silently on every line of
+every range forever. The first draft did guess, matching roman numerals case-insensitively,
+and read the `i` in *specific*, *fixed* and *possible* as the Lusso I: 29 unrelated lines
+reported as site faults on the first run.
+
+### Two qualifiers name a layout the range does not have
+
+Reported every run as known faults, not put to a reviewer:
+
+| Range | Line | What is wrong |
+|---|---|---|
+| Acadia | fridge freezer `(665 Xtra and 660 Xtra)` | there is no 665; the range is 545, 575, 655, 660 |
+| Laser | fridge freezer `(480 Xtra, 545 Xtra & 575 Xtra)` | the 480 Xtra is a 2026 Laser, deactivated in FMLV as 8645 |
+
+The Acadia one has a consequence: the 655 Xtra's only fridge line is the mistyped one, so it
+is left with **no refrigeration finding at all** rather than being given its sibling's. A
+typo is one wrong number in one place — named, not ruled on, exactly as the Bailey B65
+length is.
+
+### What the adapter declines to derive, and the model that settles it
+
+The panel's `Layout` row is per-model and explicit — `Fixed Double`, `Fixed Single`,
+`No Fixed Bed` — and `Bed Sizes` names `Front Beds`, `Fixed Bed` and `Side Dinette`. It is
+tempting, and it is wrong:
+
+> **VIP 520 publishes `No Fixed Bed` and a front make-up only. FMLV holds it as sleeping
+> at both ends, with fixed bunks.**
+
+Neither row says where a bed is, and the one model that tests the inference defeats it. So
+`sleeping_area`, `bed_types`, `kitchen_location`, `bathroom_layout` and `lounge_location`
+are all left alone.
+
+### Mappings worth not rediscovering
+
+| Coachman's label | FMLV column | Why |
+|---|---|---|
+| `Overall Length` | `shipping_length_mm` | body plus hitch. FMLV holds 7390mm for the Acadia 545 Xtra against an `exterior_body_length_mm` of 6480mm, and Coachman publish 7390mm |
+| `Interior Length` | `internal_length_mm` | 5760mm on that same caravan, which FMLV also holds |
+| `Overall Height (including T.V Aerial)` | `height_mm` | 2675mm. The `including Air Conditioning` figure is 2750mm and FMLV holds neither range at it |
+| `Awning Size` | `awning_length_mm` | centimetres, with or without a space: `1014 cm`, `1062cm` |
+| `Maximum Hitch Weight` | `max_nose_weight_kilograms` | TowCheck, not FMLV |
+| `Upper MTPLM` | — | the optioned weight-plate upgrade; the base figure is the one recorded |
+| `Length` | — | the same number as `Overall Length` on all 19 |
+
+No `exterior_body_length_mm`: Coachman publish nothing between the interior and the
+shipping length, which is the gap that took the field out of automated scope.
+
+`Twin axle` and `Twin Axle` both appear — the Lusso IV capitalises where its three siblings
+do not — so the axle count is matched case-insensitively rather than compared to a literal.
+`VIP 460` is stored in FMLV with a **trailing space** in `model`.
