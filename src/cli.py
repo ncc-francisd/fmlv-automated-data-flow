@@ -212,8 +212,19 @@ def fetch_export(
     handed the motorhome sheet parses 45 motorhomes as caravans with every dimension
     blank, matches none of them, and reports every caravan as a new product. It did
     exactly that on the first real caravan run, on 3 September 2026.
+
+    **Which supplier is asked now depends on the area too.** Coachman are listed twice in
+    the NCC dropdown, `Coachman Motorhomes` and `Coachman Caravans`, and only the second
+    reaches the caravans — see `Manufacturer.supplier_name_for`. A split supplier's export
+    still carries both sheets, so the off-area one arrives as well and is *not* a
+    baseline: `Coachman Caravans` returns two motorhomes against the thirteen
+    `Coachman Motorhomes` holds. Keeping it would hand the next motorhome run a two-row
+    baseline, because `latest_export` takes the newest file matching the area's stem and
+    would take that one — eleven live motorhomes reported as disappeared, from a caravan
+    fetch nobody connected to them. So it is deleted here, and narrated.
     """
-    if not manufacturer.ncc_supplier_name:
+    supplier_name = manufacturer.supplier_name_for(vehicle_class)
+    if not supplier_name:
         msg = (
             f"{manufacturer.fmlv_manufacturer!r} has no ncc_supplier_name set in the "
             f"registry — open the NCC site's 'Export Products by Supplier' dropdown "
@@ -240,13 +251,21 @@ def fetch_export(
     try:
         download_export(
             credentials,
-            manufacturer.ncc_supplier_name,
+            supplier_name,
             dest_path,
             headless=headless,
             on_progress=on_progress,
         )
     except NccExportError as exc:
         raise CommandError(str(exc)) from exc
+
+    if manufacturer.splits_suppliers_by_area:
+        _discard_off_area_sheet(
+            dest_path,
+            vehicle_class=vehicle_class,
+            supplier_name=supplier_name,
+            on_progress=on_progress,
+        )
 
     if VehicleClass(vehicle_class) is VehicleClass.CARAVAN:
         caravan_path = caravan_export_path(dest_path)
@@ -263,6 +282,36 @@ def fetch_export(
         return caravan_path
 
     return dest_path
+
+
+def _discard_off_area_sheet(
+    motorhome_path: Path,
+    *,
+    vehicle_class: VehicleClass,
+    supplier_name: str,
+    on_progress: Callable[[str], None] = lambda message: None,
+) -> None:
+    """Delete the sheet this download was not for, where the supplier serves one area.
+
+    Only ever called for a manufacturer the NCC split across two supplier entries, and
+    only against a file written seconds earlier by this same call — never a baseline
+    somebody is relying on. The alternative is worse than the deletion: both sheets sit
+    in one directory per manufacturer, and `latest_export` picks the newest matching the
+    area's stem, so a stray sheet from the *other* supplier silently becomes the next
+    run's baseline for an area it says almost nothing about.
+    """
+    caravan_path = caravan_export_path(motorhome_path)
+    if VehicleClass(vehicle_class) is VehicleClass.CARAVAN:
+        unwanted, kept_area = motorhome_path, "touring-caravan"
+    else:
+        unwanted, kept_area = caravan_path, "motorhome"
+    if not unwanted.exists():
+        return
+    unwanted.unlink()
+    on_progress(
+        f"discarded {unwanted.name} — {supplier_name!r} is the {kept_area} supplier, so "
+        f"its other sheet is not a baseline"
+    )
 
 
 def _is_current_model_year(year: int | None, *, today: date | None = None) -> bool:

@@ -206,6 +206,7 @@ def _row_to_manufacturer(
         price_list_url=_clean(row.get("price_list_url")),
         brochure_url=_clean(row.get("brochure_url")),
         ncc_supplier_name=_clean(row.get("ncc_supplier_name")),
+        ncc_supplier_name_caravan=_clean(row.get("ncc_supplier_name_caravan")),
         specs_format=(_clean(row.get("specs_format")) or "unknown").lower(),
         needs_javascript=needs_javascript,
         login_required=_to_bool(row.get("login_required")) or False,

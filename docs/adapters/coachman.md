@@ -592,3 +592,71 @@ shared.
 > recorded as a **fridge freezer**. That is `habitation`'s standing rule — *"a fridge, with
 > a freezer neither stated nor ruled out — nearly all of these have a freezer
 > compartment"* — and the reasoning is carried into the finding so it can be judged.
+
+## The caravans come into scope — 15 November 2026
+
+The survey left the caravan side "mapped but not built", with two things standing in the
+way. Both are now settled, and neither was what the survey expected.
+
+### The NCC list Coachman twice, and only one entry reaches the caravans
+
+`Coachman Motorhomes` and `Coachman Caravans` are separate options in the "Export Products
+by Supplier" dropdown — split for historic reasons on the FMLV side. Every dual-area brand
+before this one had a single label returning both sheets together, which is why
+`data/exports/28_Bailey/` holds a matched pair and `25_Coachman/` held only motorhome
+files: the caravans were never under the supplier the registry knew about.
+
+`config/manufacturers.csv` therefore gained `ncc_supplier_name_caravan`, read through
+`Manufacturer.supplier_name_for`. Blank on every other row, and blank still means "the one
+label serves both".
+
+### A split supplier's *other* sheet is not a baseline
+
+The export action always returns both sheets, whichever supplier is chosen. So
+`Coachman Caravans` comes down with a motorhome sheet as well — containing **two** rows,
+Avventura 545 and 565 (ids 8508 and 8509, which `Coachman Motorhomes` also holds), against
+the thirteen the motorhome baseline really has.
+
+`cli.latest_export` takes the newest file matching the area's stem. Left on disk, that
+two-row sheet would have become the next motorhome run's baseline, and the run would have
+reported eleven live motorhomes as disappeared — triggered by a caravan fetch nobody would
+have connected to them. `fetch_export` now deletes the off-area sheet whenever the
+registry says the supplier is area-specific, and narrates it.
+
+This is the failure the file's own docstrings keep circling: silent, total, and arriving
+from a direction unrelated to the thing that changed.
+
+### What the export shows
+
+19 caravans, all 2027, all active, matching the site's roster exactly — Acadia 4, Laser 6,
+Lusso 4, VIP 5. **Every one has a blank MTPLM and MRO**, which is the gap the adapter is
+being written to close.
+
+Two columns are already right and should not be re-derived: `overall_width_mm` holds 2310
+for the VIP and 2440 elsewhere, which is what the technical panels publish; and `height_mm`
+holds 2675 throughout, which is Coachman's *"Overall Height (including T.V Aerial)"* rather
+than the 2750 *"including Air Conditioning"* figure. FMLV has already chosen between those
+two heights, so the adapter follows it.
+
+One matching trap: `VIP 460` is stored with a **trailing space** in `model`.
+
+### What the site now publishes
+
+The `TBC` weights the survey found in August have been filled in for **17 of the 19**. The
+exceptions are **VIP 520 and VIP 565**, which are `TBC` in every mass field — MTPLM, MRO,
+personal payload, user payload, hitch weight, upper MTPLM — on the card *and* on the
+technical panel. They come through with the weights blank and surface as
+`missing_required`, which is the behaviour already built and tested.
+
+The caravan technical panel is a richer source than the motorhome one:
+
+* **`Personal Payload` and `Total / Maximum User Payload` are both published, and they are
+  equal** — 125/125 on the VIP 460, 156/156 on the 545. MTPLM − MRO equals both. That
+  settles for Coachman the question the Bailey pilot raised about a single payload figure
+  secretly being a total, and it is a genuine self-check.
+* **`Upper MTPLM (Optional weight plate upgrade)`** is the optioned figure, so the base
+  MTPLM is the one to record.
+* The panels carry equipment prose — Alde heating, fridge, oven, microwave, shower,
+  washroom — where `docs/adapters/README.md` records Coachman as publishing *"none at
+  all"* for motorhomes. Whether it is per-model or range-wide needs checking before it is
+  trusted; range-wide prose is what put a make-up bed on every Roller Team model.

@@ -58,6 +58,7 @@ BAILEY = Manufacturer(
     price_list_url=None,
     brochure_url=None,
     ncc_supplier_name="Bailey of Bristol",
+    ncc_supplier_name_caravan=None,
     specs_format="html",
     needs_javascript=TriState.NO,
     login_required=False,

@@ -22,6 +22,7 @@ from src.adapters.base import ExtractedMotorhome, Provenance
 from src.cli import (
     CommandError,
     _dedupe_baseline,
+    _discard_off_area_sheet,
     _is_current_model_year,
     _narrate_duplicate,
     execute_run,
@@ -34,6 +35,7 @@ from src.cli import (
 from src.product_model import io
 from src.product_model.model import Motorhome
 from src.registry.models import Manufacturer, Status, TriState
+from src.vehicle_class import VehicleClass
 
 RANGE_URL = "https://www.adria.co.uk/motorhomes/matrix"
 
@@ -53,6 +55,7 @@ def make_manufacturer(**overrides: Any) -> Manufacturer:
         "price_list_url": None,
         "brochure_url": None,
         "ncc_supplier_name": "Adria Caravans & Motorhomes",
+        "ncc_supplier_name_caravan": None,
         "specs_format": "mixed",
         "needs_javascript": TriState.YES,
         "login_required": False,
@@ -853,3 +856,125 @@ def test_the_row_kept_is_still_the_newer_one() -> None:
 
     assert [product.product_id for product in kept] == [6943]
     assert "3034" in said[0]
+
+
+# --------------------------------------------------------------------------- #
+# A manufacturer the NCC split across two supplier entries — Coachman, who are
+# listed as both `Coachman Motorhomes` and `Coachman Caravans`.
+# --------------------------------------------------------------------------- #
+
+
+def _split_supplier_manufacturer() -> Manufacturer:
+    return make_manufacturer(
+        manufacturer_id=25,
+        fmlv_manufacturer="Coachman",
+        fmlv_display_name="Coachman",
+        categories=("motorhome", "caravan"),
+        ncc_supplier_name="Coachman Motorhomes",
+        ncc_supplier_name_caravan="Coachman Caravans",
+        website_url="https://www.coachman.co.uk/",
+    )
+
+
+def test_one_supplier_label_still_serves_both_areas() -> None:
+    """The normal case, and the one that must not change: Bailey, Swift, Adria, Eriba."""
+    bailey = make_manufacturer(ncc_supplier_name="Bailey of Bristol")
+
+    assert bailey.supplier_name_for(VehicleClass.MOTORHOME) == "Bailey of Bristol"
+    assert bailey.supplier_name_for(VehicleClass.CARAVAN) == "Bailey of Bristol"
+    assert bailey.splits_suppliers_by_area is False
+
+
+def test_a_caravan_run_asks_the_caravan_supplier() -> None:
+    coachman = _split_supplier_manufacturer()
+
+    assert coachman.supplier_name_for(VehicleClass.MOTORHOME) == "Coachman Motorhomes"
+    assert coachman.supplier_name_for(VehicleClass.CARAVAN) == "Coachman Caravans"
+    assert coachman.splits_suppliers_by_area is True
+
+
+def test_the_default_area_is_motorhomes_when_none_is_given() -> None:
+    assert _split_supplier_manufacturer().supplier_name_for() == "Coachman Motorhomes"
+
+
+def test_a_caravan_fetch_discards_the_motorhome_sheet_it_came_with(
+    data_root: Path,
+) -> None:
+    """The whole reason the discard exists.
+
+    `Coachman Caravans` returns a two-row motorhome sheet beside the real caravan one.
+    Left on disk it is the newest file matching the motorhome stem, so the next
+    *motorhome* run would diff thirteen live products against those two and report
+    eleven as disappeared.
+    """
+    exports = paths.manufacturer_exports_dir(25, "Coachman", root=data_root)
+    exports.mkdir(parents=True)
+    real_baseline = exports / "2026-10-14_Coachman_motorhome-campervans.xlsx"
+    real_baseline.write_text("thirteen motorhomes", encoding="utf-8")
+
+    stray = exports / "2026-11-15_Coachman_motorhome-campervans.xlsx"
+    caravans = exports / "2026-11-15_Coachman_touring-caravans.xlsx"
+    stray.write_text("two motorhomes", encoding="utf-8")
+    caravans.write_text("nineteen caravans", encoding="utf-8")
+
+    narrated: list[str] = []
+    _discard_off_area_sheet(
+        stray,
+        vehicle_class=VehicleClass.CARAVAN,
+        supplier_name="Coachman Caravans",
+        on_progress=narrated.append,
+    )
+
+    assert not stray.exists()
+    assert caravans.exists()
+    assert (
+        latest_export(
+            root=data_root,
+            manufacturer_id=25,
+            manufacturer_name="Coachman",
+            vehicle_class=VehicleClass.MOTORHOME,
+        )
+        == real_baseline
+    )
+    assert "Coachman Caravans" in narrated[0]
+
+
+def test_a_motorhome_fetch_discards_the_caravan_sheet_it_came_with(
+    data_root: Path,
+) -> None:
+    exports = paths.manufacturer_exports_dir(25, "Coachman", root=data_root)
+    exports.mkdir(parents=True)
+    real_caravans = exports / "2026-11-15_Coachman_touring-caravans.xlsx"
+    real_caravans.write_text("nineteen caravans", encoding="utf-8")
+
+    motorhomes = exports / "2026-11-16_Coachman_motorhome-campervans.xlsx"
+    stray = exports / "2026-11-16_Coachman_touring-caravans.xlsx"
+    motorhomes.write_text("thirteen motorhomes", encoding="utf-8")
+    stray.write_text("no caravans at all", encoding="utf-8")
+
+    _discard_off_area_sheet(
+        motorhomes,
+        vehicle_class=VehicleClass.MOTORHOME,
+        supplier_name="Coachman Motorhomes",
+    )
+
+    assert motorhomes.exists()
+    assert not stray.exists()
+
+
+def test_discarding_a_sheet_that_was_never_written_is_not_an_error(
+    data_root: Path,
+) -> None:
+    """A supplier whose export carries only one sheet. Nothing to delete, no failure."""
+    exports = paths.manufacturer_exports_dir(25, "Coachman", root=data_root)
+    exports.mkdir(parents=True)
+    motorhomes = exports / "2026-11-16_Coachman_motorhome-campervans.xlsx"
+    motorhomes.write_text("thirteen motorhomes", encoding="utf-8")
+
+    _discard_off_area_sheet(
+        motorhomes,
+        vehicle_class=VehicleClass.MOTORHOME,
+        supplier_name="Coachman Motorhomes",
+    )
+
+    assert motorhomes.exists()

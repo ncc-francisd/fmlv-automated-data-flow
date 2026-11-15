@@ -51,6 +51,7 @@ def make_manufacturer(**overrides: object) -> Manufacturer:
         "price_list_url": None,
         "brochure_url": None,
         "ncc_supplier_name": "Adria Caravans & Motorhomes",
+        "ncc_supplier_name_caravan": None,
         "specs_format": "mixed",
         "needs_javascript": TriState.YES,
         "login_required": False,
