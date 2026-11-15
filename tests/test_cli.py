@@ -22,7 +22,6 @@ from src.adapters.base import ExtractedMotorhome, Provenance
 from src.cli import (
     CommandError,
     _dedupe_baseline,
-    _discard_off_area_sheet,
     _is_current_model_year,
     _narrate_duplicate,
     execute_run,
@@ -986,36 +985,104 @@ def test_the_default_area_is_motorhomes_when_none_is_given() -> None:
     assert _split_supplier_manufacturer().supplier_name_for() == "Coachman Motorhomes"
 
 
-def test_a_caravan_fetch_discards_the_motorhome_sheet_it_came_with(
+def _fake_split_supplier_download(
+    *, motorhome_bytes: bytes, caravan_bytes: bytes | None
+):
+    """Stands in for `download_export`, which writes BOTH sheets wherever it is told.
+
+    That is the behaviour the staging exists to survive, so the fake has to reproduce
+    it rather than politely writing only the sheet that was asked for.
+    """
+    from src.fetch import ncc
+
+    def fake(credentials, supplier_name, dest_path, **kwargs):  # noqa: ANN001, ARG001
+        dest = Path(dest_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(motorhome_bytes)
+        if caravan_bytes is not None:
+            ncc.caravan_export_path(dest).write_bytes(caravan_bytes)
+        return dest
+
+    return fake
+
+
+def _fetch_split_supplier(
     data_root: Path,
+    monkeypatch,
+    *,
+    vehicle_class: VehicleClass,
+    motorhome_bytes: bytes = b"two motorhomes",
+    caravan_bytes: bytes | None = b"nineteen caravans",
+    on_progress=lambda message: None,
+) -> Path:
+    from src import cli
+
+    monkeypatch.setattr(
+        cli,
+        "download_export",
+        _fake_split_supplier_download(
+            motorhome_bytes=motorhome_bytes, caravan_bytes=caravan_bytes
+        ),
+    )
+    monkeypatch.setattr(
+        cli.NccCredentials,
+        "from_env",
+        classmethod(lambda cls: cls(email="a@b", password="x")),
+    )
+    return cli.fetch_export(
+        manufacturer=_split_supplier_manufacturer(),
+        data_root=data_root,
+        vehicle_class=vehicle_class,
+        on_progress=on_progress,
+    )
+
+
+def test_a_caravan_fetch_keeps_only_the_caravan_sheet(
+    data_root: Path, monkeypatch
 ) -> None:
-    """The whole reason the discard exists.
+    """The whole reason the off-area sheet is dropped.
 
     `Coachman Caravans` returns a two-row motorhome sheet beside the real caravan one.
     Left on disk it is the newest file matching the motorhome stem, so the next
     *motorhome* run would diff thirteen live products against those two and report
     eleven as disappeared.
     """
-    exports = paths.manufacturer_exports_dir(25, "Coachman", root=data_root)
-    exports.mkdir(parents=True)
-    real_baseline = exports / "2026-10-14_Coachman_motorhome-campervans.xlsx"
-    real_baseline.write_text("thirteen motorhomes", encoding="utf-8")
-
-    stray = exports / "2026-11-15_Coachman_motorhome-campervans.xlsx"
-    caravans = exports / "2026-11-15_Coachman_touring-caravans.xlsx"
-    stray.write_text("two motorhomes", encoding="utf-8")
-    caravans.write_text("nineteen caravans", encoding="utf-8")
-
     narrated: list[str] = []
-    _discard_off_area_sheet(
-        stray,
+    placed = _fetch_split_supplier(
+        data_root,
+        monkeypatch,
         vehicle_class=VehicleClass.CARAVAN,
-        supplier_name="Coachman Caravans",
         on_progress=narrated.append,
     )
 
-    assert not stray.exists()
-    assert caravans.exists()
+    exports = paths.manufacturer_exports_dir(25, "Coachman", root=data_root)
+    assert placed.read_bytes() == b"nineteen caravans"
+    assert placed.parent == exports
+    assert list(exports.glob("*motorhome-campervans.xlsx")) == []
+    assert any("Coachman Caravans" in line for line in narrated)
+
+
+def test_a_caravan_fetch_does_not_overwrite_the_days_motorhome_baseline(
+    data_root: Path, monkeypatch
+) -> None:
+    """The bug the first version of this shipped with, found 15 November 2026.
+
+    `download_export` writes both sheets to their final dated names before returning,
+    so downloading into place and deleting the stray afterwards wrote the two-row
+    motorhome sheet **over** the real thirteen-row baseline of the same date, and then
+    deleted it. `latest_export` quietly fell back a month, with nothing said. The
+    deletion was fine; doing it after the damage was not.
+    """
+    exports = paths.manufacturer_exports_dir(25, "Coachman", root=data_root)
+    exports.mkdir(parents=True)
+    todays_motorhomes = (
+        exports / f"{date.today().isoformat()}_Coachman_motorhome-campervans.xlsx"
+    )
+    todays_motorhomes.write_text("thirteen motorhomes", encoding="utf-8")
+
+    _fetch_split_supplier(data_root, monkeypatch, vehicle_class=VehicleClass.CARAVAN)
+
+    assert todays_motorhomes.read_text(encoding="utf-8") == "thirteen motorhomes"
     assert (
         latest_export(
             root=data_root,
@@ -1023,47 +1090,143 @@ def test_a_caravan_fetch_discards_the_motorhome_sheet_it_came_with(
             manufacturer_name="Coachman",
             vehicle_class=VehicleClass.MOTORHOME,
         )
-        == real_baseline
+        == todays_motorhomes
     )
-    assert "Coachman Caravans" in narrated[0]
 
 
-def test_a_motorhome_fetch_discards_the_caravan_sheet_it_came_with(
-    data_root: Path,
+def test_a_motorhome_fetch_keeps_only_the_motorhome_sheet(
+    data_root: Path, monkeypatch
 ) -> None:
     exports = paths.manufacturer_exports_dir(25, "Coachman", root=data_root)
     exports.mkdir(parents=True)
-    real_caravans = exports / "2026-11-15_Coachman_touring-caravans.xlsx"
+    real_caravans = exports / "2026-01-02_Coachman_touring-caravans.xlsx"
     real_caravans.write_text("nineteen caravans", encoding="utf-8")
 
-    motorhomes = exports / "2026-11-16_Coachman_motorhome-campervans.xlsx"
-    stray = exports / "2026-11-16_Coachman_touring-caravans.xlsx"
-    motorhomes.write_text("thirteen motorhomes", encoding="utf-8")
-    stray.write_text("no caravans at all", encoding="utf-8")
-
-    _discard_off_area_sheet(
-        motorhomes,
+    placed = _fetch_split_supplier(
+        data_root,
+        monkeypatch,
         vehicle_class=VehicleClass.MOTORHOME,
-        supplier_name="Coachman Motorhomes",
+        motorhome_bytes=b"thirteen motorhomes",
+        caravan_bytes=b"no caravans at all",
     )
 
-    assert motorhomes.exists()
-    assert not stray.exists()
+    assert placed.read_bytes() == b"thirteen motorhomes"
+    assert real_caravans.read_text(encoding="utf-8") == "nineteen caravans"
+    assert [p.name for p in sorted(exports.glob("*touring-caravans.xlsx"))] == [
+        real_caravans.name
+    ]
 
 
-def test_discarding_a_sheet_that_was_never_written_is_not_an_error(
-    data_root: Path,
+def test_a_split_supplier_with_no_caravan_sheet_refuses(
+    data_root: Path, monkeypatch
 ) -> None:
-    """A supplier whose export carries only one sheet. Nothing to delete, no failure."""
-    exports = paths.manufacturer_exports_dir(25, "Coachman", root=data_root)
-    exports.mkdir(parents=True)
-    motorhomes = exports / "2026-11-16_Coachman_motorhome-campervans.xlsx"
-    motorhomes.write_text("thirteen motorhomes", encoding="utf-8")
+    """Never fall back to the other area's sheet, and never leave a half-done fetch."""
+    with pytest.raises(CommandError, match="no touring-caravan sheet"):
+        _fetch_split_supplier(
+            data_root,
+            monkeypatch,
+            vehicle_class=VehicleClass.CARAVAN,
+            caravan_bytes=None,
+        )
 
-    _discard_off_area_sheet(
-        motorhomes,
-        vehicle_class=VehicleClass.MOTORHOME,
-        supplier_name="Coachman Motorhomes",
+    exports = paths.manufacturer_exports_dir(25, "Coachman", root=data_root)
+    assert sorted(p.name for p in exports.glob("*")) == []
+
+
+# --------------------------------------------------------------------------- #
+# `fmlv fetch-export` and the product area
+# --------------------------------------------------------------------------- #
+
+
+def _fetch_export_argv(*extra: str, registry: Path, data_root: Path) -> list[str]:
+    return [
+        "fetch-export",
+        "Coachman",
+        "--data-dir",
+        str(data_root),
+        "--registry",
+        str(registry),
+        *extra,
+    ]
+
+
+@pytest.fixture
+def split_supplier_registry(tmp_path: Path) -> Path:
+    """A one-row registry for Coachman, written as `loader.load` expects to read it."""
+    import csv
+
+    from src.registry import loader
+
+    path = tmp_path / "manufacturers.csv"
+    source = paths.registry_path()
+    with source.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = list(reader.fieldnames or ())
+        row = next(r for r in reader if r["fmlv_manufacturer"] == "Coachman")
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        writer.writerow(row)
+
+    loaded = loader.load(path)
+    assert loaded.manufacturers[0].splits_suppliers_by_area is True
+    return path
+
+
+def test_fetch_export_defaults_to_the_motorhome_area(
+    split_supplier_registry: Path, data_root: Path, monkeypatch
+) -> None:
+    from src import cli
+
+    asked: dict[str, Any] = {}
+
+    def fake_fetch(**kwargs: Any) -> Path:
+        asked.update(kwargs)
+        return data_root / "motorhomes.xlsx"
+
+    monkeypatch.setattr(cli, "fetch_export", fake_fetch)
+
+    assert (
+        main(_fetch_export_argv(registry=split_supplier_registry, data_root=data_root))
+        == 0
+    )
+    assert asked["vehicle_class"] is VehicleClass.MOTORHOME
+
+
+@pytest.mark.parametrize("flag", ["--vehicle-class", "--class"])
+def test_fetch_export_can_be_asked_for_the_caravan_area(
+    flag: str, split_supplier_registry: Path, data_root: Path, monkeypatch
+) -> None:
+    """The gap the Coachman split left behind, found 15 November 2026.
+
+    `fetch-export` was the one export command with no way to name the area. Harmless
+    while every manufacturer had a single supplier label returning both sheets — the
+    area only chose between two files already on disk. Once `Coachman Caravans` became
+    a *different supplier*, and the off-area sheet started being deleted, the default
+    meant `fmlv fetch-export Coachman` asked for motorhomes and threw the caravan sheet
+    away every time, leaving the caravan baseline with no way to refresh itself.
+
+    Both spellings, because `run` says `--class` and `show-baseline` says
+    `--vehicle-class`, and reaching for the wrong one must not silently fetch motorhomes.
+    """
+    from src import cli
+
+    asked: dict[str, Any] = {}
+
+    def fake_fetch(**kwargs: Any) -> Path:
+        asked.update(kwargs)
+        return data_root / "caravans.xlsx"
+
+    monkeypatch.setattr(cli, "fetch_export", fake_fetch)
+
+    exit_code = main(
+        _fetch_export_argv(
+            flag, "caravan", registry=split_supplier_registry, data_root=data_root
+        )
     )
 
-    assert motorhomes.exists()
+    assert exit_code == 0
+    assert asked["vehicle_class"] is VehicleClass.CARAVAN
+    assert asked["manufacturer"].supplier_name_for(VehicleClass.CARAVAN) == (
+        "Coachman Caravans"
+    )

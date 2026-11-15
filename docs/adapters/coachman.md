@@ -620,11 +620,23 @@ the thirteen the motorhome baseline really has.
 `cli.latest_export` takes the newest file matching the area's stem. Left on disk, that
 two-row sheet would have become the next motorhome run's baseline, and the run would have
 reported eleven live motorhomes as disappeared — triggered by a caravan fetch nobody would
-have connected to them. `fetch_export` now deletes the off-area sheet whenever the
-registry says the supplier is area-specific, and narrates it.
+have connected to them.
+
+So where the registry says the supplier is area-specific, `fetch_export` hands the
+download to `_download_one_area`, which stages it in a temporary directory and moves only
+the sheet that was asked for into place. It is narrated either way.
+
+**Staging, rather than downloading into place and deleting the stray afterwards, which is
+how this shipped on 15 November 2026 and was worse than leaving the stray alone.**
+`download_export` writes *both* sheets to their final dated names before it returns, so a
+caravan fetch on a day a motorhome fetch had already run wrote the two-row sheet over the
+real thirteen-row motorhome baseline of the same date, and the tidy-up then deleted it.
+The good file was gone, `latest_export` fell back a month, and nothing said so. Fixed the
+same day, before any real fetch had been made through it.
 
 This is the failure the file's own docstrings keep circling: silent, total, and arriving
-from a direction unrelated to the thing that changed.
+from a direction unrelated to the thing that changed. It is worth noticing that the second
+version of the guard was a better instance of the hazard than the thing it guarded against.
 
 ### What the export shows
 

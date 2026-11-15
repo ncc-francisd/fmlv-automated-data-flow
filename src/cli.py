@@ -50,7 +50,9 @@ Four decisions worth knowing about:
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
+import tempfile
 import time
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Sequence
@@ -221,7 +223,8 @@ def fetch_export(
     `Coachman Motorhomes` holds. Keeping it would hand the next motorhome run a two-row
     baseline, because `latest_export` takes the newest file matching the area's stem and
     would take that one — eleven live motorhomes reported as disappeared, from a caravan
-    fetch nobody connected to them. So it is deleted here, and narrated.
+    fetch nobody connected to them. So a split supplier's download goes through
+    `_download_one_area`, which stages it and places only the sheet that was asked for.
     """
     supplier_name = manufacturer.supplier_name_for(vehicle_class)
     if not supplier_name:
@@ -248,6 +251,19 @@ def fetch_export(
         / f"{date.today().isoformat()}_{safe_name}_motorhome-campervans.xlsx"
     )
 
+    if manufacturer.splits_suppliers_by_area:
+        placed = _download_one_area(
+            credentials,
+            supplier_name,
+            dest_path,
+            vehicle_class=vehicle_class,
+            headless=headless,
+            on_progress=on_progress,
+        )
+        if placed is None:
+            raise CommandError(_no_caravan_sheet_message(manufacturer))
+        return placed
+
     try:
         download_export(
             credentials,
@@ -259,59 +275,93 @@ def fetch_export(
     except NccExportError as exc:
         raise CommandError(str(exc)) from exc
 
-    if manufacturer.splits_suppliers_by_area:
-        _discard_off_area_sheet(
-            dest_path,
-            vehicle_class=vehicle_class,
-            supplier_name=supplier_name,
-            on_progress=on_progress,
-        )
-
     if VehicleClass(vehicle_class) is VehicleClass.CARAVAN:
         caravan_path = caravan_export_path(dest_path)
         if not caravan_path.exists():
             # A motorhome-only supplier's export has no caravan sheet. Silently falling
             # back to the motorhome one is the failure this whole argument exists to
             # prevent, so refuse instead.
-            msg = (
-                f"{manufacturer.fmlv_manufacturer!r}'s export contains no touring-caravan "
-                f"sheet, so there is no caravan baseline to diff against. Check the "
-                f"manufacturer really does list caravans on the NCC site."
-            )
-            raise CommandError(msg)
+            raise CommandError(_no_caravan_sheet_message(manufacturer))
         return caravan_path
 
     return dest_path
 
 
-def _discard_off_area_sheet(
-    motorhome_path: Path,
+def _no_caravan_sheet_message(manufacturer: Manufacturer) -> str:
+    return (
+        f"{manufacturer.fmlv_manufacturer!r}'s export contains no touring-caravan "
+        f"sheet, so there is no caravan baseline to diff against. Check the "
+        f"manufacturer really does list caravans on the NCC site."
+    )
+
+
+def _download_one_area(
+    credentials: NccCredentials,
+    supplier_name: str,
+    dest_path: Path,
     *,
     vehicle_class: VehicleClass,
-    supplier_name: str,
+    headless: bool = True,
     on_progress: Callable[[str], None] = lambda message: None,
-) -> None:
-    """Delete the sheet this download was not for, where the supplier serves one area.
+) -> Path | None:
+    """Download a split supplier's export, keeping only the sheet for this area.
 
-    Only ever called for a manufacturer the NCC split across two supplier entries, and
-    only against a file written seconds earlier by this same call — never a baseline
-    somebody is relying on. The alternative is worse than the deletion: both sheets sit
-    in one directory per manufacturer, and `latest_export` picks the newest matching the
-    area's stem, so a stray sheet from the *other* supplier silently becomes the next
-    run's baseline for an area it says almost nothing about.
+    Only for a manufacturer the NCC split across two supplier entries. One export
+    action still returns both sheets whichever supplier was asked, and for a split
+    supplier the other one is a stray rather than a baseline: `Coachman Caravans`
+    returns a two-row motorhome sheet against the thirteen `Coachman Motorhomes` holds.
+    Left on disk it would become the next motorhome run's baseline, because
+    `latest_export` takes the newest file matching the area's stem — eleven live
+    motorhomes reported as disappeared, from a caravan fetch nobody would connect
+    to them.
+
+    **Staged through a temporary directory rather than downloaded into place and tidied
+    up afterwards**, which is how this was first written and was worse than leaving the
+    stray alone. `download_export` writes both sheets to their final dated names before
+    returning, so a caravan fetch on a day a motorhome fetch had already run wrote the
+    two-row stray *over* the real thirteen-row motorhome baseline of the same date, and
+    the tidy-up then deleted it. The good file was gone and `latest_export` quietly fell
+    back to whatever was next newest — a month-old baseline, with nothing said.
+
+    Returns where the wanted sheet was placed, or `None` if the export did not contain
+    it; the caller turns that into the refusal, rather than returning the other area's.
     """
-    caravan_path = caravan_export_path(motorhome_path)
-    if VehicleClass(vehicle_class) is VehicleClass.CARAVAN:
-        unwanted, kept_area = motorhome_path, "touring-caravan"
-    else:
-        unwanted, kept_area = caravan_path, "motorhome"
-    if not unwanted.exists():
-        return
-    unwanted.unlink()
-    on_progress(
-        f"discarded {unwanted.name} — {supplier_name!r} is the {kept_area} supplier, so "
-        f"its other sheet is not a baseline"
-    )
+    # `download_export` would create this, but the staging directory has to live inside
+    # it — same filesystem, so the move at the end is a rename rather than a copy.
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=".fetch-", dir=dest_path.parent))
+    try:
+        staged = staging / dest_path.name
+        try:
+            download_export(
+                credentials,
+                supplier_name,
+                staged,
+                headless=headless,
+                on_progress=on_progress,
+            )
+        except NccExportError as exc:
+            raise CommandError(str(exc)) from exc
+
+        if VehicleClass(vehicle_class) is VehicleClass.CARAVAN:
+            wanted, final = caravan_export_path(staged), caravan_export_path(dest_path)
+            kept_area, discarded = "touring-caravan", staged.name
+        else:
+            wanted, final = staged, dest_path
+            kept_area, discarded = "motorhome", caravan_export_path(staged).name
+
+        if not wanted.exists():
+            return None
+
+        final.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(wanted), str(final))
+        on_progress(
+            f"kept {final.name} and discarded {discarded} — {supplier_name!r} is the "
+            f"{kept_area} supplier, so its other sheet is not a baseline"
+        )
+        return final
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
 
 
 def _is_current_model_year(year: int | None, *, today: date | None = None) -> bool:
@@ -906,6 +956,13 @@ def _fetch_export_command(args: argparse.Namespace) -> int:
 
     Thin wiring over `fetch_export` — registry resolution plus the same error
     reporting `_run_command` uses.
+
+    **`--vehicle-class` has to be passed through**, even though for all but one
+    manufacturer both sheets arrive together and the area only picks between them. For a
+    manufacturer split across two NCC supplier entries it decides *which supplier is
+    asked*, and the off-area sheet is then deleted — so defaulting to motorhome here
+    would make `fmlv fetch-export Coachman` throw away the caravan sheet every time and
+    leave the caravan baseline with no way to refresh itself.
     """
     data_root: Path = args.data_dir
     config_root: Path = args.config_dir
@@ -923,6 +980,7 @@ def _fetch_export_command(args: argparse.Namespace) -> int:
         data_root=data_root,
         headless=not args.show_browser,
         on_progress=_print_with_timestamp,
+        vehicle_class=VehicleClass(args.vehicle_class),
     )
 
     print(f"downloaded {manufacturer.fmlv_manufacturer} export to {dest_path}")
@@ -1349,6 +1407,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--show-browser",
         action="store_true",
         help="run non-headless, for debugging against the real site",
+    )
+    # Both spellings, because `run` says `--class` and the other export commands say
+    # `--vehicle-class`, and picking one here would make the other silently fetch the
+    # wrong area for a split supplier.
+    fetch_export_parser.add_argument(
+        "--vehicle-class",
+        "--class",
+        dest="vehicle_class",
+        choices=tuple(member.value for member in VehicleClass),
+        default=DEFAULT_VEHICLE_CLASS.value,
+        help=(
+            "which product area this export is the baseline for. Only matters for a "
+            "manufacturer listed twice in the NCC dropdown — Coachman's caravans are "
+            "reachable only under 'Coachman Caravans' (default: %(default)s)"
+        ),
     )
     fetch_export_parser.set_defaults(handler=_fetch_export_command)
 
