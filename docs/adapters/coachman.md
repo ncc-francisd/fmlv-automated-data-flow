@@ -657,15 +657,40 @@ One matching trap: `VIP 460` is stored with a **trailing space** in `model`.
 The `TBC` weights the survey found in August have been filled in for **17 of the 19**. The
 exceptions are **VIP 520 and VIP 565**, which are `TBC` in every mass field — MTPLM, MRO,
 personal payload, user payload, hitch weight, upper MTPLM — on the card *and* on the
-technical panel. They come through with the weights blank and surface as
+technical panel. They came through with the weights blank and surfaced as
 `missing_required`, which is the behaviour already built and tested.
+
+**Coachman sent the figures for both on 16 November 2026**, and the site still said `TBC`
+when it was checked live that morning. They are recorded from
+`MANUFACTURER_FILE_2027` — 1591/1449/142 on the 520, 1679/1524/155 on the 565, 100kg hitch
+weight each, both reconciling — and the entry announces itself as deletable the moment the
+site catches up.
+
+**Two rows of that file do not reconcile, and in both the site is right.** Named as known
+faults so nobody re-derives them, and narrated on every run:
+
+| | Their file | The site | Why the site wins |
+|---|---|---|---|
+| Lusso IV | MRO 1096kg | MRO 1896kg | 2056 − 1896 = 160, their own payload. 1096 is a digit transposition and reconciles with nothing. |
+| Acadia 660 Xtra | payload 160 + 5 = 165kg | 175kg | Both masses match the file and imply 175. 10kg are unaccounted for and there is no telling which half is short. |
+
+The 660's split is refused rather than part-applied: the file may divide the published
+total, never change it. **Worth querying the 660 breakdown with Coachman** — it is the one
+Acadia whose two halves are still unknown.
 
 The caravan technical panel is a richer source than the motorhome one:
 
 * **`Personal Payload` and `Total / Maximum User Payload` are both published, and they are
-  equal** — 125/125 on the VIP 460, 156/156 on the 545. MTPLM − MRO equals both. That
-  settles for Coachman the question the Bailey pilot raised about a single payload figure
-  secretly being a total, and it is a genuine self-check.
+  equal** — 125/125 on the VIP 460, 156/156 on the 545. MTPLM − MRO equals both, which is
+  a genuine self-check and is still read as one.
+
+  It was first written up as settling the question the Bailey pilot raised about a single
+  payload figure secretly being a total. **It settled it the other way.** Coachman's own
+  2027 model-data file, received 16 November 2026, divides the Acadia payload into 155kg
+  personal effects and 5kg optional equipment — so on that range both published rows are
+  the *total*, and the row labelled `Personal Payload` is mislabelled on Coachman's own
+  page. Laser, Lusso and VIP carry no optional equipment, which is why the equality looked
+  conclusive across all nineteen. See `MANUFACTURER_FILE_2027`.
 * **`Upper MTPLM (Optional weight plate upgrade)`** is the optioned figure, so the base
   MTPLM is the one to record.
 * The panels carry equipment prose — Alde heating, fridge, oven, microwave, shower,

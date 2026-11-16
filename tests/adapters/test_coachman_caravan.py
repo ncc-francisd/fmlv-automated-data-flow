@@ -11,6 +11,7 @@ Every negative test here is a trap this adapter actually hit while it was being 
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -595,3 +596,166 @@ def test_the_roster_and_the_taxonomy_agree_on_every_range(tmp_path: Path) -> Non
         found = sum(1 for p in products if p.term_id == term)
         assert found == expected, ranges[term]
     assert json.loads(ROSTER)[0]["title"]["rendered"].startswith("Lusso")
+
+
+# --------------------------------------------------------------------------- #
+# Coachman's own 2027 model-data file
+#
+# Received 16 November 2026. Two jobs: the masses for the pair the site publishes
+# as `TBC`, and the payload split the panel has no row for.
+# --------------------------------------------------------------------------- #
+
+
+def _tbc_spec() -> coachman_caravan.CoachmanCaravanSpec:
+    """A VIP 520 as the site actually gives it — every mass unreadable."""
+    return coachman_caravan.CoachmanCaravanSpec(
+        internal_length_mm=5420, overall_width_mm=2310, berths=3
+    )
+
+
+def _acadia_spec(payload: int = 160) -> coachman_caravan.CoachmanCaravanSpec:
+    """An Acadia 545 Xtra as the site gives it: one payload row, labelled wrongly."""
+    return coachman_caravan.CoachmanCaravanSpec(
+        mtplm_kilograms=1679,
+        mro_kilograms=1519,
+        personal_effects_payload_kilograms=payload,
+        total_payload_kilograms=payload,
+        max_nose_weight_kilograms=100,
+    )
+
+
+def test_a_tbc_model_takes_every_mass_from_the_file() -> None:
+    said: list[str] = []
+
+    merged = coachman_caravan.apply_manufacturer_file(
+        "VIP", "520", _tbc_spec(), on_progress=said.append
+    )
+
+    assert merged.mtplm_kilograms == 1591
+    assert merged.mro_kilograms == 1449
+    assert merged.personal_effects_payload_kilograms == 142
+    assert merged.max_nose_weight_kilograms == 100
+    assert merged.payload_reconciles is True
+    assert merged.from_manufacturer_file == {
+        "mtplm_kilograms",
+        "mro_kilograms",
+        "personal_effects_payload_kilograms",
+        "max_nose_weight_kilograms",
+    }
+    assert any("2027 model-data file" in line for line in said)
+    # The site's own figures are untouched.
+    assert merged.internal_length_mm == 5420
+    assert merged.berths == 3
+
+
+def test_the_file_never_overwrites_a_figure_the_site_publishes() -> None:
+    """A stored table must not quietly replace the live source. It may only fill a gap."""
+    said: list[str] = []
+    published = replace(_tbc_spec(), mtplm_kilograms=1600)
+
+    merged = coachman_caravan.apply_manufacturer_file(
+        "VIP", "520", published, on_progress=said.append
+    )
+
+    assert merged.mtplm_kilograms == 1600
+    assert "mtplm_kilograms" not in merged.from_manufacturer_file
+    assert any("DISAGREEMENT" in line for line in said)
+
+
+def test_an_entry_the_site_has_caught_up_with_says_it_can_be_deleted() -> None:
+    said: list[str] = []
+    published = replace(_tbc_spec(), mtplm_kilograms=1591)
+
+    coachman_caravan.apply_manufacturer_file(
+        "VIP", "520", published, on_progress=said.append
+    )
+
+    assert any("can be deleted from MANUFACTURER_FILE_2027" in line for line in said)
+
+
+def test_the_acadia_payload_is_divided_not_replaced() -> None:
+    """The panel's `Personal Payload` row is the total. FMLV has a column for each half."""
+    said: list[str] = []
+
+    merged = coachman_caravan.apply_manufacturer_file(
+        "Acadia", "545 Xtra", _acadia_spec(), on_progress=said.append
+    )
+
+    assert merged.personal_effects_payload_kilograms == 155
+    assert merged.optional_equipment_payload_kilograms == 5
+    # The total is exactly what it was, and still reconciles with the masses.
+    assert merged.payload_reconciles is True
+    assert any("divided the site's 160kg payload" in line for line in said)
+
+
+def test_a_split_that_does_not_sum_to_the_published_total_is_refused() -> None:
+    """Acadia 660 Xtra: 160 + 5 against a published 175. Ten kilos unaccounted for.
+
+    The file may divide the site's total, never change it, so the whole split is dropped
+    rather than two-thirds of it applied.
+    """
+    said: list[str] = []
+
+    merged = coachman_caravan.apply_manufacturer_file(
+        "Acadia", "660 Xtra", _acadia_spec(payload=175), on_progress=said.append
+    )
+
+    assert merged.personal_effects_payload_kilograms == 175
+    assert merged.optional_equipment_payload_kilograms is None
+    assert merged.from_manufacturer_file == frozenset()
+    assert any("KNOWN FAULT" in line and "10kg are unaccounted" in line for line in said)
+
+
+def test_a_known_faulty_row_is_named_and_not_applied() -> None:
+    """Lusso IV's 1096kg is a transposition of the site's 1896kg, and nothing else."""
+    said: list[str] = []
+    site = coachman_caravan.CoachmanCaravanSpec(
+        mtplm_kilograms=2056, mro_kilograms=1896, personal_effects_payload_kilograms=160
+    )
+
+    merged = coachman_caravan.apply_manufacturer_file(
+        "Lusso", "IV", site, on_progress=said.append
+    )
+
+    assert merged == site
+    assert any("KNOWN FAULT" in line and "1096" in line for line in said)
+
+
+def test_a_model_the_file_says_nothing_about_is_untouched() -> None:
+    said: list[str] = []
+    site = _acadia_spec()
+
+    assert (
+        coachman_caravan.apply_manufacturer_file(
+            "Laser", "545 Xtra", site, on_progress=said.append
+        )
+        == site
+    )
+    assert said == []
+
+
+def test_payload_reconciles_sums_the_two_halves() -> None:
+    """Checking the personal half alone would call all four Acadias broken."""
+    split = coachman_caravan.CoachmanCaravanSpec(
+        mtplm_kilograms=1679,
+        mro_kilograms=1519,
+        personal_effects_payload_kilograms=155,
+        optional_equipment_payload_kilograms=5,
+    )
+
+    assert split.payload_reconciles is True
+    assert replace(split, optional_equipment_payload_kilograms=4).payload_reconciles is False
+
+
+def test_every_file_entry_names_a_model_the_adapter_can_reach() -> None:
+    """A typo in a key is silent: the entry simply never matches anything."""
+    keyed = set(coachman_caravan.MANUFACTURER_FILE_2027) | set(
+        coachman_caravan.MANUFACTURER_FILE_DISAGREES
+    )
+    ranges = {label for _, label in coachman_caravan.DEFAULT_RANGES}
+
+    assert {rng for rng, _ in keyed} <= ranges
+    assert not (
+        set(coachman_caravan.MANUFACTURER_FILE_2027)
+        & set(coachman_caravan.MANUFACTURER_FILE_DISAGREES)
+    ), "a model cannot be both applied and refused"

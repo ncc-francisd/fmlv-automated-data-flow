@@ -46,9 +46,13 @@ and the berths are real — and the gaps surface as `missing_required` for a per
 body-only figure, which is the same gap Bailey have, and the field is out of automated
 scope in `config/field_guide_caravan.csv` because of it.
 
-*No `optional_equipment_payload_kilograms`.* `Total / Maximum User Payload` equals
-`Personal Payload` on every model, so the optional half is zero and belongs blank — its
-normal state on all 92 real caravan products this project holds.
+*`optional_equipment_payload_kilograms` on the four Acadias, and nowhere else.* The panel
+has one payload row, and `Total / Maximum User Payload` equals `Personal Payload` on every
+model — which first read as proof that the optional half was nil. Coachman's own 2027
+model-data file says otherwise: on the Acadias both rows are the **total**, 5kg of which
+is optional equipment, and the label `Personal Payload` is wrong on their own page. The
+split comes from the file; see `MANUFACTURER_FILE_2027`. Laser, Lusso and VIP genuinely
+carry none, so for those the single published figure was right all along.
 
 *No `Upper MTPLM`.* It is the optioned weight-plate upgrade — 1750kg against a base 1679kg —
 and the base vehicle rule takes the base figure.
@@ -158,6 +162,102 @@ _CENTIMETRES = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*cm", re.IGNORECASE)
 def _centimetres(value: str) -> int | None:
     match = _CENTIMETRES.search(value)
     return round(float(match.group(1).replace(",", "")) * 10) if match else None
+
+
+@dataclass(frozen=True)
+class _ManufacturerFigures:
+    """One model's row from Coachman's own 2027 model-data file."""
+
+    mtplm_kilograms: int | None = None
+    mro_kilograms: int | None = None
+    personal_effects_payload_kilograms: int | None = None
+    #: The half the website does not publish at all — see `MANUFACTURER_FILE_2027`.
+    optional_equipment_payload_kilograms: int | None = None
+    max_nose_weight_kilograms: int | None = None
+    #: True where the two payload halves **re-divide a figure the site already publishes**
+    #: rather than filling a gap, so the site's single number is not a rival reading to be
+    #: preferred — it is the sum, under a label that calls it the personal half. Applied
+    #: only when `personal + optional` equals what the site publishes, which is what makes
+    #: this safe: the file cannot move the total, only say how it splits.
+    reapportions_published_payload: bool = False
+
+
+#: Figures from **Coachman's own 2027 model-data file**, where the website does not carry
+#: them or carries them in a shape it cannot express.
+#:
+#: `New Model Data 2027 list - Coachman-16-11-26.csv`, sent by Coachman and received
+#: 16 November 2026. Forty-one rows, of which the twenty-two dealer-special models
+#: (`Festival 545`, `Chiltington VIP`, `Penhurst Laser Xtra` and the rest) are out of
+#: scope: FMLV does not list them. Only the nineteen core layouts are read, and of those
+#: only the five below need anything from the file.
+#:
+#: **Two reasons an entry is here, and nothing else qualifies.**
+#:
+#: * **The site publishes `TBC`.** VIP 520 and VIP 565 are `TBC` in every mass row on the
+#:   panel *and* the card, checked again live on 16 November 2026. They are the pair that
+#:   produced no review rows at all, and the file is their only source.
+#: * **The site cannot express the split.** The panel has one payload row. Coachman's file
+#:   divides it into personal effects and optional equipment, and FMLV has a column for
+#:   each. The four Acadia layouts carry 5kg of optional equipment; every Laser, Lusso and
+#:   VIP carries none, so for those the single published figure was already right.
+#:
+#: **This overturns what the adapter first recorded.** The module docstring said the
+#: optional half was nil throughout because `Total / Maximum User Payload` equalled
+#: `Personal Payload` on every model. Those two rows *are* equal — but on the Acadias they
+#: are both the total, and the label `Personal Payload` is simply wrong on Coachman's own
+#: page. The worry logged during the Bailey pilot, that one published payload figure might
+#: secretly be a total, turns out to be exactly what this was.
+#:
+#: **Every entry is audited against the live site each run** by `audit_manufacturer_file`,
+#: which narrates a disagreement and announces an entry the site has caught up with, so a
+#: stored figure cannot quietly outlive its reason for existing.
+MANUFACTURER_FILE_2027: dict[tuple[str, str], _ManufacturerFigures] = {
+    # The two the site publishes as TBC. Both reconcile: 1591-1449 = 142, 1679-1524 = 155.
+    ("VIP", "520"): _ManufacturerFigures(1591, 1449, 142, None, 100),
+    ("VIP", "565"): _ManufacturerFigures(1679, 1524, 155, None, 100),
+    # The payload split only. Masses are left to the site, which agrees with the file to
+    # the kilogram on all four, so there is nothing to override there.
+    #
+    # `660 Xtra` is listed with the others **and is expected to be refused**: its halves
+    # come to 165kg against the 175kg its own masses imply, so the reapportioning rule
+    # rejects it and the site's single figure stands. It is here rather than hand-noted as
+    # an exception so that the arithmetic decides, and so the split starts applying by
+    # itself if Coachman correct the row.
+    ("Acadia", "545 Xtra"): _ManufacturerFigures(
+        personal_effects_payload_kilograms=155,
+        optional_equipment_payload_kilograms=5,
+        reapportions_published_payload=True,
+    ),
+    ("Acadia", "575 Xtra"): _ManufacturerFigures(
+        personal_effects_payload_kilograms=155,
+        optional_equipment_payload_kilograms=5,
+        reapportions_published_payload=True,
+    ),
+    ("Acadia", "655 Xtra"): _ManufacturerFigures(
+        personal_effects_payload_kilograms=160,
+        optional_equipment_payload_kilograms=5,
+        reapportions_published_payload=True,
+    ),
+    ("Acadia", "660 Xtra"): _ManufacturerFigures(
+        personal_effects_payload_kilograms=160,
+        optional_equipment_payload_kilograms=5,
+        reapportions_published_payload=True,
+    ),
+}
+
+#: Rows of Coachman's file that **do not reconcile**, named so nobody re-derives them.
+#:
+#: Faults in one document, not conflicts between two sources — so neither is applied and
+#: neither raises a question. The site's figure stands in both cases, and in both the
+#: site's figure is the one the arithmetic supports.
+MANUFACTURER_FILE_DISAGREES: dict[tuple[str, str], str] = {
+    ("Lusso", "IV"): (
+        "their file gives a mass in running order of 1096kg, which leaves a payload of "
+        "960kg against the 160kg they state. The site's 1896kg is a straight digit "
+        "transposition of it and reconciles exactly (2056 - 1896 = 160), so the file is "
+        "simply mistyped and the site is right"
+    ),
+}
 
 #: `Twin axle`, `Twin Axle` — the Lusso IV capitalises where its three siblings do not, so
 #: this is matched case-insensitively rather than compared to a literal.
@@ -291,31 +391,46 @@ class CoachmanCaravanSpec:
     mtplm_kilograms: int | None = None
     mro_kilograms: int | None = None
     personal_effects_payload_kilograms: int | None = None
+    #: Blank on every model the site speaks for, and set only from Coachman's own file —
+    #: see `MANUFACTURER_FILE_2027`.
+    optional_equipment_payload_kilograms: int | None = None
     max_nose_weight_kilograms: int | None = None
-    #: Read to check `personal_effects_payload_kilograms`, never recorded.
+    #: Read to check the payload columns, never recorded.
     total_payload_kilograms: int | None = None
     rrp_pounds: int | None = None
     berths: int | None = None
     twin_axle: bool = False
+    #: Field names taken from Coachman's 2027 model-data file rather than the website, so
+    #: `build_extracted` can cite the right source. Empty for every model the site covers.
+    from_manufacturer_file: frozenset[str] = frozenset()
 
     @property
     def payload_reconciles(self) -> bool | None:
-        """Whether both payload rows equal `MTPLM - MRO`, or `None` if unknowable.
+        """Whether the payload columns equal `MTPLM - MRO`, or `None` if unknowable.
 
-        True on all 17 weighed models. The one arithmetic relationship Coachman state four
-        sides of, so it catches a misread figure that is otherwise entirely plausible.
+        The one arithmetic relationship Coachman state four sides of, so it catches a
+        misread figure that is otherwise entirely plausible.
+
+        **The two payload columns are summed, not checked one at a time.** They are halves
+        of one figure, and on the Acadias the personal half alone is 5kg short of the
+        masses by design — see `MANUFACTURER_FILE_2027`. Checking `personal` against
+        `MTPLM - MRO` would report all four as broken. `Total / Maximum User Payload`, the
+        site's own second row, is still checked whole, because that one *is* the total.
         """
         if self.mtplm_kilograms is None or self.mro_kilograms is None:
             return None
         derived = self.mtplm_kilograms - self.mro_kilograms
-        published = [
-            value
-            for value in (
-                self.personal_effects_payload_kilograms,
-                self.total_payload_kilograms,
+        published: list[int] = []
+        if (
+            self.personal_effects_payload_kilograms is not None
+            or self.optional_equipment_payload_kilograms is not None
+        ):
+            published.append(
+                (self.personal_effects_payload_kilograms or 0)
+                + (self.optional_equipment_payload_kilograms or 0)
             )
-            if value is not None
-        ]
+        if self.total_payload_kilograms is not None:
+            published.append(self.total_payload_kilograms)
         if not published:
             return None
         return all(value == derived for value in published)
@@ -342,6 +457,186 @@ def spec_from_panel(pairs: dict[str, str]) -> CoachmanCaravanSpec:
         rrp_pounds=_pounds(pairs.get("Price", "")),
         berths=int(berths) if berths.isdigit() else None,
         twin_axle=bool(_TWIN_AXLE.search(pairs.get("Axles", ""))),
+    )
+
+
+#: Why each field came from the file rather than the page, written into its provenance so
+#: a reviewer is not left to work out why one figure has a different source from its
+#: neighbours.
+#: Coachman's own names for these figures, so provenance reads as their page does rather
+#: than as a Python attribute with the underscores taken out.
+_FIELD_LABELS: dict[str, str] = {
+    "mtplm_kilograms": "MTPLM",
+    "mro_kilograms": "Mass in Running Order",
+    "personal_effects_payload_kilograms": "personal effects payload",
+    "optional_equipment_payload_kilograms": "optional equipment payload",
+    "max_nose_weight_kilograms": "Maximum Hitch Weight",
+}
+
+_TBC_REASON = "because the site publishes 'TBC' for every mass on this model"
+
+_MANUFACTURER_FILE_REASONS: dict[str, str] = {
+    "mtplm_kilograms": _TBC_REASON,
+    "mro_kilograms": _TBC_REASON,
+    "personal_effects_payload_kilograms": _TBC_REASON,
+    "max_nose_weight_kilograms": (
+        f"{_TBC_REASON}. Recorded for the TowCheck sister site; FMLV has no column for "
+        f"it, so it is a finding and is written only to the readable copy of the upload"
+    ),
+}
+
+#: The same two columns again, worded for the other reason a figure comes from the file:
+#: not a gap on the page, but a published total the page divides wrongly.
+_REAPPORTIONED_REASONS: dict[str, str] = {
+    "personal_effects_payload_kilograms": (
+        "because the site publishes a single payload figure under a label calling it the "
+        "personal half, when Coachman's own data shows it is the total of both halves"
+    ),
+    "optional_equipment_payload_kilograms": (
+        "which the technical panel has no row for at all. The split was accepted only "
+        "because the two halves add up to exactly the figure the site publishes — the "
+        "file is allowed to divide that total, never to change it"
+    ),
+}
+
+_MANUFACTURER_FILE_FIELDS: tuple[str, ...] = (
+    "mtplm_kilograms",
+    "mro_kilograms",
+    "personal_effects_payload_kilograms",
+    "optional_equipment_payload_kilograms",
+    "max_nose_weight_kilograms",
+)
+
+
+def apply_manufacturer_file(
+    range_label: str,
+    model: str,
+    spec: CoachmanCaravanSpec,
+    *,
+    on_progress: Callable[[str], None] = lambda message: None,
+) -> CoachmanCaravanSpec:
+    """Fold Coachman's own 2027 figures into a spec read off the site, auditing both ways.
+
+    **The site wins wherever it speaks and agrees**, so an entry stops mattering the
+    moment Coachman publish the same number, and that is announced rather than left
+    silent. Where the site speaks and *disagrees*, the file is still not applied — a
+    stored table must never quietly overwrite the live source — but the divergence is
+    narrated loudly, because it means one of the two has moved.
+
+    The file is applied only where the site is silent: a `TBC` mass, or the
+    optional-equipment column the panel has no row for at all.
+    """
+    figures = MANUFACTURER_FILE_2027.get((range_label, model))
+    if figures is None:
+        if note := MANUFACTURER_FILE_DISAGREES.get((range_label, model)):
+            on_progress(
+                f"[{range_label}] {model} — KNOWN FAULT in Coachman's own 2027 file, not "
+                f"a question and not a source conflict: {note}"
+            )
+        return spec
+
+    if figures.reapportions_published_payload:
+        return _reapportion_payload(range_label, model, spec, figures, on_progress)
+
+    changes: dict[str, int] = {}
+    taken: set[str] = set()
+    for field_name in _MANUFACTURER_FILE_FIELDS:
+        supplied = getattr(figures, field_name)
+        if supplied is None:
+            continue
+        live = getattr(spec, field_name)
+        if live is None:
+            changes[field_name] = supplied
+            taken.add(field_name)
+        elif live == supplied:
+            on_progress(
+                f"[{range_label}] {model} — the site now publishes {field_name} as "
+                f"{live}, matching Coachman's 2027 file. That entry has done its job and "
+                f"can be deleted from MANUFACTURER_FILE_2027"
+            )
+        else:
+            on_progress(
+                f"[{range_label}] {model} — DISAGREEMENT: the site publishes "
+                f"{field_name} as {live} and Coachman's 2027 file says {supplied}. The "
+                f"site is used; one of the two has moved and the file entry needs "
+                f"rechecking"
+            )
+
+    if not changes:
+        return spec
+
+    merged = replace(spec, **changes, from_manufacturer_file=frozenset(taken))
+    if merged.payload_reconciles is False:
+        on_progress(
+            f"[{range_label}] {model} — Coachman's 2027 file does not reconcile once "
+            f"merged: MTPLM {merged.mtplm_kilograms} - mass in running order "
+            f"{merged.mro_kilograms} is not the payload "
+            f"{(merged.personal_effects_payload_kilograms or 0) + (merged.optional_equipment_payload_kilograms or 0)}. "
+            f"Recorded anyway, for a reviewer to judge"
+        )
+    else:
+        on_progress(
+            f"[{range_label}] {model} — took {', '.join(sorted(taken))} from Coachman's "
+            f"2027 model-data file, received 16 November 2026, because the site publishes "
+            f"nothing there"
+        )
+    return merged
+
+
+def _reapportion_payload(
+    range_label: str,
+    model: str,
+    spec: CoachmanCaravanSpec,
+    figures: _ManufacturerFigures,
+    on_progress: Callable[[str], None],
+) -> CoachmanCaravanSpec:
+    """Split the one payload figure the site publishes into the two columns FMLV has.
+
+    **The file is only ever allowed to divide the published total, never to change it.**
+    If the two halves do not add up to what the site publishes, the split is refused and
+    the site's single figure is left exactly as it was. That is what makes a stored table
+    safe here: the worst it can do is decline to act.
+    """
+    published = spec.personal_effects_payload_kilograms
+    personal = figures.personal_effects_payload_kilograms or 0
+    optional = figures.optional_equipment_payload_kilograms or 0
+
+    if published is None:
+        on_progress(
+            f"[{range_label}] {model} — no payload published on the site, so there is "
+            f"nothing for Coachman's 2027 file to re-divide"
+        )
+        return spec
+
+    if personal + optional != published:
+        on_progress(
+            f"[{range_label}] {model} — KNOWN FAULT in Coachman's own 2027 file, not a "
+            f"question and not a source conflict: it divides the payload {personal}kg "
+            f"personal + {optional}kg optional = {personal + optional}kg, but the site "
+            f"publishes {published}kg and both masses agree with the file "
+            f"({spec.mtplm_kilograms} - {spec.mro_kilograms} = {published}). "
+            f"{abs(published - personal - optional)}kg are unaccounted for and there is "
+            f"no way to tell which half is short, so the split is refused and the site's "
+            f"single figure stands. Worth querying with Coachman"
+        )
+        return spec
+
+    on_progress(
+        f"[{range_label}] {model} — divided the site's {published}kg payload into "
+        f"{personal}kg personal effects + {optional}kg optional equipment, from "
+        f"Coachman's 2027 model-data file. The panel's 'Personal Payload' row is the "
+        f"total, not the personal half"
+    )
+    return replace(
+        spec,
+        personal_effects_payload_kilograms=personal,
+        optional_equipment_payload_kilograms=optional,
+        from_manufacturer_file=frozenset(
+            {
+                "personal_effects_payload_kilograms",
+                "optional_equipment_payload_kilograms",
+            }
+        ),
     )
 
 
@@ -412,6 +707,7 @@ def build_extracted(
         mtplm_kilograms=spec.mtplm_kilograms,
         mro_kilograms=spec.mro_kilograms,
         personal_effects_payload_kilograms=spec.personal_effects_payload_kilograms,
+        optional_equipment_payload_kilograms=spec.optional_equipment_payload_kilograms,
         max_nose_weight_kilograms=spec.max_nose_weight_kilograms,
         internal_length_mm=spec.internal_length_mm,
         shipping_length_mm=spec.shipping_length_mm,
@@ -456,11 +752,15 @@ def build_extracted(
         ("awning_length_mm", _AWNING_LABEL, "mm"),
     ):
         value = getattr(caravan, field_name)
-        if value is not None:
-            rendered = f"£{value:,}" if field_name == "rrp_pounds" else f"{value}{suffix}"
-            record(field_name, f"{label}: {rendered}, from the range page's technical panel")
+        if value is None or field_name in spec.from_manufacturer_file:
+            continue
+        rendered = f"£{value:,}" if field_name == "rrp_pounds" else f"{value}{suffix}"
+        record(field_name, f"{label}: {rendered}, from the range page's technical panel")
 
-    if spec.max_nose_weight_kilograms is not None:
+    if (
+        spec.max_nose_weight_kilograms is not None
+        and "max_nose_weight_kilograms" not in spec.from_manufacturer_file
+    ):
         record(
             "max_nose_weight_kilograms",
             f"Maximum Hitch Weight: {spec.max_nose_weight_kilograms}kg. Recorded for the "
@@ -469,14 +769,37 @@ def build_extracted(
             f"finding and written only to the readable copy of the upload",
         )
 
-    if spec.personal_effects_payload_kilograms is not None:
-        provenance["personal_effects_payload_kilograms"] = Provenance(
+    # The payload columns, which need saying rather than listing: the site publishes one
+    # figure under a label that is wrong on four models, and FMLV has a column for each
+    # half. Skipped where the file supplied them — those are cited below instead.
+    if (
+        spec.personal_effects_payload_kilograms is not None
+        and "personal_effects_payload_kilograms" not in spec.from_manufacturer_file
+    ):
+        record(
+            "personal_effects_payload_kilograms",
+            f"Personal Payload: {spec.personal_effects_payload_kilograms}kg. Coachman "
+            f"publish '{_TOTAL_PAYLOAD_LABEL}' as the same figure and this range carries "
+            f"no optional-equipment payload in their own 2027 model data, so the whole of "
+            f"MTPLM - mass in running order belongs in this column",
+        )
+
+    # Whatever Coachman's own file supplied, cited as theirs and not as the website's.
+    reapportioned = (
+        "optional_equipment_payload_kilograms" in spec.from_manufacturer_file
+    )
+    reasons = _REAPPORTIONED_REASONS if reapportioned else _MANUFACTURER_FILE_REASONS
+    for field_name in sorted(spec.from_manufacturer_file):
+        value = getattr(caravan, field_name)
+        if value is None:
+            continue
+        provenance[field_name] = Provenance(
             source_url=panel_url,
             snippet=(
-                f"{product.label} — Personal Payload: "
-                f"{spec.personal_effects_payload_kilograms}kg. Coachman publish "
-                f"'{_TOTAL_PAYLOAD_LABEL}' as the same figure, so the optional-equipment "
-                f"half is nil and stays blank; both equal MTPLM - mass in running order"
+                f"{product.label} — {_FIELD_LABELS.get(field_name, field_name)}: "
+                f"{value}kg, from Coachman's own 2027 model-data file "
+                f"('New Model Data 2027 list - Coachman-16-11-26.csv', received "
+                f"16 November 2026), {reasons.get(field_name, '')}"
             ),
         )
 
@@ -650,7 +973,12 @@ def collect(
                     model=entry.model,
                     title=entry.title,
                     models_in_range=models_in_range,
-                    spec=spec_from_panel(pairs),
+                    spec=apply_manufacturer_file(
+                        label,
+                        entry.model,
+                        spec_from_panel(pairs),
+                        on_progress=on_progress,
+                    ),
                     equipment=equipment,
                     card_mtplm_kilograms=card.mtplm_kilograms if card else None,
                     card_mro_kilograms=card.mro_kilograms if card else None,
