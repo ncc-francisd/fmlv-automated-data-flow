@@ -320,20 +320,29 @@ def write_csv(
     Excel uses to recognise UTF-8, and `read_csv` below already skips it (`utf-8-sig`).
 
     `columns` is the column set and order to write, defaulting to the whole schema.
-    `output.write_upload_csv` passes `caravan_schema.UPLOAD_COLUMNS` for the upload proper
-    and the full set for the copy a person reads — the difference between the two being
-    `max_nose_weight_kilograms`, which FMLV has no field for.
+    `output.write_upload_csv` passes `caravan_schema.GENERATED_COLUMNS` for both files it
+    writes, and `caravan_schema.UPLOAD_COLUMNS` is still what FMLV's own template is.
+
+    A column may be `caravan_schema.SPACER_COLUMN` — the empty string — which writes a
+    blank header and a blank cell on every row. Two of them separate FMLV's columns from
+    our own, so a column that is not FMLV's can never be mistaken for one that is. They
+    are the reason this writes rows itself rather than through `csv.DictWriter`: a
+    spacer is not a field, and two of them are not a duplicate field name.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8-sig") as handle:
-        # `extrasaction="ignore"` so a narrower `columns` simply drops what it leaves out:
-        # the row dict is always built for the full set.
-        writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
+        writer = csv.writer(handle)
         for _ in range(leading_blank_rows):
             # Through the csv writer, so these rows end CRLF like the rest — see
             # `io.write_csv`, which had the same mixed-line-endings bug.
-            writer.writer.writerow(["-"])
-        writer.writeheader()
+            writer.writerow(["-"])
+        writer.writerow(columns)
         for caravan in caravans:
-            writer.writerow(caravan_to_row(caravan))
+            # Built for the full schema, then narrowed: a `columns` that leaves a field
+            # out simply drops it, as `extrasaction="ignore"` used to.
+            row = caravan_to_row(caravan)
+            writer.writerow(
+                ["" if column == caravan_schema.SPACER_COLUMN else row.get(column, "")
+                 for column in columns]
+            )

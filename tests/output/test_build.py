@@ -921,6 +921,65 @@ def _caravan_run_with_a_nose_weight(
     return run, baseline
 
 
+def test_a_new_product_does_not_propose_its_nose_weight_either(
+    connection: sqlite3.Connection,
+) -> None:
+    """The same rule on the other branch, which did not follow it.
+
+    `store.changes` skipped `FINDING_FIELDS` when proposing a new product's fields, where
+    the matched path skips the wider `NOT_PROPOSED` — so a *new* caravan from a maker who
+    publishes a nose weight got a decision row for a column FMLV does not have, and
+    `apply_field` raises on it once accepted. It took Adria's run #262 on 17 November 2026
+    to surface: before that, no adapter reading a nose weight had ever found a new product.
+    """
+    from src.adapters.base import ExtractedCaravan
+    from src.product_model.caravan import Caravan
+    from src.vehicle_class import VehicleClass
+
+    run = store.start_run(
+        connection,
+        manufacturer_id=3,
+        fmlv_manufacturer="Adria Mobil",
+        trigger="manual",
+        vehicle_class=VehicleClass.CARAVAN,
+    )
+    caravan = Caravan(
+        manufacturer="Adria Mobil",
+        manufacturer_display_name="Adria",
+        manufacturer_range="Alpina",
+        model="623 UC MISSISSIPPI",
+        rrp_pounds=40_000,
+        max_nose_weight_kilograms=100,
+    )
+    extracted = ExtractedCaravan(
+        caravan=caravan,
+        provenance={
+            "rrp_pounds": Provenance(source_url="https://adria.com", snippet="£40,000"),
+            "max_nose_weight_kilograms": Provenance(
+                source_url="https://adria.com", snippet="Max nose weight: 100"
+            ),
+        },
+    )
+    store.persist_diff(
+        connection,
+        run_id=run.id,
+        manufacturer_id=3,
+        diffs=diff_products([extracted], []),
+        vehicle_class=VehicleClass.CARAVAN,
+    )
+
+    decided = [e.change.field for e in store.list_change_queue(connection, run.id)]
+    findings = [
+        f.field
+        for product_findings in store.findings_by_product(connection, run.id).values()
+        for f in product_findings
+    ]
+
+    assert "rrp_pounds" in decided, "the sanity check: this really is a new product"
+    assert "max_nose_weight_kilograms" not in decided
+    assert "max_nose_weight_kilograms" in findings
+
+
 def test_a_nose_weight_is_never_proposed_only_reported(
     connection: sqlite3.Connection,
 ) -> None:
@@ -942,10 +1001,15 @@ def test_a_nose_weight_is_never_proposed_only_reported(
     assert "max_nose_weight_kilograms" in findings
 
 
-def test_the_nose_weight_reaches_the_readable_csv_and_not_the_upload(
+def test_the_nose_weight_reaches_both_files_in_column_bm(
     connection: sqlite3.Connection, tmp_path: Path
 ) -> None:
-    """The whole point of the column: usable by us, invisible to FMLV's importer."""
+    """The whole point of the column: usable by us, past the end of FMLV's template.
+
+    Requested 17 November 2026 — the nose weight was already in the readable copy at BK,
+    and had to be transposed to BM by hand. It is now written to BM in both files, with
+    FMLV's own 62 columns untouched through BJ and two blank columns between.
+    """
     from src.product_model import caravan_schema
     from src.vehicle_class import VehicleClass
 
@@ -969,9 +1033,16 @@ def test_the_nose_weight_reaches_the_readable_csv_and_not_the_upload(
     with result.readable_path.open(encoding="utf-8-sig", newline="") as handle:
         [row] = list(csv.DictReader(handle))
 
-    assert "max_nose_weight_kilograms" not in upload_header
-    assert upload_header == list(caravan_schema.UPLOAD_COLUMNS)
+    # FMLV's template, untouched, then two blanks, then ours.
+    assert upload_header[:62] == list(caravan_schema.UPLOAD_COLUMNS)
+    assert upload_header[62:] == ["", "", "max_nose_weight_kilograms"]
+    assert upload_header == list(caravan_schema.GENERATED_COLUMNS)
     assert row["max_nose_weight_kilograms"] == "100"
+
+    # Column BM on the data rows too, not just the header, and the spacers really are
+    # empty rather than carrying a repeated value.
+    upload_row = next(csv.reader([upload_lines[3]]))
+    assert upload_row[62:] == ["", "", "100"]
 
 
 def test_a_nose_weight_is_not_carried_over_when_a_run_does_not_find_one(

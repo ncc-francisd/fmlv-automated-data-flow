@@ -536,13 +536,16 @@ def write_upload_csv(
         caravans = [p for p in products if isinstance(p, Caravan)]
         assert len(caravans) == len(products), "a caravan upload cannot carry motorhome rows"
         issues = validate_all_caravans(caravans)
-        # The upload drops `max_nose_weight_kilograms`; the readable copy keeps it. FMLV
-        # has no field for it, so pasting it in would break the template, but it is the
-        # whole reason the column exists — see `caravan_schema.NEVER_IN_UPLOAD`.
+        # Both files carry the same columns: FMLV's template through BJ, two blank
+        # columns, then `max_nose_weight_kilograms` in BM. FMLV has no field for the nose
+        # weight and its importer is understood to read only as far as BJ, which is what
+        # puts ours past the end rather than inside the template — see
+        # `caravan_schema.GENERATED_COLUMNS`, which also says what to do if that turns
+        # out to be wrong.
         write_caravan_csv(
-            caravans, path, leading_blank_rows=2, columns=caravan_schema.UPLOAD_COLUMNS
+            caravans, path, leading_blank_rows=2, columns=caravan_schema.GENERATED_COLUMNS
         )
-        write_caravan_csv(caravans, readable_path, columns=caravan_schema.COLUMNS)
+        write_caravan_csv(caravans, readable_path, columns=caravan_schema.GENERATED_COLUMNS)
     else:
         motorhomes = [p for p in products if isinstance(p, Motorhome)]
         assert len(motorhomes) == len(products), "a motorhome upload cannot carry caravan rows"

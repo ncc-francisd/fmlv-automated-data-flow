@@ -122,22 +122,51 @@ COLUMNS: tuple[str, ...] = (
     "latest_model_id",
     "images",
     "archived",
-    # Appended past the end of FMLV's own template, deliberately — see NEVER_IN_UPLOAD.
+    # Appended past the end of FMLV's own template, deliberately — see
+    # OUTSIDE_FMLV_TEMPLATE.
     "max_nose_weight_kilograms",
 )
 
-#: Columns that exist for us and **never** for FMLV, so they are written to the generated
-#: CSV and stripped from the upload.
+#: Columns that exist for us and **never** for FMLV. FMLV has no maximum nose weight
+#: field and is not getting one — the figure is for the TowCheck sister site — so it is
+#: held out of `UPLOAD_COLUMNS`, which must stay FMLV's own template exactly.
 #:
 #: Distinct from the motorhome schema's `NOT_YET_IN_UPLOAD_TEMPLATE`, which holds back a
 #: column Steadfast have built but not released: that one is temporary and is kept out of
-#: *both* files so nobody pastes it in early. This is permanent. FMLV has no maximum nose
-#: weight field and is not getting one — the figure is for the TowCheck sister site — so it
-#: belongs in the file a person reads and never in the file they upload.
-NEVER_IN_UPLOAD: frozenset[str] = frozenset({"max_nose_weight_kilograms"})
+#: *both* files so nobody pastes it in early. This one is permanent, and it is **not**
+#: kept out of the generated file — see `GENERATED_COLUMNS`.
+OUTSIDE_FMLV_TEMPLATE: frozenset[str] = frozenset({"max_nose_weight_kilograms"})
 
+#: FMLV's own upload template, exactly: 62 columns ending at `archived` in column BJ.
+#: Nothing may be added to this, reordered within it or removed from it — see
+#: `GENERATED_COLUMNS` for where our own columns go instead.
 UPLOAD_COLUMNS: tuple[str, ...] = tuple(
-    column for column in COLUMNS if column not in NEVER_IN_UPLOAD
+    column for column in COLUMNS if column not in OUTSIDE_FMLV_TEMPLATE
+)
+
+#: A column with no field behind it: a blank header and a blank cell on every row.
+#: `caravan_io.write_csv` writes one wherever this appears in its `columns`.
+SPACER_COLUMN = ""
+
+#: What a run's generated CSVs actually carry — **both** of them, the upload and the
+#: readable copy alike. FMLV's 62 template columns, then two spacers, then our own.
+#:
+#: **The nose weight lands in column BM**, which is where the requester keeps it
+#: (17 November 2026) and saves him transposing it by hand out of BK. The two blank
+#: columns are a deliberate buffer: Steadfast's export already carries an `active` column
+#: in BK that the template does not, so putting ours hard against `archived` would park
+#: it exactly where FMLV's own next column is most likely to land.
+#:
+#: **This rests on FMLV's importer reading only as far as BJ** — the requester's
+#: understanding, not something this repo can prove, and the first upload carrying these
+#: columns must be checked against FMLV before the rest of the caravan adapters follow.
+#: If it turns out the importer does not tolerate them, the upload goes back to
+#: `UPLOAD_COLUMNS` and only the readable copy keeps the nose weight.
+GENERATED_COLUMNS: tuple[str, ...] = (
+    *UPLOAD_COLUMNS,
+    SPACER_COLUMN,
+    SPACER_COLUMN,
+    "max_nose_weight_kilograms",
 )
 
 #: Written back exactly as read. Guide: "PLEASE Leave as is!"

@@ -203,6 +203,12 @@ _SPEC_PATTERNS: dict[str, re.Pattern[str]] = {
     "mtplm_kilograms": re.compile(
         r"Minimal technically permissible laden mass \(MTPLM-min, kg\)\s+(\d+)"
     ),
+    # **Not an FMLV field** — a finding for the TowCheck sister site, which cannot say
+    # whether a car may legally tow a caravan without it. `Max nose weight 100` is the
+    # one line in the mass block that states no unit; every figure around it is in
+    # kilogrammes and 100kg is the usual limit, so that is how it is read, and the
+    # provenance says the document does not state it.
+    "max_nose_weight_kilograms": re.compile(r"Max nose weight\s+(\d+)"),
 }
 
 #: `Awning perimeter dimensions (body/chassis, cm) 1083/638` — the **body** figure, in
@@ -437,6 +443,7 @@ def build_extracted(
         rrp_pounds=product.product.price_pounds,
         mtplm_kilograms=mtplm,
         mro_kilograms=figures.get("mro_kilograms"),
+        max_nose_weight_kilograms=figures.get("max_nose_weight_kilograms"),
         personal_effects_payload_kilograms=product.derived_payload_kilograms,
         shipping_length_mm=figures.get("shipping_length_mm"),
         exterior_body_length_mm=figures.get("exterior_body_length_mm"),
@@ -502,6 +509,16 @@ def build_extracted(
         record(
             "mro_kilograms",
             f"Mass in running order (MIRO-min, kg): {figures.get('mro_kilograms')}",
+        )
+    nose = figures.get("max_nose_weight_kilograms")
+    if nose is not None:
+        record(
+            "max_nose_weight_kilograms",
+            f"Max nose weight: {nose}. **The PDF states no unit on this line**, alone in "
+            f"the mass block — it is read as kilogrammes because every figure around it "
+            f"is, and because {nose}kg is an ordinary limit for a caravan of this mass. "
+            f"Not an FMLV field: it is for the TowCheck sister site, and it reaches you "
+            f"in column BM of the generated CSV rather than as a change to approve",
         )
     if product.derived_payload_kilograms is not None:
         record(

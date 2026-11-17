@@ -404,6 +404,28 @@ all**, where FMLV holds 2000. Every other product publishes both. Proposing 2500
 take a maximum where the convention is the minimum, so nothing should be proposed for its
 permissible mass until Adria publishes the pair.
 
+## The maximum nose weight — 17 November 2026
+
+Adria state it in the mass block, and it is the same figure on all nine live layouts:
+
+```
+Max loading weight (kg) with All Inclusive Pack weight deducted 161
+Max nose weight 100
+```
+
+**100 kg on every one, including the two Actions**, whose masses are still unpublished —
+so the nose weight is readable on a layout whose MTPLM is not. A flat figure across four
+ranges and 1650–2500 kg of MTPLM is the standard hitch limit rather than a per-model
+measurement, and it is worth knowing it will not vary.
+
+**The line states no unit**, alone in a block where every other figure carries `(kg)`.
+It is read as kilogrammes, and the provenance says the document does not say so.
+
+Not an FMLV field — it is for the TowCheck sister site, and reaches a reviewer as a
+finding rather than a change to approve, in **column BM** of the generated CSV. See
+`docs/adapters/README.md` § "The maximum nose weight is collected, and never carried
+over".
+
 ## Traps
 
 **Length is the total including the tow bar, not the body length.** The PDF states

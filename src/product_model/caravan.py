@@ -85,8 +85,9 @@ class Caravan(BaseModel):
 
     #: **Not an FMLV field.** The maximum nose weight, for the TowCheck sister site, which
     #: tells an owner whether their car can legally tow a given caravan — and cannot answer
-    #: without this figure. FMLV itself has no column for it, so it rides in the generated
-    #: CSV and is held out of the upload: see `caravan_schema.NEVER_IN_UPLOAD`.
+    #: without this figure. FMLV itself has no column for it, so it rides in column BM of
+    #: the generated CSVs, two blank columns past the end of FMLV's own template: see
+    #: `caravan_schema.GENERATED_COLUMNS`.
     #:
     #: **Never carried over, unlike every other mass here.** The requester's rule, 9
     #: November 2026: *"either it is current and factual, off the website, or we couldn't

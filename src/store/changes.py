@@ -56,6 +56,7 @@ from ..product_model.findings import (
     FLOORPLAN_FIELD,
     FLOORPLAN_SNIPPET,
     NOSE_WEIGHT_FIELD,
+    NOT_PROPOSED,
     SILENCE_MEANS,
 )
 from ..product_model.validation import (
@@ -879,8 +880,16 @@ def persist_diff(
         if diff.kind == ChangeKind.NEW_PRODUCT:
             profile = profile_for(diff.extracted.product)
             for field_name, provenance in diff.extracted.provenance.items():
-                if field_name in FINDING_FIELDS:
-                    continue  # reported above, never proposed
+                if field_name in NOT_PROPOSED:
+                    # Reported above, never proposed. `NOT_PROPOSED` rather than
+                    # `FINDING_FIELDS` because it also holds the nose weight, which FMLV
+                    # has no column for: proposing it put a decision in front of a
+                    # reviewer that `apply_field` would then raise on. The matched path
+                    # (`diff.compare`) has always read `NOT_PROPOSED`; this one had not,
+                    # so the bug could only appear on a *new* product of a manufacturer
+                    # that publishes a nose weight, which is why it took until Adria's
+                    # run #262 on 17 November 2026 to show up.
+                    continue
                 value = field_value(diff.extracted.product, field_name)
                 if (
                     value is None

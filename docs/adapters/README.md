@@ -2566,11 +2566,28 @@ Two follow-on questions the later surveys added:
 whether their car may legally tow a given caravan, and cannot answer without the caravan's
 maximum nose weight. FMLV itself has no column for it and is not getting one.
 
-So it is collected into `Caravan.max_nose_weight_kilograms`, written to the **readable copy**
-of the upload and stripped from the upload proper. `caravan_schema.NEVER_IN_UPLOAD` is that
-strip, and it is not the same thing as the motorhome schema's
-`NOT_YET_IN_UPLOAD_TEMPLATE`: that one holds back a column Steadfast have built but not
-released, is temporary, and is kept out of *both* files so nobody pastes it in early.
+So it is collected into `Caravan.max_nose_weight_kilograms` and written to **column BM of
+both generated CSVs** — the upload and the readable copy alike — two blank columns past
+`archived`, which is the last of FMLV's own. `caravan_schema.GENERATED_COLUMNS` is that
+arrangement and `UPLOAD_COLUMNS` remains FMLV's 62-column template exactly, so nothing has
+been added to, reordered within or removed from what the importer reads.
+
+**Changed 17 November 2026**, on the requester's ask: it used to be written only to the
+readable copy, in BK, and transposed to BM by hand every time. The two spacers are a
+buffer rather than decoration — Steadfast's *export* already carries an `active` column in
+BK that the upload template does not, so a column of ours hard against `archived` would
+sit exactly where FMLV's own next one is likeliest to land.
+
+**This rests on FMLV's importer reading only as far as BJ**, which is the requester's
+understanding and not something this repo can prove. The first upload carrying these
+columns has to be checked against FMLV before the remaining caravan adapters follow. If
+the importer turns out not to tolerate them, the upload goes back to `UPLOAD_COLUMNS` and
+only the readable copy keeps the nose weight.
+
+`caravan_schema.OUTSIDE_FMLV_TEMPLATE` is what holds it out of `UPLOAD_COLUMNS`, and it is
+not the same thing as the motorhome schema's `NOT_YET_IN_UPLOAD_TEMPLATE`: that one holds
+back a column Steadfast have built but not released, is temporary, and is kept out of
+*both* files so nobody pastes it in early.
 
 Three rules, all the requester's, 9 November 2026:
 
@@ -2589,14 +2606,25 @@ Three rules, all the requester's, 9 November 2026:
   `output.build.build_upload_products` therefore assigns it unconditionally, including to
   `None`.
 
-**Where it is actually published, which is not many places.** Of the sixteen caravan
-adapters, three sources carry a real figure and are wired:
+**Where it is actually published, which is not many places.** Of the seventeen caravan
+adapters, four sources are known to carry a real figure:
 
-| | what it says |
-|---|---|
-| **Eriba** | `Maximum nose weight (kg) 100 100 100 100`, per layout, in the price list |
-| **Adria** | `Max nose weight 100`, in the price list |
-| **Freedom** | `Noseweight: 70kg`, on the model page |
+| | what it says | read? |
+|---|---|---|
+| **Eriba** | `Maximum nose weight (kg) 100 100 100 100`, per layout, in the price list | yes |
+| **Coachman** | `Maximum Hitch Weight`, on every weighed model's technical panel | yes |
+| **Adria** | `Max nose weight 100`, in the technical-data PDF's mass block | yes, 17 Nov 2026 |
+| **Freedom** | `Noseweight: 70kg`, on the model page | **not yet** |
+
+**The other thirteen adapters have never looked.** A blank in BM therefore means one of
+two quite different things today — the maker publishes nothing, or nobody has checked —
+and only the four above distinguish them. Each adapter picks the field up when it is next
+touched, the way the habitation findings were done, rather than in a sweep.
+
+**Adria states no unit on its line**, alone in a mass block where everything else is in
+kilogrammes. It is read as kilogrammes and the provenance says the document does not say
+so, which is the general rule: record the reading and name the assumption, rather than
+leaving the figure out or quietly asserting it.
 
 Campod prints the label with no value after it. Bailey's pages mention nose weight only as
 marketing copy — *"centrally mounted gas locker for enhanced towing stability and reduced

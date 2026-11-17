@@ -170,6 +170,40 @@ def test_the_payload_is_derived_not_read(rio_grande: str) -> None:
     assert product.derived_payload_kilograms == 215
 
 
+# --- the nose weight, for TowCheck ----------------------------------------------------
+
+
+def test_the_nose_weight_is_read_off_the_pdf(
+    rio_grande: str, colorado: str, tyne: str
+) -> None:
+    """`Max nose weight 100`, in the mass block. Not an FMLV field — a finding for the
+    TowCheck sister site, which reaches a reviewer in column BM of the generated CSV."""
+    for text in (rio_grande, colorado, tyne):
+        assert parse_caravan_pdf(text).get("max_nose_weight_kilograms") == 100
+
+
+def test_a_pdf_without_a_nose_weight_leaves_it_blank(action: str) -> None:
+    """The requester's rule, 9 November 2026: found or blank, never carried over. Both
+    Action configurations publish `TBA` for their technical data and state no nose
+    weight, which is exactly the case the rule is about."""
+    assert parse_caravan_pdf(action).get("max_nose_weight_kilograms") is None
+
+
+def test_the_nose_weight_reaches_the_product_and_its_provenance(rio_grande: str) -> None:
+    live = next(p for p in _livewire("alpina") if p.layout_label == "623 HT RIO GRANDE")
+    product = AdriaCaravan(
+        config=RANGES[0], product=live, figures=parse_caravan_pdf(rio_grande), pdf_url="x"
+    )
+
+    extracted = adria_caravan.build_extracted(product, basis="")
+
+    assert extracted.product.max_nose_weight_kilograms == 100
+    snippet = extracted.provenance["max_nose_weight_kilograms"].snippet
+    # The document really does state no unit on this one line, and saying so is the
+    # point: a reviewer can see what was assumed rather than having to trust it.
+    assert "states no unit" in snippet
+
+
 # --- length -------------------------------------------------------------------------
 
 

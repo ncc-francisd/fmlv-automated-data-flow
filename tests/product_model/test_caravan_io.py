@@ -105,13 +105,50 @@ def test_the_schema_column_order_matches_the_real_export_exactly() -> None:
     assert caravan_schema.UPLOAD_COLUMNS == header
 
 
-def test_the_nose_weight_column_is_ours_alone_and_never_uploaded() -> None:
+def test_the_nose_weight_column_is_ours_alone_and_sits_past_fmlvs_template() -> None:
     """FMLV has no maximum nose weight field and is not getting one — the figure is for the
-    TowCheck sister site. So it rides in the copy a person reads and is stripped from the
-    upload, which must stay byte-compatible with FMLV's own template."""
+    TowCheck sister site. So it is kept out of `UPLOAD_COLUMNS`, which must stay FMLV's own
+    template exactly, and written past the end of it instead."""
     assert caravan_schema.COLUMNS[-1] == "max_nose_weight_kilograms"
     assert "max_nose_weight_kilograms" not in caravan_schema.UPLOAD_COLUMNS
-    assert caravan_schema.NEVER_IN_UPLOAD == frozenset({"max_nose_weight_kilograms"})
+    assert caravan_schema.OUTSIDE_FMLV_TEMPLATE == frozenset({"max_nose_weight_kilograms"})
+
+
+def test_the_generated_files_put_the_nose_weight_in_column_bm() -> None:
+    """Requested 17 November 2026, so the figure lands where it is kept rather than being
+    transposed out of BK by hand.
+
+    The two spacers are a buffer, not decoration: Steadfast's export already carries an
+    `active` column in BK that the upload template does not, so a column of ours hard
+    against `archived` would sit exactly where FMLV's own next one is likeliest to land.
+    """
+    generated = caravan_schema.GENERATED_COLUMNS
+    assert len(generated) == 65
+    # BJ, BK, BL, BM — column 63 is index 62.
+    assert generated[61] == "archived"
+    assert generated[62] == caravan_schema.SPACER_COLUMN
+    assert generated[63] == caravan_schema.SPACER_COLUMN
+    assert generated[64] == "max_nose_weight_kilograms"
+    # FMLV's template is carried through untouched, in order.
+    assert generated[:62] == caravan_schema.UPLOAD_COLUMNS
+
+
+def test_a_spacer_column_writes_a_blank_header_and_blank_cells(tmp_path: Path) -> None:
+    """A spacer is not a field, so it must not pick up a value from the row dict — and two
+    of them must not collapse into one, which is what `csv.DictWriter` would have done
+    with a repeated field name."""
+    path = tmp_path / "spaced.csv"
+    caravan_io.write_csv(
+        [Caravan(manufacturer="Bailey", model="Phoenix 420")],
+        path,
+        columns=caravan_schema.GENERATED_COLUMNS,
+    )
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        header, row = list(csv.reader(handle))[:2]
+
+    assert header[62:] == ["", "", "max_nose_weight_kilograms"]
+    assert row[62:] == ["", "", ""]
+    assert len(header) == len(row) == 65
 
 
 # --------------------------------------------------------------------------- #
