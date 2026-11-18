@@ -2004,6 +2004,28 @@ overview cards against six collected families is what exposed the gap. **An abse
 explain is a gap in the search, not a fact about the manufacturer** — do not write it up as a
 discontinued range until a second source agrees.
 
+**And a roster that was complete can quietly stop being complete.** Rule from Panama,
+18 November 2026. Their homepage linked all five model pages at the survey, so it was the
+roster; `sitemap.xml` listed only dynamic sitemaps for videos and news and was written off.
+Panama then rebuilt the site into two ranges whose buttons Wix renders client-side, and the
+homepage came to link four pages out of nine. The run collected three models for two months
+and said nothing, because **an unlinked page and a withdrawn model are the same thing from
+an adapter's side** — there is no error to raise.
+
+Two things follow, and they apply to every adapter whose roster is a page a person edits:
+
+- **Prefer the machine-written list and keep the human one as a cross-check.** Panama's
+  *pages* sitemap — a different file from the `sitemap.xml` that was useless — lists every
+  page that exists, because Wix writes it from the pages rather than from the navigation.
+  Read both, take the union, and narrate any page that is in one and not the other. Where
+  the machine list is the only one, every URL still has to yield a title, a price and a
+  spec block before it becomes a product, because a sitemap can keep a page that is no
+  longer sold.
+- **Re-check the roster source, not just the roster.** The note in that adapter said "do
+  not use the sitemap", which was true when written and false fourteen weeks later. A
+  survey decision about *where* the list lives deserves the same periodic doubt as the
+  numbers on it.
+
 ### The roster parser is the one that must have a fixture test
 
 **Anchor a roster on the page's meaning, not on a framework's spelling — and pin it with
