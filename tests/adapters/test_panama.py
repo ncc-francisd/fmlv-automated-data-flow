@@ -23,14 +23,17 @@ import pytest
 from src.adapters import adapter_for, panama
 from src.adapters.panama import (
     BASE_VEHICLE,
+    EXPECTED_LAYOUTS,
     FMLV_RANGE,
     HIGH_TOP_ABOVE_MM,
     PanamaProduct,
     _build_extracted_motorhome,
+    _first_millimetres,
     _reconciles,
     find_model_urls,
     parse_model_page,
     plain_text,
+    sitemap_model_urls,
 )
 from src.product_model.enums import BodyType, Heating, Refrigeration
 
@@ -40,15 +43,21 @@ FIXTURES = Path(__file__).parent / "fixtures"
 #: a heredoc is too easy to lose to an escaping layer.
 B = chr(92)
 
-#: Panama's UK roster. Five on the site against the three FMLV holds.
-EXPECTED_LAYOUTS = 5
-
 PAGES: dict[str, str] = {
     "panama_p12.html": "https://www.panamauk.co.uk/p12",
     "panama_p12_plus.html": "https://www.panamauk.co.uk/p12-plus",
     "panama_p57.html": "https://www.panamauk.co.uk/p57",
     "panama_p10e.html": "https://www.panamauk.co.uk/p10-e",
+    "panama_p12_se_awd.html": "https://www.panamauk.co.uk/p12-se-awd",
 }
+
+#: `pages-sitemap.xml` as Wix served it on 18 November 2026, whole.
+SITEMAP = "panama_pages_sitemap.xml"
+
+#: **The SE fixture has had its `<style>` and `<script>` blocks removed and nothing else.**
+#: The page is 2.5MB as served and 1.6MB of that is CSS; `plain_text` discards both tags
+#: before reading a word, and the trimmed copy was checked to parse to the identical
+#: `PanamaProduct` before it was saved.
 
 
 def _page(name: str) -> str:
@@ -62,12 +71,38 @@ def _parse(name: str) -> PanamaProduct:
 
 
 # --------------------------------------------------------------------------- #
-# The roster, which is not in the sitemap
+# The roster: the pages sitemap, with the homepage as a second opinion
 # --------------------------------------------------------------------------- #
 
 
-def test_the_homepage_links_are_the_roster() -> None:
-    """`sitemap.xml` lists five *other* sitemaps and no model page at all."""
+def test_the_pages_sitemap_lists_every_layout() -> None:
+    """**The roster, as of 18 November 2026.** The homepage links four of these nine."""
+    urls = sitemap_model_urls(_page(SITEMAP), ("p",))
+
+    assert len(urls) == EXPECTED_LAYOUTS
+    assert sorted(url.rsplit("/", 1)[-1] for url in urls) == [
+        "p10-e",
+        "p12",
+        "p12-plus",
+        "p12-se",
+        "p12-se-awd",
+        "p50",
+        "p50-plus",
+        "p57",
+        "p57-se",
+    ]
+
+
+def test_the_sitemaps_other_pages_are_not_mistaken_for_models() -> None:
+    """It lists thirty-odd pages and only nine of them are vehicles."""
+    urls = sitemap_model_urls(_page(SITEMAP), ("p",))
+
+    for junk in ("panama-media", "panama-owners", "privacy-policy", "panama-se-range"):
+        assert not any(url.endswith(junk) for url in urls), junk
+
+
+def test_the_homepage_is_still_read_as_a_roster() -> None:
+    """Kept as the fallback and the cross-check: Wix could drop the sitemap tomorrow."""
     html_ = (
         '<a href="/p12">a</a><a href="/p12-plus">b</a><a href="/p57">c</a>'
         '<a href="/p50-plus">d</a><a href="/p10-e">e</a>'
@@ -75,8 +110,22 @@ def test_the_homepage_links_are_the_roster() -> None:
 
     urls = find_model_urls(html_, ("p",))
 
-    assert len(urls) == EXPECTED_LAYOUTS
+    assert len(urls) == 5
     assert urls[0] == "https://www.panamauk.co.uk/p12"
+
+
+def test_a_slug_of_several_words_is_read() -> None:
+    """**The bug this fix exists for.** The path pattern allowed one hyphenated word, so
+    `/p12-se-awd` matched nothing — and `/p57-se` and `/p12-se` with it. Three live models
+    went uncollected and nothing said so, because an unlinked page and a withdrawn model
+    look the same from here."""
+    html_ = '<a href="/p12-se-awd">a</a><a href="/p57-se">b</a><a href="/p12-se">c</a>'
+
+    assert find_model_urls(html_, ("p",)) == [
+        "https://www.panamauk.co.uk/p12-se-awd",
+        "https://www.panamauk.co.uk/p57-se",
+        "https://www.panamauk.co.uk/p12-se",
+    ]
 
 
 def test_the_sites_other_pages_are_not_mistaken_for_models() -> None:
@@ -353,3 +402,65 @@ def test_the_page_publishes_both_mirror_figures() -> None:
     assert "Overall Width (inc mirrors)" in text
     assert "2275mm" in text
     assert "Overall Width (mirrors folded)" in text
+
+
+# --------------------------------------------------------------------------- #
+# The SE pages, which broke two readers at once
+# --------------------------------------------------------------------------- #
+
+
+def test_a_multi_word_model_name_is_read_from_the_title() -> None:
+    """`<title>P\\12 SE  AWD| Panama MPV Campervan</title>` — two spaces inside the name
+    and none before the pipe. The old pattern took one word plus an optional `Hybrid`, so
+    this page returned `None` and was narrated as carrying no model name at all."""
+    assert _parse("panama_p12_se_awd.html").model == f"{B}12 SE AWD"
+
+
+def test_the_se_page_yields_every_field() -> None:
+    """Nothing else about these pages is unusual: same template, same labels."""
+    product = _parse("panama_p12_se_awd.html")
+
+    assert product.rrp_pounds == 74995
+    assert product.mtplm_kilograms == 3170
+    assert product.mro_kilograms == 2715
+    assert product.mh_length_mm == 5050
+    assert product.mh_height_mm == 2020
+    assert product.berths == 4
+    assert product.mh_passenger_seats_inc_driver == 5
+
+
+def test_the_payload_label_missing_its_bracket_is_still_read() -> None:
+    """The three SE pages print `Maximum User Payload (A-B` with no closing bracket.
+    Read, the figure corroborates the two masses; unread, the payload is derived and
+    nothing checks it."""
+    text_ = plain_text(_page("panama_p12_se_awd.html"))
+    assert "Maximum User Payload (A-B 455kg" in text_, "the bracket is really missing"
+
+    product = _parse("panama_p12_se_awd.html")
+
+    assert product.published_payload_kilograms == 455
+    assert product.mtplm_kilograms - product.mro_kilograms == 455
+
+
+def test_the_se_page_still_takes_the_mirrors_folded_width() -> None:
+    """It publishes both, `(inc mirrors) 2275mm` first and `(mirrors folded) 2150mm`
+    second. FMLV wants the folded one — the settled rule — and the label is what picks it,
+    not the order or the size."""
+    text_ = plain_text(_page("panama_p12_se_awd.html"))
+    assert "Overall Width (inc mirrors)" in text_
+    assert "2275mm" in text_
+
+    assert _parse("panama_p12_se_awd.html").mh_width_mm == 2150
+
+
+def test_a_dimension_that_lost_its_unit_is_still_read() -> None:
+    r"""Quoted from the live `P\12+` page on 18 November 2026, which prints `Overall Height
+    6'7" | 2000` where every sibling prints `2000mm` and where it printed `2000mm` itself
+    in September. 6'7" is 2007mm, so the figure is millimetres."""
+    assert _first_millimetres("6'7\" | 2000 Ford Tourneo Custom 2.0 EcoBlue 136") == 2000
+
+
+def test_a_bare_number_outside_the_metric_column_is_not_a_dimension() -> None:
+    """The window after a label runs into the next row. Without the pipe anchor, the
+    height on that same page would have read the `215` of the tyre size."""
+    assert _first_millimetres("Tyre size 215/60 R17 C") is None

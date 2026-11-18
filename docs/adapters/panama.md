@@ -17,24 +17,60 @@ layouts on the site; FMLV holds three.
   the UK."* Here the reverse is true, because `panamauk.co.uk` **is** a UK site: it lists
   five and FMLV holds three.
 
-## The source: five model pages on a UK site
+## The source: nine model pages on a UK site
 
 This is not the two-source shape the other Marquis brands have. `panamauk.co.uk` carries
 both the roster and the numbers, so Panama is closer to Auto-Sleepers than to Benimar.
 
-**Do not use `sitemap.xml`.** It lists five *other* sitemaps — videos, news, events — and
-no model pages. The roster comes from the homepage's own links:
-
-| page | site name | in FMLV |
-| --- | --- | --- |
-| `/p12` | `P\12` | `P` / `/12` |
-| `/p57` | `P\57` | `P` / `/57` |
-| `/p10-e` | `P\10E Hybrid` | `P` / `\10E Hybrid` |
-| `/p12-plus` | `P\12+` | — **new** |
-| `/p50-plus` | `P\50+` | — **new** |
-
-Every page is plain HTML on a Wix-style site — large (2 MB raw, 13 KB of text) but
+Every page is plain HTML on a Wix site — large (2–2.5 MB raw, 13 KB of text) but
 server-rendered, so no browser is needed.
+
+### The roster moved, and reading the homepage alone was costing us five models
+
+**At the survey, September 2026**, `sitemap.xml` listed five *other* sitemaps — videos,
+news, events — and no model page at all, so the homepage's own links were the only roster
+there was.
+
+**That changed when Panama rebuilt the site in autumn 2026**, and it changed quietly.
+`pages-sitemap.xml` now lists **all nine** model pages. The homepage links **four**. The
+rest hang off two new range pages, `/panama-core-range` (titled *Panama Signature*) and
+`/panama-se-range`, whose *DISCOVER* buttons Wix renders client-side — they are not in the
+served HTML, so a plain fetch cannot follow them.
+
+Between 15 September and 18 November 2026 the adapter therefore collected three models and
+said nothing about the other six. **An unlinked page and a withdrawn model look identical
+from here**, which is why the roster is now the sitemap, with the homepage kept as its
+fallback and its cross-check: a page in one and not the other is read, and said out loud.
+
+| page | site name | range | in FMLV, Sept 2026 |
+| --- | --- | --- | --- |
+| `/p12` | `P\12` | Signature | `P` / `/12` |
+| `/p12-plus` | `P\12+` | Signature | — |
+| `/p50` | `P\50` | Signature | — |
+| `/p50-plus` | `P\50+` | Signature | — |
+| `/p57` | `P\57` | Signature | `P` / `/57` |
+| `/p12-se` | `P\12 SE` | SE | — |
+| `/p12-se-awd` | `P\12 SE AWD` | SE | — |
+| `/p57-se` | `P\57 SE` | SE | — |
+| `/p10-e` | `P\10E Hybrid` | — | `P` / `\10E Hybrid` |
+
+**The Signature and SE names are not recorded.** FMLV files all nine under range `P` with
+the layout as the model, which is what it already holds for the three it has, and the SE
+is in the model name anyway.
+
+### Three readers had to change with it
+
+Found on 18 November 2026, each of them a silent failure rather than an error:
+
+* **The path pattern allowed one hyphenated word**, so `/p12-se-awd`, `/p12-se` and
+  `/p57-se` matched nothing — even on the one page that did link the first of them.
+* **The title pattern took one word and an optional `Hybrid`.** `P\12 SE AWD| Panama MPV
+  Campervan` is three, with two spaces inside the name and none before the pipe, so the
+  page was narrated as carrying no model name at all.
+* **`Maximum User Payload (A-B` is missing its closing bracket** on all three SE pages.
+  Unread, their payload would be derived from the two masses with nothing corroborating
+  it. The `P\57` is a different case and not fixable in a label: that page prints no
+  payload row at all.
 
 ## Every page states the specification, and labels the widths
 
@@ -136,11 +172,25 @@ so that one column means one thing. See `README.md`.
 
 FMLV already holds 2150 on its existing rows, so nothing changes for them.
 
+## A dimension can arrive without its unit
+
+**18 November 2026.** The `P\12+` page prints `Overall Height 6'7" | 2000` — no `mm`, and
+the row moved below the tyre size. The same page printed `2000mm` in September and its
+eight siblings still do, and 6'7" is 2007mm, so the figure is millimetres.
+
+`_first_millimetres` falls back to a bare number **after the pipe**, which is where this
+site puts the metric figure in every row. Not to any bare number: the window after a label
+runs on into the next row, so left loose the height on that page would have read the `215`
+of `215/60 R17 C`.
+
 ## Still unverified
 
 * **Price.** Not yet looked for. Marquis are the seller, so their price is the one that
   counts by the settled rule, and it may not be on `panamauk.co.uk` at all.
 * **Habitation.** Not yet examined.
 * **Floorplans.** Not yet examined.
+* **Whether the Signature and SE pages ever carry a model the sitemap does not.** Their
+  buttons are client-side, so nothing here has read them; the sitemap has been complete
+  every time it has been checked, which is twice.
 * **Whether the P\12's two columns are two FMLV products.** If the seven-seat version is
   sold as a distinct vehicle, the answer to question 1 is "both", not "column 1".

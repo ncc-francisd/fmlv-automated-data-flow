@@ -1,4 +1,4 @@
-"""Panama — five Ford-based campervans from a UK site that carries the whole story.
+"""Panama — nine Ford-based campervans from a UK site that carries the whole story.
 
 `docs/adapters/panama.md` is the survey; this is what it decided.
 
@@ -8,8 +8,21 @@ Auto-Sleepers than to Benimar.
 
 Four things drive the module:
 
-* **The roster comes from the homepage, not the sitemap.** `sitemap.xml` lists five *other*
-  sitemaps — videos, news, events — and no model page at all. See `find_model_urls`.
+* **The roster comes from the pages sitemap, with the homepage as a second opinion.**
+  It did not when this adapter was written: `sitemap.xml` named five dynamic sitemaps
+  for videos, news and events and no model page at all, so the homepage was the only
+  roster there was. Panama rebuilt the site in autumn 2026 and `pages-sitemap.xml` now
+  lists all nine model pages, while the homepage links **four**. The rest hang off two
+  new range pages, `/panama-core-range` (titled *Panama Signature*) and
+  `/panama-se-range`, whose buttons Wix renders client-side and which a plain fetch
+  therefore cannot follow.
+
+  Reading the homepage alone cost five live models between September and November 2026
+  — `P\\12+`, `P\\50`, `P\\50+`, `P\\12 SE` and `P\\57 SE` — with nothing in the run
+  log to say so, because a model page that is not linked looks exactly like a model
+  that was withdrawn. So `sitemap_model_urls` is the roster and `find_model_urls` is
+  kept as its fallback and its cross-check: a page on one and not the other is read,
+  and said out loud.
 * **The model name carries a backslash**, and it is a real `U+005C` rather than a rendering
   artefact: `P\\12`, `P\\57`, `P\\10E Hybrid`. FMLV holds two of the three with a forward
   slash instead, which the requester is correcting at upload. It costs nothing in matching
@@ -40,10 +53,20 @@ BASE_URL = "https://www.panamauk.co.uk"
 MANUFACTURER = "Panama"
 MANUFACTURER_DISPLAY_NAME = "Panama"
 
-#: **The roster page, because the sitemap is useless here.** `sitemap.xml` names five
-#: dynamic sitemaps for videos, news and events and lists no vehicle. The homepage links
-#: every model directly.
+#: **The roster.** `sitemap.xml` itself is still no use — it names five dynamic sitemaps
+#: for videos, news and events — but the pages sitemap it points at lists every model
+#: page, which it did not when this adapter was written.
+ROSTER_SITEMAP_URL = f"{BASE_URL}/pages-sitemap.xml"
+
+#: The homepage, kept as the fallback roster and as a cross-check on the sitemap. It
+#: links four of the nine models; the module docstring says why that is not enough.
 INDEX_URL = f"{BASE_URL}/"
+
+#: What Panama list: `P\10E Hybrid`, then `P\12`, `P\12+`, `P\50`, `P\50+` and `P\57`
+#: under *Signature*, and `P\12 SE`, `P\12 SE AWD` and `P\57 SE` under *SE*. Compared
+#: against what was collected, so a page dropped by a template change is reported
+#: rather than read as a withdrawal.
+EXPECTED_LAYOUTS = 9
 
 #: Panama sell one range, which FMLV holds as `P` with the layout in the model.
 FMLV_RANGE = "P"
@@ -63,10 +86,21 @@ HIGH_TOP_ABOVE_MM = 2300
 
 # --- Reading the roster ----------------------------------------------------------------
 
-#: A model link on the homepage: `/p12`, `/p12-plus`, `/p57`, `/p50-plus`, `/p10-e`.
-#: Anchored so `/panama-media`, `/panama-owners` and `/pages-sitemap.xml` cannot match.
+#: A model page's path: `/p12`, `/p12-plus`, `/p10-e`, `/p57-se`, `/p12-se-awd`. The
+#: digit after `/p` is what keeps `/panama-media`, `/panama-owners` and
+#: `/pages-sitemap.xml` out, and **the trailing group repeats** — it did not until
+#: 18 November 2026, which is how `/p12-se-awd` went unread even on the page that
+#: did link it.
+_MODEL_PATH = r"/p\d+(?:-[a-z0-9]+)*"
+
+#: A model link on the homepage.
 _MODEL_HREF = re.compile(
-    rf'href="(?:{re.escape(BASE_URL)})?(?P<path>/p\d+(?:-[a-z]+)?|/p\d+-e)"', re.I
+    rf'href="(?:{re.escape(BASE_URL)})?(?P<path>{_MODEL_PATH})"', re.I
+)
+
+#: A model page in `pages-sitemap.xml`, whose `<loc>` carries the absolute URL.
+_SITEMAP_MODEL_LOC = re.compile(
+    rf"<loc>\s*(?:https?://[^<\s/]+)?(?P<path>{_MODEL_PATH})\s*</loc>", re.I
 )
 
 _TAGS = re.compile(r"(?is)<(script|style)\b.*?</\1>")
@@ -83,22 +117,46 @@ def plain_text(page: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(html.unescape(stripped))).strip()
 
 
-def find_model_urls(index_html: str, ranges: Iterable[str]) -> list[str]:
-    """Every model page the homepage links, in page order, deduplicated."""
+def _model_urls(
+    pattern: re.Pattern[str], document: str, ranges: Iterable[str]
+) -> list[str]:
     if not list(ranges):
         return []
     urls: list[str] = []
-    for match in _MODEL_HREF.finditer(index_html):
+    for match in pattern.finditer(document):
         url = f"{BASE_URL}{match.group('path').lower()}"
         if url not in urls:
             urls.append(url)
     return urls
 
 
+def find_model_urls(index_html: str, ranges: Iterable[str]) -> list[str]:
+    """Every model page the homepage links, in page order, deduplicated."""
+    return _model_urls(_MODEL_HREF, index_html, ranges)
+
+
+def sitemap_model_urls(sitemap_xml: str, ranges: Iterable[str]) -> list[str]:
+    """Every model page `pages-sitemap.xml` lists, in sitemap order, deduplicated.
+
+    **The complete roster, where the homepage is a selection.** Wix writes this file
+    from the pages that exist rather than from whatever the front page last linked, so
+    a model stays in it until its page is taken down. That cuts both ways: a page could
+    in principle linger here after Panama stop selling it, which is why every URL still
+    has to yield a title, a price and a spec block before it becomes a product.
+    """
+    return _model_urls(_SITEMAP_MODEL_LOC, sitemap_xml, ranges)
+
+
 # --- Reading one page ------------------------------------------------------------------
 
 #: The model as Panama write it, from the page title: `P\12 | Panama MPV Campervan`.
-_TITLE_NAME = re.compile(r"<title>\s*(?P<name>P.\S*(?:\s+Hybrid)?)\s*\|", re.I)
+#:
+#: **Everything up to the pipe, because the name can be several words.** It used to be
+#: one word with an optional `Hybrid` after it, which silently refused `P\12 SE AWD|
+#: Panama MPV Campervan` — note that Panama put no space before the pipe on that page,
+#: and two inside the name. The backslash is required rather than any character, so a
+#: page whose title merely happens to contain a `P` cannot be read as a model.
+_TITLE_NAME = re.compile(r"<title[^>]*>\s*(?P<name>P\\[^|<]*?)\s*\|", re.I)
 
 #: **Stems, because the labels vary between sibling pages.** `MTPLM (A) kg` on the P\12
 #: and `MTPLM (A)` on the other four; `sleeping positions` on four and `sleeping potitions`
@@ -111,7 +169,11 @@ _LABELS: dict[str, re.Pattern[str]] = {
     "height": re.compile(r"Overall Height", re.I),
     "mtplm": re.compile(r"MTPLM \(A\)", re.I),
     "mro": re.compile(r"Mass in Running Order \(B\)", re.I),
-    "payload": re.compile(r"Maximum User Payload \(A-B\)", re.I),
+    # The closing bracket is missing on the three SE layouts, so it is optional here
+    # rather than costing those pages their published payload — and `_reconciles` the
+    # corroboration it gets from one. The P\57 is a separate case and not fixable from
+    # here: that page prints no payload row at all, so its figure stays derived.
+    "payload": re.compile(r"Maximum User Payload \(A-B\)?", re.I),
 }
 
 #: How far into the text after a label to look for its value.
@@ -132,10 +194,23 @@ def _after_label(text: str, key: str) -> str | None:
 
 
 def _first_millimetres(value: str | None) -> int | None:
-    """The **first** `NNNNmm` after a label. See `_FIRST_COLUMN`."""
+    """The **first** `NNNNmm` after a label. See `_FIRST_COLUMN`.
+
+    **A figure after the pipe counts even with no `mm` on it.** Every dimension on this
+    site is printed `<imperial> | <metric>mm`, and on 18 November 2026 the P\\12+ page was
+    found printing `Overall Height 6'7" | 2000` — the unit dropped and the row moved below
+    the tyre size. The same page printed `2000mm` in September and its eight siblings still
+    do, and 6'7" is 2007mm, so the figure is millimetres and reading it is not a guess.
+
+    The fallback is anchored to the pipe rather than taking any bare number, because the
+    window after a label runs on into the next row: left loose, `Overall Height` on that
+    page would have read the `215` of `215/60 R17 C` as a height.
+    """
     if value is None:
         return None
     match = re.search(r"(\d{3,5})\s*mm", value)
+    if match is None:
+        match = re.search(r"\|\s*(\d{3,5})\b", value)
     return int(match.group(1)) if match else None
 
 
@@ -412,6 +487,65 @@ def _build_extracted_motorhome(product: PanamaProduct) -> ExtractedMotorhome:
 # --- The run ---------------------------------------------------------------------------
 
 
+def _roster(
+    http: Fetcher, keys: tuple[str, ...], on_progress: Callable[[str], None]
+) -> list[str]:
+    """The model pages to read: the pages sitemap, then anything only the homepage has.
+
+    **Both, every run.** The sitemap is the complete list and the homepage is a selection
+    from it, but the homepage is the one a person edits, so a page that appears there first
+    is read rather than waited for. Where the two disagree the run says which gave what, so
+    a roster that quietly shrinks is visible in the log instead of arriving as five
+    withdrawals.
+    """
+    on_progress(f"reading the roster: {ROSTER_SITEMAP_URL}")
+    sitemap = http.fetch(ROSTER_SITEMAP_URL)
+    from_sitemap: list[str] = []
+    if sitemap.status_code == 200:
+        from_sitemap = sitemap_model_urls(
+            sitemap.file_path.read_text(encoding="utf-8", errors="replace"), keys
+        )
+        on_progress(f"{len(from_sitemap)} model page(s) listed in the pages sitemap")
+    else:
+        on_progress(
+            f"WARNING: the pages sitemap returned {sitemap.status_code}, so the roster "
+            f"falls back to the homepage, which links only part of the range"
+        )
+
+    on_progress(f"fetching the model index: {INDEX_URL}")
+    index = http.fetch(INDEX_URL)
+    from_homepage: list[str] = []
+    if index.status_code == 200:
+        from_homepage = find_model_urls(
+            index.file_path.read_text(encoding="utf-8", errors="replace"), keys
+        )
+        on_progress(f"{len(from_homepage)} model page(s) linked from the homepage")
+    elif from_sitemap:
+        on_progress(
+            f"the homepage returned {index.status_code}; the sitemap's roster stands on "
+            f"its own this run"
+        )
+    else:
+        message = (
+            f"{INDEX_URL} returned {index.status_code} and {ROSTER_SITEMAP_URL} gave no "
+            f"model page, so there is no roster to read"
+        )
+        raise RuntimeError(message)
+
+    urls = list(from_sitemap)
+    for url in from_homepage:
+        if url not in urls:
+            urls.append(url)
+            on_progress(
+                f"{url} is linked from the homepage and absent from the sitemap, and is "
+                f"read anyway"
+            )
+    for url in from_sitemap:
+        if from_homepage and url not in from_homepage:
+            on_progress(f"{url} is in the sitemap and not linked from the homepage")
+    return urls
+
+
 def collect(
     http: Fetcher,
     browser: object,  # noqa: ARG001 - plain HTTP throughout; no JavaScript on this site
@@ -420,21 +554,9 @@ def collect(
     ranges: tuple[tuple[str, str], ...] = DEFAULT_RANGES,
     on_progress: Callable[[str], None] = lambda message: None,
 ) -> list[ExtractedMotorhome]:
-    """Every layout the homepage links."""
-    on_progress(f"fetching the model index: {INDEX_URL}")
-    index = http.fetch(INDEX_URL)
-    if index.status_code != 200:
-        message = (
-            f"{INDEX_URL} returned {index.status_code}; it is the roster, because "
-            f"sitemap.xml lists no model pages at all"
-        )
-        raise RuntimeError(message)
-
-    urls = find_model_urls(
-        index.file_path.read_text(encoding="utf-8", errors="replace"),
-        (key for key, _label in ranges),
-    )
-    on_progress(f"{len(urls)} model page(s) linked from the homepage")
+    """Every layout Panama publish a page for."""
+    keys = tuple(key for key, _label in ranges)
+    urls = _roster(http, keys, on_progress)
 
     results: list[ExtractedMotorhome] = []
     for url in urls:
@@ -475,5 +597,10 @@ def collect(
 
         results.append(_build_extracted_motorhome(product))
 
+    if keys == tuple(key for key, _label in DEFAULT_RANGES) and len(results) != EXPECTED_LAYOUTS:
+        on_progress(
+            f"expected {EXPECTED_LAYOUTS} layouts and collected {len(results)} — check "
+            f"whether Panama have changed the range"
+        )
     on_progress(f"collected {len(results)} product(s)")
     return results
