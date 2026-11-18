@@ -183,10 +183,38 @@ site puts the metric figure in every row. Not to any bare number: the window aft
 runs on into the next row, so left loose the height on that page would have read the `215`
 of `215/60 R17 C`.
 
+## Marquis publish a UK price list, and it confirms all nine
+
+**18 November 2026, after the roster was questioned.** `panamauk.co.uk` is the UK site,
+not a European one: *About Us* states that **Marquis Leisure "has secured exclusive import
+rights for the Panama range"** and work alongside dealer partners in Scotland and Ireland,
+the footer reads © Panama Campervans UK, and every model page prices itself under a
+heading of *UK Dealer Pricing & Options*. The factory is Trigano's, at Peñíscola in Spain.
+
+`/brochures` links one PDF: **2027 SEASON RANGE PRICES AND SPECIFICATION, EFFECTIVE 1ST
+OCTOBER 2026**, carrying the Marquis trademark notice. It is laid out in three sections —
+**SIGNATURE MODELS**, **SE MODELS** and **PLUG IN HYBRID** — and between them they hold all
+nine layouts, at OTR prices matching the model pages to the pound and masses matching to
+the kilogram.
+
+So the Signature and SE names are the price list's own, and **Signature is not a new range**:
+it is a banner over the five layouts that were already there. Only the P\50 is new under it.
+
+**Marquis's own site is not the check it looks like.** `marquisleisure.co.uk/new-motorhomes/panama`
+appears to list five models, but each of those five is a link to a *stock search* —
+`motorhome-search?status=New+stock&model=P%2F12` and so on. It is what is on the forecourt,
+not what the range is, and a model announced for 2027 is missing from it until one arrives.
+Checking a range against it would retire four live products.
+
+The price list is not read by the adapter. The model pages carry everything it holds and
+agree with it throughout, so there is nothing to gain today — but it is the better source
+the moment the two disagree, being the importer's own document, and it is where to look
+first if a page is ever withdrawn mid-season.
+
 ## Still unverified
 
-* **Price.** Not yet looked for. Marquis are the seller, so their price is the one that
-  counts by the settled rule, and it may not be on `panamauk.co.uk` at all.
+* **Whether the price list and the pages can disagree.** They do not today, on any of the
+  nine, which is one reading of one edition.
 * **Habitation.** Not yet examined.
 * **Floorplans.** Not yet examined.
 * **Whether the Signature and SE pages ever carry a model the sitemap does not.** Their
