@@ -157,11 +157,11 @@ SPACER_COLUMN = ""
 #: in BK that the template does not, so putting ours hard against `archived` would park
 #: it exactly where FMLV's own next column is most likely to land.
 #:
-#: **This rests on FMLV's importer reading only as far as BJ** — the requester's
-#: understanding, not something this repo can prove, and the first upload carrying these
-#: columns must be checked against FMLV before the rest of the caravan adapters follow.
-#: If it turns out the importer does not tolerate them, the upload goes back to
-#: `UPLOAD_COLUMNS` and only the readable copy keeps the nose weight.
+#: **FMLV's importer reads only as far as BJ, and this has now been shown.** It began as
+#: the requester's understanding; on 18 November 2026 an Adria run was uploaded carrying
+#: all three extra columns and went through clean. Nova neither collects the nose weight
+#: nor exports it — the figure is for the TowCheck sister site, which every FMLV caravan
+#: page links through to — so the extra columns are simply ignored on the way in.
 GENERATED_COLUMNS: tuple[str, ...] = (
     *UPLOAD_COLUMNS,
     SPACER_COLUMN,

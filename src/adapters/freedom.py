@@ -214,6 +214,7 @@ class Specification:
     overall_width_mm: int | None = None
     height_mm: int | None = None
     headroom_mm: int | None = None
+    max_nose_weight_kilograms: int | None = None
 
 
 #: `Height` and `Headroom` carry a roof qualifier on the two pop-top Microlites and not on
@@ -227,6 +228,8 @@ _LABELS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("overall_width_mm", ("Width",)),
     ("height_mm", ("Height (Roof Down)", "Height")),
     ("headroom_mm", ("Headroom (Roof Up)", "Headroom")),
+    # One word on every page, unlike everyone else who publishes it.
+    ("max_nose_weight_kilograms", ("Noseweight",)),
 )
 
 
@@ -313,6 +316,8 @@ def build_extracted(
         overall_width_mm=spec.overall_width_mm,
         height_mm=spec.height_mm,
         headroom_mm=spec.headroom_mm,
+        # Not an FMLV field — see the record below.
+        max_nose_weight_kilograms=spec.max_nose_weight_kilograms,
         body_type=CaravanBodyType.MICRO,
         twin_axle=False,
     )
@@ -375,6 +380,16 @@ def build_extracted(
         f"{spec.mtplm_kilograms}kg, under the {MICRO_MAX_MTPLM_KG}kg threshold",
     )
     record("twin_axle", "single axle — Freedom build no twin-axle caravan")
+    nose = spec.max_nose_weight_kilograms
+    if nose is not None:
+        record(
+            "max_nose_weight_kilograms",
+            f"Noseweight: {nose}kg, from the page's own weights block. Freedom publish "
+            f"the same {nose}kg on every model, so it is the hitch's limit rather than a "
+            f"per-model measurement. Not an FMLV field: it is for the TowCheck sister "
+            f"site, and it reaches you in column BM of the generated CSV rather than as "
+            f"a change to approve",
+        )
     return ExtractedCaravan(caravan=caravan, provenance=provenance)
 
 

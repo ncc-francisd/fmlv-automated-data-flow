@@ -291,3 +291,33 @@ def test_the_price_provenance_warns_about_the_index(microlite_sport: str) -> Non
 
     assert "/models/" in snippet
     assert "stale" in snippet
+
+
+# --- the maximum nose weight ----------------------------------------------------------
+
+
+def test_the_nose_weight_is_read_from_the_weights_block(
+    microlite_sport: str, carpento_360: str
+) -> None:
+    """Freedom spell it as one word, `Noseweight: 70kg`, in the same block as the masses."""
+    for page in (microlite_sport, carpento_360):
+        assert parse_specification(page).max_nose_weight_kilograms == 70
+
+
+def test_the_nose_weight_is_a_finding_and_never_a_proposal(microlite_sport: str) -> None:
+    """FMLV has no column for it — it reaches the reviewer as a note and the generated CSV
+    in column BM, for the TowCheck sister site."""
+    extracted = _built(microlite_sport, "Sport")
+
+    assert extracted.caravan.max_nose_weight_kilograms == 70
+    snippet = extracted.provenance["max_nose_weight_kilograms"].snippet
+    assert "TowCheck" in snippet
+    assert "column BM" in snippet
+
+
+def test_a_page_without_a_nose_weight_proposes_none(carpento_360: str) -> None:
+    """Found or blank, never carried over: a page that stops publishing it must leave the
+    column empty rather than repeat last run's figure."""
+    without = carpento_360.replace("Noseweight", "Something else")
+
+    assert parse_specification(without).max_nose_weight_kilograms is None

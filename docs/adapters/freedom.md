@@ -37,6 +37,19 @@ Single Bed Size:     1.85m x 0.5m
 `Width` and `Double Bed Size` appear on **all eight**. Height and headroom do too, under
 two spellings — see the pop-top note.
 
+### The maximum nose weight — 18 November 2026
+
+Freedom publish it on every model page, in the weights block above, and **spell it as one
+word**: `Noseweight: 70kg`. Everyone else who publishes it uses two. The figure is the same
+70kg on all eight, across 750kg to 1000kg of MTPLM, so it is the hitch's rated limit and
+not a per-model measurement — a run that starts reporting variation is a sign the page has
+changed shape, not that Freedom have reweighed anything.
+
+It is a finding and never a proposal: FMLV has no column for it, and it reaches the
+reviewer as a note and the generated CSV in column BM, for the TowCheck sister site. See
+`docs/adapters/README.md` for the rules that govern it, including that it is found-or-blank
+and never carried over.
+
 ### There is no price list, and the one PDF is not it
 
 The whole site links **exactly one** PDF, `2025-Freedom-Web-Brochure-v1.1.pdf`. It carries

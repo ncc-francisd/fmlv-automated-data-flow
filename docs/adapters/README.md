@@ -2564,7 +2564,14 @@ Two follow-on questions the later surveys added:
 
 **Added 9 November 2026, caravans only.** TowCheck — FMLV's sister site — tells an owner
 whether their car may legally tow a given caravan, and cannot answer without the caravan's
-maximum nose weight. FMLV itself has no column for it and is not getting one.
+maximum nose weight. Every FMLV caravan page carries a link through to the matching
+caravan on `towcheck.co.uk`, and that check is what the figure is for.
+
+**Nova neither collects it nor exports it**, the requester, 18 November 2026. So it is not
+an FMLV field, it is not getting one, and — the part that matters here — **the baseline can
+never contain one.** There is nothing for a run to compare its reading against and nothing
+to inherit, which is why found-or-blank below is the only behaviour available rather than
+merely the chosen one.
 
 So it is collected into `Caravan.max_nose_weight_kilograms` and written to **column BM of
 both generated CSVs** — the upload and the readable copy alike — two blank columns past
@@ -2578,11 +2585,11 @@ buffer rather than decoration — Steadfast's *export* already carries an `activ
 BK that the upload template does not, so a column of ours hard against `archived` would
 sit exactly where FMLV's own next one is likeliest to land.
 
-**This rests on FMLV's importer reading only as far as BJ**, which is the requester's
-understanding and not something this repo can prove. The first upload carrying these
-columns has to be checked against FMLV before the remaining caravan adapters follow. If
-the importer turns out not to tolerate them, the upload goes back to `UPLOAD_COLUMNS` and
-only the readable copy keeps the nose weight.
+**Proven, 18 November 2026.** This rested on FMLV's importer reading only as far as BJ,
+which was the requester's understanding and nothing this repo could show. An Adria run was
+then generated, deployed and uploaded carrying all three extra columns, and **it went
+through clean** — so the arrangement is settled and the remaining caravan adapters can pick
+the field up. The 65-column file is what a caravan run produces from now on.
 
 `caravan_schema.OUTSIDE_FMLV_TEMPLATE` is what holds it out of `UPLOAD_COLUMNS`, and it is
 not the same thing as the motorhome schema's `NOT_YET_IN_UPLOAD_TEMPLATE`: that one holds
@@ -2614,12 +2621,20 @@ adapters, four sources are known to carry a real figure:
 | **Eriba** | `Maximum nose weight (kg) 100 100 100 100`, per layout, in the price list | yes |
 | **Coachman** | `Maximum Hitch Weight`, on every weighed model's technical panel | yes |
 | **Adria** | `Max nose weight 100`, in the technical-data PDF's mass block | yes, 17 Nov 2026 |
-| **Freedom** | `Noseweight: 70kg`, on the model page | **not yet** |
+| **Freedom** | `Noseweight: 70kg`, on the model page | yes, 18 Nov 2026 |
 
 **The other thirteen adapters have never looked.** A blank in BM therefore means one of
 two quite different things today — the maker publishes nothing, or nobody has checked —
 and only the four above distinguish them. Each adapter picks the field up when it is next
 touched, the way the habitation findings were done, rather than in a sweep.
+
+**What the stored snapshots say about the rest, 18 November 2026.** Every caravan snapshot
+held locally was searched for `nose weight`, `noseweight`, `hitch weight`, `hitch load` and
+`Stützlast`, HTML and extracted PDF text alike. Outside the four above the only hits were
+Campod's empty label and Bailey's marketing line, both named below. That is a real signal
+and not a proof: a snapshot only holds the pages an adapter already fetches, so a figure on
+a tab nobody opens would not show up. Treat it as "no reason to expect one" rather than
+"the maker publishes none".
 
 **Adria states no unit on its line**, alone in a mass block where everything else is in
 kilogrammes. It is read as kilogrammes and the provenance says the document does not say
