@@ -247,3 +247,71 @@ def test_the_same_name_rank_ignores_case_and_spacing() -> None:
     assert _same_name_rank(make_motorhome(manufacturer_range="p", model=r"\50+"), baseline) == 0
     assert _same_name_rank(make_motorhome(manufacturer_range="P", model=r"\50+ "), baseline) == 0
     assert _same_name_rank(make_motorhome(manufacturer_range="P", model=r"\50"), baseline) == 1
+
+
+def test_a_suffix_spaced_one_way_in_fmlv_still_claims_its_own_row() -> None:
+    """**Etrusco's spelling, in Panama's situation.**
+
+    FMLV holds `CV` / `640 SB +`, with a space before the plus, where Etrusco's own site
+    writes `640 SB+`. Today that pair matches correctly only because FMLV happens to hold
+    the plain `640 SB` as well, so the plain scraped name finds an exact row and the
+    plussed one is left the right row by elimination. Take the plain row away — which is
+    exactly the position Panama was in, one baseline row and two perfect candidates — and
+    the spacing is all that separates them.
+
+    With the exact name compared as typed, `640 SB+` does not match `640 SB +`, neither
+    candidate ranks ahead of the other, and the tie falls through to collection order: the
+    plain `640 SB` takes the row and the `640 SB+` FMLV is selling is proposed as new.
+    """
+    plussed = make_motorhome(manufacturer_range="CV", model="640 SB +", product_id=7969)
+    scraped_plain = make_extracted(manufacturer_range="CV", model="640 SB")
+    scraped_plussed = make_extracted(manufacturer_range="CV", model="640 SB+")
+
+    # The plain one first, which is the order that loses the row.
+    results = match_products([scraped_plain, scraped_plussed], [plussed])
+
+    assert results[0].baseline is None, "the plain 640 SB is the new one"
+    assert results[1].baseline is plussed, "640 SB+ belongs on the 640 SB + row"
+
+
+def test_both_spellings_present_in_fmlv_keep_their_own_rows() -> None:
+    """The case Etrusco is actually in today, which must not move: FMLV holds both the
+    plain row and the spaced-suffix one, and each scraped name goes to its own."""
+    plain = make_motorhome(manufacturer_range="CV", model="640 SB", product_id=6533)
+    plussed = make_motorhome(manufacturer_range="CV", model="640 SB +", product_id=7969)
+    scraped_plain = make_extracted(manufacturer_range="CV", model="640 SB")
+    scraped_plussed = make_extracted(manufacturer_range="CV", model="640 SB+")
+
+    results = match_products([scraped_plussed, scraped_plain], [plain, plussed])
+
+    assert results[0].baseline is plussed
+    assert results[1].baseline is plain
+
+
+def test_the_same_name_rank_ignores_every_space_not_just_repeated_ones() -> None:
+    """Carthago writes a weight both ways — `4.2 t` and `4.2t` — and FMLV holds one of
+    them. Collapsing runs of whitespace is not enough; the spaces have to go."""
+    from src.diff.matching import _same_name_rank
+
+    baseline = make_motorhome(manufacturer_range="C2-tourer", model='I 147 RB-LE "K" comfort 4.2t')
+
+    same = make_motorhome(
+        manufacturer_range="C2-tourer", model='I 147 RB-LE "K" comfort 4.2 t'
+    )
+    assert _same_name_rank(same, baseline) == 0
+
+    # A real difference still separates them: 4.2t and 3.5t are two vehicles.
+    other = make_motorhome(
+        manufacturer_range="C2-tourer", model='I 147 RB-LE "K" lightweight 3.5 t'
+    )
+    assert _same_name_rank(other, baseline) == 1
+
+
+def test_dropping_spaces_does_not_merge_two_real_layouts() -> None:
+    """Sunlight sells both a `CLIFF 540` and a `CLIFF 540 V`. Removing spaces must not
+    make the trailing letter disappear along with them."""
+    from src.diff.matching import _same_name_rank
+
+    plain = make_motorhome(manufacturer_range="CLIFF Adventure", model="CLIFF 540")
+    with_v = make_motorhome(manufacturer_range="CLIFF Adventure", model="CLIFF 540 V")
+    assert _same_name_rank(plain, with_v) == 1

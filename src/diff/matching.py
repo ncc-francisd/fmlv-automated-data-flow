@@ -340,13 +340,35 @@ def _same_name_rank(left: Product, right: Product) -> int:
     `+`: that would split `Matrix Plus` from `Matrix +` on every manufacturer that writes
     the suffix as a word, to mend one that writes it as a symbol. Two rows that both match
     exactly still tie here and are separated by the chassis, as before.
+
+    **"Verbatim" ignores case and spacing** — see `_name_key` for why it has to.
     """
     return 0 if _name_key(left) == _name_key(right) else 1
 
 
 def _name_key(product: Product) -> tuple[str, str]:
+    """A product's range and model reduced to what a person would call the same name.
+
+    **Every space is dropped, not merely collapsed**, because the two sides of a
+    comparison are a manufacturer's own page and a row somebody typed into FMLV, and they
+    space a suffix differently. Etrusco is the live case: FMLV holds `CV` / `640 SB +`
+    where the site writes `640 SB+`. Collapsing runs of whitespace leaves those two
+    different strings, so neither `640 SB` nor `640 SB+` would rank as the exact name and
+    the pair could still swap rows — the very thing `_same_name_rank` exists to stop.
+    Carthago spaces a weight the same two ways, `4.2 t` against `4.2t`.
+
+    **This cannot merge two different products.** Names that differ only in where the
+    spaces fall are the same name to a reader; anything that distinguishes two real
+    layouts — a digit, a trailing letter, a symbol — survives untouched, so Sunlight's
+    `CLIFF 540` and `CLIFF 540 V` stay apart.
+
+    Range and model stay separate rather than being joined into one string: which half of
+    the name a manufacturer puts a word in is a real difference, and flattening it would
+    make this agree far more often than it should.
+    """
+
     def normalise(value: str | None) -> str:
-        return " ".join((value or "").split()).casefold()
+        return "".join((value or "").split()).casefold()
 
     return (
         normalise(getattr(product, "manufacturer_range", None)),

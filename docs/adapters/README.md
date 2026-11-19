@@ -2372,6 +2372,21 @@ exactly still tie there and are separated by the chassis, as before.
 Plus` from `Matrix +` across every manufacturer that writes the suffix as a word, to mend
 one that writes it as a symbol.
 
+**"The same name" ignores spacing as well as case.** The two sides of the comparison are a
+manufacturer's page and a row somebody typed into FMLV, and they space a suffix
+differently: FMLV holds Etrusco's `CV` / `640 SB +` where the site writes `640 SB+`, and
+Carthago writes a weight as both `4.2 t` and `4.2t`. Compared as typed, neither scraped
+name would rank as the exact match of the row FMLV holds, and the tie-break above would
+never fire. Nothing is lost by dropping the spaces — a name that differs only in where
+they fall is the same name to a reader, while a digit, a trailing letter or a symbol
+survives untouched, so Sunlight's `CLIFF 540` and `CLIFF 540 V` stay apart.
+
+Swept on 19 November 2026, four brands besides Panama sell two live layouts the tokeniser
+cannot separate: Elddis (`Whirlwind GT 196` and `196+`), Etrusco (three `CV` pairs),
+Carthago (six `C2-tourer` pairs differing only by that space in the weight) and Malibu
+(`comfort` against `comfort **`). All of them match correctly today. The point of the rank
+is that they go on doing so when the other half of a pair appears, or disappears.
+
 **The general lesson, which outlives the `+`.** Two products whose names differ *only* in
 punctuation are one product to the matcher. Where a manufacturer distinguishes two live
 layouts by a symbol alone — `+`, `S`, a hyphen, a trailing letter — that pair is a standing
