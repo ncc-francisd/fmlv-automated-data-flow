@@ -154,3 +154,77 @@ def test_invalid_trigger_is_rejected_by_the_schema(connection: sqlite3.Connectio
             VALUES (1, 'Adria Mobil', 'not_a_real_trigger', 'running', '2026-01-01T00:00:00')
             """
         )
+
+
+# --- What the run compared against (store.record_baseline) ---
+
+
+def test_a_new_run_has_no_baseline_recorded_yet(connection: sqlite3.Connection) -> None:
+    """All three read back `None` until the baseline has actually been built, so a run
+    that failed during the export fetch cannot claim a baseline it never had."""
+    run = store.start_run(
+        connection, manufacturer_id=221, fmlv_manufacturer="Panama", trigger="manual"
+    )
+    assert run.baseline_supplier is None
+    assert run.baseline_export is None
+    assert run.baseline_count is None
+
+
+def test_record_baseline_names_the_supplier_file_and_count(
+    connection: sqlite3.Connection,
+) -> None:
+    r"""**Panama, 19 November 2026.** The run proposed `P\12+` and `P\50+` as new while
+    FMLV held both live, because the registry named the importer's NCC supplier entry and
+    that entry returns three Panama products where the brand's own returns five. Nothing
+    on the run said which export it had used or how big it was."""
+    run = store.start_run(
+        connection, manufacturer_id=221, fmlv_manufacturer="Panama", trigger="manual"
+    )
+    recorded = store.record_baseline(
+        connection,
+        run.id,
+        supplier_name="Marquis Leisure",
+        export_path=r"data\exports\221_Panama\2026-11-19_Panama_motorhome-campervans.xlsx",
+        product_count=3,
+    )
+    assert recorded.baseline_supplier == "Marquis Leisure"
+    assert recorded.baseline_export.endswith("2026-11-19_Panama_motorhome-campervans.xlsx")
+    assert recorded.baseline_count == 3
+    # And it survives a re-read, which is what the review page does.
+    assert store.get_run(connection, run.id).baseline_count == 3
+
+
+def test_a_baseline_of_nothing_is_recorded_as_nothing(
+    connection: sqlite3.Connection,
+) -> None:
+    """Zero is a fact and must not read as "not recorded" — a brand new to FMLV really
+    does have an empty baseline (`fmlv empty-baseline`), and the page says so."""
+    run = store.start_run(
+        connection, manufacturer_id=999, fmlv_manufacturer="Atom", trigger="manual"
+    )
+    recorded = store.record_baseline(
+        connection, run.id, supplier_name=None, export_path="empty.xlsx", product_count=0
+    )
+    assert recorded.baseline_count == 0
+    assert recorded.baseline_supplier is None
+
+
+def test_recording_a_baseline_leaves_the_rest_of_the_run_alone(
+    connection: sqlite3.Connection,
+) -> None:
+    run = store.start_run(
+        connection,
+        manufacturer_id=25,
+        fmlv_manufacturer="Coachman",
+        trigger="scheduled",
+        range_label="VIP",
+        vehicle_class="caravan",
+    )
+    recorded = store.record_baseline(
+        connection, run.id, supplier_name="Coachman Caravans", export_path="x.xlsx",
+        product_count=17,
+    )
+    assert recorded.status == "running"
+    assert recorded.range_label == "VIP"
+    assert recorded.vehicle_class.value == "caravan"
+    assert store.finish_run(connection, run.id).baseline_count == 17

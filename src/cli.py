@@ -703,6 +703,20 @@ def execute_run(
                 # the same baseline and would repeat every line after the review.
                 on_discard=_narrate_duplicate(on_progress),
             )
+            # Recorded now rather than at the end, so a run that fails during the sweep
+            # still says what it was comparing against. See `store.record_baseline` for
+            # the Panama run this exists because of.
+            store.record_baseline(
+                connection,
+                run.id,
+                supplier_name=manufacturer.supplier_name_for(vehicle_class),
+                export_path=str(export_path),
+                product_count=len(baseline),
+            )
+            on_progress(
+                f"Baseline: {len(baseline)} {manufacturer.fmlv_manufacturer} product(s) "
+                f"from {export_path.name}"
+            )
 
             # One browser process and one HTTP client for the whole run — the browser
             # is launched even for an adapter that won't use it, which the `Adapter`

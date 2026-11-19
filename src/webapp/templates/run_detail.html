@@ -21,6 +21,23 @@
       · finished {{ run.finished_at|fmt_dt }} · took {{ run_duration(run) }}
     {% endif %}
   </p>
+  {# What the run compared against. Without this an incomplete baseline is invisible:
+     it proposes live products as new, which looks exactly like a growing range. #}
+  <p class="muted">
+    {% if run.baseline_count is not none %}
+      Compared against <strong>{{ run.baseline_count }}</strong>
+      {{ brand }} product{{ "" if run.baseline_count == 1 else "s" }} in the FMLV export
+      {%- if run.baseline_supplier %} for supplier
+        <strong>{{ run.baseline_supplier }}</strong>
+      {%- endif %}
+      {%- if run.baseline_export %} ({{ run.baseline_export.replace("\\", "/").rsplit("/", 1)[-1] }})
+      {%- endif %}.
+      If a product you know FMLV holds is listed as new below, check it is one of those
+      {{ run.baseline_count }} before anything else.
+    {% else %}
+      The baseline this run used was not recorded.
+    {% endif %}
+  </p>
   {% if run.error_message %}
     <p class="form-error">{{ run.error_message }}</p>
   {% endif %}

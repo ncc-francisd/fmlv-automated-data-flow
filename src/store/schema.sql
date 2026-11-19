@@ -18,7 +18,15 @@ CREATE TABLE IF NOT EXISTS run (
     -- Which FMLV product area this run swept: 'motorhome' or 'caravan'
     -- (src/vehicle_class.py). Defaulted so every run recorded before caravans existed
     -- reads back correctly, and so `db._apply_column_migrations` can add it in place.
-    vehicle_class TEXT NOT NULL DEFAULT 'motorhome'
+    vehicle_class TEXT NOT NULL DEFAULT 'motorhome',
+    -- What this run actually diffed against: the NCC supplier label asked for, the file
+    -- it came back in, and how many of its rows survived the baseline filter. Recorded
+    -- because an incomplete baseline is otherwise invisible -- see `runs.record_baseline`.
+    -- NULL on every run from before this shipped, which the review page states as
+    -- "not recorded" rather than inventing.
+    baseline_supplier TEXT,
+    baseline_export TEXT,
+    baseline_count INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_run_manufacturer ON run (manufacturer_id, started_at);

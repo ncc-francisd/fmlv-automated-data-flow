@@ -2502,3 +2502,51 @@ def test_the_run_page_says_nothing_when_every_product_raised_a_row(
     body = client.get(f"/runs/{run_id}").text
 
     assert "Read, nothing to report" not in body
+
+
+# --- What the run compared against ---
+
+
+def test_the_run_page_names_the_baseline_it_compared_against(
+    client: TestClient, db_path: Path, run_with_one_change: tuple[int, int]
+) -> None:
+    r"""**The reason this is on the page at all.** Panama's `P\12+` and `P\50+` came back
+    as new products while FMLV held both live and active, and twice over: the registry
+    named the importer's NCC supplier entry, which returns three Panama products where the
+    brand's own entry returns five. Nothing on the run page said which export had been
+    used or how many rows were in it, so the only way to see the baseline was two rows
+    short was to download it by hand.
+    """
+    run_id, _change_id = run_with_one_change
+    connection = store.connect(db_path)
+    try:
+        store.record_baseline(
+            connection,
+            run_id,
+            supplier_name="Marquis Leisure",
+            export_path=r"data\exports\221_Panama\2026-11-19_Panama_motorhome-campervans.xlsx",
+            product_count=3,
+        )
+    finally:
+        connection.close()
+
+    text = client.get(f"/runs/{run_id}").text
+
+    assert "Marquis Leisure" in text
+    assert "2026-11-19_Panama_motorhome-campervans.xlsx" in text
+    assert "<strong>3</strong>" in text
+    # The Windows path is shown by filename, not as a backslash-ridden absolute path.
+    assert r"data\exports" not in text
+
+
+def test_a_run_from_before_this_says_so_rather_than_claiming_a_baseline(
+    client: TestClient, run_with_one_change: tuple[int, int]
+) -> None:
+    """Every run already on the deployed VM has no baseline recorded. Saying "not
+    recorded" is honest; showing a zero would read as "it compared against nothing"."""
+    run_id, _change_id = run_with_one_change
+
+    text = client.get(f"/runs/{run_id}").text
+
+    assert "was not recorded" in text
+    assert "Compared against" not in text

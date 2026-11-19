@@ -30,6 +30,12 @@ _SCHEMA_SQL = resources.files(__package__).joinpath("schema.sql").read_text(enco
 _ADDED_COLUMNS = [
     ("run", "range_label", "TEXT"),
     ("run", "vehicle_class", "TEXT NOT NULL DEFAULT 'motorhome'"),
+    # What the run diffed against. Nullable rather than defaulted: a run recorded before
+    # these shipped did have a baseline, we simply do not know which, and a zero or an
+    # empty string there would read as a fact.
+    ("run", "baseline_supplier", "TEXT"),
+    ("run", "baseline_export", "TEXT"),
+    ("run", "baseline_count", "INTEGER"),
     ("product", "vehicle_class", "TEXT NOT NULL DEFAULT 'motorhome'"),
     # Part of a product's identity, not a field of it: one layout on a Fiat and the
     # same layout on a Mercedes are two vehicles with two review histories.

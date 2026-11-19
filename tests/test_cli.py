@@ -1230,3 +1230,68 @@ def test_fetch_export_can_be_asked_for_the_caravan_area(
     assert asked["manufacturer"].supplier_name_for(VehicleClass.CARAVAN) == (
         "Coachman Caravans"
     )
+
+
+# --------------------------------------------------------------------------- #
+# What the run compared against
+# --------------------------------------------------------------------------- #
+
+
+def test_a_run_records_the_baseline_it_compared_against(
+    data_root: Path, export_path: Path
+) -> None:
+    r"""**Why a run has to say this.** Panama's `P\12+` and `P\50+` came back as new
+    products while FMLV held both live and active. The cause was not the diff: the
+    registry named the importer's NCC supplier entry, which returns three Panama products
+    where the brand's own returns five, so the two were never in the baseline to be
+    matched. An incomplete baseline proposes live products as new, which looks exactly
+    like a range that has grown, and nothing recorded was enough to tell the two apart.
+
+    The export here holds two products and only one is Adria's, so the count is the
+    *filtered* baseline rather than the file's row count — which is the number that
+    matters, and the one a reviewer should compare against FMLV.
+    """
+    summary = run_once(
+        data_root=data_root,
+        export_path=export_path,
+        adapter=FakeAdapter([make_extracted()]),
+    )
+
+    connection = store.connect(paths.db_path(root=data_root))
+    try:
+        run = store.get_run(connection, summary.run.id)
+    finally:
+        connection.close()
+
+    assert run.baseline_count == 1
+    assert run.baseline_supplier == "Adria Caravans & Motorhomes"
+    assert run.baseline_export == str(export_path)
+
+
+def test_a_run_that_fails_still_says_what_it_was_comparing_against(
+    data_root: Path, export_path: Path
+) -> None:
+    """Recorded as soon as the baseline is built, not at the end — a run that died during
+    the website sweep is exactly the one somebody needs the context for."""
+
+    class Exploding(FakeAdapter):
+        def collect(self, *args: Any, **kwargs: Any) -> list[Any]:
+            msg = "the site returned 503"
+            raise RuntimeError(msg)
+
+    with pytest.raises(RuntimeError):
+        run_once(
+            data_root=data_root,
+            export_path=export_path,
+            adapter=Exploding([make_extracted()]),
+        )
+
+    connection = store.connect(paths.db_path(root=data_root))
+    try:
+        [run] = store.list_runs(connection)
+    finally:
+        connection.close()
+
+    assert run.status == "failed"
+    assert run.baseline_count == 1
+    assert run.baseline_export == str(export_path)

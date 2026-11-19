@@ -2401,6 +2401,11 @@ baseline is indistinguishable from a brand that has genuinely grown.**
 export the run actually used, by name, before reasoning about scores. Only once it is in
 there and still unmatched is it a matching problem.
 
+**The run page now says which baseline it used** — the supplier label, the file and how
+many of its rows survived the filter (`store.record_baseline`). It is the first line under
+the run's own heading, because it is the first thing to check. A run from before this
+shipped says so rather than showing a zero.
+
 **When the supplier label is the importer's name, check it is the whole brand.** A brand's
 own name in that dropdown may be a different, larger view of it than its importer's entry.
 This is not a reason to prefer one by default: audited on 19 November 2026, `Hobby`

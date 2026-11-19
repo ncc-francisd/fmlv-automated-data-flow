@@ -36,6 +36,13 @@ class Run:
     #: is (`store/schema.sql`) — every run recorded before caravans existed was a
     #: motorhome run, and reads back as one.
     vehicle_class: VehicleClass = DEFAULT_VEHICLE_CLASS
+    #: The NCC supplier label this run's baseline was exported under, the file it came
+    #: back in, and how many rows of it survived the baseline filter. All three are
+    #: `None` on a run recorded before `record_baseline` existed, and on one that failed
+    #: before it got that far. See `record_baseline`.
+    baseline_supplier: str | None = None
+    baseline_export: str | None = None
+    baseline_count: int | None = None
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> Run:
@@ -50,6 +57,9 @@ class Run:
             error_message=row["error_message"],
             range_label=row["range_label"],
             vehicle_class=VehicleClass(row["vehicle_class"]),
+            baseline_supplier=row["baseline_supplier"],
+            baseline_export=row["baseline_export"],
+            baseline_count=row["baseline_count"],
         )
 
 
@@ -96,6 +106,45 @@ def start_run(
     connection.commit()
     assert cursor.lastrowid is not None
     return get_run(connection, cursor.lastrowid)
+
+
+def record_baseline(
+    connection: sqlite3.Connection,
+    run_id: int,
+    *,
+    supplier_name: str | None,
+    export_path: str,
+    product_count: int,
+) -> Run:
+    """Record what this run compared against, before it compares anything.
+
+    **The gap this closes.** A run says what it collected and what it proposes, and said
+    nothing at all about the other half of the comparison. So when Panama's `P\12+` and
+    `P\50+` arrived as new products on 19 November 2026 while FMLV held both live and
+    active, there was no way to see from the run that its baseline held three Panama rows
+    rather than five — the two were missing because the registry named the importer's NCC
+    supplier entry, which returns a different set of products from the brand's own. The
+    run succeeded, the counts looked plausible, and accepting the two "new" products would
+    have duplicated two live ones.
+
+    An incomplete baseline never announces itself: it proposes live products as new, which
+    is indistinguishable from a manufacturer that has genuinely grown. Naming the supplier,
+    the file and the row count is what lets a reviewer tell the two apart in a glance
+    instead of a download.
+
+    Written as soon as the baseline is built rather than at the end, so a run that fails
+    later still says what it was working from.
+    """
+    connection.execute(
+        """
+        UPDATE run
+           SET baseline_supplier = ?, baseline_export = ?, baseline_count = ?
+         WHERE id = ?
+        """,
+        (supplier_name, export_path, product_count, run_id),
+    )
+    connection.commit()
+    return get_run(connection, run_id)
 
 
 def finish_run(connection: sqlite3.Connection, run_id: int) -> Run:

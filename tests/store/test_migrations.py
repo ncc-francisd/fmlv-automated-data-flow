@@ -330,3 +330,37 @@ def test_a_store_already_carrying_blank_is_left_alone(legacy_db: Path) -> None:
         assert connection.execute("SELECT COUNT(*) FROM decision").fetchone()[0] == 2
     finally:
         connection.close()
+
+
+def test_connect_adds_the_baseline_columns_and_leaves_them_blank(legacy_db: Path) -> None:
+    """A run recorded before `record_baseline` existed did have a baseline — we simply do
+    not know which. `None` says that; a `0` would claim it compared against nothing.
+
+    The three columns arrive by `ALTER TABLE` on the deployed store, which holds the only
+    copy of the review history, so this asserts the run row survives intact as well.
+    """
+    connection = store.connect(legacy_db)
+    try:
+        run = store.get_run(connection, 7)
+    finally:
+        connection.close()
+
+    assert run.baseline_supplier is None
+    assert run.baseline_export is None
+    assert run.baseline_count is None
+    assert run.status == "succeeded"
+
+
+def test_a_migrated_store_can_record_a_baseline(legacy_db: Path) -> None:
+    """The columns are usable, not merely present — the rebuild of `product` recreates
+    that table from a frozen CREATE TABLE, and it would be easy for a `run` column added
+    afterwards to exist in the schema file and nowhere else."""
+    connection = store.connect(legacy_db)
+    try:
+        recorded = store.record_baseline(
+            connection, 7, supplier_name="Bailey", export_path="b.xlsx", product_count=81
+        )
+    finally:
+        connection.close()
+
+    assert (recorded.baseline_supplier, recorded.baseline_count) == ("Bailey", 81)
