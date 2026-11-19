@@ -322,6 +322,38 @@ class MatchResult:
     method: str | None  # "exact" | "fuzzy" | None
 
 
+def _same_name_rank(left: Product, right: Product) -> int:
+    """`0` when the two carry the same range and model verbatim, `1` otherwise.
+
+    Sorts *within* an equal similarity score, ahead of the chassis, and exists because a
+    perfect token score is not the same thing as a perfect name. `_tokenize` keeps letters
+    and digits only, so **a `+` does not survive it**: `P\\50` and `P\\50+` reduce to the
+    same bag and score 1.000 against each other and against FMLV's `P\\50+`. Until Panama
+    published a `P\\50` that cost nothing, because there was only ever one of them.
+
+    When they published it, 19 November 2026, the greedy assignment had two perfect
+    candidates for one baseline row and fell through to collection order, so the new
+    `P\\50` claimed the `P\\50+` row and the real `P\\50+` was proposed as a new product
+    FMLV already held and was actively selling.
+
+    **Ranking the exact name first is the narrow fix**, not teaching `_tokenize` about
+    `+`: that would split `Matrix Plus` from `Matrix +` on every manufacturer that writes
+    the suffix as a word, to mend one that writes it as a symbol. Two rows that both match
+    exactly still tie here and are separated by the chassis, as before.
+    """
+    return 0 if _name_key(left) == _name_key(right) else 1
+
+
+def _name_key(product: Product) -> tuple[str, str]:
+    def normalise(value: str | None) -> str:
+        return " ".join((value or "").split()).casefold()
+
+    return (
+        normalise(getattr(product, "manufacturer_range", None)),
+        normalise(getattr(product, "model", None)),
+    )
+
+
 def _chassis_rank(left: Product, right: Product) -> int:
     """`0` when the two name the same base vehicle, `1` when they disagree.
 
@@ -366,7 +398,7 @@ def match_products(
     scraped_list = list(scraped)
     baseline_list = list(baseline)
 
-    candidates: list[tuple[float, int, tuple[int, int], int, int]] = []
+    candidates: list[tuple[float, int, int, tuple[int, int], int, int]] = []
     for s_idx, extracted in enumerate(scraped_list):
         for b_idx, baseline_motorhome in enumerate(baseline_list):
             score = token_similarity(
@@ -376,6 +408,7 @@ def match_products(
                 candidates.append(
                     (
                         score,
+                        _same_name_rank(extracted.product, baseline_motorhome),
                         _chassis_rank(extracted.product, baseline_motorhome),
                         _tie_break(baseline_motorhome),
                         s_idx,
@@ -383,10 +416,11 @@ def match_products(
                     )
                 )
 
-    # Best score first; then the chassis, so two products sharing a name go to the
-    # baseline rows built on the same base vehicle; then the tie-break, then insertion
-    # order (scraped-index then baseline-index ascending) so results are deterministic
-    # run to run.
+    # Best score first; then the name verbatim, so a product FMLV holds under exactly
+    # this name claims that row ahead of one that merely tokenises the same; then the
+    # chassis, so two products sharing a name go to the baseline rows built on the same
+    # base vehicle; then the tie-break, then insertion order (scraped-index then
+    # baseline-index ascending) so results are deterministic run to run.
     candidates.sort(
         key=lambda candidate: (
             -candidate[0],
@@ -394,12 +428,13 @@ def match_products(
             candidate[2],
             candidate[3],
             candidate[4],
+            candidate[5],
         )
     )
 
     matched_scraped: dict[int, tuple[int, float]] = {}
     used_baseline: set[int] = set()
-    for score, _chassis, _tie, s_idx, b_idx in candidates:
+    for score, _same_name, _chassis, _tie, s_idx, b_idx in candidates:
         if score < threshold:
             break
         if s_idx in matched_scraped or b_idx in used_baseline:

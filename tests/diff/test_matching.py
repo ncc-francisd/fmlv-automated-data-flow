@@ -212,3 +212,38 @@ def test_a_long_word_never_swallows_a_number() -> None:
     from src.diff.matching import _tokenize
 
     assert _tokenize("Campervan 640") == frozenset({"campervan", "640"})
+
+
+def test_a_plus_suffix_keeps_its_own_baseline_row() -> None:
+    r"""**Panama, 19 November 2026.** `_tokenize` keeps letters and digits only, so `P\50`
+    and `P\50+` reduce to the same bag and both score 1.000 against FMLV's `P\50+`. For a
+    year that cost nothing, because only the `+` existed. The day Panama published the
+    plain `P\50`, the greedy assignment had two perfect candidates for one row, fell
+    through to collection order, and gave the row to the new model — so a product FMLV
+    held and was actively selling came back as new.
+
+    The exact name now outranks an equal score, so the row goes to the product that
+    carries its name verbatim and the genuinely new one is left over.
+    """
+    baseline = make_motorhome(manufacturer_range="P", model=r"\50+")
+    newcomer = make_extracted(manufacturer_range="P", model=r"\50")
+    incumbent = make_extracted(manufacturer_range="P", model=r"\50+")
+
+    # The newcomer first, which is the order the roster gives and the order that failed.
+    results = match_products([newcomer, incumbent], [baseline])
+
+    assert results[0].baseline is None, "the new P\50 is new"
+    assert results[1].baseline is baseline, "the P\50+ keeps its own row"
+
+
+def test_the_same_name_rank_ignores_case_and_spacing() -> None:
+    """An export that holds `P \\50 +` is holding the same name, not a different product.
+    Separation has to come from the characters that differ, not from how they are typed.
+    """
+    from src.diff.matching import _same_name_rank
+
+    baseline = make_motorhome(manufacturer_range="P", model=r"\50+")
+
+    assert _same_name_rank(make_motorhome(manufacturer_range="p", model=r"\50+"), baseline) == 0
+    assert _same_name_rank(make_motorhome(manufacturer_range="P", model=r"\50+ "), baseline) == 0
+    assert _same_name_rank(make_motorhome(manufacturer_range="P", model=r"\50"), baseline) == 1

@@ -2352,6 +2352,33 @@ reassured by it. The same applies to the sanity check in `CLAUDE.md` — an impl
 number of new products usually means a rename, but which rename has to be evidenced on a
 figure that varies between models.
 
+### A live product proposed as new is a matching failure, not a roster one
+
+**Panama, 19 November 2026.** A run proposed `P\50+` as a new product. FMLV held it, live
+and active, under exactly that name.
+
+`_tokenize` keeps letters and digits, so **a `+` does not survive it**: `P\50` and `P\50+`
+both reduce to `{p, 50}` and score **1.000** against each other and against FMLV's `P\50+`.
+That cost nothing while Panama sold only the `+`. The day they added a plain `P\50`, the
+greedy assignment had two perfect candidates for one baseline row, fell through to
+collection order, and handed the row to the newcomer — leaving the incumbent with nothing
+to match and classifying it as new.
+
+`match_products` now ranks **the name verbatim** above an equal score and below the score
+itself, so the row goes to the product carrying its name exactly. Two rows that both match
+exactly still tie there and are separated by the chassis, as before.
+
+**The narrow fix was the right one.** Teaching `_tokenize` about `+` would split `Matrix
+Plus` from `Matrix +` across every manufacturer that writes the suffix as a word, to mend
+one that writes it as a symbol.
+
+**The general lesson, which outlives the `+`.** Two products whose names differ *only* in
+punctuation are one product to the matcher. Where a manufacturer distinguishes two live
+layouts by a symbol alone — `+`, `S`, a hyphen, a trailing letter — that pair is a standing
+hazard: it is invisible until both halves exist at once, and then it presents as a product
+FMLV is actively selling arriving as new. **Check the export before believing it.** A
+"new" product whose name is already in the baseline is never a new product.
+
 ### Naming a rename, when the score cannot reach it
 
 An adapter can declare the pair outright instead, which is the lever the paragraph above
