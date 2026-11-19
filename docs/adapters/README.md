@@ -2352,7 +2352,7 @@ reassured by it. The same applies to the sanity check in `CLAUDE.md` — an impl
 number of new products usually means a rename, but which rename has to be evidenced on a
 figure that varies between models.
 
-### A live product proposed as new is a matching failure, not a roster one
+### A live product proposed as new is never a new product
 
 **Panama, 19 November 2026.** A run proposed `P\50+` as a new product. FMLV held it, live
 and active, under exactly that name.
@@ -2378,6 +2378,36 @@ layouts by a symbol alone — `+`, `S`, a hyphen, a trailing letter — that pai
 hazard: it is invisible until both halves exist at once, and then it presents as a product
 FMLV is actively selling arriving as new. **Check the export before believing it.** A
 "new" product whose name is already in the baseline is never a new product.
+
+#### And the second time, it was the baseline itself
+
+**Panama again, the same day.** The matcher fix went out, the run went again, and `P\12+`
+and `P\50+` came back as new *once more* — this time both of them. Nothing was wrong with
+the matcher. **They were not in the baseline to be matched against.**
+
+FMLV's export is taken one supplier at a time, from the site's own "Export Products by
+Supplier" dropdown, and the registry's `ncc_supplier_name` names which entry to ask for.
+Panama appears in that dropdown **twice** — once as `Marquis Leisure`, their importer, and
+once as `Panama`. The two return different sets: `Marquis Leisure` returned three Panama
+products, `Panama` returned five. The two missing from the importer's export were the two
+this pipeline created itself, from the September run's upload.
+
+So the baseline was two rows short, the run could not match what was not there, and it did
+the only thing left — proposed them as new. Nothing failed. Nothing warned. **An incomplete
+baseline is indistinguishable from a brand that has genuinely grown.**
+
+**What to do about it.** When a product FMLV holds live arrives as new, the matcher is the
+*second* thing to look at. The first is whether the baseline contains it at all — read the
+export the run actually used, by name, before reasoning about scores. Only once it is in
+there and still unmatched is it a matching problem.
+
+**When the supplier label is the importer's name, check it is the whole brand.** A brand's
+own name in that dropdown may be a different, larger view of it than its importer's entry.
+This is not a reason to prefer one by default: audited on 19 November 2026, `Hobby`
+configured as `AURA` was right (the brand's own entry held 145 rows and not one of them
+survived the baseline filter, while `AURA` held every live Hobby product), and `Airstream` configured as `Lowdhams` was right (both entries
+returned the same three live caravans). Panama was the only one of the three that was
+wrong. Check, rather than assume either way.
 
 ### Naming a rename, when the score cannot reach it
 

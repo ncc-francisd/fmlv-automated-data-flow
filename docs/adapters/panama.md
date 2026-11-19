@@ -211,6 +211,35 @@ agree with it throughout, so there is nothing to gain today — but it is the be
 the moment the two disagree, being the importer's own document, and it is where to look
 first if a page is ever withdrawn mid-season.
 
+## The baseline came from the wrong half of FMLV
+
+**19 November 2026.** With the matcher fix deployed, the VM's run still proposed `P\12+`
+and `P\50+` as new products, and FMLV still held both of them live and active. The matcher
+was not at fault the second time. **They were not in the baseline.**
+
+The baseline is one supplier's export, and the registry's `ncc_supplier_name` chose which
+supplier to ask for. Panama is in the NCC's dropdown **twice**:
+
+| Dropdown entry | Panama products returned |
+|---|---|
+| `Marquis Leisure` | 3 — `P/57`, `P/12`, `P\10E Hybrid` (plus 26 Mobilvetta rows) |
+| `Panama` | 5 — those three **and** `P\12+` (9063) and `P\50+` (9064) |
+
+The two it was missing are the two this pipeline created, from run #84's upload on 14
+September. Why Nova files them under one entry and not the other is Nova's business and is
+not known here; what is known is that the importer's entry has stopped being a complete
+view of the brand, so `ncc_supplier_name` is now **`Panama`**, the superset.
+
+Nothing failed while this was wrong. The run succeeded, the counts looked plausible, and a
+reviewer accepting the two "new" products would have created a second `P\12+` and a second
+`P\50+` alongside the live ones. The survey note that said the supplier "IS `Marquis
+Leisure`, NOT `Panama`" was correct when it was written in September, against an FMLV that
+held three Panama products and none of ours.
+
+**The sibling brands are unaffected.** Mobilvetta keeps `Marquis Leisure` — it is the only
+brand in that export that needs it. Audited the same day, `Hobby` (configured as `AURA`)
+and `Airstream` (configured as `Lowdhams`) are both correct as they stand.
+
 ## Still unverified
 
 * **Whether the price list and the pages can disagree.** They do not today, on any of the
