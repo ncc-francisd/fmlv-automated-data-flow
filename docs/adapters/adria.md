@@ -552,3 +552,27 @@ HTML; it appears only once the page has run. The browser is still required.
 After the fix: **35 motorhomes** across the seven ranges, which is what the 2027 price list
 holds and what this adapter collected before, and **9 caravans** against an expected 10 —
 a roster change to look at, not a parsing failure.
+
+## The Rio Grande is withdrawn — 26 November 2026
+
+The health check above left "9 caravans against an expected 10" as a roster change to
+look at. Run 272 closed it, and the way it closed is worth keeping.
+
+The missing layout is the **Alpina 623 HT Rio Grande**. The Alpina page now offers two
+configurations, Mississippi and Colorado, where it offered three.
+
+The run reported **no discontinued products**: nine collected, nine in the FMLV export,
+every one matched. That is the second piece of evidence, and it is the one that makes the
+withdrawal safe to act on. Had the Rio Grande still been a live FMLV row it would have
+been flagged as disappeared and the baseline would have read ten; a bijection between the
+two nines says the row has already left FMLV's live set as well. The last local export
+that holds it is `2026-09-29`, where `product_id` 7216 is still unarchived.
+
+So the site and FMLV agree independently, and `EXPECTED_LAYOUTS` drops to 9. A site that
+goes quiet on its own is a parse failure until proved otherwise — the Livewire-to-Alpine
+move three sections up is exactly that mistake waiting to happen. Two sources agreeing is
+a roster change.
+
+The fixtures still carry the Rio Grande and should keep it: `_livewire("alpina")` is a
+real capture of a three-configuration page, and two tests use it to prove the awning and
+nose-weight reads. Nothing is served by rewriting history to match the current site.

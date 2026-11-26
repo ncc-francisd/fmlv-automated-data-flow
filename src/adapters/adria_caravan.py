@@ -157,8 +157,18 @@ def sub_range_for(config: RangeConfig, product: LivewireProduct) -> str:
     return config.fmlv_range
 
 
-#: Ten configurations across the four ranges, against FMLV's eleven live rows.
-EXPECTED_LAYOUTS = 10
+#: Nine configurations across the four ranges, against FMLV's nine live rows.
+#:
+#: **Was ten.** The `Alpina 623 HT RIO GRANDE` left the range between 29 September and
+#: 26 November 2026, and the withdrawal is corroborated twice over rather than read off
+#: the site alone: the Alpina page now offers two configurations where it offered three,
+#: and run 272 matched all nine collected products against all nine the FMLV export still
+#: holds with nothing left over — so the row is already out of FMLV's live set too. One
+#: source going quiet is a parse failure until proved otherwise; two agreeing is a roster
+#: change. Left at ten it would have cried wolf on every run from here on.
+#:
+#: The comparison is `!=`, so a Rio Grande that comes back is flagged just as loudly.
+EXPECTED_LAYOUTS = 9
 
 #: What the site now calls a layout, against what FMLV still holds.
 #:

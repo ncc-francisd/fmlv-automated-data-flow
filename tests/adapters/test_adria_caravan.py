@@ -77,7 +77,7 @@ def test_the_four_caravan_ranges() -> None:
         "Altea",
         "Action",
     ]
-    assert EXPECTED_LAYOUTS == 10
+    assert EXPECTED_LAYOUTS == 9
 
 
 def test_no_caravan_range_takes_its_model_from_the_trim() -> None:
