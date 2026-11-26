@@ -410,7 +410,49 @@ class GuidePayloads:
 
 
 def _reconciles(product: SwiftProduct, guide: GuidePayloads) -> tuple[bool, str]:
-    """`payload == MTPLM - MRO`, checked across the two documents that split it."""
+    """`payload == MTPLM - MRO`, checked across the two documents that split it.
+
+    **This still answers truthfully; the caller no longer drops on a False.** A
+    contradiction is reported, never fatal — the requester's ruling, 26 November 2026.
+    Asked which document wins, he answered with the question that settles it: the
+    quick guide is a download, effectively a brochure, while the figures this adapter
+    reads *are* the ones the site shows in each layout's pop-up. The live page is the
+    maker's current statement; the leaflet is a snapshot of one. So the site's MTPLM and
+    MRO are recorded and the guide, where it disagrees, is narrated against them.
+
+    This is the same ranking the project already applies elsewhere — a model page beats a
+    standing page, a displayed sterling price beats a converted one — and it is the one
+    the module docstring's "one deliberate softness" was already reaching for: there is no
+    join here, one JSON object is one vehicle, so column misalignment is structurally
+    impossible and the only risk left is Swift mis-stating a figure. A mis-stated figure
+    is something a reviewer should see, not something that should delete the vehicle.
+
+    **What it cost to have this the other way round.** Swift's 2027 Merlin is a new
+    nine-layout campervan range, and the guide and the site disagree on five of the nine:
+
+    | | site MTPLM - MRO | quick guide | |
+    |---|---|---|---|
+    | Merlin 112 | 765kg | 815kg | out by 50 |
+    | Merlin 212 | 635kg | 685kg | out by 50 |
+    | Merlin 122 | 650kg | 665kg | out by 15 |
+    | Merlin 144 | 600kg | 600kg | agrees |
+    | Merlin 244 | 470kg | 470kg | agrees |
+    | Merlin 164 | 585kg | 570kg | out by 15 |
+    | Merlin 264 | 455kg | 395kg | out by 60 |
+    | Merlin 174 | 515kg | 515kg | agrees |
+    | Merlin 274 | 385kg | 385kg | agrees |
+
+    Four agree to the kilogramme, so it is not a units or a basis problem — it is five
+    wrong numbers in one of the two documents. Dropping on contradiction withheld five
+    **new** products from a range FMLV does not yet hold, and the only trace was a line in
+    the run log. The products now come through with the disagreement stated on the
+    payload's provenance, where it reaches a person who can act on it.
+
+    Note also how weak the contradicting evidence is. The guide is keyed on
+    `(length, MTPLM)`, and all nine Merlins are 3500kg across three lengths, so "none of
+    them is your figure" means only that the derived payload is not in a bag of four
+    numbers shared by four different vehicles.
+    """
     return guide.check(product)
 
 
@@ -1025,14 +1067,22 @@ def collect(
             for product in products:
                 ok, basis = _reconciles(product, guide)
                 if not ok:
-                    on_progress(
-                        f"[{category}] {product.label} — SKIPPED: payload doesn't "
-                        f"reconcile ({product.mtplm_kilograms} - "
-                        f"{product.mro_kilograms} = {product.mh_payload_kilograms}kg, "
-                        f"but the {basis})"
+                    # Narrated, not dropped — see `_reconciles` for the ruling and for
+                    # what dropping cost on the Merlin. The site's figures are what get
+                    # recorded, and the disagreement rides on the payload's provenance
+                    # so it reaches the review page rather than only the run log.
+                    basis = (
+                        f"{basis}. THE SITE'S FIGURE IS RECORDED: the quick guide is a "
+                        f"downloaded leaflet, and these masses are the ones the model's "
+                        f"own layout pop-up shows, so the page wins"
                     )
-                    continue
-                if basis.startswith("quick guide prints no"):
+                    on_progress(
+                        f"[{category}] {product.label} — SWIFT'S TWO DOCUMENTS DISAGREE: "
+                        f"{product.mtplm_kilograms} - {product.mro_kilograms} = "
+                        f"{product.mh_payload_kilograms}kg from the site, but the "
+                        f"{basis}. Worth raising with Swift"
+                    )
+                elif basis.startswith("quick guide prints no"):
                     on_progress(
                         f"[{category}] {product.label} — payload "
                         f"{product.mh_payload_kilograms}kg UNCHECKED: {basis}"

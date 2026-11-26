@@ -317,11 +317,14 @@ def test_every_scraped_payload_reconciles_against_the_guide() -> None:
         assert basis.startswith("quick guide prints"), f"{product.label} went unchecked"
 
 
-def test_a_contradicted_payload_is_rejected() -> None:
-    """A wrong MRO must not survive the check.
+def test_a_contradicted_payload_is_reported() -> None:
+    """A wrong MRO must not pass the check silently.
 
     This is what the self-check exists for — Swift mis-stating a figure, since the JSON
-    has no join to misalign.
+    has no join to misalign. **It reports; it no longer drops.** The requester ruled on
+    26 November 2026 that the site wins, the quick guide being a downloaded leaflet while
+    these masses are the ones each layout's pop-up shows, so `collect` records the site's
+    figures and narrates the disagreement. See `_reconciles`.
     """
     guide = parse_guide_payloads(MOTORHOME_GUIDE)
     wrong = SwiftProduct(
@@ -339,11 +342,11 @@ def test_a_contradicted_payload_is_rejected() -> None:
 
 
 def test_a_floorplan_the_guide_does_not_cover_is_allowed_but_flagged() -> None:
-    """A gap in the guide warns; only a contradiction drops.
+    """A gap and a contradiction are different things, and the basis string says which.
 
-    The brochure version dropped hard because its two tables were joined and a misjoin
-    was the risk. There is no join here, so losing a real vehicle over a marketing
-    leaflet's coverage would be the worse error.
+    Nothing drops on either any more, but a reviewer needs to tell "the leaflet does not
+    cover this" from "the leaflet says something else" — so the two keep distinct
+    wording, which is what `collect` branches on.
     """
     guide = parse_guide_payloads(MOTORHOME_GUIDE)
     unlisted = SwiftProduct(
@@ -358,6 +361,32 @@ def test_a_floorplan_the_guide_does_not_cover_is_allowed_but_flagged() -> None:
 
     assert ok
     assert basis.startswith("quick guide prints no")
+
+
+def test_the_merlin_disagreement_is_reported_rather_than_dropped() -> None:
+    """**What the Merlin cost.** Swift's 2027 campervan guide and their own website
+    disagree on five of the nine Merlin layouts, and four agree to the kilogramme — so it
+    is five wrong numbers in one document, not a units or a basis problem.
+
+    Dropping on contradiction withheld five *new* products from a range FMLV does not
+    hold, leaving only a line in the run log. `_reconciles` still answers truthfully, so
+    the disagreement reaches the reviewer; what changed is that `collect` no longer
+    throws the vehicle away over it.
+    """
+    guide = parse_guide_payloads(CAMPERVAN_GUIDE)
+    merlin_112 = SwiftProduct(
+        range_label="Merlin",
+        model="112",
+        mh_length_mm=5410,
+        mtplm_kilograms=3500,
+        mro_kilograms=2735,  # the site's figure; the guide implies 2685
+    )
+
+    ok, basis = _reconciles(merlin_112, guide)
+
+    assert not ok
+    assert "815" in basis
+    assert "765" in basis
 
 
 def test_a_product_with_no_weights_has_nothing_to_contradict() -> None:
