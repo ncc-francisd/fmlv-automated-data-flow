@@ -494,6 +494,15 @@ Two things will bite anyone using it:
   layout, never the series.
 * **Filter the index by `vehicleType` too** — see the next section for what it costs not
   to. `motorhome` and `van` are FMLV's motorhome product area; `caravan` is not.
+* **`lengthOverall` is the SHIPPING length**, and the API publishes it in **centimetres**.
+  Settled 26 November 2026 by matching Eriba's eighteen 2027 layouts to FMLV's own rows on
+  their two masses: `lengthOverall` agrees with `shipping_length_mm` on 17 of 18,
+  `heightOverall` with `height_mm` on 17 of 18, and `headroomLivingArea` with
+  `headroom_mm` on all 18 — the odd one out being a layout whose masses collide with an
+  earlier model year's row, not a mapping failure. Eriba's API says 506cm for a Touring
+  310 where FMLV holds `shipping_length_mm=5060, internal_length_mm=3660`, so reading it
+  as the internal length would overstate the habitable space by 1.4m on that one product
+  alone. There is no internal or body length in the payload at all.
 
 ### One catalogue can carry two product areas, and only one field says which
 

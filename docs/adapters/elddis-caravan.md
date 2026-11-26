@@ -1,8 +1,8 @@
 # Elddis touring caravans — site survey
 
-Surveyed 26 November 2026, after the `Riviera` range turned up in the motorhome
-adapter's roster and was filtered out of it. **No adapter has been written.** This is the
-stage-1 survey; nothing has been built.
+Surveyed **and built** 26 November 2026, after the `Riviera` range turned up in the
+motorhome adapter's roster and was filtered out of it. The adapter is
+`src/adapters/elddis_caravan.py`; five layouts collected, none dropped.
 
 FMLV manufacturer id **8**, `fmlv_manufacturer` **`Elddis (EHG UK)`** — the same row the
 motorhome adapter uses, so this is a **second product area on an existing row**, the shape
@@ -24,10 +24,20 @@ That is why the requester could not find it on the website and could only find s
 media posts: `elddis.co.uk` links no Riviera page, and the API says why. The homepage
 range-link scan the motorhome adapter runs finds no slug matching it either.
 
-**So an adapter written today would collect five layouts, find no price and no drawing,
-and propose five new products for a range the manufacturer has not launched.** Whatever
-is built must honour `availableForWebsite` and emit nothing until it flips — which also
-makes the adapter self-starting the day Elddis do launch.
+**They are collected and emitted anyway**, on the requester's instruction: *"it looks
+like we're going to have to enter those as new models, but yeah, build them, and then the
+moment they go on their website we will activate them, and probably not before."* FMLV's
+staging state is an inactive product, not an absent one, so the right place for an
+unlaunched model is a row somebody has created and not yet switched on. The adapter
+narrates the flag it read, once per layout, so a reviewer knows to leave the product
+inactive:
+
+```
+[Riviera 580 FL] NOT YET PUBLISHED BY ELDDIS: the configurator flags this layout
+`availableForWebsite: false` and publishes no price and no floorplan, and elddis.co.uk
+links no page for it. It is collected so the product can be created in FMLV ready to go,
+and it should be left INACTIVE until Elddis put it on their site
+```
 
 ## FMLV's Elddis caravan area exists, and is entirely switched off
 
@@ -106,10 +116,32 @@ on.
 * **Whether Elddis will publish a price list** of the kind the motorhome side gets its
   figures from.
 
-## The registry row needs two edits before anything runs
+## The registry row carries both product areas
 
-Both on the existing row 13, `Elddis (EHG UK)`:
+Two edits on the existing row 13, `Elddis (EHG UK)`, made 26 November 2026:
 
-* `ncc_supplier_name_caravan` is **empty** and must become **`Elddis Caravans`** — read
-  off the NCC dropdown, not guessed.
-* `categories` is **`motorhome`** and must become **`motorhome,caravan`**.
+* `ncc_supplier_name_caravan` is **`Elddis Caravans`** — read off the NCC dropdown and
+  confirmed by the requester, not guessed. `ncc_supplier_name` stays `Elddis Motorhomes`.
+* `categories` is **`motorhome,caravan`**.
+
+**`Elddis Campervans` is deliberately unused.** The GTV campervans sit in the *motorhome*
+export — `Autoquest Apex` holds 8 motorhomes and 4 campervans — and that third entry timed
+out twice rather than returning anything on 26 November. It is probably empty or
+duplicative, but it has not been read, and Panama is the precedent for a second supplier
+entry holding products the first does not.
+
+## What the first live run found
+
+```
+model year 2027: 7 series in the catalogue, 1 of them touring caravans — Riviera
+[Riviera] 5 layout(s)
+[Riviera 580 FL] read: 4 berth, MTPLM 1800kg less mass in running order 1265kg,
+                 giving a payload of 535kg, 7170mm shipping length
+collected 5 Elddis caravan(s)
+```
+
+All five reconcile. Each carries berths, both masses, a derived payload, shipping length,
+width, height, headroom and a rigid body type, plus bed types and a sleeping area as
+findings. None carries a price, and **none carries `twin_axle`** — the payload states no
+axle count, and the field is a `bool` defaulting to `False`, so recording no provenance
+for it is what keeps "we did not look" from reaching FMLV as "it has one axle".

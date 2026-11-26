@@ -1,0 +1,1449 @@
+[
+ {
+  "id": 4654463,
+  "marketingName": "Riviera 580 FL",
+  "grossPrice": null,
+  "technicalData": {
+   "maxPersons": null,
+   "extraMaxPersons": null,
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "4",
+    "unit": null,
+    "unitLong": null
+   },
+   "extraSleepingBerths": null,
+   "technicalDataBed": {
+    "key": "technicalDataBed",
+    "value": {
+     "items": [
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "135",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "200",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "french-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "front",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "135",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "210",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "seating-group-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      }
+     ]
+    },
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "1800",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "weightRoadworthy": {
+    "key": "weightRoadworthy",
+    "value": "1265",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMax": {
+    "key": "trailingLoadMax",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMaxUnrestrained": {
+    "key": "trailingLoadMaxUnrestrained",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "manufacturerSpecifiedWeightForOptionalEquipment": {
+    "key": "manufacturerSpecifiedWeightForOptionalEquipment",
+    "value": 438,
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "717",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "wheelbase": {
+    "key": "wheelbase",
+    "value": "",
+    "unit": "mm",
+    "unitLong": "millimeters"
+   },
+   "widthOverall": {
+    "key": "widthOverall",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "widthOverallwithoutMirrors": {
+    "key": "widthOverallwithoutMirrors",
+    "value": "230",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "heightOverall": {
+    "key": "heightOverall",
+    "value": "265",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "headroomLivingArea": {
+    "key": "headroomLivingArea",
+    "value": "198",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceStorageSpace": null,
+   "clearanceGarageSpaceWidth": {
+    "key": "clearanceGarageSpaceWidth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceHeight": {
+    "key": "clearanceGarageSpaceHeight",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceDepth": {
+    "key": "clearanceGarageSpaceDepth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "isGarageSpaceAccessibleFromInside": {
+    "key": "isGarageSpaceAccessibleFromInside",
+    "value": "",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets12V": {
+    "key": "numberOfOutlets12V",
+    "value": "0",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets230V": {
+    "key": "numberOfOutlets230V",
+    "value": "8",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutletsUSB": null,
+   "tireSize": {
+    "key": "tireSize",
+    "value": "195 R14C LI106",
+    "unit": null,
+    "unitLong": null
+   }
+  },
+  "layoutImage": null,
+  "layoutImageVertical": null,
+  "bodyType": null,
+  "internalName": "580 FL",
+  "vehicleType": "caravan",
+  "available": false,
+  "availableForWebsite": false
+ },
+ {
+  "id": 4654103,
+  "marketingName": "Riviera 590 SDW",
+  "grossPrice": null,
+  "technicalData": {
+   "maxPersons": null,
+   "extraMaxPersons": null,
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "3",
+    "unit": null,
+    "unitLong": null
+   },
+   "extraSleepingBerths": null,
+   "technicalDataBed": {
+    "key": "technicalDataBed",
+    "value": {
+     "items": [
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "85",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "190",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "single-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "front",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "85",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "195",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "single-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "front",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "210",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "190",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "yes",
+        "bedType": "single-to-double-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "front",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "90",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "185",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "seating-group-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "middle",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      }
+     ]
+    },
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "1800",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "weightRoadworthy": {
+    "key": "weightRoadworthy",
+    "value": "1310",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMax": {
+    "key": "trailingLoadMax",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMaxUnrestrained": {
+    "key": "trailingLoadMaxUnrestrained",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "manufacturerSpecifiedWeightForOptionalEquipment": {
+    "key": "manufacturerSpecifiedWeightForOptionalEquipment",
+    "value": 381,
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "733",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "wheelbase": {
+    "key": "wheelbase",
+    "value": "",
+    "unit": "mm",
+    "unitLong": "millimeters"
+   },
+   "widthOverall": {
+    "key": "widthOverall",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "widthOverallwithoutMirrors": {
+    "key": "widthOverallwithoutMirrors",
+    "value": "230",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "heightOverall": {
+    "key": "heightOverall",
+    "value": "265",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "headroomLivingArea": {
+    "key": "headroomLivingArea",
+    "value": "198",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceStorageSpace": null,
+   "clearanceGarageSpaceWidth": {
+    "key": "clearanceGarageSpaceWidth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceHeight": {
+    "key": "clearanceGarageSpaceHeight",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceDepth": {
+    "key": "clearanceGarageSpaceDepth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "isGarageSpaceAccessibleFromInside": {
+    "key": "isGarageSpaceAccessibleFromInside",
+    "value": "",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets12V": {
+    "key": "numberOfOutlets12V",
+    "value": "0",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets230V": {
+    "key": "numberOfOutlets230V",
+    "value": "6",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutletsUSB": null,
+   "tireSize": {
+    "key": "tireSize",
+    "value": "195 R14C LI106",
+    "unit": null,
+    "unitLong": null
+   }
+  },
+  "layoutImage": null,
+  "layoutImageVertical": null,
+  "bodyType": null,
+  "internalName": "590 SDW",
+  "vehicleType": "caravan",
+  "available": false,
+  "availableForWebsite": false
+ },
+ {
+  "id": 4655988,
+  "marketingName": "Riviera 600 FDB",
+  "grossPrice": null,
+  "technicalData": {
+   "maxPersons": null,
+   "extraMaxPersons": null,
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "5",
+    "unit": null,
+    "unitLong": null
+   },
+   "extraSleepingBerths": {
+    "key": "extraSleepingBerths",
+    "value": "6",
+    "unit": null,
+    "unitLong": null
+   },
+   "technicalDataBed": {
+    "key": "technicalDataBed",
+    "value": {
+     "items": [
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "155",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "210",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "double-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "front",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "100",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "190",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "seating-group-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "middle",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "75",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "200",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "bunk-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "80",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "75",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "200",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "bunk-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "80",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "75",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "200",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "yes",
+        "bedType": "bunk-bed",
+        "hintDimensionForDealer": "SA #200",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "76",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "75",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "200",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "yes",
+        "bedType": "bunk-bed",
+        "hintDimensionForDealer": "SA #200",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "80",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "75",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "200",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "yes",
+        "bedType": "bunk-bed",
+        "hintDimensionForDealer": "SA #200",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "80",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      }
+     ]
+    },
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "1800",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "weightRoadworthy": {
+    "key": "weightRoadworthy",
+    "value": "1315",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMax": {
+    "key": "trailingLoadMax",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMaxUnrestrained": {
+    "key": "trailingLoadMaxUnrestrained",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "manufacturerSpecifiedWeightForOptionalEquipment": {
+    "key": "manufacturerSpecifiedWeightForOptionalEquipment",
+    "value": 365,
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "733",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "wheelbase": {
+    "key": "wheelbase",
+    "value": "",
+    "unit": "mm",
+    "unitLong": "millimeters"
+   },
+   "widthOverall": {
+    "key": "widthOverall",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "widthOverallwithoutMirrors": {
+    "key": "widthOverallwithoutMirrors",
+    "value": "230",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "heightOverall": {
+    "key": "heightOverall",
+    "value": "265",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "headroomLivingArea": {
+    "key": "headroomLivingArea",
+    "value": "198",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceStorageSpace": null,
+   "clearanceGarageSpaceWidth": {
+    "key": "clearanceGarageSpaceWidth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceHeight": {
+    "key": "clearanceGarageSpaceHeight",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceDepth": {
+    "key": "clearanceGarageSpaceDepth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "isGarageSpaceAccessibleFromInside": {
+    "key": "isGarageSpaceAccessibleFromInside",
+    "value": "",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets12V": {
+    "key": "numberOfOutlets12V",
+    "value": "0",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets230V": {
+    "key": "numberOfOutlets230V",
+    "value": "8",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutletsUSB": {
+    "key": "numberOfOutletsUSB",
+    "value": "3",
+    "unit": null,
+    "unitLong": null
+   },
+   "tireSize": {
+    "key": "tireSize",
+    "value": "195 R14C LI106",
+    "unit": null,
+    "unitLong": null
+   }
+  },
+  "layoutImage": null,
+  "layoutImageVertical": null,
+  "bodyType": null,
+  "internalName": "600 FDB",
+  "vehicleType": "caravan",
+  "available": false,
+  "availableForWebsite": false
+ },
+ {
+  "id": 4656165,
+  "marketingName": "Riviera 640 LS",
+  "grossPrice": null,
+  "technicalData": {
+   "maxPersons": null,
+   "extraMaxPersons": null,
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "4",
+    "unit": null,
+    "unitLong": null
+   },
+   "extraSleepingBerths": null,
+   "technicalDataBed": {
+    "key": "technicalDataBed",
+    "value": {
+     "items": [
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "140",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "210",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "seating-group-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "front",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "85",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "215",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "single-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "85",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "205",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "single-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "210",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "215",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "yes",
+        "bedType": "single-to-double-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      }
+     ]
+    },
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "1800",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "weightRoadworthy": {
+    "key": "weightRoadworthy",
+    "value": "1335",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMax": {
+    "key": "trailingLoadMax",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMaxUnrestrained": {
+    "key": "trailingLoadMaxUnrestrained",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "manufacturerSpecifiedWeightForOptionalEquipment": {
+    "key": "manufacturerSpecifiedWeightForOptionalEquipment",
+    "value": 361,
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "765",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "wheelbase": {
+    "key": "wheelbase",
+    "value": "",
+    "unit": "mm",
+    "unitLong": "millimeters"
+   },
+   "widthOverall": {
+    "key": "widthOverall",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "widthOverallwithoutMirrors": {
+    "key": "widthOverallwithoutMirrors",
+    "value": "230",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "heightOverall": {
+    "key": "heightOverall",
+    "value": "265",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "headroomLivingArea": {
+    "key": "headroomLivingArea",
+    "value": "198",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceStorageSpace": null,
+   "clearanceGarageSpaceWidth": {
+    "key": "clearanceGarageSpaceWidth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceHeight": {
+    "key": "clearanceGarageSpaceHeight",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceDepth": {
+    "key": "clearanceGarageSpaceDepth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "isGarageSpaceAccessibleFromInside": {
+    "key": "isGarageSpaceAccessibleFromInside",
+    "value": "",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets12V": {
+    "key": "numberOfOutlets12V",
+    "value": "0",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets230V": {
+    "key": "numberOfOutlets230V",
+    "value": "7",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutletsUSB": null,
+   "tireSize": {
+    "key": "tireSize",
+    "value": "195 R14C LI106",
+    "unit": null,
+    "unitLong": null
+   }
+  },
+  "layoutImage": null,
+  "layoutImageVertical": null,
+  "bodyType": null,
+  "internalName": "640 LS",
+  "vehicleType": "caravan",
+  "available": false,
+  "availableForWebsite": false
+ },
+ {
+  "id": 4656527,
+  "marketingName": "Riviera 660 IU",
+  "grossPrice": null,
+  "technicalData": {
+   "maxPersons": null,
+   "extraMaxPersons": null,
+   "sleepingBerths": {
+    "key": "sleepingBerths",
+    "value": "4",
+    "unit": null,
+    "unitLong": null
+   },
+   "extraSleepingBerths": null,
+   "technicalDataBed": {
+    "key": "technicalDataBed",
+    "value": {
+     "items": [
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "150",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "205",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "queen-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "front",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      },
+      {
+       "values": {
+        "width": {
+         "key": "width",
+         "value": "135",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "length": {
+         "key": "length",
+         "value": "210",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondWidth": {
+         "key": "secondWidth",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "secondLength": {
+         "key": "secondLength",
+         "value": "",
+         "unit": "cm",
+         "unitLong": "centimetres"
+        },
+        "isOptional": "no",
+        "bedType": "seating-group-bed",
+        "hintDimensionForDealer": "",
+        "installedIn": "rear",
+        "maxLoad": {
+         "key": "maxLoad",
+         "value": "",
+         "unit": "kg",
+         "unitLong": "kilograms"
+        }
+       }
+      }
+     ]
+    },
+    "unit": null,
+    "unitLong": null
+   },
+   "weightGrossVehicle": {
+    "key": "weightGrossVehicle",
+    "value": "2000",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "weightRoadworthy": {
+    "key": "weightRoadworthy",
+    "value": "1380",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMax": {
+    "key": "trailingLoadMax",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "trailingLoadMaxUnrestrained": {
+    "key": "trailingLoadMaxUnrestrained",
+    "value": "",
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "manufacturerSpecifiedWeightForOptionalEquipment": {
+    "key": "manufacturerSpecifiedWeightForOptionalEquipment",
+    "value": 514,
+    "unit": "kg",
+    "unitLong": "kilograms"
+   },
+   "lengthOverall": {
+    "key": "lengthOverall",
+    "value": "784",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "wheelbase": {
+    "key": "wheelbase",
+    "value": "",
+    "unit": "mm",
+    "unitLong": "millimeters"
+   },
+   "widthOverall": {
+    "key": "widthOverall",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "widthOverallwithoutMirrors": {
+    "key": "widthOverallwithoutMirrors",
+    "value": "230",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "heightOverall": {
+    "key": "heightOverall",
+    "value": "265",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "headroomLivingArea": {
+    "key": "headroomLivingArea",
+    "value": "198",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceStorageSpace": null,
+   "clearanceGarageSpaceWidth": {
+    "key": "clearanceGarageSpaceWidth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceHeight": {
+    "key": "clearanceGarageSpaceHeight",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "clearanceGarageSpaceDepth": {
+    "key": "clearanceGarageSpaceDepth",
+    "value": "",
+    "unit": "cm",
+    "unitLong": "centimetres"
+   },
+   "isGarageSpaceAccessibleFromInside": {
+    "key": "isGarageSpaceAccessibleFromInside",
+    "value": "",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets12V": {
+    "key": "numberOfOutlets12V",
+    "value": "0",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutlets230V": {
+    "key": "numberOfOutlets230V",
+    "value": "9",
+    "unit": null,
+    "unitLong": null
+   },
+   "numberOfOutletsUSB": {
+    "key": "numberOfOutletsUSB",
+    "value": "1",
+    "unit": null,
+    "unitLong": null
+   },
+   "tireSize": {
+    "key": "tireSize",
+    "value": "225/70 R15C LI112",
+    "unit": null,
+    "unitLong": null
+   }
+  },
+  "layoutImage": null,
+  "layoutImageVertical": null,
+  "bodyType": null,
+  "internalName": "660 IU",
+  "vehicleType": "caravan",
+  "available": false,
+  "availableForWebsite": false
+ }
+]
