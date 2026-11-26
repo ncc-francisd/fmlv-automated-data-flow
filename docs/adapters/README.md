@@ -492,6 +492,80 @@ Two things will bite anyone using it:
   UK sites rename freely: Bürstner's `B66 644 TD` is published as `Lyseo TD 644 G` under a
   series called `Lyseo TD`, and its `B66 644 C` under one called `Eliseo C`. Join on the
   layout, never the series.
+* **Filter the index by `vehicleType` too** — see the next section for what it costs not
+  to. `motorhome` and `van` are FMLV's motorhome product area; `caravan` is not.
+
+### One catalogue can carry two product areas, and only one field says which
+
+**Elddis, 26 November 2026.** The motorhome adapter drives its roster off the brand's
+configurator series index. Elddis added a **touring caravan** range, `Riviera`, to that
+index, and five caravans were collected as motorhomes.
+
+**Nothing in the series itself gives it away.** A caravan's `bodyType` is `null`, which is
+also what an unrecognised motorhome body would be, so the adapter's "unknown body type,
+left blank and narrated" path absorbed it. The API's `vehicleType` is the only field that
+distinguishes them, and it was not being read.
+
+**Every signal that something was wrong arrived as an ordinary gap:**
+
+```
+NEW RANGE: 'Riviera' is in Elddis's 2027 catalogue and not in this adapter's list
+[Riviera 580 FL] WARNING: no price published, left blank
+[Riviera 580 FL] WARNING: no body type proposed
+[Riviera 580 FL] read: £0, 4 berth, None seats, 1800kg, 7170mm long
+expected 18 layouts and collected 23
+```
+
+Each of those is a line an adapter prints routinely, and three of them have an innocent
+reading. The one that cannot be read innocently is in the data: **an 1800 kg motorhome
+with no travel seats is not a thing.** A caravan collected as a motorhome does not look
+like a parsing failure; it looks like a manufacturer who has launched something unusual.
+
+Two things generalise:
+
+* **Before treating any index as the roster for one product area, find out whether it is
+  one.** A brand that builds both will eventually put both in the same catalogue, and the
+  day it does is not announced. Where the source states the kind — as this API does — read
+  it. Where it does not, the roster needs a different source, or a guard on the figures.
+* **A "new range" message is not a safe default.** Collecting an unknown range and saying
+  so is right where the catalogue holds one kind of vehicle. Where it can hold two, the
+  same generosity files the other kind under the wrong export. Drop what you cannot
+  identify, name it, and let a person decide — which is what the adapter now does for a
+  `vehicleType` that is neither motorhome, van nor caravan.
+
+The sibling EHG brands were checked rather than assumed: Carado's 2027 index is motorhomes
+and vans only; Eriba's genuinely mixes three caravan series with one van, but `eriba.py`
+and `eriba_caravan.py` each drive off their own named range list rather than off the index,
+so neither can reach the other's products.
+
+### A self-check's premise is a claim about today's documents, and it can expire
+
+**Auto-Trail, 26 November 2026.** `_reconciles` refused to emit a product whose two
+published berth maxima disagreed — `Sleeps` against `Max. No. of berths` — on the evidence
+that they agreed on all 21 models that stated both, so a disagreement meant two models'
+blocks had been read as one. That was true when it was written and it caught a real fault.
+
+The 2027 Adventure specification prints `Sleeps 4` with `Max. No. of berths 6` on two of
+its four models, and it is not a slip — every other row in those blocks is the right
+model's. They are four-berth vans that take six with the options fitted. **The check
+dropped two real products the day the range went live.**
+
+The repair is not to weaken the check but to ask which direction of disagreement can only
+be an error. No vehicle sleeps more people than its maximum number of berths, so a maximum
+*below* the top of `Sleeps` still drops the product; above it is ordinary and is narrated.
+The check keeps its full strength against the fault it was built for and stops firing on
+the manufacturer telling the truth.
+
+So when a self-check fires on a product that looks real, **re-read the premise before
+re-reading the product.** A premise of the form "these agree on all N models today" is a
+statement about the documents in front of you, not a law, and a new range is exactly the
+event that tests it. Record the count and the date in the docstring — as that one did —
+so the next person can tell a premise from a rule.
+
+**And say which figures failed.** Both Adventures were dropped on their berth rows under a
+message naming three gross weights, all of them correct. A drop message that names a fixed
+set of fields rather than the ones that actually failed sends the first investigation to
+the wrong page of the document.
 
 ### Look for a drawing by what it is, not by what it is called
 

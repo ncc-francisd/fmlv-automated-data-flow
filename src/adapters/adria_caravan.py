@@ -601,13 +601,15 @@ def collect(
             range_url, capture_url_contains=_LIVEWIRE_UPDATE_MARKER, scroll=True
         )
         products = parse_dom_products(
-            page_result.file_path.read_text(encoding="utf-8", errors="replace")
+            page_result.file_path.read_text(encoding="utf-8", errors="replace"),
+            on_progress,
         )
         if not products:
             on_progress(
                 f"[{config.label}] WARNING: the range page rendered no configurations — "
-                f"no `setProductId` button was found, so the layout selector has moved "
-                f"again. Its products cannot be collected this run"
+                f"neither a `data-product-id` layout-selector button nor the older "
+                f"`setProductId` one was found, so the layout selector has moved again. "
+                f"Its products cannot be collected this run"
             )
         else:
             on_progress(f"[{config.label}] {len(products)} configuration(s) found")

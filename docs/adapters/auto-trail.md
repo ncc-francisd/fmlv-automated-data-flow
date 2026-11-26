@@ -680,3 +680,68 @@ from the 25 models that do have one, and GBP 180 of its GBP 635 is unexplained b
 list's own stated government charges of GBP 455. Either an Adventure card on their site or
 an on-the-road figure from them would retire the inference.
 
+
+## The Adventure range went live, and a self-check expired with it — 26 November 2026
+
+### Adventure is now collected from the site like any other range
+
+`motorhomes-range/adventure` resolves. The retirement switch built on 2 October 2026 —
+`_adventure_range_is_published` — went true, which until today meant the four Adventures
+were emitted by **nothing at all**: the fallback stops, and the range was not on
+`DEFAULT_RANGES` for the ordinary loop to pick up.
+
+The page carries the four models and their prices like every other range page. The one
+thing it does *not* carry is the technical specification: `2027-tech-spec-adventure-1-1-1.pdf`
+is linked from the **model** pages, not the range page — which is where this adapter reads
+every range's spec from anyway, so nothing special was needed. Adding
+`("motorhomes-range/adventure", "Adventure")` to `DEFAULT_RANGES` was the whole change.
+
+The price-list-and-spreadsheet fallback is **kept, not deleted**. It costs one fetch of a
+page that is being checked anyway, and it is the only other source for these four if
+Auto-Trail take the page down — which is exactly what they did to the Adventure
+*campervans*.
+
+### `Sleeps` and `Max. No. of berths` can legitimately disagree
+
+`_reconciles` tested the two published berth maxima for **equality**, on the evidence that
+they agreed on all 21 models that stated both, so a disagreement meant the block
+boundaries had slipped and two models' figures had been mixed.
+
+The 2027 Adventure specification falsifies that premise:
+
+| | Sleeps | Max. No. of berths | Mass in running order | Length |
+|---|---|---|---|---|
+| Adventure 64 | 4 | 4 | 2880kg | 6371mm |
+| Adventure 74 | 4 | 4 | 3000kg | 7288mm |
+| **Adventure 76** | 4 | **6** | 3030kg | 7288mm |
+| **Adventure 76G** | 4 | **6** | 3000kg | 7288mm |
+
+It is not a slip. Every other row in those two blocks is the right model's — the masses
+and lengths are distinct and correct, and the blocks are cleanly separated by their
+`ADVENTURE 76` / `ADVENTURE 76G` headings. They are four-berth vans that take six with the
+options fitted, which is ordinary. Tested as equality, the check **dropped two real
+products the day the range went live.**
+
+**Only one direction of disagreement can mean a slip.** No vehicle sleeps more people than
+its maximum number of berths, so `Max. No. of berths` *below* the top of `Sleeps` remains a
+failure and still drops the product. Above it is ordinary, and is narrated instead:
+
+```
+[Adventure] Adventure 76 — NOTE: sleeps 4 but states a maximum of 6 berths. 4 is
+recorded, the standard figure — the others need options, per the settled berths rule
+```
+
+### The skip message now names the figures that failed
+
+Both Adventures were dropped on their **berth** rows under a message about gross weights —
+`SKIPPED: weights don't reconcile (max gross 3500kg, running order 3030kg, gross train
+4750kg)` — all three of which are correct and none of which was the problem. That sent the
+first look at it to the wrong page of the document. `_why_it_does_not_reconcile` now says
+which test failed, in the words of the rows it failed on.
+
+### The roster is 31, and the drop from 37 is accounted for
+
+27 before Adventure, 31 with it. The 2026 figure was 37; the difference is three ranges
+Auto-Trail have ended, all three already recorded in `WITHDRAWN_RANGES` and confirmed by
+their marketing executive on 9 November 2026 — Expedition Coachbuilt (4), V-Line SE (4)
+and the Adventure campervans (2). 37 − 10 + 4 = 31.

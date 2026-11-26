@@ -143,3 +143,42 @@ def test_technical_data_is_handed_over_raw_and_unwrapped_on_demand() -> None:
 @pytest.mark.parametrize("payload", ["", "not json", "{}", '[{"id": 1}]'])
 def test_an_unusable_models_response_yields_no_layouts(payload: str) -> None:
     assert ehg.parse_models(payload) == []
+
+
+def test_a_series_carries_the_api_s_own_vehicle_type() -> None:
+    """The only thing that tells a caravan range from a motorhome one.
+
+    Elddis put a touring caravan range into the same series index as its motorhomes for
+    2027, and nothing else in the entry distinguishes it: a caravan's `bodyType` is
+    `null`, which is also what an unrecognised motorhome body would be.
+    """
+    payload = json.dumps(
+        [
+            {"id": 1, "name": "Autoquest GT", "modelYear": "2027", "vehicleType": "motorhome"},
+            {"id": 2, "name": "Autoquest GTV", "modelYear": "2027", "vehicleType": "van"},
+            {"id": 3, "name": "Riviera", "modelYear": "2027", "vehicleType": "caravan"},
+        ]
+    )
+
+    by_name = {entry.name: entry.vehicle_type for entry in ehg.parse_series_index(payload)}
+
+    assert by_name == {
+        "Autoquest GT": "motorhome",
+        "Autoquest GTV": "van",
+        "Riviera": "caravan",
+    }
+    assert "motorhome" in ehg.MOTORHOME_VEHICLE_TYPES
+    assert "van" in ehg.MOTORHOME_VEHICLE_TYPES
+    assert ehg.CARAVAN_VEHICLE_TYPE not in ehg.MOTORHOME_VEHICLE_TYPES
+
+
+def test_a_series_with_no_vehicle_type_reports_none_rather_than_guessing() -> None:
+    """Absent is not the same as caravan, and an adapter has to be able to tell."""
+    payload = json.dumps(
+        [
+            {"id": 1, "name": "No type", "modelYear": "2027"},
+            {"id": 2, "name": "Wrong type", "modelYear": "2027", "vehicleType": 7},
+        ]
+    )
+
+    assert [entry.vehicle_type for entry in ehg.parse_series_index(payload)] == [None, None]

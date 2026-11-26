@@ -504,3 +504,51 @@ its mass and payload simply not proposed, and it matches through the rename.
 only by their trims. They drop on the TBA check before that matters, but the collision
 would otherwise file two caravans under one FMLV identity, so `collect` refuses a
 duplicate `(range, model)` and says why.
+
+## The layout selector moved again — 26 November 2026
+
+**Both adapters collected zero products.** Seven motorhome ranges and four caravan ranges,
+every one of them reporting the same thing:
+
+```
+[Matrix] WARNING: the range page rendered no configurations — no `setProductId` button
+         was found, so the layout selector has moved again
+```
+
+The pages themselves were fine — right titles, 500–700 KB each, nothing timing out. Adria
+have taken the layout selector **off Livewire and put it on Alpine**:
+
+```html
+<!-- was -->
+wire:click.prevent="setProductId('100351-2627-wnnb-79400b010-14')"
+data-gtm-type="MB 600 SPB" data-gtm-value="Supreme RHD AWD"
+
+<!-- now -->
+data-product-id="100351-2627-gxajlm5200f032-11"
+x-on:click.prevent="openProduct($el.dataset.productId, $el.getAttribute('href'), $el)"
+data-gtm="layout_selector_more"
+data-gtm-type="670 DC" data-gtm-value="Select RHD"
+```
+
+**The product id format did not change**, so `technical_data_pdf_url` and everything
+downstream of it — the per-configuration PDF, the masses, the dimensions, the nose weight
+— needed no change at all. The whole outage was one attribute name.
+
+**The new pattern is anchored on `data-gtm="layout_selector_more"`.** `data-gtm-type`
+alone appears 95 times on a range page — the logo, the top menu, every product card — so
+anchoring on it would match things that are not layouts. The `layout_selector_more` marker
+sits only on the selector's own buttons, which makes this pattern *narrower* than the one
+it replaces rather than merely different.
+
+**Both shapes are now accepted, newest first**, and falling back to the older one is
+narrated. This markup has moved twice in three months — `wire:click` to `wire:click.prevent`
+on 1 October 2026, Livewire to Alpine on 26 November — and each time two product areas went
+to zero until somebody noticed. One extra regex over a page already being scanned is a
+cheap hedge against a third move, and a part-built site could serve one shape per range.
+
+**A plain fetch still will not do.** `data-product-id` is absent from the server-rendered
+HTML; it appears only once the page has run. The browser is still required.
+
+After the fix: **35 motorhomes** across the seven ranges, which is what the 2027 price list
+holds and what this adapter collected before, and **9 caravans** against an expected 10 —
+a roster change to look at, not a parsing failure.

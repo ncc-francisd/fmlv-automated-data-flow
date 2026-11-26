@@ -62,10 +62,18 @@ def test_the_label_is_auto_trails_own_name() -> None:
 
 def test_the_withdrawn_campervan_adventure_is_off_the_roster() -> None:
     """It has to be, or two ranges would file under one name — see
-    `_withdrawn_ranges_returned`, which is what now watches for its return."""
+    `_withdrawn_ranges_returned`, which is what now watches for its return.
+
+    **The motorhome Adventure joined the roster on 26 November 2026**, when Auto-Trail
+    published its range page. So `Adventure` is a label here now; what must stay true is
+    that it belongs to the *motorhome* path and that exactly one range claims the name.
+    """
     paths = {path for path, _label in auto_trail.DEFAULT_RANGES}
+    labels = [label for _path, label in auto_trail.DEFAULT_RANGES]
+
     assert "campervans-range/adventure" not in paths
-    assert ADVENTURE_RANGE_LABEL not in {label for _path, label in auto_trail.DEFAULT_RANGES}
+    assert labels.count(ADVENTURE_RANGE_LABEL) == 1
+    assert ("motorhomes-range/adventure", ADVENTURE_RANGE_LABEL) in auto_trail.DEFAULT_RANGES
 
 
 # --- reading the price list -----------------------------------------------------------

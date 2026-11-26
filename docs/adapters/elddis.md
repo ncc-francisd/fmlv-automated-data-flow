@@ -767,3 +767,53 @@ roof open. Per the base-vehicle rule it is not part of the vehicle as standard.
 
 **No floorplan and no photograph** for any layout — every image field in the API is null. The
 positional habitation fields cannot be pointed at a drawing, and the run says so.
+
+## A caravan range arrived in the motorhome catalogue — 26 November 2026
+
+Elddis added a **touring caravan range, `Riviera`**, to the same configurator series index
+this adapter drives its roster off. The index is the roster, and it stopped being a
+motorhome roster:
+
+```
+Autoquest GTS   vehicleType=motorhome   bodyType=partially-integrated   2 models
+Autoquest GT    vehicleType=motorhome   bodyType=partially-integrated   3 models
+Whirlwind GTS   vehicleType=motorhome   bodyType=partially-integrated   2 models
+Whirlwind GT    vehicleType=motorhome   bodyType=partially-integrated   3 models
+Whirlwind GTV   vehicleType=van         bodyType=campervan             3 models
+Autoquest GTV   vehicleType=van         bodyType=campervan             5 models
+Riviera         vehicleType=caravan     bodyType=null                  5 models
+```
+
+**Nothing in the series' own name or body type tells it apart.** A caravan's `bodyType` is
+`null`, which is also what an unrecognised motorhome body would be, so the adapter's
+"unknown body type, left blank and narrated" path absorbed it without complaint. The
+`vehicleType` field is the only thing that distinguishes them, and it was not being read.
+
+Left in, the five Riviera layouts were collected as **motorhomes**, and every signal that
+something was wrong was reported as an ordinary gap rather than an error:
+
+```
+NEW RANGE: 'Riviera' is in Elddis's 2027 catalogue and not in this adapter's list
+[Riviera 580 FL] WARNING: no price published, left blank
+[Riviera 580 FL] WARNING: no body type proposed
+[Riviera 580 FL] read: £0, 4 berth, None seats, 1800kg, 7170mm long
+expected 18 layouts and collected 23
+```
+
+An 1800 kg motorhome with no travel seats is not a thing, and five of them arriving at
+once is not a range Elddis have grown. They would have been proposed as **new motorhome
+products** into a product area Elddis has no caravans in.
+
+`ehg_configurator.parse_series_index` now reads `vehicleType`, and `collect` drops the
+caravan series before the new-range check ever sees them, naming them once per run. A
+series whose type is neither motorhome, van nor caravan is skipped and narrated
+separately rather than guessed at.
+
+**The sibling EHG brands are unaffected, which was checked rather than assumed.** Carado's
+2027 index is 7 motorhomes and 3 vans with no caravans. Eriba's genuinely mixes 3 caravans
+with 1 van, but `eriba.py` and `eriba_caravan.py` each drive off their own named range
+list rather than off the index, so neither can pick up the other's products. Bürstner and
+Niesmann + Bischoff do not serve this endpoint at all.
+
+**If FMLV should carry Elddis caravans, that is a new caravan adapter**, not a change
+here — the data is in the same API and `EXPECTED_LAYOUTS` would be the place to start.

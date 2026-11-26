@@ -620,6 +620,51 @@ def collect(
         raise RuntimeError(msg)
     on_progress(f"model year {model_year}: {len(series)} series — {', '.join(s.name for s in series)}")
 
+    # **One catalogue, two product areas.** The series index is the roster, and from the
+    # 2027 catalogue it stopped being a motorhome roster: Elddis put the `Riviera` touring
+    # caravans in it, alongside the coachbuilts and the campervans. Nothing in a series'
+    # name or body type tells them apart — a caravan carries `bodyType: null`, which is
+    # also what an unknown motorhome body would carry — so the API's own `vehicleType` is
+    # the only thing that does, and it is read rather than inferred.
+    #
+    # Dropped here rather than filtered further down, so the "new range" check below never
+    # sees them: left in, five caravans would have been proposed as new *motorhomes*, with
+    # 1800kg masses and no travel seats, into a product area Elddis has no caravans in.
+    # They belong to FMLV's caravan export, which is a separate adapter nobody has written.
+    caravans = [s for s in series if s.vehicle_type == ehg.CARAVAN_VEHICLE_TYPE]
+    if caravans:
+        on_progress(
+            f"CARAVAN RANGE(S) IN THE MOTORHOME CATALOGUE, not collected here: "
+            f"{', '.join(repr(s.name) for s in caravans)}. Elddis's configurator lists "
+            f"touring caravans in the same series index as the motorhomes, and this is the "
+            f"motorhome adapter. FMLV holds no Elddis caravans; if it should, that is a new "
+            f"caravan adapter, not a change here"
+        )
+    unknown = [
+        s
+        for s in series
+        if s.vehicle_type is not None
+        and s.vehicle_type not in ehg.MOTORHOME_VEHICLE_TYPES
+        and s.vehicle_type != ehg.CARAVAN_VEHICLE_TYPE
+    ]
+    for entry in unknown:
+        on_progress(
+            f"[{entry.name}] SKIPPED: the API calls this a {entry.vehicle_type!r}, which is "
+            f"neither a motorhome, a van nor a caravan. Collecting it would file an unknown "
+            f"kind of vehicle as a motorhome, so it is left for a person to look at"
+        )
+    series = [
+        s
+        for s in series
+        if s.vehicle_type is None or s.vehicle_type in ehg.MOTORHOME_VEHICLE_TYPES
+    ]
+    if not series:
+        msg = (
+            f"the series index at {index_url} lists {model_year} series, but none of them "
+            f"is a motorhome or a campervan"
+        )
+        raise RuntimeError(msg)
+
     # **The roster is checked against the adapter's own list, both ways.** A series the
     # brand has added is swept and announced rather than waited for; one this adapter knows
     # that the API no longer lists is announced too, because that is a range being retired.

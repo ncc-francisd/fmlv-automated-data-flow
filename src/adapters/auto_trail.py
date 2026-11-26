@@ -82,6 +82,16 @@ MANUFACTURER_DISPLAY_NAME = "Auto-Trail"
 #: Campervans are included on the same basis as Swift's and Adria's: FMLV treats them as
 #: motorhomes and the export carries both under one manufacturer.
 DEFAULT_RANGES: tuple[tuple[str, str], ...] = (
+    # Added 26 November 2026, the day `_adventure_range_is_published` first said yes.
+    # Until then the Adventures came from the 2027 price list joined to the spreadsheet
+    # Auto-Trail sent the NCC, because `motorhomes-range-sitemap.xml` did not list them.
+    # The range page now carries the four models and their prices like any other, and the
+    # technical specification is linked from the **model** pages — which is where this
+    # adapter reads every range's spec from — so nothing special is needed any more.
+    #
+    # The label is `Adventure`, which is the page's own title and the price list's
+    # heading, not a name of ours. See `ADVENTURE_RANGE_LABEL`.
+    ("motorhomes-range/adventure", "Adventure"),
     ("motorhomes-range/excel", "Excel"),
     ("motorhomes-range/f-line", "F-Line"),
     ("motorhomes-range/imala", "Imala"),
@@ -742,20 +752,32 @@ def _reconciles(product: AutoTrailProduct) -> bool:
     mtplm, mro, mgtw = product.mtplm_kilograms, product.mro_kilograms, product.mgtw_kilograms
 
     # The berth *maximum* is published twice by the motorhome documents — as the upper
-    # bound of `Sleeps` and again as `Max. No. of berths`. They agree on all 21 models
-    # that state both, so a disagreement means the block boundaries slipped and two
-    # models' figures have been mixed.
+    # bound of `Sleeps` and again as `Max. No. of berths` — and a disagreement was taken
+    # as proof that the block boundaries slipped and two models' figures had been mixed.
+    #
+    # **Only one direction of disagreement means that, and it took the Adventure to show
+    # it.** Auto-Trail's 2027 Adventure specification prints `Sleeps 4` with
+    # `Max. No. of berths 6` on the 76 and the 76G, and it is not a slip: every other row
+    # in those two blocks is the right model's — 7288mm long, 3030kg and 3000kg in
+    # running order. They are four-berth vans that take six with the options fitted, which
+    # is ordinary, and the equal-or-greater reading is the only one a document can
+    # legitimately print. Tested as equality, the check dropped two real products on
+    # Auto-Trail telling the truth.
+    #
+    # `Max. No. of berths` **below** the top of `Sleeps` stays a failure: no vehicle
+    # sleeps more people than its maximum number of berths, so that can only be two
+    # models' figures mixed, which is the thing this guards against. The gap in the
+    # ordinary direction is narrated by the caller instead of dropping the product.
     #
     # Note this compares the two published maxima with each other, not with `berths`.
     # `berths` records the *standard* figure (the lower bound of `Sleeps`, per the
     # base-vehicle rule in `docs/adapters/README.md`), so comparing it against
-    # `Max. No. of berths` would reject every model whose `Sleeps` is a range — which is
-    # 17 of the 37 — while catching nothing. The check keeps its full strength here: it
-    # still fails if either figure comes out of the wrong block.
+    # `Max. No. of berths` would reject every model whose `Sleeps` is a range while
+    # catching nothing.
     if (
         product.stated_max_berths is not None
         and product.sleeps_max is not None
-        and product.sleeps_max != product.stated_max_berths
+        and product.stated_max_berths < product.sleeps_max
     ):
         return False
 
@@ -767,6 +789,43 @@ def _reconciles(product: AutoTrailProduct) -> bool:
         return False
     payload = mtplm - mro
     return MIN_PAYLOAD_KG <= payload <= MAX_PAYLOAD_KG
+
+
+def _why_it_does_not_reconcile(product: AutoTrailProduct) -> str:
+    """Which figures failed `_reconciles`, in the words of the rows they came from.
+
+    `_reconciles` returns a bare bool because that is what the caller needs to decide;
+    this says what a person needs in order to go and look. Kept beside it so the two
+    cannot drift apart.
+    """
+    mtplm, mro, mgtw = product.mtplm_kilograms, product.mro_kilograms, product.mgtw_kilograms
+    if (
+        product.stated_max_berths is not None
+        and product.sleeps_max is not None
+        and product.stated_max_berths < product.sleeps_max
+    ):
+        return (
+            f"it sleeps {product.sleeps_max} but states a maximum of "
+            f"{product.stated_max_berths} berths, which no vehicle does — so the berth "
+            f"rows of two models have been read as one"
+        )
+    if mgtw is not None and mtplm is not None and mgtw <= mtplm:
+        return (
+            f"max gross train {mgtw}kg is not above max gross {mtplm}kg, so a weight row "
+            f"may have been misread"
+        )
+    if mtplm is not None and mro is not None and mtplm <= mro:
+        return (
+            f"max gross {mtplm}kg is not above running order {mro}kg, so a weight row may "
+            f"have been misread"
+        )
+    if mtplm is not None and mro is not None:
+        return (
+            f"the payload implied by max gross {mtplm}kg and running order {mro}kg is "
+            f"{mtplm - mro}kg, outside the {MIN_PAYLOAD_KG}-{MAX_PAYLOAD_KG}kg a motorhome "
+            f"carries, so a weight row may have been misread"
+        )
+    return "its published figures contradict each other"
 
 
 def _towing_identity_holds(product: AutoTrailProduct) -> bool:
@@ -1385,7 +1444,16 @@ def _adventure_range_is_published(http: Fetcher, on_progress: Callable[[str], No
     **The retirement switch.** While this is false the four Adventures come from the price
     list and the spreadsheet. The day it goes true they are on the site like every other
     range, and keeping them here as well would propose each of them twice — so `collect`
-    stops emitting them and says so loudly.
+    stops emitting them from the fallback.
+
+    **It went true on 26 November 2026**, and `motorhomes-range/adventure` is on
+    `DEFAULT_RANGES` from that day. The range page carries the four models and their
+    prices; the technical specification is linked from the *model* pages, which is where
+    this adapter reads every range's spec from, so nothing special was needed.
+
+    The fallback is kept rather than deleted. It costs one fetch of a page that is being
+    checked anyway, and it is the only other source of these four if Auto-Trail take the
+    page down — which is exactly what they did to the Adventure *campervans*.
     """
     for path in ("motorhomes-range/adventure", "motorhomes-range/adventure-coachbuilt"):
         url = f"{BASE_URL}/{path}/"
@@ -1396,11 +1464,10 @@ def _adventure_range_is_published(http: Fetcher, on_progress: Callable[[str], No
         if _NOT_FOUND_TITLE.search(html):
             continue
         on_progress(
-            f"[{ADVENTURE_RANGE_LABEL}] {url} now resolves, so Auto-Trail have published "
-            f"the Adventure motorhomes. The four built into this adapter are NOT emitted "
-            f"this run, to avoid proposing each of them twice. ADD THE RANGE TO "
-            f"DEFAULT_RANGES and delete ADVENTURE_SPECS — and take the range label from "
-            f"the page rather than keeping {ADVENTURE_RANGE_LABEL!r}, which is ours"
+            f"[{ADVENTURE_RANGE_LABEL}] {url} resolves, so the Adventures are collected "
+            f"from the site like every other range and the price-list fallback stays "
+            f"dormant. It is kept rather than deleted: if Auto-Trail take the page down "
+            f"again, the spreadsheet and the price list are still the only other source"
         )
         return True
     return False
@@ -1503,13 +1570,25 @@ def collect(
 
         for product in products:
             if not _reconciles(product):
+                # Naming the figures that actually failed, not a fixed list of weights.
+                # The Adventure 76 was dropped on its berth rows under a message about
+                # gross weights, which sent the first look at it to the wrong page of the
+                # document.
                 on_progress(
-                    f"[{label}] {product.label} — SKIPPED: weights don't reconcile "
-                    f"(max gross {product.mtplm_kilograms}kg, running order "
-                    f"{product.mro_kilograms}kg, gross train {product.mgtw_kilograms}kg), "
-                    f"so a weight row may have been misread"
+                    f"[{label}] {product.label} — SKIPPED: {_why_it_does_not_reconcile(product)}"
                 )
                 continue
+            if (
+                product.stated_max_berths is not None
+                and product.sleeps_max is not None
+                and product.stated_max_berths > product.sleeps_max
+            ):
+                on_progress(
+                    f"[{label}] {product.label} — NOTE: sleeps {product.sleeps_max} but "
+                    f"states a maximum of {product.stated_max_berths} berths. "
+                    f"{product.berths} is recorded, the standard figure — the others need "
+                    f"options, per the settled berths rule"
+                )
             for warning in product.parse_warnings:
                 on_progress(f"[{label}] {product.label} — WARNING: {warning}")
 

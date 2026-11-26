@@ -50,6 +50,20 @@ SERIES_MODELS_PATH = "/configurator-api/series/{series_id}/models"
 #: Pins the UK edition, so prices come in sterling and marketing names in English.
 UK_QUERY = "locale=en_GB&country=GB&currencyCode=GBP"
 
+#: The API's `vehicleType` values that belong in FMLV's **motorhome** product area.
+#: `van` is a campervan, which FMLV files as a motorhome; `motorhome` is everything with a
+#: coachbuilt or A-class body.
+#:
+#: Named here rather than left implicit because the catalogue of one brand can carry more
+#: than one product area, and the series index is the only place that says which is which.
+#: Elddis proved it on 26 November 2026 by adding a **caravan** range, `Riviera`, to the
+#: same index the motorhome adapter drives its roster off — see `elddis.collect`.
+MOTORHOME_VEHICLE_TYPES: frozenset[str] = frozenset({"motorhome", "van"})
+
+#: The value that marks a touring caravan. Its own constant so an adapter can say *why* it
+#: dropped a series rather than just that the type was not one it wanted.
+CARAVAN_VEHICLE_TYPE = "caravan"
+
 
 @dataclass(frozen=True)
 class EhgSeries:
@@ -58,6 +72,11 @@ class EhgSeries:
     id: int
     name: str
     model_year: int | None = None
+    #: The API's own `vehicleType`: `motorhome`, `van` or `caravan`. Read rather than
+    #: inferred, because a brand's catalogue can mix product areas and nothing else in the
+    #: index distinguishes them — a caravan series carries a `bodyType` of `null`, which is
+    #: also what an unrecognised motorhome body would carry. `None` where the API omits it.
+    vehicle_type: str | None = None
 
 
 @dataclass(frozen=True)
@@ -123,7 +142,15 @@ def parse_series_index(payload: str, *, model_year: int | None = None) -> list[E
         year = int(year) if str(year).isdigit() else None
         if model_year is not None and year != model_year:
             continue
-        series.append(EhgSeries(id=identifier, name=" ".join(name.split()), model_year=year))
+        vehicle_type = entry.get("vehicleType")
+        series.append(
+            EhgSeries(
+                id=identifier,
+                name=" ".join(name.split()),
+                model_year=year,
+                vehicle_type=vehicle_type if isinstance(vehicle_type, str) else None,
+            )
+        )
     return series
 
 

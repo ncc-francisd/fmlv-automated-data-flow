@@ -257,11 +257,50 @@ def parse_livewire_products(response_body: bytes) -> list[LivewireProduct]:
 #: `.prevent`, `.stop`, `.self` and chains of them are all ordinary Livewire, so any
 #: run of `.modifier` is accepted rather than the one spelling seen on the day.
 _QUOTE = r"(?:'|&#0?39;)"
-_DOM_PRODUCT = re.compile(
+_DOM_PRODUCT_LIVEWIRE = re.compile(
     r'wire:click(?:\.[a-z]+)*="setProductId\(' + _QUOTE + r"(?P<id>[^'&]+)" + _QUOTE + r'\)"'
     r"(?P<rest>(?:(?!wire:click).){0,600}?)"
     r'data-gtm-type="(?P<layout>[^"]*)"\s*data-gtm-value="(?P<trim>[^"]*)"',
     re.S,
+)
+
+#: The same three fields after Adria moved the layout selector **off Livewire and onto
+#: Alpine**, found 26 November 2026 with both adapters at zero products again:
+#:
+#: ```html
+#: data-product-id="100351-2627-gxajlm5200f032-11"
+#: x-on:click.prevent="openProduct($el.dataset.productId, $el.getAttribute('href'), $el)"
+#: data-gtm="layout_selector_more"
+#: data-gtm-type="670 DC"            <- the layout
+#: data-gtm-value="Select RHD"       <- the trim
+#: ```
+#:
+#: **Anchored on `data-gtm="layout_selector_more"`, not on `data-gtm-type` alone.** That
+#: attribute appears 95 times on a range page — the logo, the top menu, every product
+#: card — and only the layout selector's buttons carry the `layout_selector_more` marker
+#: beside a product id. Anchoring on it is what makes this pattern narrower than the one
+#: it replaces, rather than merely different.
+#:
+#: The id format did not change, so `technical_data_pdf_url` and everything downstream of
+#: it is untouched.
+_DOM_PRODUCT_ALPINE = re.compile(
+    r'data-product-id="(?P<id>[^"]+)"'
+    r"(?P<rest>(?:(?!data-product-id).){0,400}?)"
+    r'data-gtm="layout_selector_more"\s*'
+    r'data-gtm-type="(?P<layout>[^"]*)"\s*data-gtm-value="(?P<trim>[^"]*)"',
+    re.S,
+)
+
+#: **Both shapes are accepted, newest first.** Adria have now moved this markup twice in
+#: three months — `wire:click` to `wire:click.prevent` on 1 October 2026, then Livewire to
+#: Alpine on 26 November — and each time every product in two product areas went to zero
+#: until somebody noticed. Matching either costs one more regex over a page that is being
+#: scanned anyway; matching only the current one costs another outage if they move back,
+#: and a part-built site could serve one shape per range. The pattern that matched is
+#: narrated, so a silent switch back is visible in the run log rather than invisible.
+_DOM_PRODUCT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("data-product-id (Alpine)", _DOM_PRODUCT_ALPINE),
+    ("setProductId (Livewire)", _DOM_PRODUCT_LIVEWIRE),
 )
 
 #: The configurator link the page carries, e.g. `https://configure.adria-mobil.com/gb/26-27`.
@@ -290,7 +329,10 @@ def _configurator_base(page_html: str) -> str | None:
     return (markets or links)[0]
 
 
-def parse_dom_products(page_html: str) -> list[LivewireProduct]:
+def parse_dom_products(
+    page_html: str,
+    on_progress: Callable[[str], None] | None = None,
+) -> list[LivewireProduct]:
     """Every configuration the rendered range page offers.
 
     Replaces `parse_livewire_products` as the roster source. Adria rebuilt the site in
@@ -303,9 +345,21 @@ def parse_dom_products(page_html: str) -> list[LivewireProduct]:
     """
     configurator_url = _configurator_base(page_html)
 
+    matches: list[re.Match[str]] = []
+    for label, pattern in _DOM_PRODUCT_PATTERNS:
+        matches = list(pattern.finditer(page_html))
+        if matches:
+            if on_progress is not None and label != _DOM_PRODUCT_PATTERNS[0][0]:
+                on_progress(
+                    f"the layout selector matched the OLDER {label} markup, not the "
+                    f"current one. Adria have changed it back, or are serving two shapes "
+                    f"at once — worth a look before the next season's run"
+                )
+            break
+
     products: list[LivewireProduct] = []
     seen: set[str] = set()
-    for match in _DOM_PRODUCT.finditer(page_html):
+    for match in matches:
         product_id = html.unescape(match.group("id")).strip()
         if not product_id or product_id in seen:
             continue
@@ -894,13 +948,15 @@ def collect(
             range_url, capture_url_contains=_LIVEWIRE_UPDATE_MARKER, scroll=True
         )
         products = parse_dom_products(
-            page_result.file_path.read_text(encoding="utf-8", errors="replace")
+            page_result.file_path.read_text(encoding="utf-8", errors="replace"),
+            on_progress,
         )
         if not products:
             on_progress(
                 f"[{config.label}] WARNING: the range page rendered no configurations — "
-                f"no `setProductId` button was found, so the layout selector has moved "
-                f"again. Its products cannot be collected this run"
+                f"neither a `data-product-id` layout-selector button nor the older "
+                f"`setProductId` one was found, so the layout selector has moved again. "
+                f"Its products cannot be collected this run"
             )
         else:
             on_progress(f"[{config.label}] {len(products)} configuration(s) found")

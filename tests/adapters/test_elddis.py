@@ -215,16 +215,43 @@ def test_the_series_index_is_filtered_to_one_model_year() -> None:
         "Autoquest GT",
         "Autoquest GTS",
         "Autoquest GTV",
+        "Riviera",
         "Whirlwind GT",
         "Whirlwind GTS",
         "Whirlwind GTV",
     ]
 
 
-def test_the_adapters_range_list_matches_the_catalogue() -> None:
-    """Six ranges, eighteen layouts — and the list is reconciled against the API each run."""
+def test_the_catalogue_carries_caravans_and_this_is_the_motorhome_adapter() -> None:
+    """`Riviera` arrived in the 2027 index as a touring caravan range.
+
+    The fixture is the live index, so this is not a hypothetical: seven series come back
+    and one of them is a caravan. Left in, five caravans would be proposed as new
+    motorhomes — 1800kg, no travel seats, no price — into a product area Elddis has no
+    caravans in.
+    """
     series = ehg.parse_series_index(_fixture("elddis_series.json"), model_year=2027)
-    assert {s.name for s in series} == {label for _key, label in DEFAULT_RANGES}
+
+    caravans = [s for s in series if s.vehicle_type == ehg.CARAVAN_VEHICLE_TYPE]
+
+    assert [s.name for s in caravans] == ["Riviera"]
+
+
+def test_the_adapters_range_list_matches_the_motorhome_half_of_the_catalogue() -> None:
+    """Six ranges, eighteen layouts — reconciled against the API each run.
+
+    Against the **motorhome half**, now that the index carries both product areas. A
+    caravan range missing from `DEFAULT_RANGES` is correct, not a gap to fill.
+    """
+    series = ehg.parse_series_index(_fixture("elddis_series.json"), model_year=2027)
+
+    motorhomes = {
+        s.name
+        for s in series
+        if s.vehicle_type is None or s.vehicle_type in ehg.MOTORHOME_VEHICLE_TYPES
+    }
+
+    assert motorhomes == {label for _key, label in DEFAULT_RANGES}
     assert EXPECTED_LAYOUTS == 18
 
 

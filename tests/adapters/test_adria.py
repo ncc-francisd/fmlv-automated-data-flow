@@ -521,6 +521,82 @@ def test_either_apostrophe_spelling_is_read() -> None:
         assert len(got) == 1 and got[0].product_id == "abc-1"
 
 
+def test_the_alpine_layout_selector_yields_every_configuration() -> None:
+    """**The second time this markup moved, and the second brand-wide outage.**
+
+    26 November 2026: Adria took the layout selector off Livewire and put it on Alpine,
+    so `setProductId(...)` is on no range page any more and the id is in a plain
+    `data-product-id` attribute. Both adapters collected zero products — seven motorhome
+    ranges and four caravan ranges — and only the empty-scrape guard stood between that
+    and a run proposing the whole brand for retirement.
+
+    The fixture is the live Matrix page, trimmed to its selector buttons.
+    """
+    cards = (FIXTURES / "adria_matrix_layout_selector_alpine.html").read_text(
+        encoding="utf-8"
+    )
+
+    got = adria.parse_dom_products(cards)
+
+    assert len(got) == 7
+    assert got[0].product_id == "100351-2627-gxajlm5200f032-11"
+    assert got[0].layout_label == "670 DC"
+    assert got[0].trim_label == "Select RHD"
+    assert all(p.configurator_url == "https://configure.adria-mobil.com/gb/26-27" for p in got)
+
+
+def test_the_alpine_pattern_ignores_the_pages_other_gtm_tags() -> None:
+    """`data-gtm-type` is on 95 elements of a range page — the logo, the menu, the cards.
+
+    Only the layout selector's buttons carry `data-gtm="layout_selector_more"` beside a
+    product id, which is why the pattern is anchored on that and not on `data-gtm-type`.
+    """
+    page = (
+        '<a href="https://configure.adria-mobil.com/gb/26-27">c</a>'
+        '<a data-product-id="not-a-layout-1" data-gtm="product"'
+        ' data-gtm-type="logo" data-gtm-value="header"></a>'
+        '<a data-product-id="real-1" data-gtm="layout_selector_more"'
+        ' data-gtm-type="670 DC" data-gtm-value="Select RHD"></a>'
+    )
+
+    got = adria.parse_dom_products(page)
+
+    assert [p.product_id for p in got] == ["real-1"]
+
+
+def test_the_older_livewire_markup_still_reads_and_says_so() -> None:
+    """Both shapes are accepted, and falling back to the old one is announced.
+
+    Adria have moved this markup twice in three months. Matching either costs one regex;
+    matching only the current one costs another outage if they move back. A silent switch
+    back would otherwise be invisible, so the run log names it.
+    """
+    markup = (
+        '<a href="https://configure.adria-mobil.com/gb/26-27">c</a>'
+        "wire:click.prevent=\"setProductId('old-1')\""
+        ' data-gtm-type="780 DC" data-gtm-value="Standard RHD"'
+    )
+    said: list[str] = []
+
+    got = adria.parse_dom_products(markup, said.append)
+
+    assert [p.product_id for p in got] == ["old-1"]
+    assert len(said) == 1
+    assert "OLDER" in said[0]
+
+
+def test_the_current_markup_is_not_announced_as_a_fallback() -> None:
+    """Only the *older* shape is worth a line in the log."""
+    cards = (FIXTURES / "adria_matrix_layout_selector_alpine.html").read_text(
+        encoding="utf-8"
+    )
+    said: list[str] = []
+
+    adria.parse_dom_products(cards, said.append)
+
+    assert said == []
+
+
 # --- the supplied price list ----------------------------------------------------------
 
 

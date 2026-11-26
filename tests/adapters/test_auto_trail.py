@@ -284,18 +284,62 @@ def test_a_berth_range_still_reconciles(f_line: dict[str, AutoTrailProduct]) -> 
     assert auto_trail._reconciles(f60)
 
 
-def test_disagreeing_berth_maxima_are_rejected() -> None:
-    """Two maxima that disagree mean the block boundaries slipped."""
+def test_fewer_berths_than_it_sleeps_is_rejected() -> None:
+    """No vehicle sleeps more people than its maximum number of berths.
+
+    So this can only be two models' berth rows read as one, which is the slip the check
+    exists for. The *other* direction is ordinary and is tested below.
+    """
     slipped = AutoTrailProduct(
         range_label="F-Line",
         model="F70",
         berths=2,
-        sleeps_max=4,
-        stated_max_berths=6,  # read out of the following model's block
+        sleeps_max=6,
+        stated_max_berths=4,  # read out of the neighbouring model's block
         mtplm_kilograms=3500,
         mro_kilograms=2980,
     )
     assert not auto_trail._reconciles(slipped)
+    assert "sleeps 6" in auto_trail._why_it_does_not_reconcile(slipped)
+
+
+def test_more_berths_than_it_sleeps_is_ordinary_and_kept() -> None:
+    """**The Adventure 76 and 76G, 26 November 2026.**
+
+    Auto-Trail print `Sleeps 4` with `Max. No. of berths 6` on both, and it is not a
+    slip: every other row in those blocks is the right model's — 7288mm, 3030kg and
+    3000kg in running order. They are four-berth vans that take six with the options
+    fitted. Tested as equality, the check dropped two real products the day the range
+    went live, under a message about gross weights.
+    """
+    optioned = AutoTrailProduct(
+        range_label="Adventure",
+        model="Adventure 76",
+        berths=4,
+        sleeps_max=4,
+        stated_max_berths=6,
+        mtplm_kilograms=3500,
+        mro_kilograms=3030,
+        mgtw_kilograms=4750,
+    )
+    assert auto_trail._reconciles(optioned)
+
+
+def test_the_skip_message_names_the_figures_that_failed() -> None:
+    """A berth failure reported as a weight failure sends the first look at the wrong page."""
+    heavy = AutoTrailProduct(
+        range_label="F-Line",
+        model="F70",
+        berths=4,
+        mtplm_kilograms=4750,  # the C71 trap: no `Max. gross weight` row of its own
+        mro_kilograms=2600,
+    )
+
+    why = auto_trail._why_it_does_not_reconcile(heavy)
+
+    assert not auto_trail._reconciles(heavy)
+    assert "2150kg" in why
+    assert "berth" not in why
 
 
 # --------------------------------------------------------------------------- #
