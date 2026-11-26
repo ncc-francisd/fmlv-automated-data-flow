@@ -8,7 +8,7 @@
 {# A new product's empty column: no existing value, so the answers are set one or leave it blank. #}
 {% set unset_new = is_unset_field(entry.change) %}
 {% set already = (entry.change.new_value or entry.change.old_value or '').split(', ') %}
-<div id="change-{{ entry.change.id }}" class="change-row{% if missing %} missing-field-row{% endif %}{% if unset and not entry.decision %} selection-needed-row{% endif %}">
+<div id="change-{{ entry.change.id }}" data-decided="{{ "true" if entry.decision else "false" }}" class="change-row{% if missing %} missing-field-row{% endif %}{% if unset and not entry.decision %} selection-needed-row{% endif %}">
   <div class="field-name">
     {{ entry.change.field }}
     {% if unset and not entry.decision %}

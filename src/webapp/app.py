@@ -56,11 +56,10 @@ from .. import paths, scheduling, store
 from ..adapters import adapter_for, adapters_for
 from ..cli import (
     CommandError,
-    _dedupe_baseline,
+    baseline_for,
     execute_run,
     find_manufacturer,
     latest_export,
-    read_baseline,
     resolve_ranges,
 )
 from ..diff.compare import LAYOUT_FIELDS
@@ -831,11 +830,12 @@ def create_app(
         except CommandError as exc:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=422)
 
-        baseline = _dedupe_baseline(
-            product
-            for product in read_baseline(export_path, run.vehicle_class)
-            if product.manufacturer == manufacturer.fmlv_manufacturer
-            and not product.archived
+        # `baseline_for`, not a filter written out here. This call site used to test
+        # only `archived`, so it kept deactivated rows the run itself had excluded —
+        # which silently cost three live Elddis products their `product_id` on
+        # 26 November 2026. See `cli.baseline_for`.
+        baseline = baseline_for(
+            export_path, manufacturer=manufacturer, vehicle_class=run.vehicle_class
         )
         result = generate_upload(
             connection,

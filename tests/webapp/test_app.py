@@ -7,6 +7,7 @@ the same path a reviewer actually hits.
 """
 
 from __future__ import annotations
+import csv
 
 import os
 import re
@@ -2550,3 +2551,176 @@ def test_a_run_from_before_this_says_so_rather_than_claiming_a_baseline(
 
     assert "was not recorded" in text
     assert "Compared against" not in text
+
+
+def _export_csv(products: list) -> str:
+    """An FMLV export as a CSV, carrying the `active` column the upload template lacks."""
+    columns = [
+        "product_id",
+        "year",
+        "manufacturer",
+        "manufacturer_range",
+        "model",
+        "rrp_pounds",
+        "archived",
+        "active",
+    ]
+    lines = [",".join(columns)]
+    for product in products:
+        lines.append(
+            ",".join(
+                [
+                    str(product.product_id or ""),
+                    str(product.year or ""),
+                    product.manufacturer or "",
+                    product.manufacturer_range or "",
+                    product.model or "",
+                    str(product.rrp_pounds or ""),
+                    "Yes" if product.archived else "No",
+                    "Yes" if product.active else "No",
+                ]
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
+# --- A deactivated twin must not steal a live product's id -----------------------------
+#
+# 26 November 2026, Elddis. FMLV held `Whirlwind GTV` 554, 560 and 563 twice over: once
+# deactivated (8968-8970) and once live (9192-9194). The run compared against the live
+# rows and matched all 18 products, reporting nothing new. The review app's "Generate
+# upload CSV" button filtered the baseline on `archived` alone, so it kept the
+# deactivated twins as well; `_dedupe_baseline` saw each layout twice, broke the
+# model-year tie in favour of the row it met first — the deactivated one — and dropped
+# the live row. The upload CSV then carried three rows with no `product_id` at all, which
+# FMLV would have loaded as three brand-new duplicates of live products.
+
+
+@pytest.fixture
+def run_with_a_deactivated_twin(db_path: Path) -> int:
+    """One live product whose range/model FMLV also holds on a deactivated row."""
+    data_root = db_path.parent
+    (data_root / "manufacturers.csv").write_text(
+        "manufacturer_id,fmlv_manufacturer,website_url\n3,Adria Mobil,https://example.invalid/\n",
+        encoding="utf-8",
+    )
+    this_year = date.today().year
+    live = make_baseline(product_id=9192, year=this_year, active=True)
+    deactivated = make_baseline(product_id=8968, year=this_year, active=False)
+
+    connection = store.connect(db_path)
+    try:
+        run = store.start_run(
+            connection, manufacturer_id=3, fmlv_manufacturer="Adria Mobil", trigger="manual"
+        )
+        diffs = diff_products([make_extracted(rrp_pounds=93920)], [live])
+        store.persist_diff(connection, run_id=run.id, manufacturer_id=3, diffs=diffs)
+        for entry in store.list_change_queue(connection, run.id):
+            store.record_decision(
+                connection, proposed_change_id=entry.change.id, action="accept", decided_by="ben"
+            )
+        store.finish_run(connection, run.id)
+    finally:
+        connection.close()
+
+    export_dir = paths.manufacturer_exports_dir(3, "Adria Mobil", root=data_root)
+    export_dir.mkdir(parents=True, exist_ok=True)
+    # Written by hand because `active` is read-only — `io.write_csv` never emits it, so a
+    # round-tripped row always comes back live and could not express this fault at all.
+    # The deactivated row goes FIRST, so a tie-break that keeps whichever was seen first
+    # keeps the wrong one: the order the real Elddis export came in.
+    (export_dir / "2026-08-01_Adria-Mobil_motorhome-campervans.csv").write_text(
+        _export_csv([deactivated, live]), encoding="utf-8-sig"
+    )
+    return run.id
+
+
+def test_the_upload_csv_keeps_the_live_product_id_despite_a_deactivated_twin(
+    client: TestClient, run_with_a_deactivated_twin: int, db_path: Path
+) -> None:
+    run_id = run_with_a_deactivated_twin
+
+    response = client.post(f"/runs/{run_id}/generate-upload")
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+    uploads = list((db_path.parent / "uploads").rglob("*motorhome-campervans.csv"))
+    written = [p for p in uploads if "readable" not in p.name]
+    assert len(written) == 1
+    rows = list(csv.reader(written[0].read_text(encoding="utf-8-sig").splitlines()))
+    header = next(row for row in rows if row and row[0] == "product_id")
+    body = [row for row in rows[rows.index(header) + 1 :] if row and any(row)]
+
+    ids = [row[0].strip() for row in body]
+    assert ids == ["9192"], (
+        "the live product's id must survive — a blank here is a duplicate product in FMLV"
+    )
+
+
+def test_the_upload_baseline_is_the_same_set_the_run_compared_against(tmp_path: Path) -> None:
+    """`baseline_for` is the one definition, so the review and the CSV cannot disagree.
+
+    Asserted directly rather than only through the route, because the failure mode is a
+    filter being written out a second time somewhere and quietly losing a clause.
+    """
+    from src.cli import baseline_for
+    from src.registry import loader
+
+    this_year = date.today().year
+    rows = [
+        make_baseline(product_id=8968, year=this_year, active=False),
+        make_baseline(product_id=9192, year=this_year, active=True),
+        make_baseline(product_id=1, year=this_year - 4, active=True),
+        make_baseline(product_id=2, year=this_year, active=True, archived=True),
+    ]
+    export = tmp_path / "2026-08-01_Adria-Mobil_motorhome-campervans.csv"
+    export.write_text(_export_csv(rows), encoding="utf-8-sig")
+
+    registry = tmp_path / "manufacturers.csv"
+    registry.write_text(
+        "manufacturer_id,fmlv_manufacturer,website_url\n"
+        "3,Adria Mobil,https://example.invalid/\n",
+        encoding="utf-8",
+    )
+    manufacturer = loader.load(registry).manufacturers[0]
+    kept = baseline_for(export, manufacturer=manufacturer, vehicle_class="motorhome")
+
+    assert [product.product_id for product in kept] == [9192], (
+        "only the live, current-year, unarchived row belongs in the baseline"
+    )
+
+
+def test_the_pending_heading_can_be_recounted_in_the_browser(
+    client: TestClient, run_with_one_change: tuple[int, int]
+) -> None:
+    """Deciding a row swaps only that row, so the heading has to recount client-side.
+
+    Reported 26 November 2026: a reviewer who had accepted all 24 Elddis changes still
+    read "Pending (24)" and took it for a fault. The markup the recount depends on is
+    asserted here because the script itself cannot run in this test.
+    """
+    run_id, _change_id = run_with_one_change
+
+    page = client.get(f"/runs/{run_id}").text
+
+    assert 'id="pending-heading"' in page
+    assert 'id="pending-section"' in page
+    assert 'data-decided="false"' in page
+    assert "refreshPendingCount" in page
+
+
+def test_a_decided_row_comes_back_marked_as_decided(
+    client: TestClient, run_with_one_change: tuple[int, int]
+) -> None:
+    """The swapped-in row must say it is decided, or the recount cannot see it."""
+    run_id, change_id = run_with_one_change
+
+    response = client.post(
+        f"/runs/{run_id}/changes/{change_id}/decide",
+        data={"action": "accept", "reviewer_name": "ben"},
+    )
+
+    assert response.status_code == 200
+    assert 'data-decided="true"' in response.text
+    assert 'data-decided="false"' not in response.text

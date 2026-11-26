@@ -72,17 +72,24 @@
     {%- endif %}
   </p>
 
-  <h2>Pending ({{ pending|length }})</h2>
-  {% if not pending %}
-    <p class="muted">Nothing waiting on a decision.</p>
-  {% else %}
-    {% for product_id, group in pending|groupby('product.id') %}
-      {% set product = group[0].product %}
-      {% set entries = group %}
-      {% set error = None %}
-      {% include "partials/product_group.html" %}
-    {% endfor %}
-  {% endif %}
+  {# The count is recomputed in the browser after every htmx swap. Deciding a row swaps
+     only that row (or, for "Accept all", one product's block), so this heading used to
+     keep whatever number the page was loaded with — a reviewer who had just accepted
+     everything still read "Pending (24)" and reasonably took it for a fault. Reported
+     26 November 2026. #}
+  <h2 id="pending-heading">Pending ({{ pending|length }})</h2>
+  <div id="pending-section">
+    {% if not pending %}
+      <p class="muted">Nothing waiting on a decision.</p>
+    {% else %}
+      {% for product_id, group in pending|groupby('product.id') %}
+        {% set product = group[0].product %}
+        {% set entries = group %}
+        {% set error = None %}
+        {% include "partials/product_group.html" %}
+      {% endfor %}
+    {% endif %}
+  </div>
 
   {% if disappearance_notices %}
     <h2>Missing from the manufacturer's site ({{ disappearance_notices|length }})</h2>
@@ -156,4 +163,27 @@
       </div>
     {% endfor %}
   {% endif %}
+
+<script>
+  // Rows stay where they are when decided — they are not moved into "Decided" until the
+  // page is reloaded — so the live count is the rows still marked undecided.
+  function refreshPendingCount() {
+    const section = document.getElementById("pending-section");
+    const heading = document.getElementById("pending-heading");
+    if (!section || !heading) return;
+    const left = section.querySelectorAll('.change-row[data-decided="false"]').length;
+    heading.textContent = "Pending (" + left + ")";
+    if (left === 0 && !document.getElementById("pending-cleared")) {
+      const note = document.createElement("p");
+      note.id = "pending-cleared";
+      note.className = "muted";
+      note.textContent =
+        "Everything here has been decided. Generate the upload CSV, or reload to " +
+        "move these into Decided.";
+      heading.insertAdjacentElement("afterend", note);
+    }
+  }
+  document.body.addEventListener("htmx:afterSwap", refreshPendingCount);
+  refreshPendingCount();
+</script>
 {% endblock %}

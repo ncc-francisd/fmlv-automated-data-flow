@@ -541,6 +541,49 @@ def _dedupe_baseline(
     return passthrough + deduped
 
 
+def baseline_for(
+    export_path: Path,
+    *,
+    manufacturer: Manufacturer,
+    vehicle_class: VehicleClass | str = DEFAULT_VEHICLE_CLASS,
+    in_scope: Callable[[Product], bool] | None = None,
+    on_discard: Callable[[Product, Product], None] | None = None,
+) -> list[Product]:
+    """The baseline rows a run diffs against, and the rows an upload CSV writes back to.
+
+    **One function because the two must be the same set.** The filter used to be written
+    out at all three call sites — the run, `generate-upload`, and the review app's
+    "Generate upload CSV" button — and the comment on `on_discard` at the run site
+    asserted that the other two "rebuild the same baseline". They did not. The app's copy
+    tested only `archived`, leaving out `active` and the model year.
+
+    That cost real products on 26 November 2026. FMLV held `Whirlwind GTV` 554, 560 and
+    563 twice over: once deactivated (8968-8970) and once live (9192-9194). The run saw
+    only the live rows and matched all 18 Elddis products cleanly. The button kept the
+    deactivated rows too, so `_dedupe_baseline` found each layout twice, broke the
+    model-year tie in favour of the row it saw first — the deactivated one — and dropped
+    the live row from the baseline. `build_upload_products` then could not find product
+    9192, built it as a **new** product, and wrote a row with no `product_id`. Uploading
+    that CSV would have created a second, duplicate `Whirlwind GTV 554` in FMLV, and the
+    review page gave no hint of it: it had correctly reported nothing new.
+
+    So a reviewer approves what the run proposed, and the CSV must write to the rows the
+    run compared. Any future narrowing of the baseline belongs here and nowhere else.
+    """
+    return _dedupe_baseline(
+        (
+            product
+            for product in read_baseline(export_path, vehicle_class)
+            if product.manufacturer == manufacturer.fmlv_manufacturer
+            and not product.archived
+            and product.active
+            and _is_current_model_year(product.year)
+            and (in_scope is None or in_scope(product))
+        ),
+        on_discard=on_discard,
+    )
+
+
 def _narrate_duplicate(on_progress: Callable[[str], None]) -> Callable[[Product, Product], None]:
     """An `on_discard` that tells the reviewer a baseline row left the comparison.
 
@@ -689,18 +732,14 @@ def execute_run(
                     f"(FMLV login + download took {time.monotonic() - fetch_started:.1f}s)"
                 )
 
-            baseline = _dedupe_baseline(
-                (
-                    product
-                    for product in read_baseline(export_path, vehicle_class)
-                    if product.manufacturer == manufacturer.fmlv_manufacturer
-                    and not product.archived
-                    and product.active
-                    and _is_current_model_year(product.year)
-                    and (in_scope is None or in_scope(product))
-                ),
-                # Narrated here and not at the two upload-CSV call sites, which rebuild
-                # the same baseline and would repeat every line after the review.
+            baseline = baseline_for(
+                export_path,
+                manufacturer=manufacturer,
+                vehicle_class=vehicle_class,
+                in_scope=in_scope,
+                # Narrated here and not at the two upload-CSV call sites, which build the
+                # same baseline through the same function and would repeat every line
+                # after the review.
                 on_discard=_narrate_duplicate(on_progress),
             )
             # Recorded now rather than at the end, so a run that fails during the sweep
@@ -1277,13 +1316,8 @@ def _generate_upload_command(args: argparse.Namespace) -> int:
             msg = f"export not found: {export_path}"
             raise CommandError(msg)
 
-        baseline = _dedupe_baseline(
-            product
-            for product in read_baseline(export_path, run.vehicle_class)
-            if product.manufacturer == manufacturer.fmlv_manufacturer
-            and not product.archived
-            and product.active
-            and _is_current_model_year(product.year)
+        baseline = baseline_for(
+            export_path, manufacturer=manufacturer, vehicle_class=run.vehicle_class
         )
 
         queue = store.list_change_queue(connection, run.id)
