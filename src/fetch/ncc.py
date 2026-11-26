@@ -26,13 +26,20 @@ here.
 from __future__ import annotations
 
 import os
+import time
 import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
-from playwright.sync_api import Download, Error as PlaywrightError, Page, sync_playwright
+from playwright.sync_api import (
+    Download,
+    Error as PlaywrightError,
+    Page,
+    TimeoutError as PlaywrightTimeoutError,
+    sync_playwright,
+)
 
 load_dotenv()
 
@@ -103,6 +110,17 @@ class NccSiteConfig:
     #: baseline for a diff needs everything currently in FMLV, not just the live subset.
     only_active_toggle_selector: str = '[dusk="only_active_products-default-boolean-field"]'
     run_action_selector: str = '[dusk="confirm-action-button"]'
+    #: How long to wait for Nova to hand over the generated zip, in milliseconds.
+    #:
+    #: **Playwright's default is 30 seconds and that is not enough.** Nova builds the
+    #: workbook server-side after "Run Action" is clicked, and how long that takes is a
+    #: property of the supplier, not of us. `Elddis Campervans` exceeded 30s on three
+    #: separate attempts on 26 Nov 2026 and returned its 18 products on the fourth, which
+    #: had been read as the entry being empty or duplicative — so the registry was left
+    #: pointing at an entry that really was empty, and a run proposed all 18 live products
+    #: as new. A timeout here is indistinguishable from an absent export unless it says so,
+    #: so the wait is generous and `download_export` reports how long it actually took.
+    download_timeout_ms: int = 180_000
     #: Name of the motorhome/campervan file inside the downloaded zip.
     motorhome_export_filename: str = "motorhome-campervans.xlsx"
     #: Name of the touring-caravan file inside the same zip. Saved alongside the
@@ -327,9 +345,31 @@ def download_export(
             )
             _ensure_toggle_off(page, config.only_active_toggle_selector)
 
-            on_progress(f"triggering the export download for {supplier_name!r}")
-            with page.expect_download() as download_info:
-                page.click(config.run_action_selector)
+            on_progress(
+                f"triggering the export download for {supplier_name!r} — waiting up to "
+                f"{config.download_timeout_ms // 1000}s for Nova to generate it"
+            )
+            started = time.monotonic()
+            try:
+                with page.expect_download(
+                    timeout=config.download_timeout_ms
+                ) as download_info:
+                    page.click(config.run_action_selector)
+            except PlaywrightTimeoutError as exc:
+                waited = int(time.monotonic() - started)
+                msg = (
+                    f"Nova did not hand over an export for {supplier_name!r} within "
+                    f"{waited}s. This is the export being slow or failing to generate, "
+                    f"NOT evidence that the supplier holds no products — do not conclude "
+                    f"the entry is empty from this, and do not upload a run whose baseline "
+                    f"came back empty. Try the export by hand at {config.products_url} to "
+                    f"see what it returns."
+                )
+                raise NccExportError(msg) from exc
+            on_progress(
+                f"Nova returned the {supplier_name!r} export after "
+                f"{time.monotonic() - started:.0f}s"
+            )
             _save_download(page, download_info.value, zip_path, supplier_name)
         finally:
             browser.close()

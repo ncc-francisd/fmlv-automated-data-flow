@@ -253,3 +253,52 @@ def test_an_unreachable_link_says_so_rather_than_hiding_the_failure(tmp_path: Pa
     with pytest.raises(NccExportError) as caught:
         _save_download(page, _FakeDownload(), tmp_path / "export.zip", "Barefoot Caravans")
     assert "could not be re-requested" in str(caught.value)
+
+
+# --- A slow export is not an empty one ------------------------------------------------
+#
+# Playwright's default 30s wait on `expect_download` was the whole of the 26 Nov 2026
+# Elddis fault. `Elddis Campervans` took longer than that to generate three times
+# running, the timeout was read as "the entry is probably empty or duplicative", and the
+# registry was left pointing at `Elddis Motorhomes` — which really was empty. The run that
+# followed fetched a baseline of nothing and proposed all 18 live products as new.
+
+
+def test_a_slow_export_is_reported_as_slow_not_as_an_empty_supplier(
+    config: NccSiteConfig, tmp_path: Path
+) -> None:
+    """A download that never arrives must not read as a supplier holding no products.
+
+    Driven by pointing `run_action_selector` at the actions dropdown — a real element on
+    the page that triggers no download — so the wait expires exactly as it does against
+    Nova.
+    """
+    credentials = NccCredentials(email="someone@example.com", password="hunter2")
+    stalling = NccSiteConfig(
+        login_url=config.login_url,
+        products_url=config.products_url,
+        run_action_selector='button[dusk="index-standalone-action-dropdown"]',
+        download_timeout_ms=1_500,
+    )
+
+    with pytest.raises(NccExportError) as excinfo:
+        download_export(
+            credentials,
+            "Test Motorhomes",
+            tmp_path / "downloads" / "motorhome-campervans.xlsx",
+            config=stalling,
+        )
+
+    message = str(excinfo.value)
+    assert "Test Motorhomes" in message
+    assert "NOT evidence that the supplier holds no products" in message
+    assert "do not upload a run whose baseline came back empty" in message
+
+
+def test_the_download_wait_is_long_enough_for_nova_to_generate_an_export() -> None:
+    """Three minutes, not Playwright's 30 seconds.
+
+    Asserted rather than left to a default because the 30s default is what made a slow
+    supplier look like an empty one, and nothing else in the flow would notice.
+    """
+    assert NccSiteConfig().download_timeout_ms >= 120_000
