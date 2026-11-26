@@ -21,6 +21,7 @@ from src.adapters.adria_caravan import (
     _reconciles,
     body_type_for,
     model_name,
+    mtplm_note,
     parse_caravan_pdf,
     range_config,
     sub_range_for,
@@ -392,3 +393,85 @@ def test_the_summary_panels_reversed_label_is_not_read() -> None:
     text = "mass in running order (miro-min, kg) 4 nr. of berths Number of berths 6"
 
     assert parse_caravan_pdf(text).get("berths") == 6
+
+
+# --- the 2026-27 sheet: one mass, and it is the uprated one ---------------------------
+#
+# Adria changed the mass block for 2026-27 and broke two readings at once. Both are here
+# against the real sheets, because both produced a plausible wrong number rather than an
+# error — the kind that reaches a reviewer looking like fact.
+
+
+@pytest.fixture
+def colorado_2627() -> str:
+    return _pdf("alpina_colorado_2627")
+
+
+@pytest.fixture
+def mississippi_2627() -> str:
+    return _pdf("alpina_mississippi_2627")
+
+
+def test_the_colorado_publishes_one_mass_in_all_three_slots(colorado_2627: str) -> None:
+    """Maximum, minimum and optional increase all read 2500 — nothing to choose between."""
+    figures = parse_caravan_pdf(colorado_2627)
+    assert figures.get("mtplm_kilograms") == 2500
+    assert figures.maximum_laden_kilograms == 2500
+    assert figures.optional_laden_kilograms == 2500
+    assert figures.get("mro_kilograms") == 1837
+
+
+def test_the_colorados_uprate_is_read_as_fitted(colorado_2627: str) -> None:
+    """`✕` means fitted on these sheets, so the 2500kg chassis is on this caravan.
+
+    If this ever reads `None`, check `adria._FITTED` first: the whole reading of these
+    documents turns on that mark meaning fitted rather than crossed out.
+    """
+    assert parse_caravan_pdf(colorado_2627).uprate_fitted_kilograms == 2500
+
+
+def test_the_mass_note_says_the_figure_is_the_uprated_chassis(colorado_2627: str) -> None:
+    """The provenance must not claim it avoided the uprate while recording it.
+
+    This is the actual defect: the old wording was unconditional, so on this one sheet it
+    told the reviewer the 2500kg it had just recorded was 'NOT the maximum ... which is
+    the uprated chassis'.
+    """
+    note = mtplm_note(parse_caravan_pdf(colorado_2627))
+    assert "UPRATED CHASSIS" in note
+    assert "2500kg" in note
+    assert "NOT the 'Maximum technical permissable laden mass'" not in note
+
+
+def test_the_ordinary_sheet_still_prefers_the_base_vehicle(mississippi_2627: str) -> None:
+    """Eight of the nine publish two figures, and the lower one is still the answer."""
+    figures = parse_caravan_pdf(mississippi_2627)
+    assert figures.get("mtplm_kilograms") == 1950
+    assert figures.maximum_laden_kilograms == 2000
+    assert figures.uprate_fitted_kilograms is None
+    note = mtplm_note(figures)
+    assert "NOT the 'Maximum technical permissable laden mass' of 2000kg" in note
+    assert "UPRATED CHASSIS" not in note
+
+
+def test_the_colorado_is_the_twin_axle_that_justifies_the_mass(colorado_2627: str) -> None:
+    assert parse_caravan_pdf(colorado_2627).axles == 2
+    assert parse_caravan_pdf(_pdf("altea_tyne")).axles == 1
+
+
+def test_adrias_own_payload_is_read_from_the_labelled_line(
+    colorado_2627: str, mississippi_2627: str
+) -> None:
+    """Not from the `Max loading weight (kg)` artefact that tracks the permissible mass.
+
+    The artefact reads 2500 on the Colorado and 2000 on the Mississippi — the permissible
+    mass over again. Naming either in the provenance as "Adria's own payload" is how a
+    reviewer learns to stop reading provenance.
+    """
+    assert parse_caravan_pdf(colorado_2627).published_max_loading == 123
+    assert parse_caravan_pdf(mississippi_2627).published_max_loading == 123
+
+
+def test_the_old_payload_wording_is_still_read(rio_grande: str) -> None:
+    """The 2025-26 sheets say `Max loading weight (kg) with ...`, and some may persist."""
+    assert parse_caravan_pdf(rio_grande).published_max_loading == 161

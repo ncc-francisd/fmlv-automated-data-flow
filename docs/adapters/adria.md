@@ -576,3 +576,59 @@ a roster change.
 The fixtures still carry the Rio Grande and should keep it: `_livewire("alpina")` is a
 real capture of a three-configuration page, and two tests use it to prove the awning and
 nose-weight reads. Nothing is served by rewriting history to match the current site.
+
+## The 2026-27 mass block, and the Colorado — 26 November 2026
+
+Adria changed the mass block between model years and broke two readings at once. Both
+produced a plausible wrong sentence rather than an error, which is why both are worth
+recording.
+
+### The Colorado is sold on the uprated chassis
+
+| | min | max | optional | uprate fitted | MIRO | payload | axles |
+|---|---|---|---|---|---|---|---|
+| 623 UC Mississippi | 1950 | 2000 | — | — | 1745 | 205 | 1 |
+| **623 UL Colorado** | **2500** | **2500** | **2500** | **2500** | 1837 | **663** | **2** |
+| 612 DL Seine | 1800 | 1800 | — | — | 1641 | 159 | 1 |
+| 623 DP Tiber | 1800 | 1900 | — | — | 1637 | 163 | 1 |
+| 612 DL Tyne | 1650 | 1800 | — | — | 1418 | 232 | 1 |
+| 622 DK Avon | 1650 | 1800 | — | — | 1412 | 238 | 1 |
+| 622 DP Dart | 1650 | 1800 | — | — | 1393 | 257 | 1 |
+| 391 LH (Truma) | 1300 | 1500 | — | — | 1052 | 248 | 1 |
+| 391 LH (Sports) | 1300 | 1500 | — | — | 1092 | 208 | 1 |
+
+The Colorado is the only twin axle and the only one with an uprate. Its sheet prints
+2500 kg in all three mass slots and lists `Increased MTPLM to 2500 kg` as **fitted** in
+`CZ. Adria Vehicle Information` — and `✕` means fitted on these sheets, not crossed out.
+
+So there is no base-vehicle figure published anywhere on the document. The settled
+base-vehicle rule needs two figures to choose between; one qualified figure is still the
+mass. It is recorded, and the payload of 663 kg follows as arithmetic from Adria's own
+two numbers. The twin axle is what makes that carrying capacity coherent, and it is
+proposed from the same sheet.
+
+**The defect was the provenance, not the number.** The old wording was unconditional, so
+on this one sheet it told the reviewer that the 2500 kg it had just recorded was "NOT the
+'Maximum technical permissable laden mass' … which is the uprated chassis". A provenance
+that misdescribes its own figure is worse than none: it spends the reviewer's trust to
+get a wrong number accepted. `mtplm_note()` now branches, and the run narrates the case
+by name so it reaches the summary rather than only the field.
+
+FMLV holds 2000 / 1837 / 163 from the previous sheet, so this arrives as a change to
+approve, not a silent drift.
+
+### `Max loading weight` moved, and the old pattern found an artefact
+
+The 2025-26 sheets read `Max loading weight (kg) with All Inclusive Pack weight deducted
+161`. The 2026-27 sheets read `Max loading weight in kg (user payload) with All Inclusive
+Pack weight deducted 123`.
+
+The old regex did not stop matching, which is the whole problem. It found a bare `Max
+loading weight (kg) 2000` further down — a table artefact that tracks the permissible
+mass and is not a payload at all — so every payload provenance named "Adria's own Max
+loading weight" as 2000 kg on the Mississippi and 1700 kg on the Seine.
+
+A regex that silently moves to the wrong line is worse than one that stops matching: the
+first is read as fact, the second gets investigated. The new wording is tried first and
+the old one is kept as a fallback, tightened to insist on `with` so it can never reach
+the artefact again.

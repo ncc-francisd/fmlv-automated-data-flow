@@ -104,6 +104,7 @@ __all__ = [
     "VEHICLE_CLASS",
     "AdriaCaravan",
     "collect",
+    "mtplm_note",
     "parse_caravan_pdf",
     "range_config",
 ]
@@ -234,9 +235,36 @@ _AXLES = re.compile(r"Number of axles\s+(\d+)")
 #: would put an uprated chassis in `mtplm_kilograms` on five of eight products.
 _MAX_LADEN = re.compile(r"Maximum technical permissable laden mass \(MTPLM\) \( kg \)\s+(\d+)")
 
-#: `Max loading weight (kg) with All Inclusive Pack weight deducted 161` — Adria's own
-#: payload, which is not FMLV's. Read only to name it in the provenance.
-_MAX_LOADING = re.compile(r"Max loading weight \(kg\)[^\n]*?\s(\d+)\s*$", re.MULTILINE)
+#: `Technically possible weight increase (optional MTPLM, kg) 2500`. Printed only where
+#: an uprate exists — absent on eight of the nine.
+_OPTIONAL_MTPLM = re.compile(
+    r"Technically possible weight increase \(optional MTPLM, kg\)\s+(\d+)"
+)
+
+#: `Increased MTPLM to 2500 kg ✕`, in the sheet's `CZ. Adria Vehicle Information` list.
+#:
+#: **`✕` means FITTED on these sheets, not crossed out.** The proof is in `adria._FITTED`,
+#: and reading it backwards here would invert this too: the line says the uprate is *on*
+#: this configuration, not merely available for it.
+_UPRATE_FITTED = re.compile(r"Increased MTPLM to\s+(\d+)\s*kg\s*✕")
+
+#: Adria's own user payload, which is **not** FMLV's. Read only so the provenance can name
+#: it and say it was rejected.
+#:
+#: **The label moved for 2026-27.** It used to read `Max loading weight (kg) with All
+#: Inclusive Pack weight deducted 161`; it now reads `Max loading weight in kg (user
+#: payload) with All Inclusive Pack weight deducted 123`. The old pattern did not stop
+#: matching — it found a bare `Max loading weight (kg) 2000` further down, a table artefact
+#: that tracks the permissible mass and is not a payload at all. So the provenance told
+#: reviewers that "Adria's own Max loading weight" was 2000kg on the Mississippi and
+#: 1700kg on the Seine. A regex that silently moves to the wrong line is worse than one
+#: that stops matching, which is why the fallback below now insists on `with`.
+_MAX_LOADING_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"Max loading weight in kg \(user payload\)[^\n]*?\s(\d+)\s*$", re.MULTILINE
+    ),
+    re.compile(r"Max loading weight \(kg\) with[^\n]*?\s(\d+)\s*$", re.MULTILINE),
+)
 
 #: `CZ. Adria Vehicle Information` followed by `TBA` — an announced layout whose technical
 #: data has not been published. Both Action configurations are in this state.
@@ -255,6 +283,8 @@ class _Figures:
     awning_length_mm: int | None = None
     axles: int | None = None
     maximum_laden_kilograms: int | None = None
+    optional_laden_kilograms: int | None = None
+    uprate_fitted_kilograms: int | None = None
     published_max_loading: int | None = None
     technical_data_is_tba: bool = False
 
@@ -273,15 +303,73 @@ def parse_caravan_pdf(text: str) -> _Figures:
     awning = _AWNING.search(text)
     axles = _AXLES.search(text)
     maximum = _MAX_LADEN.search(text)
-    loading = _MAX_LOADING.search(text)
+    loading = next(
+        (
+            match
+            for match in (pattern.search(text) for pattern in _MAX_LOADING_PATTERNS)
+            if match is not None
+        ),
+        None,
+    )
+    optional = _OPTIONAL_MTPLM.search(text)
+    uprate = _UPRATE_FITTED.search(text)
     return _Figures(
         values=values,
         # The body figure, in cm; the chassis figure after the slash is not FMLV's.
         awning_length_mm=int(awning.group(1)) * 10 if awning else None,
         axles=int(axles.group(1)) if axles else None,
         maximum_laden_kilograms=int(maximum.group(1)) if maximum else None,
+        optional_laden_kilograms=int(optional.group(1)) if optional else None,
+        uprate_fitted_kilograms=int(uprate.group(1)) if uprate else None,
         published_max_loading=int(loading.group(1)) if loading else None,
         technical_data_is_tba=bool(_TBA.search(text)),
+    )
+
+
+def mtplm_note(figures: _Figures) -> str:
+    """What the provenance should say about the permissible mass this sheet publishes.
+
+    Adria normally print two figures — a maximum and an `MTPLM-min` below it — and FMLV
+    records the lower. That is the settled base-vehicle rule, in the one place this brand
+    makes it easy to get wrong, and it is right on eight of the nine caravans.
+
+    **The Alpina Colorado defeats it.** Its 2026-27 sheet prints 2500kg in all three mass
+    slots — maximum, minimum and `Technically possible weight increase` — and lists
+    `Increased MTPLM to 2500 kg` as *fitted* in `CZ. Adria Vehicle Information`. It is a
+    twin-axle caravan sold with the uprate on it, and no lower figure is published
+    anywhere on the document.
+
+    The old wording was unconditional, so it would have told a reviewer the recorded
+    figure was "NOT the maximum ... which is the uprated chassis" while recording exactly
+    that. A provenance that misdescribes its own number is worse than no provenance: it
+    spends the reviewer's trust to get a wrong figure accepted.
+
+    One qualified figure is still the mass — the base-vehicle rule needs two to choose
+    between — so it is recorded, and this says plainly what it is.
+    """
+    mtplm = figures.get("mtplm_kilograms")
+    if mtplm is None:
+        return ""
+    maximum = figures.maximum_laden_kilograms
+    uprate = figures.uprate_fitted_kilograms
+    if maximum is not None and maximum != mtplm:
+        return (
+            f"NOT the 'Maximum technical permissable laden mass' of {maximum}kg on the "
+            f"line above it, which is the uprated chassis — FMLV records the base vehicle."
+        )
+    if uprate is not None and uprate == mtplm:
+        return (
+            f"**THIS IS THE UPRATED CHASSIS, AND ADRIA PUBLISH NO OTHER FIGURE.** The "
+            f"maximum, the MTPLM-min and the 'Technically possible weight increase' all "
+            f"read {mtplm}kg, and the sheet's `CZ. Adria Vehicle Information` list marks "
+            f"`Increased MTPLM to {uprate} kg` as fitted to this configuration. So there "
+            f"are not two figures to choose between and the base-vehicle rule cannot "
+            f"apply; one qualified figure is still the mass. The payload rises with it, "
+            f"and the axle count says why this caravan can carry it."
+        )
+    return (
+        f"The maximum and the MTPLM-min are the same {mtplm}kg on this sheet, so there "
+        f"are not two figures to choose between."
     )
 
 
@@ -431,6 +519,30 @@ _FEATURE_NOTES: dict[str, str] = {
 }
 
 
+def _own_payload_clause(figures: _Figures) -> str:
+    """Name Adria's own user payload so a reviewer can see it was read and rejected."""
+    own = figures.published_max_loading
+    if own is None:
+        return "Adria print no user payload of their own on this sheet."
+    return (
+        f"Adria's own 'Max loading weight in kg (user payload)' of {own}kg is NOT this "
+        f"figure — it further deducts the All Inclusive Pack — and is deliberately not "
+        f"recorded."
+    )
+
+
+def _uprate_payload_clause(figures: _Figures) -> str:
+    """Why this one payload is three times its siblings', where that is the case."""
+    uprate = figures.uprate_fitted_kilograms
+    if uprate is None or uprate != figures.get("mtplm_kilograms"):
+        return ""
+    return (
+        f" **This payload is large because the permissible mass is the uprated "
+        f"{uprate}kg**, fitted to this configuration — see the permissible mass above. "
+        f"It is arithmetic from Adria's own two figures, not a parsing slip."
+    )
+
+
 def build_extracted(
     product: AdriaCaravan, *, basis: str, fitted: Iterable[str] = ()
 ) -> ExtractedCaravan:
@@ -511,9 +623,7 @@ def build_extracted(
         record(
             "mtplm_kilograms",
             f"Minimal technically permissible laden mass (MTPLM-min, kg): {mtplm}. "
-            f"NOT the 'Maximum technical permissable laden mass' of "
-            f"{figures.maximum_laden_kilograms}kg on the line above it, which is the "
-            f"uprated chassis — FMLV records the base vehicle. {basis}",
+            f"{mtplm_note(figures)} {basis}",
         )
     if figures.get("mro_kilograms") is not None:
         record(
@@ -534,9 +644,8 @@ def build_extracted(
         record(
             "personal_effects_payload_kilograms",
             f"{product.derived_payload_kilograms}kg, derived as MTPLM-min minus the mass "
-            f"in running order. Adria's own 'Max loading weight' of "
-            f"{figures.published_max_loading}kg is NOT this figure — it further deducts "
-            f"the All Inclusive Pack — and is deliberately not recorded",
+            f"in running order. {_own_payload_clause(figures)}"
+            f"{_uprate_payload_clause(figures)}",
         )
         record(
             "optional_equipment_payload_kilograms",
@@ -674,6 +783,18 @@ def collect(
                     f"{live.berths} berths, "
                     f"payload {caravan.derived_payload_kilograms}kg"
                 )
+                uprate = caravan.figures.uprate_fitted_kilograms
+                if uprate is not None and uprate == caravan.figures.get(
+                    "mtplm_kilograms"
+                ):
+                    on_progress(
+                        f"{prefix} — ONE MASS, AND IT IS THE UPRATED ONE: Adria print "
+                        f"{uprate}kg as the maximum, the MTPLM-min and the optional "
+                        f"increase alike, and list `Increased MTPLM to {uprate} kg` as "
+                        f"fitted to this configuration. There is no base-vehicle figure "
+                        f"to prefer, so it is recorded and the payload rises with it. "
+                        f"Check it against what FMLV holds before approving"
+                    )
 
     if tba:
         on_progress(
@@ -694,13 +815,18 @@ def collect(
     )
     on_progress(
         "PAYLOAD IS DERIVED as MTPLM-min minus the mass in running order, which is what "
-        "FMLV holds. Adria's own 'Max loading weight' further deducts the All Inclusive "
-        "Pack and is never recorded. Note also that the permissible mass read is the "
-        "MINIMUM, not the maximum on the line above it: FMLV records the base vehicle, "
-        "and the two differ on five of the eight readable layouts."
+        "FMLV holds. Adria's own user payload further deducts the All Inclusive Pack and "
+        "is never recorded. The permissible mass read is the MINIMUM, not the maximum on "
+        "the line above it: FMLV records the base vehicle, and the two differ on most "
+        "layouts. Where a sheet prints only ONE permissible mass there is nothing to "
+        "choose between, and the line above says so for that caravan by name."
     )
 
-    if seen != EXPECTED_LAYOUTS:
+    # **Only meaningful across the whole roster.** `EXPECTED_LAYOUTS` counts all four
+    # ranges, so a `--range alpina` run would otherwise report "expected 9 and the site
+    # offered 2" every time and teach a reviewer to ignore the one line that catches a
+    # genuine drop.
+    if ranges == DEFAULT_RANGES and seen != EXPECTED_LAYOUTS:
         on_progress(
             f"expected {EXPECTED_LAYOUTS} configurations across the four ranges and the "
             f"site offered {seen} — check whether the range has changed"
