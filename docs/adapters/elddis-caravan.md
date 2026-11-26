@@ -121,7 +121,9 @@ on.
 Two edits on the existing row 13, `Elddis (EHG UK)`, made 26 November 2026:
 
 * `ncc_supplier_name_caravan` is **`Elddis Caravans`** — read off the NCC dropdown and
-  confirmed by the requester, not guessed. `ncc_supplier_name` stays `Elddis Motorhomes`.
+  confirmed by the requester, not guessed. `ncc_supplier_name` was left as
+  `Elddis Motorhomes` on the day and **corrected to `Elddis Campervans` later the
+  same day** — see below.
 * `categories` is **`motorhome,caravan`**.
 
 **`Elddis Campervans` is deliberately unused.** The GTV campervans sit in the *motorhome*

@@ -1,7 +1,7 @@
 # Elddis — site survey and adapter notes
 
 Surveyed 21 August 2026. `manufacturer_id` **8**, `fmlv_manufacturer` **`Elddis (EHG UK)`**,
-`ncc_supplier_name` **`Elddis Motorhomes`** (both confirmed against the real export, not guessed).
+`ncc_supplier_name` **`Elddis Campervans`** (both confirmed against the real export, not guessed) — it was `Elddis Motorhomes` until 26 November 2026, see *The supplier entry moved with the range* below.
 
 Elddis is the British arm of Erwin Hymer Group UK Ltd, built at Consett, County Durham. It is
 **not** a "non-core brand" in the sense `README.md` describes — there is no European parent
@@ -22,8 +22,10 @@ their site.
 Francis gave this over the course of the survey rather than up front:
 
 - **The site**: `https://elddis.co.uk/` — correct, and the only source needed.
-- **`ncc_supplier_name` is `Elddis Motorhomes`** — confirmed working; `fetch-export` logged in
-  and downloaded on the first attempt.
+- **`ncc_supplier_name` was `Elddis Motorhomes`** — confirmed working in August 2026;
+  `fetch-export` logged in and downloaded on the first attempt. It stopped being the
+  right entry when the range was replaced; see *The supplier entry moved with the
+  range*.
 - **The manufacturer list names it `Elddis (EHG UK)`**, which settled a three-way ambiguity in
   `resources/manufacturers-full-list.csv` (see below).
 - **Scope is the Elddis brand only, motorhomes and campervans.** Elddis caravans are out of
@@ -817,3 +819,33 @@ Niesmann + Bischoff do not serve this endpoint at all.
 
 **If FMLV should carry Elddis caravans, that is a new caravan adapter**, not a change
 here — the data is in the same API and `EXPECTED_LAYOUTS` would be the place to start.
+
+## The supplier entry moved with the range — 26 November 2026
+
+`ncc_supplier_name` is now **`Elddis Campervans`**, not `Elddis Motorhomes`.
+
+The NCC dropdown carries three Elddis entries. Through the 2026 range the motorhome one
+was right, and demonstrably so: `Autoquest Apex` held 8 motorhomes and 4 campervans in a
+single export, so the campervans plainly did not need an entry of their own. When the
+caravan adapter was written earlier the same day, `Elddis Campervans` timed out twice
+rather than returning anything, and was written off as "probably empty or duplicative".
+
+It was neither. On the third attempt it returned **all 18 of the 2027 layouts** —
+product ids 9177–9194, model year 2027, `archived = No`, `active = Yes`, across
+`Autoquest GT`/`GTS`/`GTV` and `Whirlwind GT`/`GTS`/`GTV`. That is `EXPECTED_LAYOUTS`
+exactly, so the whole live range sits there and nothing is left behind. `Elddis
+Motorhomes` now returns nothing at all.
+
+**What it cost.** A VM run against the stale label fetched an empty baseline, found
+nothing to match against, and proposed all 18 live products as new. The numbers were
+individually correct and the CLAUDE.md rename check cleared them, because there is no
+rename — the products were simply invisible. Uploading that run would have given FMLV 36
+Elddis rows and a deduplication job.
+
+**Two things to carry elsewhere.** A timeout is not evidence that a supplier entry is
+empty; it is no evidence at all, and the entry has to be read before it can be ruled out.
+And where a brand holds several supplier entries, the arrangement that held for last
+season's range does not survive a range replacement — October replaced every Elddis model
+name, and the products were re-filed at the same time. Both are now in
+`docs/adapters/README.md`. Panama is the standing precedent for the first half of this:
+one brand, two entries, products hiding in the one nobody read.

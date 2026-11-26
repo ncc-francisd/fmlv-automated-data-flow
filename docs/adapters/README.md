@@ -2690,6 +2690,36 @@ So when a pattern reads one labelled row out of a document:
   permissible mass is not a payload; the tell was there in the number long before anyone
   read the label.
 
+### An empty baseline is a finding, not a starting point
+
+A run that collects the right products against a baseline of **nothing** reports every one
+of them as new, and every number in it can be correct. There is no parsing fault to find,
+the rename check clears, and the proposal looks like a manufacturer who replaced their
+whole range overnight — which does happen, so the shape alone does not give it away.
+
+The baseline comes from one NCC supplier entry, named in the registry's
+`ncc_supplier_name`. **A brand can hold several**, and which one its products sit in is a
+fact about the NCC site, not about the brand. Elddis has three; Panama is in the dropdown
+twice with the importer's entry holding half the range.
+
+So before accepting that a manufacturer has replaced everything:
+
+- **Read the other entries in the dropdown.** Not all of them are named after the product
+  area they hold. Elddis's campervan entry holds the coachbuilts too.
+- **A timeout is not evidence that an entry is empty.** It is no evidence at all. Elddis's
+  campervan entry timed out twice and was written off; on the third attempt it held the
+  entire live range, and a run had meanwhile proposed all 18 of those products as new.
+- **Do not reason from last season's arrangement.** Where products sit is re-decided when
+  they are uploaded, so a range replacement is exactly the moment the filing changes. The
+  entry that was demonstrably right in August was empty by November.
+- **Count against `EXPECTED_LAYOUTS` before repointing.** An entry holding the full
+  expected count is the whole answer; one holding part of it means the range is split and
+  both entries matter.
+
+The upload is where this becomes expensive: the products are already in FMLV, so accepting
+the run creates a second row for each and a deduplication job. **Do not upload a run whose
+baseline was empty until the emptiness itself is explained.**
+
 ## Start here: is there a brochure or price list PDF?
 
 **Ask this before looking at the website's rendering behaviour at all.** It was the
