@@ -1911,6 +1911,27 @@ precisely because nobody browsing the site ever opens it.
 
 ### The website overrules the PDF, and a document's year is what the page says
 
+> **A corollary worth stating outright, Swift, 26 November 2026: a downloaded leaflet may
+> not delete a vehicle the page publishes.** `swift.py` cross-checks its derived payload
+> against the campervan quick guide, and *dropped* the product where the two disagreed.
+> Asked which document wins, the requester answered with the question that settles it:
+> **is the quick guide a download — effectively a brochure?** It is; and the masses the
+> adapter reads are the ones each layout's own pop-up on the live page shows. So the rule
+> above already decided it, and the adapter was not applying it.
+>
+> This cost five products. Swift's 2027 Merlin is a new nine-layout campervan range whose
+> guide and website disagree on five of the nine while four agree to the kilogramme — so
+> it is five wrong numbers in one document, not a units or a basis problem. Five **new**
+> products were withheld from a range FMLV does not hold, and the only trace was a line in
+> the run log.
+>
+> The general shape: **a cross-check earns the right to drop a product only when failing
+> it means the parse is wrong.** Where it instead means two of the manufacturer's
+> documents disagree, the check has found a fact about the manufacturer, and a fact
+> belongs in front of a reviewer rather than in a filter. Ask which it is before wiring a
+> check to `continue`. Swift's own module docstring had the reason already — one JSON
+> object is one vehicle, so there is no join to misalign — and still dropped.
+>
 > **One documented exception, Elddis, 25 August 2026.** The rule below rests on a reason —
 > a PDF is usually the last thing updated, so it is usually the stale one. Where that
 > reason demonstrably does not hold, the rule does not either. Elddis's website publishes
