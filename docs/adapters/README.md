@@ -2650,6 +2650,46 @@ withdrawn, check it against the site rather than against the scope of an email, 
 which base vehicle each existing FMLV row describes — the new figures may belong on new
 rows rather than over the old ones. See [`bilbos.md`](bilbos.md).
 
+### A provenance sentence must branch with the data it describes
+
+Provenance is how a reviewer decides whether to trust a figure, so a sentence that is
+true of most products and false of one is more dangerous than no sentence at all. It
+spends the trust earned on every other row to get the wrong number accepted.
+
+Adria's caravans normally publish two permissible masses, and the provenance said so
+unconditionally: *"NOT the 'Maximum technical permissable laden mass' of Nkg on the line
+above it, which is the uprated chassis — FMLV records the base vehicle."* On the one
+sheet where the maximum and the minimum are the same figure, that sentence claimed to
+have avoided the uprated chassis while recording precisely that.
+
+Write the explanation as a function of the figures, not as a constant. If a clause says
+"NOT the other figure", the code has to have checked there *was* another figure and that
+it differed. Where there is only one, say that instead — and see the rule above on a
+single qualified mass still being the mass.
+
+### A regex that moves to the wrong line is worse than one that stops matching
+
+When a manufacturer relabels a row, the failure to want is a clean miss: the field goes
+blank, nothing is proposed, and somebody investigates. The failure to fear is a loose
+pattern that finds a *different* line and reports it as fact.
+
+Adria renamed `Max loading weight (kg) with …` to `Max loading weight in kg (user
+payload) with …` between model years. The old pattern kept matching, because a bare `Max
+loading weight (kg) 2000` sits further down the same sheet — a table artefact that
+tracks the permissible mass and is not a payload at all. Nothing raised, nothing went
+blank, and the provenance simply began naming the wrong figure.
+
+So when a pattern reads one labelled row out of a document:
+
+- **Anchor on the whole label**, not a fragment of it. `Max loading weight \(kg\)` is a
+  prefix of several lines; `with` was what made it unambiguous.
+- **Add the new wording as a new pattern and keep the old one as a fallback**, tightened
+  so it can only match what it used to. Manufacturers reissue sheets per market and per
+  model year, so both formats are live at once during a changeover.
+- **Sanity-check the value's magnitude against its siblings.** A payload equal to the
+  permissible mass is not a payload; the tell was there in the number long before anyone
+  read the label.
+
 ## Start here: is there a brochure or price list PDF?
 
 **Ask this before looking at the website's rendering behaviour at all.** It was the
