@@ -151,16 +151,27 @@ WITHDRAWN_RANGES: dict[str, str] = {
 #: on the same footing as F-Line, Excel and Imala, which never needed a suffix.
 ADVENTURE_RANGE_LABEL = "Adventure"
 
-#: What the website's "Price from" card adds to the price list's ex-works-including-VAT
-#: figure. **Verified across 25 models** on 2 October 2026: every card in the nine ranges
-#: that have one sits exactly this far above its price-list row (one is a pound out, from
-#: rounding). The price list's own stated government on-the-road charges are GBP455, so
-#: GBP180 of this is Auto-Trail's and is not explained in the document.
+#: What the Adventure's "Price from" card adds to the price list's ex-works-including-VAT
+#: figure, for the fallback that runs only while Auto-Trail have no Adventure cards.
 #:
-#: Used **only** for the Adventure range, which has no card to read. The other nine ranges
-#: read the real figure off the page and never come near this. The first run after
-#: Auto-Trail publish the Adventure cards replaces these with the published price.
-_ON_THE_ROAD_UPLIFT_POUNDS = 635
+#: **GBP455, and it was GBP635 until 28 November 2026.** The GBP635 came from the nine
+#: ranges that do have a card: verified across 25 models on 2 October 2026, every card
+#: sits exactly that far above its price-list row (one a pound out, from rounding). The
+#: price list's stated government charges are GBP455, so GBP180 of it was Auto-Trail's own
+#: and unexplained in the document — presumably delivery.
+#:
+#: Auto-Trail published the Adventure cards on 26 November 2026, and **they do not carry
+#: that GBP180**: 68,500 -> 68,955 and 71,000 -> 71,455, exactly GBP455 on all four. So
+#: the one range this constant was ever used for is the one range the GBP635 was wrong
+#: for, and every Adventure price FMLV held was GBP180 high until the cards replaced it.
+#:
+#: Left at the figure the Adventure's own cards prove rather than the one its siblings
+#: use, because this fallback exists for the case where those cards cannot be read, and
+#: it must not quietly reintroduce the error they just corrected. Note the Adventure page
+#: of the price list states a *third* figure, GBP257, for "Private Heavy Goods (Over
+#: 3,500kg GVW)" — Auto-Trail's own documents disagree, and the website card wins because
+#: FMLV records the maker's headline published price.
+_ON_THE_ROAD_UPLIFT_POUNDS = 455
 
 #: How far the spreadsheet's length may sit from the price list's before the price list
 #: wins. The price list prints metres to 2dp, so a 7288mm vehicle reads as `7.29m` and the

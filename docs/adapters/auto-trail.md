@@ -745,3 +745,39 @@ which test failed, in the words of the rows it failed on.
 Auto-Trail have ended, all three already recorded in `WITHDRAWN_RANGES` and confirmed by
 their marketing executive on 9 November 2026 — Expedition Coachbuilt (4), V-Line SE (4)
 and the Adventure campervans (2). 37 − 10 + 4 = 31.
+
+## The Adventure's on-the-road charge is £455, not £635 — 28 November 2026
+
+Auto-Trail published the Adventure range page on 26 November 2026, so the adapter stopped
+estimating the price and started reading the card like every other range. The four prices
+each fell by **exactly £180**:
+
+| | ex works incl VAT | our estimate | the card | delta |
+|---|---|---|---|---|
+| 64 | £68,500 | £69,135 | **£68,955** | −£180 |
+| 74 | £71,000 | £71,635 | **£71,455** | −£180 |
+| 76 | £71,000 | £71,635 | **£71,455** | −£180 |
+| 76G | £71,000 | £71,635 | **£71,455** | −£180 |
+
+**The change is a correction of ours, not a repricing by Auto-Trail.** The ex-works
+figures in the price list are unchanged; only the uplift was wrong. A uniform delta across
+a whole range, with the maker's own base figures standing still, is the shape of a
+derivation error rather than a price move — a repricing does not land on four models to
+the pound.
+
+The estimate came from the nine ranges that *do* carry a card, where the card sits £635
+above the price-list row on 25 of 25 models. The Adventure page of the price list prints
+no `ON THE ROAD PRICE` column at all, so there was nothing to check it against, and £635
+was the only figure available. It was wrong for this range by the £180 that is
+Auto-Trail's own and has never been explained in the document.
+
+Auto-Trail state **three** different on-the-road totals in one price list: £455 on the
+Expedition Van, V-Line Sport and Excel pages, £257 on the Adventure, Imala and Frontier
+pages for "Private Heavy Goods (Over 3,500kg GVW)", and an unprinted £635 implied by the
+cards. The Adventure's own footnote says £257 and its card charges £455. Their documents
+disagree with each other, so the **card wins** — FMLV records the maker's headline
+published price.
+
+`_ON_THE_ROAD_UPLIFT_POUNDS` is now £455. It is only reachable if the Adventure cards
+cannot be read, and leaving it at £635 would have quietly reintroduced the £180 the cards
+had just corrected.

@@ -119,8 +119,12 @@ def test_the_on_the_road_price_adds_the_verified_uplift() -> None:
     including VAT, checked across 25 models. The Adventure range has no card yet."""
     rows = parse_adventure_price_list(PRICE_LIST)
 
-    assert rows["64"].on_the_road_pounds == 68500 + 635
-    assert rows["74"].on_the_road_pounds == 71000 + 635
+    # GBP455, the government charges the price list states, and NOT the GBP635 the nine
+    # carded ranges sit above their rows. Auto-Trail's Adventure cards, published
+    # 26 November 2026, read 68,955 and 71,455 — exactly GBP455 up, so the extra GBP180
+    # those other ranges carry is not charged on this one.
+    assert rows["64"].on_the_road_pounds == 68500 + 455 == 68955
+    assert rows["74"].on_the_road_pounds == 71000 + 455 == 71455
 
 
 # --- joining the two documents --------------------------------------------------------
