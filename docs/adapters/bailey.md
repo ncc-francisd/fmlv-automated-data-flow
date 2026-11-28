@@ -530,3 +530,15 @@ Two things to carry from the whole episode:
   back; it did nothing about the 1951 already sitting in FMLV. The plausibility floor
   (`validation.MIN_PLAUSIBLE_LENGTH_MM = 4000`) guards what the pipeline *writes*, not
   what FMLV already holds, so it was never going to surface this either.
+
+## The five Ascents re-propose as new, and that is correct — 28 November 2026
+
+Run of 28 November: **27 collected, 5 new, all Ascent** — the same five, in the same
+words, as run #151 on 9 October. Not a fault and not a matching failure. **They have not
+been uploaded to FMLV yet; they are waiting on images.** A product the pipeline cannot
+find in the baseline is new, and it will say so on every run until the upload lands.
+
+The trap is the window *after* the upload and *before* activation. `baseline_for` drops
+inactive rows, so a freshly uploaded Ascent that is still waiting on its photographs is
+invisible to the run and comes back as new a second time — and uploading that CSV would
+create five duplicates. Upload once, activate, re-fetch the export, and they match.
