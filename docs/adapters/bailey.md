@@ -503,3 +503,30 @@ classified  6 changed, 16 unchanged, 5 new, 2 disappeared
 The 5 new are exactly the 5 Ascent layouts, and nothing disappeared to match them — so
 this is a new range, not a rename. The 2 disappeared are **Endeavour B63 and B64**, both
 of which now return a genuine 404.
+
+## Bailey fixed the B65 length, and the proposal reversed — 28 November 2026
+
+`Endeavour B65` now publishes **`Overall Body Length: 5.980m / 19'7"`** — in the summary
+block and in the technical specification, three occurrences, matching the comparison
+table that was right all along and matching its B62 and B68 siblings.
+
+So the standing instruction above is spent. The run no longer proposes `5980 -> 1951`;
+it proposes **`1951 -> 5980`, and that is to be accepted.** FMLV holds the wrong figure
+today, which means the 4 September correction did not survive — either a later run's
+`-> 1951` was accepted rather than rejected, or the correction never reached an upload.
+Nothing about Bailey's page is wrong any more; ours is.
+
+**What 1.951m actually is: Internal Headroom.** It is still on all three Endeavour pages,
+unchanged, and it is identical across B62, B65 and B68. Bailey's mistake was repeating
+one row's figure into another row on one of three otherwise identical pages — which is
+why no sibling disagreed with it and why nothing in the parse could have caught it.
+
+Two things to carry from the whole episode:
+
+- **A published figure can be wrong, be accepted, and then go quiet.** Once accepted it
+  reports as verified-unchanged and never returns to a reviewer. It took a human reading
+  the page to notice, three months after the fact.
+- **A rejection is not a correction.** Rejecting `-> 1951` stopped the proposal coming
+  back; it did nothing about the 1951 already sitting in FMLV. The plausibility floor
+  (`validation.MIN_PLAUSIBLE_LENGTH_MM = 4000`) guards what the pipeline *writes*, not
+  what FMLV already holds, so it was never going to surface this either.
